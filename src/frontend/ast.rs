@@ -11,17 +11,18 @@
 //! ```
 //! AST definition:
 //! ```
-//! let program: Program = Program(vec![], vec![
+//! let program = Program(vec![], vec![
 //!         Stat::Assign(
 //!             AssignLhs::Var(A),
 //!             AssignRhs::Expr(
-//!                 ExprKind::BinOp(
-//!                     ExprKind::Int(9),
+//!                 Expr::BinOp(
+//!                     Box::new(Expr::Int(9)),
 //!                     BinOp::Mul,
-//!                     ExprKind::BinOp(
+//!                     Box::new(
+//!                         Expr::BinOp(
 //!                         Int 3,
 //!                         BinOp::Add,
-//!                         Int 7
+//!                         Int 7)
 //!                     )
 //!                 )
 //!             )
@@ -42,7 +43,7 @@
 //! ```
 //! AST definition:
 //! ```
-//! let aa = Program(vec![
+//! Program(vec![
 //! Function(Type::Int, String::from("function_name"),
 //!     vec![ Param(Type::Int, String::from("a"))],
 //!     vec![
@@ -60,7 +61,6 @@
 //!         AssignRhs::Call(String::from("function_name"), vec![Expr::Int(6)]))
 //! ]);
 //! ```
-//!
 
 /// Type specification in WACC.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -88,17 +88,46 @@ pub enum Type {
 /// An index into an array variable in WACC. The first argument specifies the
 /// name of the variable, and the second the indicies to the array dimensions.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct ArrayElem(String, Vec<ExprKind>);
+pub struct ArrayElem(String, Vec<Expr>);
 
+/// All unary operators supported by WACC and used in [expressions](Expr).
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum UnOp {
+    /// Logical negation
+    /// ```text
+    /// bool a = ! true ;
+    /// bool b = ! (a && true) ;
+    /// ```
     Neg,
+
+    /// Integer negation
+    /// ```text
+    /// int a = -3 ;
+    /// int b = -(a * 4) ;
+    /// ```
     Minus,
+
+    /// Gets the length of an array as an integer.
+    /// ```text
+    /// int[] arr = [1,2,3,4] ;
+    /// int arr_length = len arr ;
+    /// ```
     Len,
+
+    /// Gets the ascii value associated with a character as an integer.
+    /// ```text
+    /// int a = ord 'a' ;
+    /// ```
     Ord,
+
+    /// Gets the character associated with a given integer ascii value.
+    /// ```text
+    /// char a = chr 97 ;
+    /// ```
     Chr,
 }
 
+/// Binary Operators supported by WACC available for use in [expressions](Expr).
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum BinOp {
     Add,
@@ -117,36 +146,73 @@ pub enum BinOp {
 }
 
 /// Expression Data Type
-/// ```
 ///
+/// # Examples:
+/// ## Example of nested binary operators
+/// ```text
+/// (4 - 3) + (9 * 7)
+/// ```
+/// ```
+/// Expr::BinOp(
+///     Box::new(
+///         Expr::BinOp(
+///             Box::new(Expr::Int(4)),
+///             BinOp::Sub,
+///             Box::new(Expr::Int(3))
+///         ),
+///         BinOp::Add,
+///         Expr::BinOp(
+///             Box::new(Expr::Int(9)),
+///             BinOp::Mul,
+///             Box::new(Expr::Int(7))
+///         )
+///     )
+/// )
 /// ```  
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum ExprKind {
+pub enum Expr {
+    Null,
     Int(u32),
     Bool(bool),
     Char(char),
     String(String),
-    Null,
     Var(String),
     ArrayElem(ArrayElem),
-    UnOp(UnOp, Box<ExprKind>),
-    BinOp(Box<ExprKind>, BinOp, Box<ExprKind>),
+
+    /// Unary operator application determined by the [UnOp enum](Unop).
+    UnOp(UnOp, Box<Expr>),
+
+    /// Binary operator application determined by the [BinOp enum](BinOp).
+    BinOp(Box<Expr>, BinOp, Box<Expr>),
 }
 
+/// Lefthand side of assignments.
+/// ```text
+/// AssignLHS = AssignRHS ;
+/// ```
 pub enum AssignLhs {
     Var(String),
     ArrayElem(ArrayElem),
-    PairFst(ExprKind),
-    PairSnd(ExprKind),
+    PairFst(Expr),
+    PairSnd(Expr),
 }
 
+/// Righthand side of assignments.
+/// ```text
+/// AssignLHS = AssignRHS ;
+/// ```
 pub enum AssignRhs {
-    Expr(ExprKind),
-    Array(Vec<ExprKind>),
-    NewPair(ExprKind, ExprKind),
-    PairFst(ExprKind),
-    PairSnd(ExprKind),
-    Call(String, Vec<ExprKind>),
+    /// Assigns an [expression](Expr)
+    /// ```
+    /// AssignLHS = AssignRHS ;
+    /// ```
+    Expr(Expr),
+
+    Array(Vec<Expr>),
+    NewPair(Expr, Expr),
+    PairFst(Expr),
+    PairSnd(Expr),
+    Call(String, Vec<Expr>),
 }
 
 pub enum Stat {
@@ -154,18 +220,42 @@ pub enum Stat {
     Def(Type, String, AssignRhs),
     Assign(AssignLhs, AssignRhs),
     Read(AssignLhs),
-    Free(ExprKind),
-    Return(ExprKind),
-    Exit(ExprKind),
-    Print(ExprKind),
-    PrintLn(ExprKind),
-    If(ExprKind, Vec<Stat>, Vec<Stat>),
-    While(ExprKind, Vec<Stat>),
-    Scope(Vec<Stat>),
+    Free(Expr),
+    Return(Expr),
+    Exit(Expr),
+    Print(Expr),
+    PrintLn(Expr),
+    If(Expr, Body, Body),
+    While(Expr, Body),
+    Scope(Body),
 }
 
-pub struct Param(Type, String);
+pub struct Body(pub Vec<Stat>); // Will also contain a symbol table
 
-pub struct Function(Type, String, Vec<Param>, Vec<Stat>);
+pub struct Param(pub Type, pub String);
 
-pub struct Program(Vec<Function>, Vec<Stat>);
+pub struct Function(pub Type, pub String, pub Vec<Param>, pub Body);
+
+pub struct Program(pub Vec<Function>, pub Body);
+
+use std::collections::HashMap;
+use std::rc::{Rc, Weak};
+struct SymbolTableContents<T>(HashMap<String, T>, Option<Weak<SymbolTable<T>>>);
+
+pub struct SymbolTable<T>(Rc<SymbolTableContents<T>>);
+
+impl<T> SymbolTable<T> {
+    /// Search symbol table for an identifier, including all parent symbol tables/scopes.
+    fn find(&self, ident: &str) -> Option<&T> {
+        unimplemented!();
+        let SymbolTableContents(ref hash_map, ref parent) = *(self.0);
+        if let Some(val) = hash_map.get(ident) {
+            return Some(val);
+        }
+        if let Some(ref parent) = parent {
+            parent.upgrade().unwrap().clone().find(ident)
+        } else {
+            None
+        }
+    }
+}
