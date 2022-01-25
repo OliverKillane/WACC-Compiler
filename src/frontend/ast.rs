@@ -446,16 +446,16 @@ pub struct SymbolTable<'a, T> {
 /// ```
 impl<'a, T> SymbolTable<'a, T> {
     /// Create a new empty symbol table with no parent scopes.
-    fn new() -> SymbolTable<'a, T> {
-        SymbolTable {
+    fn new() -> Self {
+        Self {
             scope: HashMap::new(),
             parent: None,
         }
     }
 
     /// Create a new empty symbol table with a parent scope.
-    fn new_child(parent: Rc<SymbolTable<'a, T>>) -> SymbolTable<'a, T> {
-        SymbolTable::<'a, T> {
+    fn new_child(parent: Rc<Self>) -> Self {
+        Self {
             scope: HashMap::new(),
             parent: Some(parent),
         }
