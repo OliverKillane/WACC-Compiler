@@ -420,6 +420,7 @@ use std::rc::Rc;
 
 /// Symbol Table data structure linked to the parent symbol tables for parent
 /// scopes.
+#[derive(Debug)]
 pub struct SymbolTable<'a, T> {
     scope: HashMap<&'a str, T>,
     parent: Option<Rc<SymbolTable<'a, T>>>,
@@ -482,6 +483,20 @@ impl<'a, T> SymbolTable<'a, T> {
     /// assert_eq!(child.find("foo"), Some(&Type::Bool));
     /// ```
     fn find(&self, ident: &'a str) -> Option<&T> {
+        match self.scope.get(ident) {
+            Some(a) => Some(a),
+            None => match &self.parent {
+                Some(p) => p.find(ident),
+                None => None,
+            },
+        }
+    }
+
+    fn find_iter(&self, ident: &'a str) -> Option<&T> {
+        self.iter().find_map(|v| v.scope.get(ident))
+    }
+
+    fn find_loop(&self, ident: &'a str) -> Option<&T> {
         let mut symbol_table = self;
 
         loop {
@@ -493,20 +508,61 @@ impl<'a, T> SymbolTable<'a, T> {
                 },
             }
         }
+    }
 
-        // match self.scope.get(ident) {
-        //     Some(a) => Some(a),
-        //     None => match &self.parent {
-        //         Some(p) => p.find(ident),
-        //         None => None,
-        //     },
-        // }
+    fn iter(&self) -> SymbolTableIter<'_, 'a, T> {
+        SymbolTableIter(Some(self))
+    }
+}
+
+struct SymbolTableIter<'b, 'a, T>(Option<&'b SymbolTable<'a, T>>);
+
+impl<'b, 'a, T> Iterator for SymbolTableIter<'b, 'a, T> {
+    type Item = &'b SymbolTable<'a, T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.0 {
+            Some(st) => { 
+                let ret = self.0;
+                self.0 = st.parent.as_ref().map(Rc::as_ref);
+                ret
+            },
+            None => None
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn symbol_table_iter() {
+        let mut grandfather = SymbolTable::<Type>::new();
+        grandfather.add("var1", Type::Bool);
+        let g_rc = Rc::new(grandfather);
+
+        let mut parent = SymbolTable::<Type>::new_child(g_rc);
+        parent.add("var2", Type::Int);
+        let p_rc = Rc::new(parent);
+
+        let mut child1 = SymbolTable::<Type>::new_child(p_rc.clone());
+        child1.add("var1", Type::Int);
+        
+        let mut child2 = SymbolTable::<Type>::new_child(p_rc.clone());
+        child2.add("var2", Type::Bool);
+
+        let child3 = SymbolTable::<Type>::new_child(p_rc.clone());
+
+        assert_eq!(child1.iter().find_map(|v| v.scope.get("var1")), Some(&Type::Int));
+        assert_eq!(child1.iter().find_map(|v| v.scope.get("var2")), Some(&Type::Int));
+
+        assert_eq!(child2.iter().find_map(|v| v.scope.get("var1")), Some(&Type::Bool));
+        assert_eq!(child2.iter().find_map(|v| v.scope.get("var2")), Some(&Type::Bool));
+
+        assert_eq!(child3.iter().find_map(|v| v.scope.get("var1")), Some(&Type::Bool));
+        assert_eq!(child3.iter().find_map(|v| v.scope.get("var2")), Some(&Type::Int));
+    }
 
     #[test]
     fn new_scope_is_empty() {
