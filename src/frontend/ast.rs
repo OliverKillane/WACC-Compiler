@@ -86,7 +86,7 @@ pub enum Type {
 }
 
 /// An index into an array variable in WACC. The first argument specifies the
-/// name of the variable, and the second the indicies to the array dimensions.
+/// name of the variable, and the second the indices to the array dimensions.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct ArrayElem(String, Vec<Expr>);
 
@@ -130,18 +130,43 @@ pub enum UnOp {
 /// Binary Operators supported by WACC available for use in [expressions](Expr).
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum BinOp {
+    // Integer addition (+).
     Add,
+    
+    // Integer subtraction(-).
     Sub,
+
+    // Integer multipication (*).
     Mul,
+    
+    // Integer division (/).
     Div,
+    
+    // Integer modulus.
     Mod,
+    
+    // Comparison greater-than (>).
     Gt,
+    
+    // Comparison greater-than or equal (>=).
     Gte,
+    
+    // Comparison less-than (<).
     Lt,
+    
+    // Comparison less-than or equal (<=).
     Lte,
+    
+    // Comparison equality (==).
     Eq,
+    
+    // Comparison not equal (!=).
     Ne,
+    
+    // Logical conjunction/and (&&).
     And,
+    
+    // Logical disjunction/or (||).
     Or,
 }
 
@@ -179,7 +204,7 @@ pub enum Expr {
     Var(String),
     ArrayElem(ArrayElem),
 
-    /// Unary operator application determined by the [UnOp enum](Unop).
+    /// Unary operator application determined by the [UnOp enum](UnOp).
     UnOp(UnOp, Box<Expr>),
 
     /// Binary operator application determined by the [BinOp enum](BinOp).
@@ -267,28 +292,126 @@ pub enum AssignRhs {
     Call(String, Vec<Expr>),
 }
 
-/// Statements
+/// Statements for assignment, control flow and definitions.
 pub enum Stat {
+    /// A _no-operation_ instruction.
     Skip,
+
+    /// Function Definition
+    /// ```text
+    /// int function(int a, int b) is
+    ///     skip ;
+    ///     return a * 2 + b
+    /// end
+    /// ```
     Def(Type, String, AssignRhs),
+
+    /// Assignment (to variable, parts of pairs or arrays).
+    /// ```text
+    /// int a = 9 ;
+    /// ```
+    /// ```text
+    /// int[] arr = [1,2,3,4] ;
+    /// a[1] = call function(3, 4) ;
+    /// ```
     Assign(AssignLhs, AssignRhs),
+
+    /// Read from standard input.
+    /// ```text
+    /// int a = 9 ;
+    /// read a;
+    /// ```
     Read(AssignLhs),
+
+    /// Free dynamically allocated data structures.
+    /// ```text
+    /// pair(int, int) a_pair = newpair(3,3) ;
+    /// free a_pair ;
+    /// ```
     Free(Expr),
+
+    /// Return value from a subroutine/function.
+    /// ```text
+    /// int double(int b) is
+    ///     return 2 * b
+    /// end
+    /// ```
     Return(Expr),
+
+    /// End the program and return the exit code.
+    /// ```text
+    /// exit 0 ;
+    /// ```
     Exit(Expr),
+
+    /// Print text to the console.
+    /// ```text
+    /// int a = 'a' ;
+    /// print a ;
+    /// ```
     Print(Expr),
+
+    /// Print text to the console and start a new line.
+    /// ```text
+    /// int a = 'a' ;
+    /// print a + 9 ;
+    /// ```
     PrintLn(Expr),
+
+    /// If-Else statement to alter control flow.
+    /// ```text
+    /// 
+    /// if 3 = 4 - 1
+    /// then
+    ///     print 'a'
+    /// else
+    ///     print 'b'
+    /// fi ;
+    /// ```
     If(Expr, Body, Body),
+
+
+    /// While Loop control flow structure.
+    /// ```text
+    /// int n = 0 ;
+    /// while n < 10 do
+    ///     n = n + 1
+    /// done ;
+    /// ```
     While(Expr, Body),
+
+    /// Scope statement for begin-end delimited blocks of statements.
     Scope(Body),
 }
 
+/// Body stores a symbol table associated and an block of code.
 pub struct Body(pub Vec<Stat>); // Will also contain a symbol table
 
+
+/// Formal parameter used in functions.
 pub struct Param(pub Type, pub String);
 
+/// Function definition with return type, name, parameters and the code body.
+/// ```text
+/// int sum(int, a, int, b, int c) is
+///     return a + b + c
+/// end
+/// ```
 pub struct Function(pub Type, pub String, pub Vec<Param>, pub Body);
 
+/// Program is the root of the abstract syntax tree, containing all function 
+/// definitions and the main program body.
+/// ```text
+/// begin
+///     int fun(char a) is
+///         int x = ord a ;
+///         return x 
+///     end
+/// 
+///     int i = fun('a') ;
+///      exit 0
+/// end
+/// ```
 pub struct Program(pub Vec<Function>, pub Body);
 
 use std::collections::HashMap;
@@ -317,7 +440,7 @@ pub struct SymbolTable<'a, T> {
 /// // New symbol addition is successful
 /// assert_eq!(symbols.add(&a[18..19], Type::Char), None);
 ///
-/// // Can find symbols in synbol table
+/// // Can find symbols in symbol table
 /// assert_eq!(symbols.find("var"), Some(&Type::Bool));
 /// assert_eq!(symbols.find("b"), Some(&Type::Char));
 /// ```
@@ -339,15 +462,15 @@ impl<'a, T> SymbolTable<'a, T> {
     }
 
     /// Add a new symbol and value to the symbol table. If the symbol is not
-    /// yet in the current scope, return none. Else the typedata of the token
+    /// yet in the current scope, return none. Else the type_data of the token
     /// in the table is returned.
     /// ```
     /// let mut symbols = SymbolTable::<Type>::new();
     /// assert_eq!(symbols.add("variable1", Type::Char), None);
     /// assert_eq!(symbols.add("variable1", Type::Int), Some(Type::Char));
     /// ```
-    fn add(&mut self, ident: &'a str, typedata: T) -> Option<T> {
-        self.scope.insert(ident, typedata)
+    fn add(&mut self, ident: &'a str, type_data: T) -> Option<T> {
+        self.scope.insert(ident, type_data)
     }
 
     /// Search symbol table for an identifier, including all parent symbol
