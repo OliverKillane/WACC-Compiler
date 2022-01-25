@@ -482,13 +482,25 @@ impl<'a, T> SymbolTable<'a, T> {
     /// assert_eq!(child.find("foo"), Some(&Type::Bool));
     /// ```
     fn find(&self, ident: &'a str) -> Option<&T> {
-        match self.scope.get(ident) {
-            Some(a) => Some(a),
-            None => match &self.parent {
-                Some(p) => p.find(ident),
-                None => None,
-            },
+        let mut symbol_table = self;
+
+        loop {
+            match symbol_table.scope.get(ident) {
+                Some(a) => break Some(a),
+                None => match &symbol_table.parent {
+                    Some(p) => symbol_table = p,
+                    None => break None,
+                },
+            }
         }
+
+        // match self.scope.get(ident) {
+        //     Some(a) => Some(a),
+        //     None => match &self.parent {
+        //         Some(p) => p.find(ident),
+        //         None => None,
+        //     },
+        // }
     }
 }
 
