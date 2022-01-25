@@ -1,7 +1,7 @@
 #![warn(missing_docs)]
 #![doc(html_logo_url = "https://i.imgur.com/cBcRWvM.png")]
 //! The group 33 WACC Compiler project.
-//! 
+//!
 //! Lovingly developed by:
 //! - Jordan Hall
 //! - Bartłomiej Cieślar\
