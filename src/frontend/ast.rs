@@ -24,19 +24,19 @@
 //! Program(
 //!     vec![],
 //!     vec![
-//!         Stat("int a = 9 * (3 + 7)", StatCode::Def(
+//!         WrapSpan("int a = 9 * (3 + 7)", Stat::Def(
 //!             Type::Int,
 //!             "a",
 //!             AssignRhs::Expr(
-//!                 Expr(
+//!                 WrapSpan(
 //!                 "9 * (3 + 7)",
-//!                 ExprCode::BinOp(
-//!                     Box::from(Expr("9", ExprCode::Int(9))),
+//!                 Expr::BinOp(
+//!                     Box::from(WrapSpan("9", Expr::Int(9))),
 //!                     BinOp::Mul,
-//!                     Box::from(Expr("(3 + 7)", ExprCode::BinOp(
-//!                         Box::from(Expr("3", ExprCode::Int(3))),
+//!                     Box::from(WrapSpan("(3 + 7)", Expr::BinOp(
+//!                         Box::from(WrapSpan("3", Expr::Int(3))),
 //!                         BinOp::Add,
-//!                         Box::from(Expr("7", ExprCode::Int(7)))
+//!                         Box::from(WrapSpan("7", Expr::Int(7)))
 //!                     )))
 //!                 ))
 //!             )
@@ -59,36 +59,43 @@
 //! AST definition:
 //! ```
 //! Program(
-//!     vec![Function(
+//!     vec![WrapSpan(
 //!         "function_name(int a)",
-//!         Type::Int,
-//!         String::from("function_name"),
-//!         vec![Param("int a", Type::Int, "a")],
-//!         vec![Stat(
-//!             "return a + 9",
-//!             StatCode::Return(Expr(
-//!                 "a + 9",
-//!                 ExprCode::BinOp(
-//!                     Box::from(Expr("a", ExprCode::Var("a"))),
-//!                     BinOp::Add,
-//!                     Box::from(Expr("9", ExprCode::Int(9))),
-//!                 ),
-//!             )),
-//!         )],
+//!         Function(
+//!             Type::Int,
+//!             String::from("function_name"),
+//!             vec![Param("int a", Type::Int, "a")],
+//!             vec![Stat(
+//!                 "return a + 9",
+//!                 StatCode::Return(Expr(
+//!                     "a + 9",
+//!                     ExprCode::BinOp(
+//!                         Box::from(Expr("a", ExprCode::Var("a"))),
+//!                         BinOp::Add,
+//!                         Box::from(Expr("9", ExprCode::Int(9))),
+//!                     ),
+//!                 )),
+//!             )],
+//!         )
 //!     )],
-//!     vec![Stat(
+//!     vec![WrapSpan(
 //!         "int variable = call function_name(6)",
-//!         StatCode::Def(
+//!         Stat::Def(
 //!             Type::Int,
 //!             "variable",
 //!             AssignRhs::Call(
 //!                 String::from("function_name"),
-//!                 vec![Expr("6", ExprCode::Int(6))],
+//!                 vec![WrapSpan("6", Expr::Int(6))],
 //!             ),
 //!         ),
 //!     )],
 //! );
 //! ```
+
+/// A wrapper for AST nodes containing the span of the original code for which
+/// the wrapped structure represents.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct WrapSpan<'a, T>(pub &'a str, pub T);
 
 /// Type specification in WACC.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -183,33 +190,33 @@ pub enum BinOp {
 /// (4 - 3) + (9 * 7)
 /// ```
 /// ```
-/// Expr("(4 - 3) + (9 * 7)", ExprCode::BinOp(
-///     Box::from(Expr("4 - 3", ExprCode::BinOp(
-///         Box::from(Expr("4", ExprCode::Int(4))),
+/// WrapSpan("(4 - 3) + (9 * 7)", Expr::BinOp(
+///     Box::from(WrapSpan("4 - 3", Expr=::BinOp(
+///         Box::from(WrapSpan("4", Expr::Int(4))),
 ///         BinOp::Sub,
-///         Box::from(Expr("3", ExprCode::Int(3)))
+///         Box::from(WrapSpan("3", Expr::Int(3)))
 ///     ))),
 ///     BinOp::Add,
-///     Box::from(Expr("9 * 7", ExprCode::BinOp(
-///         Box::from(Expr("9", ExprCode::Int(9))),
+///     Box::from(WrapSpan("9 * 7", Expr::BinOp(
+///         Box::from(WrapSpan("9", Expr::Int(9))),
 ///         BinOp::Mul,
-///         Box::from(Expr("7", ExprCode::Int(7)))
+///         Box::from(WrapSpan("7", Expr::Int(7)))
 ///     ))),
 /// ))
 /// ```  
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum ExprCode<'a, IdRepr> {
+pub enum Expr<'a, IdRepr> {
     /// null value that can be used for pair values.
     /// ```text
     /// pair(int, int) example = null
     /// ```
     /// ```
-    /// Stat(
+    /// WrapSpan(
     ///     "pair(int, int) example = null",
-    ///     StatCode::Def(
+    ///     Stat::Def(
     ///         Type::Pair(Box::from(Type::Int), Box::from(Type::Int)),
     ///         "example",
-    ///         AssignRhs::Expr(Expr("null", ExprCode::Null)),
+    ///         AssignRhs::Expr(WrapSpan("null", Expr::Null)),
     ///     ),
     /// )
     /// ```
@@ -220,12 +227,12 @@ pub enum ExprCode<'a, IdRepr> {
     /// int a = 9
     /// ```
     /// ```
-    /// Stat(
+    /// WrapSpan(
     ///     "int a = 9",
-    ///     StatCode::Def(
+    ///     Stat::Def(
     ///         Type::Bool,
     ///         "a",
-    ///         AssignRhs::Expr(Expr("9", ExprCode::Int(9))),
+    ///         AssignRhs::Expr(WrapSpan("9", Expr::Int(9))),
     ///     ),
     /// );
     /// ```
@@ -236,12 +243,12 @@ pub enum ExprCode<'a, IdRepr> {
     /// bool a = true
     /// ```
     /// ```
-    /// Stat(
+    /// WrapSpan(
     ///     "bool a = true",
-    ///     StatCode::Def(
+    ///     Stat::Def(
     ///         Type::Bool,
     ///         "a",
-    ///         AssignRhs::Expr(Expr("true", ExprCode::Bool(true))),
+    ///         AssignRhs::Expr(WrapSpan("true", Expr::Bool(true))),
     ///     ),
     /// );
     /// ```
@@ -252,28 +259,28 @@ pub enum ExprCode<'a, IdRepr> {
     /// char a = 'a'
     /// ```
     /// ```
-    /// Stat(
+    /// WrapSpan(
     ///     "int a = 'a'",
-    ///     StatCode::Def(
+    ///     Stat::Def(
     ///         Type::Int,
     ///         "a",
-    ///         AssignRhs::Expr(Expr("'a'", ExprCode::Char('a'))),
+    ///         AssignRhs::Expr(WrapSpan("'a'", Expr::Char('a'))),
     ///     ),
     /// );
     /// ```
     Char(char),
 
     /// String Constants
-    /// ``text
+    /// ```text
     /// string a = "hello world"
     /// ```
     /// ```
-    /// Stat(
+    /// WrapSpan(
     ///     "string a = \"hello world\"",
-    ///     StatCode::Def(
+    ///     Stat::Def(
     ///         Type::Int,
     ///         "a",
-    ///         AssignRhs::Expr(Expr("\"hello world\"", ExprCode::String(String::from("hello world")))),
+    ///         AssignRhs::Expr(WrapSpan("\"hello world\"", Expr::String(String::from("hello world")))),
     ///     ),
     /// );
     /// ```
@@ -286,16 +293,16 @@ pub enum ExprCode<'a, IdRepr> {
     /// ```
     /// ```
     /// vec![
-    ///     Stat(
+    ///     WrapSpan(
     ///         "int a = 7",
-    ///         StatCode::Def(Type::Int, "a", AssignRhs::Expr(Expr("7", ExprCode::Int(7)))),
+    ///         Stat::Def(Type::Int, "a", AssignRhs::Expr(WrapSpan("7", Expr::Int(7)))),
     ///     ),
-    ///     Stat(
+    ///     WrapSpan(
     ///         "int b = a",
-    ///         StatCode::Def(
+    ///         Stat::Def(
     ///             Type::Int,
     ///             "b",
-    ///             AssignRhs::Expr(Expr("a", ExprCode::Var("a"))),
+    ///             AssignRhs::Expr(WrapSpan("a", Expr::Var("a"))),
     ///         ),
     ///     ),
     /// ];
@@ -308,34 +315,33 @@ pub enum ExprCode<'a, IdRepr> {
     /// int a = b[3][5] ;
     /// ```
     /// ```
-    /// Stat(
+    /// WrapSpan(
     ///     "int a = b[3][5]",
-    ///     StatCode::Def(
+    ///     Stat::Def(
     ///         Type::Int,
     ///         "a",
-    ///         AssignRhs::Expr(Expr(
+    ///         AssignRhs::Expr(WrapSpan(
     ///             "b[3][5]",
-    ///             ExprCode::ArrayElem(
+    ///             Expr::ArrayElem(
     ///                 "b",
-    ///                 vec![Expr("3", ExprCode::Int(3)), Expr("5", ExprCode::Int(5))],
+    ///                 vec![WrapSpan("3", Expr::Int(3)), WrapSpan("5", Expr::Int(5))],
     ///             ),
     ///         )),
     ///     ),
     /// )
     /// ```
-    ArrayElem(IdRepr, Vec<Expr<'a, IdRepr>>),
+    ArrayElem(IdRepr, Vec<WrapSpan<'a, Expr<'a, IdRepr>>>),
 
     /// Unary operator application determined by the [UnOp enum](UnOp).
-    UnOp(UnOp, Box<Expr<'a, IdRepr>>),
+    UnOp(UnOp, Box<WrapSpan<'a, Expr<'a, IdRepr>>>),
 
     /// Binary operator application determined by the [BinOp enum](BinOp).
-    BinOp(Box<Expr<'a, IdRepr>>, BinOp, Box<Expr<'a, IdRepr>>),
+    BinOp(
+        Box<WrapSpan<'a, Expr<'a, IdRepr>>>,
+        BinOp,
+        Box<WrapSpan<'a, Expr<'a, IdRepr>>>,
+    ),
 }
-
-/// Expression containing a span of the expression as well as the expression
-/// code itself.
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Expr<'a, IdRepr>(pub &'a str, pub ExprCode<'a, IdRepr>);
 
 /// Lefthand side of assignments.
 /// ```text
@@ -353,21 +359,21 @@ pub enum AssignLhs<'a, IdRepr> {
     /// int[] a = [1,2,3,4] ;
     /// a[0] = 9 ;
     /// ```
-    ArrayElem(IdRepr, Expr<'a, IdRepr>),
+    ArrayElem(IdRepr, WrapSpan<'a, Expr<'a, IdRepr>>),
 
     /// Assign to the first element of a pair
     /// ```text
     /// pair(int, bool) a = newpair(1, true) ;
     /// fst a = 3 ;
     /// ```
-    PairFst(Expr<'a, IdRepr>),
+    PairFst(WrapSpan<'a, Expr<'a, IdRepr>>),
 
     /// Assign to the second element of a pair
     /// ```text
     /// pair(int, bool) a = newpair(1, true) ;
     /// snd a = false ;
     /// ```
-    PairSnd(Expr<'a, IdRepr>),
+    PairSnd(WrapSpan<'a, Expr<'a, IdRepr>>),
 }
 
 /// Righthand side of assignments.
@@ -379,33 +385,36 @@ pub enum AssignRhs<'a, IdRepr> {
     /// ```text
     /// int a = 3 + (4 * 5) ;
     /// ```
-    Expr(Expr<'a, IdRepr>),
+    Expr(WrapSpan<'a, Expr<'a, IdRepr>>),
 
     /// Array assignment by expressions of the same type.
     /// ```text
     /// int[] int_arr = [2, 3 + 3, 4 * 7, 0] ;
     /// ```
-    Array(Vec<Expr<'a, IdRepr>>),
+    Array(Vec<WrapSpan<'a, Expr<'a, IdRepr>>>),
 
     /// Assigns to a new pair.
     /// ```text
     /// pair(int, bool) a_pair = newpair(3 + 3, true && false) ;
     /// ```
-    NewPair(Expr<'a, IdRepr>, Expr<'a, IdRepr>),
+    NewPair(
+        WrapSpan<'a, Expr<'a, IdRepr>>,
+        WrapSpan<'a, Expr<'a, IdRepr>>,
+    ),
 
     /// Assign the first element of a given pair.
     /// ```text
     /// pair(int, bool) a_pair = newpair(1, true) ;
     /// int a_fst = fst a_pair ;
     /// ```
-    PairFst(Expr<'a, IdRepr>),
+    PairFst(WrapSpan<'a, Expr<'a, IdRepr>>),
 
     /// Assign the second element of a given pair.
     /// ```text
     /// pair(int, bool) a_pair = newpair(1, true) ;
     /// bool a_snd = snd a_pair ;
     /// ```
-    PairSnd(Expr<'a, IdRepr>),
+    PairSnd(WrapSpan<'a, Expr<'a, IdRepr>>),
 
     /// Assign the return value of a function, with arguments.
     /// ```text
@@ -415,12 +424,11 @@ pub enum AssignRhs<'a, IdRepr> {
     ///
     /// int a = add(3,4) ;
     /// ```
-    Call(String, Vec<Expr<'a, IdRepr>>),
+    Call(String, Vec<WrapSpan<'a, Expr<'a, IdRepr>>>),
 }
 
-
 /// Statements for assignment, control flow and definitions.
-pub enum StatCode<'a, IdRepr> {
+pub enum Stat<'a, IdRepr> {
     /// A _no-operation_ instruction.
     Skip,
 
@@ -452,7 +460,7 @@ pub enum StatCode<'a, IdRepr> {
     /// pair(int, int) a_pair = newpair(3,3) ;
     /// free a_pair ;
     /// ```
-    Free(Expr<'a, IdRepr>),
+    Free(WrapSpan<'a, Expr<'a, IdRepr>>),
 
     /// Return value from a subroutine/function.
     /// ```text
@@ -460,27 +468,27 @@ pub enum StatCode<'a, IdRepr> {
     ///     return 2 * b
     /// end
     /// ```
-    Return(Expr<'a, IdRepr>),
+    Return(WrapSpan<'a, Expr<'a, IdRepr>>),
 
     /// End the program and return the exit code.
     /// ```text
     /// exit 0 ;
     /// ```
-    Exit(Expr<'a, IdRepr>),
+    Exit(WrapSpan<'a, Expr<'a, IdRepr>>),
 
     /// Print text to the console.
     /// ```text
     /// int a = 'a' ;
     /// print a ;
     /// ```
-    Print(Expr<'a, IdRepr>),
+    Print(WrapSpan<'a, Expr<'a, IdRepr>>),
 
     /// Print text to the console and start a new line.
     /// ```text
     /// int a = 'a' ;
     /// print a + 9 ;
     /// ```
-    PrintLn(Expr<'a, IdRepr>),
+    PrintLn(WrapSpan<'a, Expr<'a, IdRepr>>),
 
     /// If-Else statement to alter control flow.
     /// ```text
@@ -493,9 +501,9 @@ pub enum StatCode<'a, IdRepr> {
     /// fi ;
     /// ```
     If(
-        Expr<'a, IdRepr>,
-        Vec<Stat<'a, IdRepr>>,
-        Vec<Stat<'a, IdRepr>>,
+        WrapSpan<'a, Expr<'a, IdRepr>>,
+        Vec<WrapSpan<'a, Stat<'a, IdRepr>>>,
+        Vec<WrapSpan<'a, Stat<'a, IdRepr>>>,
     ),
 
     /// While Loop control flow structure.
@@ -505,43 +513,50 @@ pub enum StatCode<'a, IdRepr> {
     ///     n = n + 1
     /// done ;
     /// ```
-    While(Expr<'a, IdRepr>, Vec<Stat<'a, IdRepr>>),
+    While(
+        WrapSpan<'a, Expr<'a, IdRepr>>,
+        Vec<WrapSpan<'a, Stat<'a, IdRepr>>>,
+    ),
 }
 
-/// Statement containing the span of the statement (for error messages), as
-/// well as the statement code itself.
-pub struct Stat<'a, IdRepr>(pub &'a str, pub StatCode<'a, IdRepr>);
+/// Formal parameter used in functions, containing the type and identifier.
+pub struct Param<IdRepr>(pub Type, IdRepr);
 
-/// Formal parameter used in functions.
-/// (span of the parameter definition in the original code, type, parameter identifier)
-pub struct Param<'a, IdRepr>(&'a str, pub Type, IdRepr);
-
-/// Function definition with return type, name, parameters, the span of the
-/// definition and the code body.
+/// Function definition with the return type, name, parameters, and code body.
 /// ```text
-/// int sum(int, a, int, b, int c) is
-///     return a + b + c
+/// int sum(int a, int, b) is
+///     return a + b
 /// end
 /// ```
+/// ```
+/// WrapSpan(
+///     "int sum(int a, int, b)",
+///     Function(
+///         Type::Int,
+///         String::from("sum"),
+///         vec![WrapSpan("int a", Param(Type::Int, "a")),
+///         WrapSpan("int b", Param(Type::Int, "b")),],
+///         vec![
+///             WrapSpan("return a + b", Stat::Return(WrapSpan("a + b", Expr::BinOp(
+///                 Box::from(WrapSpan("a", Expr::Var("a"))),
+///                 BinOp::Add,
+///                 Box::from(WrapSpan("b", Expr::Var("b"))),
+///             ))))
+///         ]
+///     )
+/// )
+/// ```
 pub struct Function<'a, IdRepr>(
-    pub &'a str,
     pub Type,
     pub String,
-    pub Vec<Param<'a, IdRepr>>,
-    pub Vec<Stat<'a, IdRepr>>,
+    pub Vec<WrapSpan<'a, Param<IdRepr>>>,
+    pub Vec<WrapSpan<'a, Stat<'a, IdRepr>>>,
 );
 
 /// Program is the root of the abstract syntax tree, containing all function
-/// definitions and the main program body.
-/// ```text
-/// begin
-///     int fun(char a) is
-///         int x = ord a ;
-///         return x
-///     end
-///
-///     int i = fun('a') ;
-///     exit 0
-/// end
-/// ```
-pub struct Program<'a, IdRepr>(pub Vec<Function<'a, IdRepr>>, pub Vec<Stat<'a, IdRepr>>);
+/// definitions and the main program body, with all nested structures being 
+/// associated with the original source code by [wrappers](WrapSpan).
+pub struct Program<'a, IdRepr>(
+    pub Vec<WrapSpan<'a, Function<'a, IdRepr>>>,
+    pub Vec<WrapSpan<'a, Stat<'a, IdRepr>>>,
+);
