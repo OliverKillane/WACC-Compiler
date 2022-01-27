@@ -1,5 +1,15 @@
 //! This module defines the types for the AST structure that is produced by the
 //! parser and consumed by the semantic analyser.
+//! 
+//! References to the source code represented in the tree are kept to allow for 
+//! beautiful error messages from the semantic analyser.
+//! 
+//! The AST is generic for variable identifiers, this allows for renaming to 
+//! occur (as is required for our symbol table generation).
+//! 
+//! Function identifiers are contained withing Strings, allowing them to live 
+//! when the source code string is dropped and to be used in assembly 
+//! generation.
 //!
 //! # Examples
 //! ## Empty code with skip statement
@@ -11,24 +21,28 @@
 //! ```
 //! AST definition:
 //! ```
-//! let program = Program(vec![], vec![
-//!         Stat::Assign(
-//!             AssignLhs::Var(A),
+//! Program(
+//!     vec![],
+//!     vec![
+//!         Stat("int a = 9 * (3 + 7)", StatCode::Def(
+//!             Type::Int,
+//!             "a",
 //!             AssignRhs::Expr(
-//!                 Expr::BinOp(
-//!                     Box::new(Expr::Int(9)),
+//!                 Expr(
+//!                 "9 * (3 + 7)",
+//!                 ExprCode::BinOp(
+//!                     Box::from(Expr("9", ExprCode::Int(9))),
 //!                     BinOp::Mul,
-//!                     Box::new(
-//!                         Expr::BinOp(
-//!                         Int 3,
+//!                     Box::from(Expr("(3 + 7)", ExprCode::BinOp(
+//!                         Box::from(Expr("3", ExprCode::Int(3))),
 //!                         BinOp::Add,
-//!                         Int 7)
-//!                     )
-//!                 )
+//!                         Box::from(Expr("7", ExprCode::Int(7)))
+//!                     )))
+//!                 ))
 //!             )
-//!         )
-//!        ]
-//!    );
+//!         ))
+//!     ]
+//!     );
 //! ```
 //!
 //! ## Example of a function call
@@ -43,23 +57,36 @@
 //! ```
 //! AST definition:
 //! ```
-//! Program(vec![
-//! Function(Type::Int, String::from("function_name"),
-//!     vec![ Param(Type::Int, String::from("a"))],
-//!     vec![
-//!         Stat::Return(
-//!             Expr::BinOp(
-//!                 Expr::Var(String::from("a")),
-//!                 BinOp::Add, Expr::Int(9)
-//!             )
-//!         )
-//!     ]
-//! )
-//! ], vec![
-//!     Stat::Assign(
-//!         AssignLhs::Var(String::from("variable")),
-//!         AssignRhs::Call(String::from("function_name"), vec![Expr::Int(6)]))
-//! ]);
+//! Program(
+//!     vec![Function(
+//!         "function_name(int a)",
+//!         Type::Int,
+//!         String::from("function_name"),
+//!         vec![Param("int a", Type::Int, "a")],
+//!         vec![Stat(
+//!             "return a + 9",
+//!             StatCode::Return(Expr(
+//!                 "a + 9",
+//!                 ExprCode::BinOp(
+//!                     Box::from(Expr("a", ExprCode::Var("a"))),
+//!                     BinOp::Add,
+//!                     Box::from(Expr("9", ExprCode::Int(9))),
+//!                 ),
+//!             )),
+//!         )],
+//!     )],
+//!     vec![Stat(
+//!         "int variable = call function_name(6)",
+//!         StatCode::Def(
+//!             Type::Int,
+//!             "variable",
+//!             AssignRhs::Call(
+//!                 String::from("function_name"),
+//!                 vec![Expr("6", ExprCode::Int(6))],
+//!             ),
+//!         ),
+//!     )],
+//! );
 //! ```
 
 /// Type specification in WACC.
@@ -173,21 +200,19 @@ pub enum BinOp {
 /// (4 - 3) + (9 * 7)
 /// ```
 /// ```
-/// Expr::BinOp(
-///     Box::new(
-///         Expr::BinOp(
-///             Box::new(Expr::Int(4)),
-///             BinOp::Sub,
-///             Box::new(Expr::Int(3))
-///         ),
-///         BinOp::Add,
-///         Expr::BinOp(
-///             Box::new(Expr::Int(9)),
-///             BinOp::Mul,
-///             Box::new(Expr::Int(7))
-///         )
-///     )
-/// )
+/// Expr("(4 - 3) + (9 * 7)", ExprCode::BinOp(
+///     Box::from(Expr("4 - 3", ExprCode::BinOp(
+///         Box::from(Expr("4", ExprCode::Int(4))),
+///         BinOp::Sub,
+///         Box::from(Expr("3", ExprCode::Int(3)))
+///     ))),
+///     BinOp::Add,
+///     Box::from(Expr("9 * 7", ExprCode::BinOp(
+///         Box::from(Expr("9", ExprCode::Int(9))),
+///         BinOp::Mul,
+///         Box::from(Expr("7", ExprCode::Int(7)))
+///     ))),
+/// ))
 /// ```  
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum ExprCode<'a, IdRepr> {
@@ -292,14 +317,11 @@ pub enum StatCode<'a, IdRepr> {
     /// A _no-operation_ instruction.
     Skip,
 
-    /// Function Definition
+    /// Variable Definition
     /// ```text
-    /// int function(int a, int b) is
-    ///     skip ;
-    ///     return a * 2 + b
-    /// end
+    /// int a = 99;
     /// ```
-    Def(Type, String, AssignRhs<'a, IdRepr>),
+    Def(Type, IdRepr, AssignRhs<'a, IdRepr>),
 
     /// Assignment (to variable, parts of pairs or arrays).
     /// ```text
@@ -389,9 +411,11 @@ pub struct Stat<'a, IdRepr>(pub &'a str, pub StatCode<'a, IdRepr>);
 pub struct Expr<'a, IdRepr>(pub &'a str, pub ExprCode<'a, IdRepr>);
 
 /// Formal parameter used in functions.
+/// (span of parameter definition, type, parameter identifier)
 pub struct Param<'a, IdRepr>(&'a str, pub Type, IdRepr);
 
-/// Function definition with return type, name, parameters, the span of the definition and the code body.
+/// Function definition with return type, name, parameters, the span of the
+/// definition and the code body.
 /// ```text
 /// int sum(int, a, int, b, int c) is
 ///     return a + b + c
