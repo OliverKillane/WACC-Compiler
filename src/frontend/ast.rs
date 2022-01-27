@@ -85,11 +85,6 @@ pub enum Type {
     Array(Box<Type>, usize),
 }
 
-/// An index into an array variable in WACC. The first argument specifies the
-/// name of the variable, and the second the indices to the array dimensions.
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct ArrayElem(String, Vec<Expr>);
-
 /// All unary operators supported by WACC and used in [expressions](Expr).
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum UnOp {
@@ -195,91 +190,91 @@ pub enum BinOp {
 /// )
 /// ```  
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum Expr {
+pub enum ExprCode<'a, IdRepr> {
     Null,
     Int(u32),
     Bool(bool),
     Char(char),
     String(String),
-    Var(String),
-    ArrayElem(ArrayElem),
+    Var(IdRepr),
+    ArrayElem(IdRepr, Vec<Expr<'a, IdRepr>>),
 
     /// Unary operator application determined by the [UnOp enum](UnOp).
-    UnOp(UnOp, Box<Expr>),
+    UnOp(UnOp, Box<Expr<'a, IdRepr>>),
 
     /// Binary operator application determined by the [BinOp enum](BinOp).
-    BinOp(Box<Expr>, BinOp, Box<Expr>),
+    BinOp(Box<Expr<'a, IdRepr>>, BinOp, Box<Expr<'a, IdRepr>>),
 }
 
 /// Lefthand side of assignments.
 /// ```text
-/// AssignLHS = AssignRHS ;
+/// AssignLhs = AssignRhs ;
 /// ```
-pub enum AssignLhs {
+pub enum AssignLhs<'a, IdRepr> {
     /// Variable assignment.
     /// ```text
     /// int a = 3 ;
     /// ```
-    Var(String),
+    Var(IdRepr),
 
     /// Array element assignment.
     /// ```text
     /// int[] a = [1,2,3,4] ;
     /// a[0] = 9 ;
     /// ```
-    ArrayElem(ArrayElem),
+    ArrayElem(Expr<'a, IdRepr>),
 
     /// Assign to the first element of a pair
     /// ```text
     /// pair(int, bool) a = newpair(1, true) ;
     /// fst a = 3 ;
     /// ```
-    PairFst(Expr),
+    PairFst(Expr<'a, IdRepr>),
 
     /// Assign to the second element of a pair
     /// ```text
     /// pair(int, bool) a = newpair(1, true) ;
     /// snd a = false ;
     /// ```
-    PairSnd(Expr),
+    PairSnd(Expr<'a, IdRepr>),
 }
 
 /// Righthand side of assignments.
 /// ```text
-/// AssignLHS = AssignRHS ;
+/// AssignLhs = AssignRhs ;
 /// ```
-pub enum AssignRhs {
+pub enum AssignRhs<'a, IdRepr> {
     /// Assigns an expression.
     /// ```text
-    /// int a = 3 + (4 * 5)
+    /// int a = 3 + (4 * 5) ;
     /// ```
-    Expr(Expr),
+    Expr(Expr<'a, IdRepr>),
 
     /// Array assignment by expressions of the same type.
     /// ```text
     /// int[] int_arr = [2, 3 + 3, 4 * 7, 0] ;
     /// ```
-    Array(Vec<Expr>),
+    Array(Vec<Expr<'a, IdRepr>>),
 
     /// Assigns to a new pair.
     /// ```text
     /// pair(int, bool) a_pair = newpair(3 + 3, true && false) ;
     /// ```
-    NewPair(Expr, Expr),
+    NewPair(Expr<'a, IdRepr>, Expr<'a, IdRepr>),
 
     /// Assign the first element of a given pair.
     /// ```text
     /// pair(int, bool) a_pair = newpair(1, true) ;
     /// int a_fst = fst a_pair ;
     /// ```
-    PairFst(Expr),
+    PairFst(Expr<'a, IdRepr>),
 
     /// Assign the second element of a given pair.
     /// ```text
     /// pair(int, bool) a_pair = newpair(1, true) ;
     /// bool a_snd = snd a_pair ;
     /// ```
-    PairSnd(Expr),
+    PairSnd(Expr<'a, IdRepr>),
 
     /// Assign the return value of a function, with arguments.
     /// ```text
@@ -289,11 +284,11 @@ pub enum AssignRhs {
     ///
     /// int a = add(3,4) ;
     /// ```
-    Call(String, Vec<Expr>),
+    Call(String, Vec<Expr<'a, IdRepr>>),
 }
 
 /// Statements for assignment, control flow and definitions.
-pub enum Stat {
+pub enum StatCode<'a, IdRepr> {
     /// A _no-operation_ instruction.
     Skip,
 
@@ -304,7 +299,7 @@ pub enum Stat {
     ///     return a * 2 + b
     /// end
     /// ```
-    Def(Type, String, AssignRhs),
+    Def(Type, String, AssignRhs<'a, IdRepr>),
 
     /// Assignment (to variable, parts of pairs or arrays).
     /// ```text
@@ -314,21 +309,21 @@ pub enum Stat {
     /// int[] arr = [1,2,3,4] ;
     /// a[1] = call function(3, 4) ;
     /// ```
-    Assign(AssignLhs, AssignRhs),
+    Assign(AssignLhs<'a, IdRepr>, AssignRhs<'a, IdRepr>),
 
     /// Read from standard input.
     /// ```text
     /// int a = 9 ;
     /// read a;
     /// ```
-    Read(AssignLhs),
+    Read(AssignLhs<'a, IdRepr>),
 
     /// Free dynamically allocated data structures.
     /// ```text
     /// pair(int, int) a_pair = newpair(3,3) ;
     /// free a_pair ;
     /// ```
-    Free(Expr),
+    Free(Expr<'a, IdRepr>),
 
     /// Return value from a subroutine/function.
     /// ```text
@@ -336,27 +331,27 @@ pub enum Stat {
     ///     return 2 * b
     /// end
     /// ```
-    Return(Expr),
+    Return(Expr<'a, IdRepr>),
 
     /// End the program and return the exit code.
     /// ```text
     /// exit 0 ;
     /// ```
-    Exit(Expr),
+    Exit(Expr<'a, IdRepr>),
 
     /// Print text to the console.
     /// ```text
     /// int a = 'a' ;
     /// print a ;
     /// ```
-    Print(Expr),
+    Print(Expr<'a, IdRepr>),
 
     /// Print text to the console and start a new line.
     /// ```text
     /// int a = 'a' ;
     /// print a + 9 ;
     /// ```
-    PrintLn(Expr),
+    PrintLn(Expr<'a, IdRepr>),
 
     /// If-Else statement to alter control flow.
     /// ```text
@@ -368,7 +363,11 @@ pub enum Stat {
     ///     print 'b'
     /// fi ;
     /// ```
-    If(Expr, Body, Body),
+    If(
+        Expr<'a, IdRepr>,
+        Vec<Stat<'a, IdRepr>>,
+        Vec<Stat<'a, IdRepr>>,
+    ),
 
     /// While Loop control flow structure.
     /// ```text
@@ -377,25 +376,34 @@ pub enum Stat {
     ///     n = n + 1
     /// done ;
     /// ```
-    While(Expr, Body),
-
-    /// Scope statement for begin-end delimited blocks of statements.
-    Scope(Body),
+    While(Expr<'a, IdRepr>, Vec<Stat<'a, IdRepr>>),
 }
 
-/// Body stores a symbol table associated and an block of code.
-pub struct Body(pub Vec<Stat>); // Will also contain a symbol table
+/// Statement containing the span of the statement (for error messages), as
+/// well as the statement code itself.
+pub struct Stat<'a, IdRepr>(pub &'a str, pub StatCode<'a, IdRepr>);
+
+/// Expression containing a span of the expression as well as the expression
+/// code itself.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct Expr<'a, IdRepr>(pub &'a str, pub ExprCode<'a, IdRepr>);
 
 /// Formal parameter used in functions.
-pub struct Param(pub Type, pub String);
+pub struct Param<'a, IdRepr>(&'a str, pub Type, IdRepr);
 
-/// Function definition with return type, name, parameters and the code body.
+/// Function definition with return type, name, parameters, the span of the definition and the code body.
 /// ```text
 /// int sum(int, a, int, b, int c) is
 ///     return a + b + c
 /// end
 /// ```
-pub struct Function(pub Type, pub String, pub Vec<Param>, pub Body);
+pub struct Function<'a, IdRepr>(
+    pub &'a str,
+    pub Type,
+    pub String,
+    pub Vec<Param<'a, IdRepr>>,
+    pub Vec<Stat<'a, IdRepr>>,
+);
 
 /// Program is the root of the abstract syntax tree, containing all function
 /// definitions and the main program body.
@@ -407,7 +415,7 @@ pub struct Function(pub Type, pub String, pub Vec<Param>, pub Body);
 ///     end
 ///
 ///     int i = fun('a') ;
-///      exit 0
+///     exit 0
 /// end
 /// ```
-pub struct Program(pub Vec<Function>, pub Body);
+pub struct Program<'a, IdRepr>(pub Vec<Function<'a, IdRepr>>, pub Vec<Stat<'a, IdRepr>>);
