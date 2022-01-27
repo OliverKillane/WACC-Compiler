@@ -16,7 +16,7 @@
 //! WACC code:
 //! ```text
 //! begin  
-//!   int a = 9 * (3 + 7)
+//!     int a = 9 * (3 + 7)
 //! end
 //! ```
 //! AST definition:
@@ -49,10 +49,11 @@
 //! WACC code:
 //! ```text
 //! begin
-//!   int function_name(int a) is
-//!     return a + 9
-//!   end
-//!   int variable = call function_name(6)
+//!     int function_name(int a) is
+//!         return a + 9
+//!     end
+//! 
+//!     int variable = call function_name(6)
 //! end
 //! ```
 //! AST definition:
@@ -116,79 +117,61 @@ pub enum Type {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum UnOp {
     /// Logical negation
-    /// ```text
-    /// bool a = ! true ;
-    /// bool b = ! (a && true) ;
-    /// ```
     Neg,
 
     /// Integer negation
-    /// ```text
-    /// int a = -3 ;
-    /// int b = -(a * 4) ;
-    /// ```
     Minus,
 
     /// Gets the length of an array as an integer.
-    /// ```text
-    /// int[] arr = [1,2,3,4] ;
-    /// int arr_length = len arr ;
-    /// ```
     Len,
 
     /// Gets the ascii value associated with a character as an integer.
-    /// ```text
-    /// int a = ord 'a' ;
-    /// ```
     Ord,
 
     /// Gets the character associated with a given integer ascii value.
-    /// ```text
-    /// char a = chr 97 ;
-    /// ```
     Chr,
 }
 
 /// Binary Operators supported by WACC available for use in [expressions](Expr).
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum BinOp {
-    // Integer addition (+).
+    /// Integer addition (+).
     Add,
 
-    // Integer subtraction(-).
+    /// Integer subtraction(-).
     Sub,
 
-    // Integer multipication (*).
+    /// Integer multiplication (*).
     Mul,
 
-    // Integer division (/).
+    /// Integer division (/).
     Div,
 
-    // Integer modulus.
+    /// Integer modulus.
     Mod,
 
-    // Comparison greater-than (>).
+    /// Comparison greater-than (>).
     Gt,
 
-    // Comparison greater-than or equal (>=).
+    /// Comparison greater-than or equal (>=).
     Gte,
 
-    // Comparison less-than (<).
+    /// Comparison less-than (<).
     Lt,
 
-    // Comparison less-than or equal (<=).
+    /// Comparison less-than or equal (<=).
     Lte,
 
-    // Comparison equality (==).
+    /// Comparison equality (==).
     Eq,
 
-    // Comparison not equal (!=).
+    /// Comparison not equal (!=).
     Ne,
 
-    // Logical conjunction/and (&&).
+    /// Logical conjunction/and (&&).
     And,
 
-    // Logical disjunction/or (||).
+    /// Logical disjunction/or (||).
     Or,
 }
 
@@ -216,12 +199,36 @@ pub enum BinOp {
 /// ```  
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum ExprCode<'a, IdRepr> {
+    /// null value that can be used for pair values.
+    /// ```text
+    /// pair(int, int) example = null
+    /// ```
     Null,
+
+    /// Integer constants
     Int(u32),
+
+    /// Boolean constants
     Bool(bool),
+
+    /// Character constants
     Char(char),
+
+    // String Constants
     String(String),
+
+    /// Variable reference
+    /// ```text
+    /// int a = 7 ;
+    /// int b = a;
+    /// ```
     Var(IdRepr),
+
+    /// Array indexing
+    /// ```text
+    /// # Given some int[][] b
+    /// int a = b[3 * 3][5 / 2] ;
+    /// ```
     ArrayElem(IdRepr, Vec<Expr<'a, IdRepr>>),
 
     /// Unary operator application determined by the [UnOp enum](UnOp).
@@ -247,7 +254,7 @@ pub enum AssignLhs<'a, IdRepr> {
     /// int[] a = [1,2,3,4] ;
     /// a[0] = 9 ;
     /// ```
-    ArrayElem(Expr<'a, IdRepr>),
+    ArrayElem(IdRepr, Expr<'a, IdRepr>),
 
     /// Assign to the first element of a pair
     /// ```text

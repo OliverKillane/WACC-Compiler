@@ -1,2 +1,4 @@
 [toolchain]
 channel = "nightly"
+components = ["rustfmt", "rust-docs"]
+profile = "minimal"
