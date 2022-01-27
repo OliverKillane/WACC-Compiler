@@ -45,7 +45,7 @@ mod tests {
 ## Run
 The compiler can be build and run with the `cargo run` command. 
 
-When building for release, the binary will be `target/wacc_33`
+When building for release, the binary will be `target/compile`
 
 ## Documentation
 To build the documentation run `cargo doc`, this will create a website at 
