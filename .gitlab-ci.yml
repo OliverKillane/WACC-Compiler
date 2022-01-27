@@ -7,6 +7,8 @@
 #   intention. This will be allowed to run at a later point.
 image: rustlang/rust:nightly
 
+cache: cargo
+
 stages:
   - build
   - test
@@ -23,6 +25,28 @@ compiler-test:
   script:
     - echo "Testing the compiler..."
     - cargo test --verbose
+
+linter:
+  stage: test
+  before_script:
+  - rustup component add clippy
+  script:
+  # build job fails if there are warnings
+  - cargo clippy -- -D warnings
+
+formatter:
+  before_script:
+  - rustup component add rustfmt
+  script:
+  # build job fails if code is not formatted correctly
+  - cargo fmt -- --check
+
+auditor:
+  before_script:
+    - cargo install cargo-audit
+    - cargo generate-lockfile
+  script:
+    - cargo audit
 
 # compiler-build-release:
 #   stage: build-release
