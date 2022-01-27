@@ -31,13 +31,13 @@
 //!                 WrapSpan(
 //!                 "9 * (3 + 7)",
 //!                 Expr::BinOp(
-//!                     Box::from(WrapSpan("9", Expr::Int(9))),
+//!                     box WrapSpan("9", Expr::Int(9)),
 //!                     BinOp::Mul,
-//!                     Box::from(WrapSpan("(3 + 7)", Expr::BinOp(
-//!                         Box::from(WrapSpan("3", Expr::Int(3))),
+//!                     box WrapSpan("(3 + 7)", Expr::BinOp(
+//!                         box (WrapSpan("3", Expr::Int(3)),
 //!                         BinOp::Add,
-//!                         Box::from(WrapSpan("7", Expr::Int(7)))
-//!                     )))
+//!                         box (WrapSpan("7", Expr::Int(7))
+//!                     ))
 //!                 ))
 //!             )
 //!         ))
@@ -70,9 +70,9 @@
 //!                 StatCode::Return(Expr(
 //!                     "a + 9",
 //!                     ExprCode::BinOp(
-//!                         Box::from(Expr("a", ExprCode::Var("a"))),
+//!                         box (Expr("a", ExprCode::Var("a")),
 //!                         BinOp::Add,
-//!                         Box::from(Expr("9", ExprCode::Int(9))),
+//!                         box (Expr("9", ExprCode::Int(9)),
 //!                     ),
 //!                 )),
 //!             )],
@@ -102,21 +102,54 @@ pub struct WrapSpan<'a, T>(pub &'a str, pub T);
 pub enum Type {
     /// Integer primitive type.
     Int,
+
     /// Boolean primitive type.
     Bool,
+
     /// Character primitive type.
     Char,
+
     /// String primitive type.
     String,
+
     /// Typeless pair type. Can be coerced from or to any regular pair type.
+    /// ```text
+    /// pair(pair, pair)
+    /// ```
+    /// ```
+    /// Type::Pair(box Type::GenericPair, box Type::GenericPair)
+    /// ```
     GenericPair,
+
     /// Typed pair type. The arguments to the nameless tuple are the types of
     /// the first and second field of the pair respectively.
+    /// ```text
+    /// pair(int, bool)
+    /// pair(int[], pair(char, char)[])
+    /// ```
+    /// ```
+    /// // First type:
+    /// Type::Pair(box Type::Int, box Type::Bool)
+    ///
+    /// // Second type:
+    /// Type::Pair(
+    ///     box Type::Array(box Type::Int, 1),
+    ///     box Type::Array(box Type::Pair(box Type::Char, box Type::Char), 1),
+    /// )
+    /// ```
     Pair(Box<Type>, Box<Type>),
+
     /// Multidimentional array. The first argument is the type of elements in
     /// the arrays. The second argument is the dimensionality of the array.
     ///
-    /// **Note**: The type of the array elements should not be Array.
+    /// **Note**: For multidimensional arrays, the type is the element type,
+    /// and the size is the number of dimensions.
+    /// ```text
+    /// int[][][]
+    /// ```
+    /// ```
+    /// Type::Array(box Type::Int, 3)
+    /// ```
     Array(Box<Type>, usize),
 }
 
@@ -125,16 +158,12 @@ pub enum Type {
 pub enum UnOp {
     /// Logical negation
     Neg,
-
     /// Integer negation
     Minus,
-
     /// Gets the length of an array as an integer.
     Len,
-
     /// Gets the ascii value associated with a character as an integer.
     Ord,
-
     /// Gets the character associated with a given integer ascii value.
     Chr,
 }
@@ -144,40 +173,28 @@ pub enum UnOp {
 pub enum BinOp {
     /// Integer addition (+).
     Add,
-
     /// Integer subtraction(-).
     Sub,
-
     /// Integer multiplication (*).
     Mul,
-
     /// Integer division (/).
     Div,
-
     /// Integer modulus.
     Mod,
-
     /// Comparison greater-than (>).
     Gt,
-
     /// Comparison greater-than or equal (>=).
     Gte,
-
     /// Comparison less-than (<).
     Lt,
-
     /// Comparison less-than or equal (<=).
     Lte,
-
     /// Comparison equality (==).
     Eq,
-
     /// Comparison not equal (!=).
     Ne,
-
     /// Logical conjunction/and (&&).
     And,
-
     /// Logical disjunction/or (||).
     Or,
 }
@@ -191,17 +208,17 @@ pub enum BinOp {
 /// ```
 /// ```
 /// WrapSpan("(4 - 3) + (9 * 7)", Expr::BinOp(
-///     Box::from(WrapSpan("4 - 3", Expr=::BinOp(
-///         Box::from(WrapSpan("4", Expr::Int(4))),
+///     box (WrapSpan("4 - 3", Expr=::BinOp(
+///         box (WrapSpan("4", Expr::Int(4)),
 ///         BinOp::Sub,
-///         Box::from(WrapSpan("3", Expr::Int(3)))
-///     ))),
+///         box (WrapSpan("3", Expr::Int(3))
+///     )),
 ///     BinOp::Add,
-///     Box::from(WrapSpan("9 * 7", Expr::BinOp(
-///         Box::from(WrapSpan("9", Expr::Int(9))),
+///     box WrapSpan("9 * 7", Expr::BinOp(
+///         box WrapSpan("9", Expr::Int(9)),
 ///         BinOp::Mul,
-///         Box::from(WrapSpan("7", Expr::Int(7)))
-///     ))),
+///         box WrapSpan("7", Expr::Int(7))
+///     )),
 /// ))
 /// ```  
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -214,7 +231,7 @@ pub enum Expr<'a, IdRepr> {
     /// WrapSpan(
     ///     "pair(int, int) example = null",
     ///     Stat::Def(
-    ///         Type::Pair(Box::from(Type::Int), Box::from(Type::Int)),
+    ///         Type::Pair(box Type::Int, box Type::Int),
     ///         "example",
     ///         AssignRhs::Expr(WrapSpan("null", Expr::Null)),
     ///     ),
@@ -333,9 +350,45 @@ pub enum Expr<'a, IdRepr> {
     ArrayElem(IdRepr, Vec<WrapSpan<'a, Expr<'a, IdRepr>>>),
 
     /// Unary operator application determined by the [UnOp enum](UnOp).
+    /// ```text
+    /// bool a = !true ;
+    /// ```
+    /// ```
+    /// WrapSpan(
+    ///     "bool a = true",
+    ///     Stat::Def(
+    ///         Type::Bool,
+    ///         "a",
+    ///         AssignRhs::Expr(WrapSpan(
+    ///             "true",
+    ///             Expr::UnOp(UnOp::Neg, box WrapSpan("true", Expr::Bool(true))),
+    ///         )),
+    ///     ),
+    /// )
+    /// ``
     UnOp(UnOp, Box<WrapSpan<'a, Expr<'a, IdRepr>>>),
 
     /// Binary operator application determined by the [BinOp enum](BinOp).
+    /// ```text
+    /// int a = 3 + 7 ;
+    /// ```
+    /// ```
+    /// WrapSpan(
+    ///     "int a = 3 + 7",
+    ///     Stat::Def(
+    ///         Type::Int,
+    ///         "a",
+    ///         AssignRhs::Expr(WrapSpan(
+    ///             "3 + 7",
+    ///             Expr::BinOp(
+    ///                 box WrapSpan("3", Expr::Int(3)),
+    ///                 BinOp::Add,
+    ///                 box WrapSpan("7", Expr::Int(7)),
+    ///             ),
+    ///         )),
+    ///     ),
+    /// )
+    /// ```
     BinOp(
         Box<WrapSpan<'a, Expr<'a, IdRepr>>>,
         BinOp,
@@ -359,7 +412,7 @@ pub enum AssignLhs<'a, IdRepr> {
     /// int[] a = [1,2,3,4] ;
     /// a[0] = 9 ;
     /// ```
-    ArrayElem(IdRepr, WrapSpan<'a, Expr<'a, IdRepr>>),
+    ArrayElem(IdRepr, Vec<WrapSpan<'a, Expr<'a, IdRepr>>>),
 
     /// Assign to the first element of a pair
     /// ```text
@@ -538,9 +591,9 @@ pub struct Param<IdRepr>(pub Type, IdRepr);
 ///         WrapSpan("int b", Param(Type::Int, "b")),],
 ///         vec![
 ///             WrapSpan("return a + b", Stat::Return(WrapSpan("a + b", Expr::BinOp(
-///                 Box::from(WrapSpan("a", Expr::Var("a"))),
+///                 box WrapSpan("a", Expr::Var("a")),
 ///                 BinOp::Add,
-///                 Box::from(WrapSpan("b", Expr::Var("b"))),
+///                 box (WrapSpan("b", Expr::Var("b")),
 ///             ))))
 ///         ]
 ///     )
@@ -554,7 +607,7 @@ pub struct Function<'a, IdRepr>(
 );
 
 /// Program is the root of the abstract syntax tree, containing all function
-/// definitions and the main program body, with all nested structures being 
+/// definitions and the main program body, with all nested structures being
 /// associated with the original source code by [wrappers](WrapSpan).
 pub struct Program<'a, IdRepr>(
     pub Vec<WrapSpan<'a, Function<'a, IdRepr>>>,

@@ -1,5 +1,6 @@
 #![warn(missing_docs)]
 #![doc(html_logo_url = "https://i.imgur.com/cBcRWvM.png")]
+#![feature(box_syntax)]
 //! The group 33 WACC Compiler project.
 //!
 //! Lovingly developed by:
