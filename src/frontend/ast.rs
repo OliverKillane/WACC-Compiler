@@ -1,14 +1,14 @@
 //! This module defines the types for the AST structure that is produced by the
 //! parser and consumed by the semantic analyser.
-//! 
-//! References to the source code represented in the tree are kept to allow for 
+//!
+//! References to the source code represented in the tree are kept to allow for
 //! beautiful error messages from the semantic analyser.
-//! 
-//! The AST is generic for variable identifiers, this allows for renaming to 
+//!
+//! The AST is generic for variable identifiers, this allows for renaming to
 //! occur (as is required for our symbol table generation).
-//! 
-//! Function identifiers are contained withing Strings, allowing them to live 
-//! when the source code string is dropped and to be used in assembly 
+//!
+//! Function identifiers are contained withing Strings, allowing them to live
+//! when the source code string is dropped and to be used in assembly
 //! generation.
 //!
 //! # Examples
@@ -52,7 +52,7 @@
 //!     int function_name(int a) is
 //!         return a + 9
 //!     end
-//! 
+//!
 //!     int variable = call function_name(6)
 //! end
 //! ```
@@ -175,6 +175,11 @@ pub enum BinOp {
     Or,
 }
 
+/// Expression containing a span of the expression as well as the expression
+/// code itself.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct Expr<'a, IdRepr>(pub &'a str, pub ExprCode<'a, IdRepr>);
+
 /// Expression Data Type
 ///
 /// # Examples:
@@ -203,18 +208,80 @@ pub enum ExprCode<'a, IdRepr> {
     /// ```text
     /// pair(int, int) example = null
     /// ```
+    /// ```
+    /// Stat(
+    ///     "pair(int, int) example = null",
+    ///     StatCode::Def(
+    ///         Type::Pair(Box::from(Type::Int), Box::from(Type::Int)),
+    ///         "example",
+    ///         AssignRhs::Expr(Expr("null", ExprCode::Null)),
+    ///     ),
+    /// )
+    /// ```
     Null,
 
     /// Integer constants
+    /// ```text
+    /// int a = 9
+    /// ```
+    /// ```
+    /// Stat(
+    ///     "int a = 9",
+    ///     StatCode::Def(
+    ///         Type::Bool,
+    ///         "a",
+    ///         AssignRhs::Expr(Expr("9", ExprCode::Int(9))),
+    ///     ),
+    /// );
+    /// ```
     Int(u32),
 
     /// Boolean constants
+    /// ```text
+    /// bool a = true
+    /// ```
+    /// ```
+    /// Stat(
+    ///     "bool a = true",
+    ///     StatCode::Def(
+    ///         Type::Bool,
+    ///         "a",
+    ///         AssignRhs::Expr(Expr("true", ExprCode::Bool(true))),
+    ///     ),
+    /// );
+    /// ```
     Bool(bool),
 
     /// Character constants
+    /// ```text
+    /// char a = 'a'
+    /// ```
+    /// ```
+    /// Stat(
+    ///     "int a = 'a'",
+    ///     StatCode::Def(
+    ///         Type::Int,
+    ///         "a",
+    ///         AssignRhs::Expr(Expr("'a'", ExprCode::Char('a'))),
+    ///     ),
+    /// );
+    /// ```
     Char(char),
 
-    // String Constants
+    /// String Constants
+    /// ``text
+    /// string a = "hello world"
+    /// ```
+    /// ```
+    /// Stat(
+    ///     "string a = \"hello world\"",
+    ///     StatCode::Def(
+    ///         Type::Int,
+    ///         "a",
+    ///         AssignRhs::Expr(Expr("\"hello world\"", ExprCode::String(String::from("hello world")))),
+    ///     ),
+    /// );
+    /// ```
     String(String),
 
     /// Variable reference
@@ -222,12 +289,44 @@ pub enum ExprCode<'a, IdRepr> {
     /// int a = 7 ;
     /// int b = a;
     /// ```
+    /// ```
+    /// vec![
+    ///     Stat(
+    ///         "int a = 7",
+    ///         StatCode::Def(Type::Int, "a", AssignRhs::Expr(Expr("7", ExprCode::Int(7)))),
+    ///     ),
+    ///     Stat(
+    ///         "int b = a",
+    ///         StatCode::Def(
+    ///             Type::Int,
+    ///             "b",
+    ///             AssignRhs::Expr(Expr("a", ExprCode::Var("a"))),
+    ///         ),
+    ///     ),
+    /// ];
+    /// ```
     Var(IdRepr),
 
     /// Array indexing
     /// ```text
     /// # Given some int[][] b
-    /// int a = b[3 * 3][5 / 2] ;
+    /// int a = b[3][5] ;
+    /// ```
+    /// ```
+    /// Stat(
+    ///     "int a = b[3][5]",
+    ///     StatCode::Def(
+    ///         Type::Int,
+    ///         "a",
+    ///         AssignRhs::Expr(Expr(
+    ///             "b[3][5]",
+    ///             ExprCode::ArrayElem(
+    ///                 "b",
+    ///                 vec![Expr("3", ExprCode::Int(3)), Expr("5", ExprCode::Int(5))],
+    ///             ),
+    ///         )),
+    ///     ),
+    /// )
     /// ```
     ArrayElem(IdRepr, Vec<Expr<'a, IdRepr>>),
 
@@ -319,6 +418,10 @@ pub enum AssignRhs<'a, IdRepr> {
     Call(String, Vec<Expr<'a, IdRepr>>),
 }
 
+/// Statement containing the span of the statement (for error messages), as
+/// well as the statement code itself.
+pub struct Stat<'a, IdRepr>(pub &'a str, pub StatCode<'a, IdRepr>);
+
 /// Statements for assignment, control flow and definitions.
 pub enum StatCode<'a, IdRepr> {
     /// A _no-operation_ instruction.
@@ -408,17 +511,8 @@ pub enum StatCode<'a, IdRepr> {
     While(Expr<'a, IdRepr>, Vec<Stat<'a, IdRepr>>),
 }
 
-/// Statement containing the span of the statement (for error messages), as
-/// well as the statement code itself.
-pub struct Stat<'a, IdRepr>(pub &'a str, pub StatCode<'a, IdRepr>);
-
-/// Expression containing a span of the expression as well as the expression
-/// code itself.
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Expr<'a, IdRepr>(pub &'a str, pub ExprCode<'a, IdRepr>);
-
 /// Formal parameter used in functions.
-/// (span of parameter definition, type, parameter identifier)
+/// (span of the parameter definition in the original code, type, parameter identifier)
 pub struct Param<'a, IdRepr>(&'a str, pub Type, IdRepr);
 
 /// Function definition with return type, name, parameters, the span of the

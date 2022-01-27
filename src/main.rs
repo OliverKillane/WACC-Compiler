@@ -16,5 +16,5 @@ mod intermediate;
 /// - Processes command line arguments controlling compiler behaviour.
 /// - Halts and reports failures through returning exit codes.
 fn main() {
-    unimplemented!()
+    todo!()
 }
