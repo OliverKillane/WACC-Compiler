@@ -8,7 +8,7 @@
 image: rustlang/rust:nightly
 
 # invalid use of cache: cargo
-cache: cargo
+# cache: cargo
 
 stages:
   - build
