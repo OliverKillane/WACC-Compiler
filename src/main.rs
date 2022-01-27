@@ -4,7 +4,7 @@
 //!
 //! Lovingly developed by:
 //! - Jordan Hall
-//! - Bartłomiej Cieślar\
+//! - Bartłomiej Cieślar
 //! - Panayiotis Gavriil
 //! - Oliver Killane
 
