@@ -132,40 +132,40 @@ pub enum UnOp {
 pub enum BinOp {
     // Integer addition (+).
     Add,
-    
+
     // Integer subtraction(-).
     Sub,
 
     // Integer multipication (*).
     Mul,
-    
+
     // Integer division (/).
     Div,
-    
+
     // Integer modulus.
     Mod,
-    
+
     // Comparison greater-than (>).
     Gt,
-    
+
     // Comparison greater-than or equal (>=).
     Gte,
-    
+
     // Comparison less-than (<).
     Lt,
-    
+
     // Comparison less-than or equal (<=).
     Lte,
-    
+
     // Comparison equality (==).
     Eq,
-    
+
     // Comparison not equal (!=).
     Ne,
-    
+
     // Logical conjunction/and (&&).
     And,
-    
+
     // Logical disjunction/or (||).
     Or,
 }
@@ -360,7 +360,7 @@ pub enum Stat {
 
     /// If-Else statement to alter control flow.
     /// ```text
-    /// 
+    ///
     /// if 3 = 4 - 1
     /// then
     ///     print 'a'
@@ -369,7 +369,6 @@ pub enum Stat {
     /// fi ;
     /// ```
     If(Expr, Body, Body),
-
 
     /// While Loop control flow structure.
     /// ```text
@@ -387,7 +386,6 @@ pub enum Stat {
 /// Body stores a symbol table associated and an block of code.
 pub struct Body(pub Vec<Stat>); // Will also contain a symbol table
 
-
 /// Formal parameter used in functions.
 pub struct Param(pub Type, pub String);
 
@@ -399,428 +397,17 @@ pub struct Param(pub Type, pub String);
 /// ```
 pub struct Function(pub Type, pub String, pub Vec<Param>, pub Body);
 
-/// Program is the root of the abstract syntax tree, containing all function 
+/// Program is the root of the abstract syntax tree, containing all function
 /// definitions and the main program body.
 /// ```text
 /// begin
 ///     int fun(char a) is
 ///         int x = ord a ;
-///         return x 
+///         return x
 ///     end
-/// 
+///
 ///     int i = fun('a') ;
 ///      exit 0
 /// end
 /// ```
 pub struct Program(pub Vec<Function>, pub Body);
-
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::rc::Rc;
-
-/// Symbol Table data structure linked to the parent symbol tables for parent
-/// scopes.
-#[derive(Debug)]
-pub struct SymbolTable<'a, T> {
-    scope: HashMap<&'a str, T>,
-    parent: Option<Rc<SymbolTable<'a, T>>>,
-}
-
-/// Create new empty symbol table with no parent scopes.
-/// ```
-/// // An example source string
-/// let a = "int var = 7; char b = 'a'";
-/// let mut symbols = SymbolTable::<Type>::new();
-///
-/// // Can successfully add to symbol table
-/// assert_eq!(symbols.add(&a[4..7], Type::Int), None);
-///
-/// // Second addition returns old value
-/// assert_eq!(symbols.add("var", Type::Bool), Some(Type::Int));
-///
-/// // New symbol addition is successful
-/// assert_eq!(symbols.add(&a[18..19], Type::Char), None);
-///
-/// // Can find symbols in symbol table
-/// assert_eq!(symbols.find("var"), Some(&Type::Bool));
-/// assert_eq!(symbols.find("b"), Some(&Type::Char));
-/// ```
-impl<'a, T> SymbolTable<'a, T> {
-    /// Create a new empty symbol table with no parent scopes.
-    fn new() -> Self {
-        Self {
-            scope: HashMap::new(),
-            parent: None,
-        }
-    }
-
-    /// Create a new empty symbol table with a parent scope.
-    fn new_child(parent: Rc<Self>) -> Self {
-        Self {
-            scope: HashMap::new(),
-            parent: Some(parent),
-        }
-    }
-
-    /// Add a new symbol and value to the symbol table. If the symbol is not
-    /// yet in the current scope, return none. Else the type_data of the token
-    /// in the table is returned.
-    /// ```
-    /// let mut symbols = SymbolTable::<Type>::new();
-    /// assert_eq!(symbols.add("variable1", Type::Char), None);
-    /// assert_eq!(symbols.add("variable1", Type::Int), Some(Type::Char));
-    /// ```
-    fn add(&mut self, ident: &'a str, type_data: T) -> Option<T> {
-        self.scope.insert(ident, type_data)
-    }
-
-    /// Search symbol table for an identifier, including all parent symbol
-    /// tables/scopes.
-    /// ```
-    /// let mut parent = Rc::new(SymbolTable::<Type>::new());
-    /// let mut child = SymbolTable::<Type>::new_child(parent);
-    /// assert_eq!(parent.add("foo", Type::Bool), None);
-    /// assert_eq!(child.find("foo"), Some(&Type::Bool));
-    /// ```
-    fn find(&self, ident: &'a str) -> Option<&T> {
-        match self.scope.get(ident) {
-            Some(a) => Some(a),
-            None => match &self.parent {
-                Some(p) => p.find(ident),
-                None => None,
-            },
-        }
-    }
-
-    fn find_iter(&self, ident: &'a str) -> Option<&T> {
-        self.iter().find_map(|v| v.scope.get(ident))
-    }
-
-    fn find_loop(&self, ident: &'a str) -> Option<&T> {
-        let mut symbol_table = self;
-
-        loop {
-            match symbol_table.scope.get(ident) {
-                Some(a) => break Some(a),
-                None => match &symbol_table.parent {
-                    Some(p) => symbol_table = p,
-                    None => break None,
-                },
-            }
-        }
-    }
-
-    fn iter(&self) -> SymbolTableIter<'_, 'a, T> {
-        SymbolTableIter(Some(self))
-    }
-}
-
-struct SymbolTableIter<'b, 'a, T>(Option<&'b SymbolTable<'a, T>>);
-
-impl<'b, 'a, T> Iterator for SymbolTableIter<'b, 'a, T> {
-    type Item = &'b SymbolTable<'a, T>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.0 {
-            Some(st) => { 
-                let ret = self.0;
-                self.0 = st.parent.as_ref().map(Rc::as_ref);
-                ret
-            },
-            None => None
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn symbol_table_iter() {
-        let mut grandfather = SymbolTable::<Type>::new();
-        grandfather.add("var1", Type::Bool);
-        let g_rc = Rc::new(grandfather);
-
-        let mut parent = SymbolTable::<Type>::new_child(g_rc);
-        parent.add("var2", Type::Int);
-        let p_rc = Rc::new(parent);
-
-        let mut child1 = SymbolTable::<Type>::new_child(p_rc.clone());
-        child1.add("var1", Type::Int);
-        
-        let mut child2 = SymbolTable::<Type>::new_child(p_rc.clone());
-        child2.add("var2", Type::Bool);
-
-        let child3 = SymbolTable::<Type>::new_child(p_rc.clone());
-
-        assert_eq!(child1.iter().find_map(|v| v.scope.get("var1")), Some(&Type::Int));
-        assert_eq!(child1.iter().find_map(|v| v.scope.get("var2")), Some(&Type::Int));
-
-        assert_eq!(child2.iter().find_map(|v| v.scope.get("var1")), Some(&Type::Bool));
-        assert_eq!(child2.iter().find_map(|v| v.scope.get("var2")), Some(&Type::Bool));
-
-        assert_eq!(child3.iter().find_map(|v| v.scope.get("var1")), Some(&Type::Bool));
-        assert_eq!(child3.iter().find_map(|v| v.scope.get("var2")), Some(&Type::Int));
-    }
-
-    #[test]
-    fn new_scope_is_empty() {
-        let parent = Rc::new(SymbolTable::<Type>::new());
-        assert!(parent.scope.is_empty());
-
-        let child = SymbolTable::<Type>::new_child(parent);
-        assert!(child.scope.is_empty())
-    }
-
-    #[test]
-    fn can_add_to_table() {
-        let mut symbols = SymbolTable::<Type>::new();
-
-        assert_eq!(symbols.add("var", Type::Char), None);
-        assert_eq!(
-            symbols.add("abcde", Type::Array(Box::from(Type::Char), 3)),
-            None
-        );
-        assert_eq!(symbols.add("foo", Type::Int), None);
-        assert_eq!(
-            symbols.add(
-                "var2",
-                Type::Pair(Box::from(Type::Char), Box::from(Type::Int))
-            ),
-            None
-        );
-
-        assert_eq!(symbols.scope.len(), 4);
-    }
-
-    #[test]
-    fn can_find_in_table() {
-        let mut symbols = SymbolTable::<Type>::new();
-
-        assert_eq!(symbols.add("var", Type::Char), None);
-        assert_eq!(symbols.find("var"), Some(&Type::Char));
-
-        assert_eq!(
-            symbols.add("abcde", Type::Array(Box::from(Type::Char), 3)),
-            None
-        );
-        assert_eq!(
-            symbols.find("abcde"),
-            Some(&Type::Array(Box::from(Type::Char), 3))
-        );
-
-        assert_eq!(symbols.add("foo", Type::Int), None);
-        assert_eq!(symbols.find("foo"), Some(&Type::Int));
-
-        assert_eq!(
-            symbols.add(
-                "var2",
-                Type::Pair(Box::from(Type::Char), Box::from(Type::Int))
-            ),
-            None
-        );
-        assert_eq!(
-            symbols.find("var2"),
-            Some(&Type::Pair(Box::from(Type::Char), Box::from(Type::Int)))
-        );
-
-        assert_eq!(symbols.scope.len(), 4);
-    }
-
-    #[test]
-    fn added_values_replace_old() {
-        let mut symbols = SymbolTable::<Type>::new();
-
-        assert_eq!(symbols.add("var", Type::Char), None);
-        assert_eq!(symbols.find("var"), Some(&Type::Char));
-
-        assert_eq!(symbols.add("var", Type::Int), Some(Type::Char));
-        assert_eq!(symbols.find("var"), Some(&Type::Int));
-
-        assert_eq!(symbols.scope.len(), 1);
-    }
-
-    #[test]
-    fn child_can_find_in_parents_table() {
-        let mut parent = SymbolTable::<Type>::new();
-
-        assert_eq!(parent.add("var", Type::Char), None);
-        assert_eq!(parent.add("foo", Type::Int), None);
-        assert_eq!(
-            parent.add("abcde", Type::Array(Box::from(Type::Char), 3)),
-            None
-        );
-        assert_eq!(
-            parent.add(
-                "var2",
-                Type::Pair(Box::from(Type::Char), Box::from(Type::Int))
-            ),
-            None
-        );
-
-        let parent_ref = Rc::new(parent);
-        let child = SymbolTable::<Type>::new_child(parent_ref.clone());
-
-        assert_eq!(child.find("var"), Some(&Type::Char));
-        assert_eq!(
-            child.find("abcde"),
-            Some(&Type::Array(Box::from(Type::Char), 3))
-        );
-        assert_eq!(child.find("foo"), Some(&Type::Int));
-        assert_eq!(
-            child.find("var2"),
-            Some(&Type::Pair(Box::from(Type::Char), Box::from(Type::Int)))
-        );
-
-        assert_eq!(parent_ref.clone().scope.len(), 4);
-        assert!(child.scope.is_empty());
-    }
-
-    #[test]
-    fn parent_cannot_find_in_parents_table() {
-        let parent_ref = Rc::new(SymbolTable::<Type>::new());
-        let mut child = SymbolTable::<Type>::new_child(parent_ref.clone());
-
-        assert_eq!(child.add("var", Type::Char), None);
-        assert_ne!(parent_ref.clone().find("var"), Some(&Type::Char));
-
-        assert_eq!(
-            child.add("abcde", Type::Array(Box::from(Type::Char), 3)),
-            None
-        );
-        assert_ne!(
-            parent_ref.clone().find("abcde"),
-            Some(&Type::Array(Box::from(Type::Char), 3))
-        );
-
-        assert_eq!(child.add("foo", Type::Int), None);
-        assert_ne!(parent_ref.clone().find("foo"), Some(&Type::Int));
-
-        assert_eq!(
-            child.add(
-                "var2",
-                Type::Pair(Box::from(Type::Char), Box::from(Type::Int))
-            ),
-            None
-        );
-        assert_ne!(
-            parent_ref.clone().find("var2"),
-            Some(&Type::Pair(Box::from(Type::Char), Box::from(Type::Int)))
-        );
-
-        assert_eq!(child.scope.len(), 4);
-        assert!(parent_ref.clone().scope.is_empty());
-    }
-
-    #[test]
-    fn many_children_can_find_in_parents_table() {
-        let mut parent = SymbolTable::<Type>::new();
-
-        assert_eq!(parent.add("var", Type::Char), None);
-        assert_eq!(
-            parent.add("abcde", Type::Array(Box::from(Type::Char), 3)),
-            None
-        );
-        assert_eq!(parent.add("foo", Type::Int), None);
-        assert_eq!(
-            parent.add(
-                "var2",
-                Type::Pair(Box::from(Type::Char), Box::from(Type::Int))
-            ),
-            None
-        );
-
-        let parent_ref = Rc::new(parent);
-        let child_a = SymbolTable::<Type>::new_child(parent_ref.clone());
-        let child_b = SymbolTable::<Type>::new_child(parent_ref.clone());
-
-        assert_eq!(child_a.find("var"), Some(&Type::Char));
-        assert_eq!(child_b.find("var"), Some(&Type::Char));
-
-        assert_eq!(
-            child_a.find("abcde"),
-            Some(&Type::Array(Box::from(Type::Char), 3))
-        );
-        assert_eq!(
-            child_b.find("abcde"),
-            Some(&Type::Array(Box::from(Type::Char), 3))
-        );
-        assert_eq!(child_a.find("foo"), Some(&Type::Int));
-        assert_eq!(child_b.find("foo"), Some(&Type::Int));
-        assert_eq!(
-            child_a.find("var2"),
-            Some(&Type::Pair(Box::from(Type::Char), Box::from(Type::Int)))
-        );
-        assert_eq!(
-            child_b.find("var2"),
-            Some(&Type::Pair(Box::from(Type::Char), Box::from(Type::Int)))
-        );
-
-        assert_eq!(parent_ref.clone().scope.len(), 4);
-        assert!(child_a.scope.is_empty());
-        assert!(child_b.scope.is_empty());
-    }
-
-    #[test]
-    fn child_scopes_are_isolated() {
-        let parent_ref = Rc::new(SymbolTable::<Type>::new());
-        let mut child_a = SymbolTable::<Type>::new_child(parent_ref.clone());
-        let mut child_b = SymbolTable::<Type>::new_child(parent_ref.clone());
-
-        assert_eq!(child_a.add("var", Type::Char), None);
-        assert_ne!(parent_ref.clone().find("var"), Some(&Type::Char));
-        assert_ne!(child_b.find("var"), Some(&Type::Char));
-
-        assert_eq!(
-            child_a.add("abcde", Type::Array(Box::from(Type::Char), 3)),
-            None
-        );
-        assert_ne!(
-            parent_ref.clone().find("abcde"),
-            Some(&Type::Array(Box::from(Type::Char), 3))
-        );
-        assert_ne!(
-            child_b.find("abcde"),
-            Some(&Type::Array(Box::from(Type::Char), 3))
-        );
-
-        assert_eq!(child_a.add("foo", Type::Int), None);
-        assert_ne!(parent_ref.clone().find("foo"), Some(&Type::Int));
-        assert_ne!(child_b.find("foo"), Some(&Type::Int));
-
-        assert_eq!(
-            child_a.add(
-                "var2",
-                Type::Pair(Box::from(Type::Char), Box::from(Type::Int))
-            ),
-            None
-        );
-        assert_ne!(
-            parent_ref.clone().find("var2"),
-            Some(&Type::Pair(Box::from(Type::Char), Box::from(Type::Int)))
-        );
-        assert_ne!(
-            child_b.find("var2"),
-            Some(&Type::Pair(Box::from(Type::Char), Box::from(Type::Int)))
-        );
-
-        assert_eq!(child_b.add("var", Type::Char), None);
-        assert_eq!(
-            child_b.add("abcde", Type::Array(Box::from(Type::Char), 3)),
-            None
-        );
-        assert_eq!(child_b.add("foo", Type::Int), None);
-        assert_eq!(
-            child_b.add(
-                "var2",
-                Type::Pair(Box::from(Type::Char), Box::from(Type::Int))
-            ),
-            None
-        );
-
-        assert_eq!(child_a.scope.len(), 4);
-        assert_eq!(child_b.scope.len(), 4);
-        assert!(parent_ref.clone().scope.is_empty());
-    }
-}
