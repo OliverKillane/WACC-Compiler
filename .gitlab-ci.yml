@@ -1,0 +1,31 @@
+# Notes on our CI:
+# - Tests located test configuration annotated modules nested in the module
+#   being tested.
+# - Nightly rust used for support of the box keyword. Syntax is nicer, and 
+#   directly allocates to heap.
+# - Compiler Release is commented out to reduce pipeline time before release 
+#   intention. This will be allowed to run at a later point.
+image: rustlang/rust:nightly
+
+stages:
+  - build
+  - test
+  # - build-release
+
+compiler-build:
+  stage: build
+  script:
+    - echo "Building the compiler..."
+    - cargo build --verbose
+
+compiler-test:
+  stage: test
+  script:
+    - echo "Testing the compiler..."
+    - cargo test --verbose
+
+# compiler-build-release:
+#   stage: build-release
+#   script:
+#     - echo "Building release version of compiler..."
+#     - cargo build --release --verbose
