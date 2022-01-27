@@ -7,6 +7,7 @@
 #   intention. This will be allowed to run at a later point.
 image: rustlang/rust:nightly
 
+# invalid use of cache: cargo
 cache: cargo
 
 stages:
