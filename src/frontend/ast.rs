@@ -175,11 +175,6 @@ pub enum BinOp {
     Or,
 }
 
-/// Expression containing a span of the expression as well as the expression
-/// code itself.
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Expr<'a, IdRepr>(pub &'a str, pub ExprCode<'a, IdRepr>);
-
 /// Expression Data Type
 ///
 /// # Examples:
@@ -337,6 +332,11 @@ pub enum ExprCode<'a, IdRepr> {
     BinOp(Box<Expr<'a, IdRepr>>, BinOp, Box<Expr<'a, IdRepr>>),
 }
 
+/// Expression containing a span of the expression as well as the expression
+/// code itself.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct Expr<'a, IdRepr>(pub &'a str, pub ExprCode<'a, IdRepr>);
+
 /// Lefthand side of assignments.
 /// ```text
 /// AssignLhs = AssignRhs ;
@@ -418,9 +418,6 @@ pub enum AssignRhs<'a, IdRepr> {
     Call(String, Vec<Expr<'a, IdRepr>>),
 }
 
-/// Statement containing the span of the statement (for error messages), as
-/// well as the statement code itself.
-pub struct Stat<'a, IdRepr>(pub &'a str, pub StatCode<'a, IdRepr>);
 
 /// Statements for assignment, control flow and definitions.
 pub enum StatCode<'a, IdRepr> {
@@ -510,6 +507,10 @@ pub enum StatCode<'a, IdRepr> {
     /// ```
     While(Expr<'a, IdRepr>, Vec<Stat<'a, IdRepr>>),
 }
+
+/// Statement containing the span of the statement (for error messages), as
+/// well as the statement code itself.
+pub struct Stat<'a, IdRepr>(pub &'a str, pub StatCode<'a, IdRepr>);
 
 /// Formal parameter used in functions.
 /// (span of the parameter definition in the original code, type, parameter identifier)
