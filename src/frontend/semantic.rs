@@ -349,3 +349,72 @@ pub enum SemanticError<'a> {
     /// ```
     ReturnStatementMisplaced,
 }
+
+const KEYWORDS: [&'static str; 32] = [
+    "begin", "end", "is", "skip", "read", "free", "return", "exit", "print", "println", "if",
+    "then", "else", "fi", "while", "do", "done", "newpair", "call", "fst", "snd", "int", "bool",
+    "char", "string", "pair", "len", "ord", "chr", "true", "false", "null",
+];
+
+/// Gets the current symbol table and returns:
+/// - Symbol table of function identifier to function type
+/// - Vector of functions with correct declarations (no repeated/keyword name/s
+///   for function or parameters), these functions can be further analysed.
+/// - Vector of errors from invalid functions.
+fn get_fn_symbols<'a>(
+    fn_defs: Vec<Function<&'a str, &'a str>>,
+) -> (
+    FunctionSymbolTable,
+    Vec<Function<'a, String, &'a str>>,
+    SemanticErrorSummary<'a>,
+) {
+    todo!()
+}
+
+fn analyse_scope<'a>(
+    scope: Vec<WrapSpan<'a, Stat<'a, String, &'a str>>>,
+    local_symb: &LocalSymbolTable,
+    var_symb: &mut VariableSymbolTable,
+    fun_symb: &FunctionSymbolTable,
+    term: bool,
+) -> (
+    Vec<WrapSpan<'a, Stat<'a, String, usize>>>,
+    SemanticErrorSummary<'a>,
+    bool,
+) {
+    todo!()
+}
+
+fn analyse_expr<'a>(
+    expr: WrapSpan<'a, Expr<'a, &'a str>>,
+    cons: TypeConstraint,
+    local_symb: &LocalSymbolTable,
+    var_symb: &mut VariableSymbolTable,
+) -> SemanticErrorSummary<'a> {
+    todo!()
+}
+
+pub fn semantic_analysis<'a>(
+    prog: Program<'a, &'a str, &'a str>,
+) -> Result<
+    (
+        FunctionSymbolTable,
+        VariableSymbolTable,
+        Program<'a, String, usize>,
+    ),
+    SemanticErrorSummary<'a>,
+> {
+    todo!()
+}
+
+
+/*
+  Todo:
+  1. Remove references to ExpressionError (the old version)
+  2. Wrap local and variable table and impl add and find
+  3. comment the function prototypes just above ^^
+  4. analyse_expr
+  5. get_fn_symbols
+  6. analyse_scope
+  7. semantic_analysis
+*/
