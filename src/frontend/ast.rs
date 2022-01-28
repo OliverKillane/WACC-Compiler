@@ -400,6 +400,7 @@ pub enum Expr<'a, VarIdRepr> {
 /// ```text
 /// AssignLhs = AssignRhs ;
 /// ```
+#[derive(Debug, PartialEq, Eq)]
 pub enum AssignLhs<'a, VarIdRepr> {
     /// Variable assignment.
     /// ```text
@@ -433,6 +434,7 @@ pub enum AssignLhs<'a, VarIdRepr> {
 /// ```text
 /// AssignLhs = AssignRhs ;
 /// ```
+#[derive(Debug, PartialEq, Eq)]
 pub enum AssignRhs<'a, FunIdRepr, VarIdRepr> {
     /// Assigns an expression.
     /// ```text
@@ -481,6 +483,7 @@ pub enum AssignRhs<'a, FunIdRepr, VarIdRepr> {
 }
 
 /// Statements for assignment, control flow and definitions.
+#[derive(Debug, PartialEq, Eq)]
 pub enum Stat<'a, FunIdRepr, VarIdRepr> {
     /// A _no-operation_ instruction.
     Skip,
@@ -573,10 +576,13 @@ pub enum Stat<'a, FunIdRepr, VarIdRepr> {
         WrapSpan<'a, Expr<'a, VarIdRepr>>,
         Vec<WrapSpan<'a, Stat<'a, FunIdRepr, VarIdRepr>>>,
     ),
+
+    Block(Vec<WrapSpan<'a, Stat<'a, FunIdRepr, VarIdRepr>>>),
 }
 
 /// Formal parameter used in functions, containing the type and identifier.
-pub struct Param<VarIdRepr>(pub Type, VarIdRepr);
+#[derive(Debug, PartialEq, Eq)]
+pub struct Param<VarIdRepr>(pub Type, pub VarIdRepr);
 
 /// Function definition with the return type, name, parameters, and code body.
 /// ```text
@@ -602,6 +608,7 @@ pub struct Param<VarIdRepr>(pub Type, VarIdRepr);
 ///     )
 /// )
 /// ```
+#[derive(Debug, PartialEq, Eq)]
 pub struct Function<'a, FunIdRepr, VarIdRepr>(
     pub Type,
     pub FunIdRepr,
