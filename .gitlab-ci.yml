@@ -13,7 +13,7 @@ stages:
   - linter
   - auditor
   - test
-  # - build-release
+# - build-release
 
 build:
   stage: build
