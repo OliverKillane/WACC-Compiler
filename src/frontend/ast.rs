@@ -63,7 +63,7 @@
 //!         "function_name(int a)",
 //!         Function(
 //!             Type::Int,
-//!             String::from("function_name"),
+//!             "function_name",
 //!             vec![Param("int a", Type::Int, "a")],
 //!             vec![Stat(
 //!                 "return a + 9",
@@ -84,7 +84,7 @@
 //!             Type::Int,
 //!             "variable",
 //!             AssignRhs::Call(
-//!                 String::from("function_name"),
+//!                 "function_name",
 //!                 vec![WrapSpan("6", Expr::Int(6))],
 //!             ),
 //!         ),
@@ -222,7 +222,7 @@ pub enum BinOp {
 /// ))
 /// ```  
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum Expr<'a, IdRepr> {
+pub enum Expr<'a, VarIdRepr> {
     /// null value that can be used for pair values.
     /// ```text
     /// pair(int, int) example = null
@@ -324,7 +324,7 @@ pub enum Expr<'a, IdRepr> {
     ///     ),
     /// ];
     /// ```
-    Var(IdRepr),
+    Var(VarIdRepr),
 
     /// Array indexing
     /// ```text
@@ -347,7 +347,7 @@ pub enum Expr<'a, IdRepr> {
     ///     ),
     /// )
     /// ```
-    ArrayElem(IdRepr, Vec<WrapSpan<'a, Expr<'a, IdRepr>>>),
+    ArrayElem(VarIdRepr, Vec<WrapSpan<'a, Expr<'a, VarIdRepr>>>),
 
     /// Unary operator application determined by the [UnOp enum](UnOp).
     /// ```text
@@ -366,7 +366,7 @@ pub enum Expr<'a, IdRepr> {
     ///     ),
     /// )
     /// ``
-    UnOp(UnOp, Box<WrapSpan<'a, Expr<'a, IdRepr>>>),
+    UnOp(UnOp, Box<WrapSpan<'a, Expr<'a, VarIdRepr>>>),
 
     /// Binary operator application determined by the [BinOp enum](BinOp).
     /// ```text
@@ -390,9 +390,9 @@ pub enum Expr<'a, IdRepr> {
     /// )
     /// ```
     BinOp(
-        Box<WrapSpan<'a, Expr<'a, IdRepr>>>,
+        Box<WrapSpan<'a, Expr<'a, VarIdRepr>>>,
         BinOp,
-        Box<WrapSpan<'a, Expr<'a, IdRepr>>>,
+        Box<WrapSpan<'a, Expr<'a, VarIdRepr>>>,
     ),
 }
 
@@ -400,59 +400,59 @@ pub enum Expr<'a, IdRepr> {
 /// ```text
 /// AssignLhs = AssignRhs ;
 /// ```
-pub enum AssignLhs<'a, IdRepr> {
+pub enum AssignLhs<'a, VarIdRepr> {
     /// Variable assignment.
     /// ```text
     /// int a = 3 ;
     /// ```
-    Var(IdRepr),
+    Var(VarIdRepr),
 
     /// Array element assignment.
     /// ```text
     /// int[] a = [1,2,3,4] ;
     /// a[0] = 9 ;
     /// ```
-    ArrayElem(IdRepr, Vec<WrapSpan<'a, Expr<'a, IdRepr>>>),
+    ArrayElem(VarIdRepr, Vec<WrapSpan<'a, Expr<'a, VarIdRepr>>>),
 
     /// Assign to the first element of a pair
     /// ```text
     /// pair(int, bool) a = newpair(1, true) ;
     /// fst a = 3 ;
     /// ```
-    PairFst(WrapSpan<'a, Expr<'a, IdRepr>>),
+    PairFst(WrapSpan<'a, Expr<'a, VarIdRepr>>),
 
     /// Assign to the second element of a pair
     /// ```text
     /// pair(int, bool) a = newpair(1, true) ;
     /// snd a = false ;
     /// ```
-    PairSnd(WrapSpan<'a, Expr<'a, IdRepr>>),
+    PairSnd(WrapSpan<'a, Expr<'a, VarIdRepr>>),
 }
 
 /// Righthand side of assignments.
 /// ```text
 /// AssignLhs = AssignRhs ;
 /// ```
-pub enum AssignRhs<'a, IdRepr> {
+pub enum AssignRhs<'a, FunIdRepr, VarIdRepr> {
     /// Assigns an expression.
     /// ```text
     /// int a = 3 + (4 * 5) ;
     /// ```
-    Expr(WrapSpan<'a, Expr<'a, IdRepr>>),
+    Expr(WrapSpan<'a, Expr<'a, VarIdRepr>>),
 
     /// Array assignment by expressions of the same type.
     /// ```text
     /// int[] int_arr = [2, 3 + 3, 4 * 7, 0] ;
     /// ```
-    Array(Vec<WrapSpan<'a, Expr<'a, IdRepr>>>),
+    Array(Vec<WrapSpan<'a, Expr<'a, VarIdRepr>>>),
 
     /// Assigns to a new pair.
     /// ```text
     /// pair(int, bool) a_pair = newpair(3 + 3, true && false) ;
     /// ```
     NewPair(
-        WrapSpan<'a, Expr<'a, IdRepr>>,
-        WrapSpan<'a, Expr<'a, IdRepr>>,
+        WrapSpan<'a, Expr<'a, VarIdRepr>>,
+        WrapSpan<'a, Expr<'a, VarIdRepr>>,
     ),
 
     /// Assign the first element of a given pair.
@@ -460,14 +460,14 @@ pub enum AssignRhs<'a, IdRepr> {
     /// pair(int, bool) a_pair = newpair(1, true) ;
     /// int a_fst = fst a_pair ;
     /// ```
-    PairFst(WrapSpan<'a, Expr<'a, IdRepr>>),
+    PairFst(WrapSpan<'a, Expr<'a, VarIdRepr>>),
 
     /// Assign the second element of a given pair.
     /// ```text
     /// pair(int, bool) a_pair = newpair(1, true) ;
     /// bool a_snd = snd a_pair ;
     /// ```
-    PairSnd(WrapSpan<'a, Expr<'a, IdRepr>>),
+    PairSnd(WrapSpan<'a, Expr<'a, VarIdRepr>>),
 
     /// Assign the return value of a function, with arguments.
     /// ```text
@@ -477,11 +477,11 @@ pub enum AssignRhs<'a, IdRepr> {
     ///
     /// int a = add(3,4) ;
     /// ```
-    Call(String, Vec<WrapSpan<'a, Expr<'a, IdRepr>>>),
+    Call(FunIdRepr, Vec<WrapSpan<'a, Expr<'a, VarIdRepr>>>),
 }
 
 /// Statements for assignment, control flow and definitions.
-pub enum Stat<'a, IdRepr> {
+pub enum Stat<'a, FunIdRepr, VarIdRepr> {
     /// A _no-operation_ instruction.
     Skip,
 
@@ -489,7 +489,7 @@ pub enum Stat<'a, IdRepr> {
     /// ```text
     /// int a = 99;
     /// ```
-    Def(Type, IdRepr, AssignRhs<'a, IdRepr>),
+    Def(Type, VarIdRepr, AssignRhs<'a, FunIdRepr, VarIdRepr>),
 
     /// Assignment (to variable, parts of pairs or arrays).
     /// ```text
@@ -499,21 +499,24 @@ pub enum Stat<'a, IdRepr> {
     /// int[] arr = [1,2,3,4] ;
     /// a[1] = call function(3, 4) ;
     /// ```
-    Assign(AssignLhs<'a, IdRepr>, AssignRhs<'a, IdRepr>),
+    Assign(
+        AssignLhs<'a, VarIdRepr>,
+        AssignRhs<'a, FunIdRepr, VarIdRepr>,
+    ),
 
     /// Read from standard input.
     /// ```text
     /// int a = 9 ;
     /// read a;
     /// ```
-    Read(AssignLhs<'a, IdRepr>),
+    Read(AssignLhs<'a, VarIdRepr>),
 
     /// Free dynamically allocated data structures.
     /// ```text
     /// pair(int, int) a_pair = newpair(3,3) ;
     /// free a_pair ;
     /// ```
-    Free(WrapSpan<'a, Expr<'a, IdRepr>>),
+    Free(WrapSpan<'a, Expr<'a, VarIdRepr>>),
 
     /// Return value from a subroutine/function.
     /// ```text
@@ -521,27 +524,27 @@ pub enum Stat<'a, IdRepr> {
     ///     return 2 * b
     /// end
     /// ```
-    Return(WrapSpan<'a, Expr<'a, IdRepr>>),
+    Return(WrapSpan<'a, Expr<'a, VarIdRepr>>),
 
     /// End the program and return the exit code.
     /// ```text
     /// exit 0 ;
     /// ```
-    Exit(WrapSpan<'a, Expr<'a, IdRepr>>),
+    Exit(WrapSpan<'a, Expr<'a, VarIdRepr>>),
 
     /// Print text to the console.
     /// ```text
     /// int a = 'a' ;
     /// print a ;
     /// ```
-    Print(WrapSpan<'a, Expr<'a, IdRepr>>),
+    Print(WrapSpan<'a, Expr<'a, VarIdRepr>>),
 
     /// Print text to the console and start a new line.
     /// ```text
     /// int a = 'a' ;
     /// print a + 9 ;
     /// ```
-    PrintLn(WrapSpan<'a, Expr<'a, IdRepr>>),
+    PrintLn(WrapSpan<'a, Expr<'a, VarIdRepr>>),
 
     /// If-Else statement to alter control flow.
     /// ```text
@@ -554,9 +557,9 @@ pub enum Stat<'a, IdRepr> {
     /// fi ;
     /// ```
     If(
-        WrapSpan<'a, Expr<'a, IdRepr>>,
-        Vec<WrapSpan<'a, Stat<'a, IdRepr>>>,
-        Vec<WrapSpan<'a, Stat<'a, IdRepr>>>,
+        WrapSpan<'a, Expr<'a, VarIdRepr>>,
+        Vec<WrapSpan<'a, Stat<'a, FunIdRepr, VarIdRepr>>>,
+        Vec<WrapSpan<'a, Stat<'a, FunIdRepr, VarIdRepr>>>,
     ),
 
     /// While Loop control flow structure.
@@ -567,13 +570,13 @@ pub enum Stat<'a, IdRepr> {
     /// done ;
     /// ```
     While(
-        WrapSpan<'a, Expr<'a, IdRepr>>,
-        Vec<WrapSpan<'a, Stat<'a, IdRepr>>>,
+        WrapSpan<'a, Expr<'a, VarIdRepr>>,
+        Vec<WrapSpan<'a, Stat<'a, FunIdRepr, VarIdRepr>>>,
     ),
 }
 
 /// Formal parameter used in functions, containing the type and identifier.
-pub struct Param<IdRepr>(pub Type, IdRepr);
+pub struct Param<VarIdRepr>(pub Type, VarIdRepr);
 
 /// Function definition with the return type, name, parameters, and code body.
 /// ```text
@@ -586,7 +589,7 @@ pub struct Param<IdRepr>(pub Type, IdRepr);
 ///     "int sum(int a, int, b)",
 ///     Function(
 ///         Type::Int,
-///         String::from("sum"),
+///         "sum",
 ///         vec![WrapSpan("int a", Param(Type::Int, "a")),
 ///         WrapSpan("int b", Param(Type::Int, "b")),],
 ///         vec![
@@ -599,17 +602,17 @@ pub struct Param<IdRepr>(pub Type, IdRepr);
 ///     )
 /// )
 /// ```
-pub struct Function<'a, IdRepr>(
+pub struct Function<'a, FunIdRepr, VarIdRepr>(
     pub Type,
-    pub String,
-    pub Vec<WrapSpan<'a, Param<IdRepr>>>,
-    pub Vec<WrapSpan<'a, Stat<'a, IdRepr>>>,
+    pub FunIdRepr,
+    pub Vec<WrapSpan<'a, Param<VarIdRepr>>>,
+    pub Vec<WrapSpan<'a, Stat<'a, FunIdRepr, VarIdRepr>>>,
 );
 
 /// Program is the root of the abstract syntax tree, containing all function
 /// definitions and the main program body, with all nested structures being
 /// associated with the original source code by [wrappers](WrapSpan).
-pub struct Program<'a, IdRepr>(
-    pub Vec<WrapSpan<'a, Function<'a, IdRepr>>>,
-    pub Vec<WrapSpan<'a, Stat<'a, IdRepr>>>,
+pub struct Program<'a, FunIdRepr, VarIdRepr>(
+    pub Vec<WrapSpan<'a, Function<'a, FunIdRepr, VarIdRepr>>>,
+    pub Vec<WrapSpan<'a, Stat<'a, FunIdRepr, VarIdRepr>>>,
 );
