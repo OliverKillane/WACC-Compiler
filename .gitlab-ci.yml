@@ -7,33 +7,19 @@
 #   intention. This will be allowed to run at a later point.
 image: rustlang/rust:nightly
 
-# invalid use of cache: cargo
-# cache: cargo
-
 stages:
   - build
+  - formatter
+  - linter
+  - auditor
   - test
   # - build-release
 
-compiler-build:
+build:
   stage: build
   script:
     - echo "Building the compiler..."
     - cargo build --verbose
-
-compiler-test:
-  stage: test
-  script:
-    - echo "Testing the compiler..."
-    - cargo test --verbose
-
-linter:
-  stage: test
-  before_script:
-  - rustup component add clippy
-  script:
-  # build job fails if there are warnings
-  - cargo clippy -- -D warnings
 
 formatter:
   before_script:
@@ -42,6 +28,14 @@ formatter:
   # build job fails if code is not formatted correctly
   - cargo fmt -- --check
 
+  linter:
+  stage: test
+  before_script:
+  - rustup component add clippy
+  script:
+  # build job fails if there are warnings
+  - cargo clippy -- -D warnings
+
 auditor:
   before_script:
     - cargo install cargo-audit
@@ -49,7 +43,13 @@ auditor:
   script:
     - cargo audit
 
-# compiler-build-release:
+test:
+  stage: test
+  script:
+    - echo "Testing the compiler..."
+    - cargo test --verbose
+
+# build-release:
 #   stage: build-release
 #   script:
 #     - echo "Building release version of compiler..."
