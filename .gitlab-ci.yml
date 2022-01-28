@@ -9,22 +9,47 @@ image: rustlang/rust:nightly
 
 stages:
   - build
+  - formatter
+  - linter
+  - auditor
   - test
-  # - build-release
+# - build-release
 
-compiler-build:
+build:
   stage: build
   script:
     - echo "Building the compiler..."
     - cargo build --verbose
 
-compiler-test:
+formatter:
+  before_script:
+  - rustup component add rustfmt
+  script:
+  # build job fails if code is not formatted correctly
+  - cargo fmt -- --check
+
+linter:
+  stage: test
+  before_script:
+  - rustup component add clippy
+  script:
+  # build job fails if there are warnings
+  - cargo clippy -- -D warnings
+
+auditor:
+  before_script:
+    - cargo install cargo-audit
+    - cargo generate-lockfile
+  script:
+    - cargo audit
+
+test:
   stage: test
   script:
     - echo "Testing the compiler..."
     - cargo test --verbose
 
-# compiler-build-release:
+# build-release:
 #   stage: build-release
 #   script:
 #     - echo "Building release version of compiler..."
