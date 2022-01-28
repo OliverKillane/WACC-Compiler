@@ -20,18 +20,74 @@ use std::collections::HashMap;
 
 use super::ast::{BinOp, Expr, Function, Program, Stat, Type, UnOp, WrapSpan};
 
-type FunctionSymbolTable = HashMap<String, (Type, Vec<Type>)>;
-type VariableSymbolTable = HashMap<usize, Type>;
+/// Function symbol table, holds the globally accessible functions.
+pub struct FunctionSymbolTable(HashMap<String, (Type, Vec<Type>)>);
+
+impl FunctionSymbolTable {
+    fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    /// Define a function with the type (Return type, [param types])
+    fn def_fun(&mut self, ident: String, fun_type: (Type, Vec<Type>)) {
+        self.0.insert(ident, fun_type);
+    }
+
+    /// Get the type of a given function
+    fn get_fun(&self, ident: &str) -> Option<(Type, Vec<Type>)> {
+        match self.0.get(ident) {
+            Some(fun_type) => Some(fun_type.clone()),
+            None => None,
+        }
+    }
+}
+
+/// A flat variable symbol table with all variables renamed to integers, and associated with types.
+pub struct VariableSymbolTable(HashMap<usize, Type>);
+
+impl VariableSymbolTable {
+    fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    /// Define a variable with a type, identifier, and span of definition. 
+    /// Define it within the scope of the local symbol table.
+    fn def_var<'a, 'b>(&mut self, ident: &'a str, var_type: Type, span: &'a str, local: &mut LocalSymbolTable<'a, 'b>) -> Option<SemanticError<'a>> {
+        match local.in_scope(ident) {
+            Some(def) => Some(SemanticError::RepeatDefinitionVariable(ident, def)),
+            None => {
+                let id = self.0.len();
+                self.0.insert(id, var_type);
+                local.add_var(ident, id, span);
+                None
+            },
+        }
+    }
+
+    /// Get the type of a variable from the vantage point of the local scope.
+    fn get_type<'a, 'b>(&self, ident: &'a str, local: &mut LocalSymbolTable<'a, 'b>) -> Option<Type> {
+        match local.get_var(ident) {
+            Some((id, _)) => Some(
+                self.0
+                    .get(&id)
+                    .expect("Failure: symbol in local table but not global.")
+                    .clone(),
+            ),
+            None => None,
+        }
+    }
+}
+
 
 /// A chainable local symbol table, used to translate the current (and parent)
 /// scope variables to integers for use in the flat variable symbol table and the definition of the variable.
 struct LocalSymbolTable<'a, 'b> {
     current: HashMap<&'a str, (usize, &'a str)>,
-    parent: Option<&'b LocalSymbolTable<'a, 'b>>,
+    parent: Option<&'b Self>,
 }
 
 impl<'a, 'b> LocalSymbolTable<'a, 'b> {
-    /// Create a new root scope (no parent)
+    /// Create a new root scope (no parent).
     fn new_root() -> Self {
         LocalSymbolTable {
             current: HashMap::new(),
@@ -39,7 +95,7 @@ impl<'a, 'b> LocalSymbolTable<'a, 'b> {
         }
     }
 
-    /// Create new child scope local symbol table
+    /// Create new child scope local symbol table.
     fn new_child(parent: &'b LocalSymbolTable<'a, 'b>) -> Self {
         LocalSymbolTable {
             current: HashMap::new(),
@@ -83,6 +139,7 @@ impl<'a, 'b> LocalSymbolTable<'a, 'b> {
         }
     }
 }
+
 
 /// Holds the type constraints for an expression (concrete types, pointer type).
 /// ```text
@@ -558,7 +615,7 @@ mod tests {
 
         assert_eq!(symb_parent.current.len(), 2);
 
-        let mut symb_child = LocalSymbolTable::new_child(&symb_parent);
+        let symb_child = LocalSymbolTable::new_child(&symb_parent);
 
         assert_eq!(symb_child.get_var("var1"), Some((0, "int var1 = 9")));
         assert_eq!(symb_child.get_var("var2"), Some((1, "bool var2 = true")));
@@ -598,7 +655,7 @@ mod tests {
     }
 
     #[test]
-    fn local_symb_sibling_scopes_disjoint() {
+    fn local_symb_sibling_scopes_isolated() {
         let mut symb_parent = LocalSymbolTable::new_root();
 
         symb_parent.add_var("var1", 0, "int var1 = 9");
@@ -638,5 +695,126 @@ mod tests {
         symb_tab.add_var("var1", 0, "int var1 = 9");
 
         symb_tab.add_var("var1", 1, "bool var2 = true");
+    }
+
+
+    #[test]
+    fn var_symb_can_define_variables() {
+        let mut var_symb = VariableSymbolTable::new();
+        let mut local_symb = LocalSymbolTable::new_root(); 
+
+        assert_eq!(var_symb.def_var("var1", Type::Int, "int var1 = 9", & mut local_symb), None);
+        assert_eq!(var_symb.def_var("var2", Type::Char, "char var2 = 'a'", & mut local_symb), None);
+        
+        assert_eq!(local_symb.current.len(), 2);
+    }
+
+    fn var_symb_cannot_redefine_variables_in_same_scope() {
+        let mut var_symb = VariableSymbolTable::new();
+        let mut local_symb = LocalSymbolTable::new_root(); 
+
+        assert_eq!(var_symb.def_var("var1", Type::Int, "int var1 = 9", &mut local_symb), None);
+        assert_eq!(var_symb.def_var("var2", Type::Char, "char var2 = 'a'", &mut local_symb), None);
+
+        assert_eq!(var_symb.def_var("var1", Type::Bool, "bool var1 = true", &mut local_symb), Some(SemanticError::RepeatDefinitionVariable("var1", "int var1 = 9")));
+        assert_eq!(var_symb.def_var("var2", Type::Char, "char var2 = 'b'", &mut local_symb), Some(SemanticError::RepeatDefinitionVariable("var2", "int var1 = 9")));
+
+        assert_eq!(var_symb.get_type("var1", &mut local_symb), Some(Type::Int));
+        assert_eq!(var_symb.get_type("var2", &mut local_symb), Some(Type::Char));
+        
+        assert_eq!(local_symb.current.len(), 2);
+        assert_eq!(var_symb.0.len(), 2);
+
+    }
+
+    #[test]
+    fn var_symb_can_reference_variables_in_parent_scope() {
+        let mut var_symb = VariableSymbolTable::new();
+        let mut local_symb = LocalSymbolTable::new_root(); 
+
+        assert_eq!(var_symb.def_var("var1", Type::Int, "int var1 = 9", &mut local_symb), None);
+        assert_eq!(var_symb.def_var("var2", Type::Char, "char var2 = 'a'", &mut local_symb), None);
+
+        let mut symb_child = LocalSymbolTable::new_child(&local_symb);
+
+        assert_eq!(var_symb.get_type("var1", &mut symb_child), Some(Type::Int));
+        assert_eq!(var_symb.get_type("var2", &mut symb_child), Some(Type::Char));
+    }
+ 
+    #[test]
+    fn var_symb_can_define_variables_in_child_scope() {
+        let mut var_symb = VariableSymbolTable::new();
+        let mut parent_symb = LocalSymbolTable::new_root(); 
+
+        assert_eq!(var_symb.def_var("var1", Type::Int, "int var1 = 9", &mut parent_symb), None);
+        assert_eq!(var_symb.def_var("var2", Type::Char, "char var2 = 'a'", &mut parent_symb), None);
+
+        {
+            let mut symb_child = LocalSymbolTable::new_child(& parent_symb);
+
+            assert_eq!(var_symb.def_var("var3", Type::String, "string var3 = \"hello world\"", &mut symb_child), None);
+            assert_eq!(var_symb.def_var("var4", Type::Pair(box Type::Int, box Type::Int), "pair(int, int) var3 = null", &mut symb_child), None);
+
+            assert_eq!(var_symb.get_type("var3", &mut symb_child), Some(Type::String));
+            assert_eq!(var_symb.get_type("var4", &mut symb_child), Some(Type::Pair(box Type::Int, box Type::Int)));
+        }
+
+        assert_eq!(var_symb.get_type("var3", &mut parent_symb), None);
+        assert_eq!(var_symb.get_type("var4", &mut parent_symb), None);
+    }
+
+    #[test]
+    fn var_symb_can_shadow_variables_in_parent_scope() {
+        let mut var_symb = VariableSymbolTable::new();
+        let mut parent_symb = LocalSymbolTable::new_root(); 
+
+        assert_eq!(var_symb.def_var("var1", Type::Int, "int var1 = 5", &mut parent_symb), None);
+
+        let mut child_symb = LocalSymbolTable::new_child(&parent_symb);
+
+        assert_eq!(var_symb.def_var("var1", Type::Char, "char var1 = 'a'", &mut child_symb), None);
+
+        assert_eq!(var_symb.0.len(), 2);
+    }
+
+    #[test]
+    fn var_symb_sibling_scopes_isolated() {
+        let mut var_symb = VariableSymbolTable::new();
+        let mut parent_symb = LocalSymbolTable::new_root(); 
+
+        assert_eq!(var_symb.def_var("var1", Type::Int, "int var1 = 5", &mut parent_symb), None);
+
+        {
+            let mut child_symb = LocalSymbolTable::new_child(&parent_symb);
+            assert_eq!(var_symb.def_var("var3", Type::Char, "char var3 = 'a'", &mut child_symb), None);
+            assert_eq!(var_symb.get_type("var1", &mut child_symb), Some(Type::Int));
+            assert_eq!(var_symb.get_type("var3", &mut child_symb), Some(Type::Char));
+            assert_eq!(var_symb.0.len(), 2);
+        }
+
+        {
+            let mut child_symb = LocalSymbolTable::new_child(&parent_symb);
+            assert_eq!(var_symb.def_var("var3", Type::Int, "int var1 = 3", &mut child_symb), None);
+            assert_eq!(var_symb.get_type("var1", &mut child_symb), Some(Type::Int));
+            assert_eq!(var_symb.get_type("var3", &mut child_symb), Some(Type::Int));
+            assert_eq!(var_symb.0.len(), 3);
+        }
+    }
+
+    #[test]
+    fn var_symb_cannot_redefine_in_the_same_scope() {
+        let mut var_symb = VariableSymbolTable::new();
+        let mut local_symb = LocalSymbolTable::new_root();
+
+        assert_eq!(var_symb.def_var("var1", Type::Int, "int var1 = 5", &mut local_symb), None);
+        assert_eq!(var_symb.def_var("var1", Type::Char, "char var1 = 'a'", &mut local_symb),  Some(SemanticError::RepeatDefinitionVariable("var1", "int var1 = 5")));
+    }
+
+    #[test]
+    fn fun_symb_can_define_functions() {
+        let mut fun_symb = FunctionSymbolTable::new();
+
+        fun_symb.def_fun(String::from("fun1"), (Type::Int, vec![Type::Int, Type::Char]));
+        assert_eq!(fun_symb.get_fun("fun1"), Some((Type::Int, vec![Type::Int, Type::Char])));
     }
 }
