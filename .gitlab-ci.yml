@@ -28,7 +28,7 @@ formatter:
   # build job fails if code is not formatted correctly
   - cargo fmt -- --check
 
-  linter:
+linter:
   stage: test
   before_script:
   - rustup component add clippy
