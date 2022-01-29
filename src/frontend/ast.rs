@@ -159,9 +159,13 @@ pub enum Type {
 
 /// The semantics of type checking are encoded through implementing equality.
 /// - primitive types match eachother
-/// - The generic type matches itself, and 
-/// 
-/// 
+/// - Any type matches anything.
+/// - The generic type matches itself, it is used by the semantic analyser,
+///   when propagated as an expected type it is converted to an Any. It is used
+///   to check types for '==' where both sides are an "Any" but must be the
+///   same.
+/// - Array Types match taking into account nesting of array types
+///   (e.g Array(Array(int),1),1) == Array(int, 2) )
 impl PartialEq for Type {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -677,23 +681,29 @@ mod test {
 
     #[test]
     fn type_eq_any_type_matches_anything() {
-            assert_eq!(Type::Any, Type::Int);    
-            assert_eq!(Type::Int, Type::Any, );    
-            assert_eq!(Type::Any, Type::Char);
-            assert_eq!(Type::Char, Type::Any, );
-            assert_eq!(Type::Any, Type::Bool);
-            assert_eq!(Type::Bool, Type::Any, );
-            assert_eq!(Type::Any, Type::String);
-            assert_eq!(Type::String, Type::Any, );
-            assert_eq!(Type::Any, Type::Pair(box Type::Any, box Type::Any));
-            assert_eq!(Type::Pair(box Type::Any, box Type::Any), Type::Any);
-            assert_eq!(Type::Any, Type::Array(box Type::Pair(box Type::Int, box Type::Char), 4));
-            assert_eq!(Type::Array(box Type::Pair(box Type::Int, box Type::Char), 4), Type::Any);
-            assert_eq!(Type::Any, Type::Generic);
-            assert_eq!(Type::Generic, Type::Any, );
-            assert_eq!(Type::Any, Type::Array(box Type::Int, 1));
-            assert_eq!(Type::Array(box Type::Int, 1), Type::Any);
-            assert_eq!(Type::Any, Type::Any);
+        assert_eq!(Type::Any, Type::Int);
+        assert_eq!(Type::Int, Type::Any,);
+        assert_eq!(Type::Any, Type::Char);
+        assert_eq!(Type::Char, Type::Any,);
+        assert_eq!(Type::Any, Type::Bool);
+        assert_eq!(Type::Bool, Type::Any,);
+        assert_eq!(Type::Any, Type::String);
+        assert_eq!(Type::String, Type::Any,);
+        assert_eq!(Type::Any, Type::Pair(box Type::Any, box Type::Any));
+        assert_eq!(Type::Pair(box Type::Any, box Type::Any), Type::Any);
+        assert_eq!(
+            Type::Any,
+            Type::Array(box Type::Pair(box Type::Int, box Type::Char), 4)
+        );
+        assert_eq!(
+            Type::Array(box Type::Pair(box Type::Int, box Type::Char), 4),
+            Type::Any
+        );
+        assert_eq!(Type::Any, Type::Generic);
+        assert_eq!(Type::Generic, Type::Any,);
+        assert_eq!(Type::Any, Type::Array(box Type::Int, 1));
+        assert_eq!(Type::Array(box Type::Int, 1), Type::Any);
+        assert_eq!(Type::Any, Type::Any);
     }
 
     #[test]
@@ -703,11 +713,26 @@ mod test {
 
     #[test]
     fn type_eq_differently_nested_array_types_are_equal() {
-        assert_eq!(Type::Array(box Type::Array(box Type::Int, 2), 3), Type::Array(box Type::Int, 5));
-        assert_eq!(Type::Array(box Type::Array(box Type::Any, 2), 3), Type::Array(box Type::Int, 5));
-        assert_eq!(Type::Array(box Type::Array(box Type::Any, 2), 3), Type::Array(box Type::Array(box Type::Int, 2), 3));
-        assert_eq!(Type::Array(box Type::Any, 1), Type::Array(box Type::Pair(box Type::Generic, box Type::Int), 3));
-        assert_eq!(Type::Array(box Type::Char, 3), Type::Array(box Type::Array(box Type::Array(box Type::Char, 1), 1), 1))
+        assert_eq!(
+            Type::Array(box Type::Array(box Type::Int, 2), 3),
+            Type::Array(box Type::Int, 5)
+        );
+        assert_eq!(
+            Type::Array(box Type::Array(box Type::Any, 2), 3),
+            Type::Array(box Type::Int, 5)
+        );
+        assert_eq!(
+            Type::Array(box Type::Array(box Type::Any, 2), 3),
+            Type::Array(box Type::Array(box Type::Int, 2), 3)
+        );
+        assert_eq!(
+            Type::Array(box Type::Any, 1),
+            Type::Array(box Type::Pair(box Type::Generic, box Type::Int), 3)
+        );
+        assert_eq!(
+            Type::Array(box Type::Char, 3),
+            Type::Array(box Type::Array(box Type::Array(box Type::Char, 1), 1), 1)
+        )
     }
 
     #[test]

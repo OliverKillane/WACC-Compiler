@@ -169,8 +169,101 @@ impl<'a, 'b> LocalSymbolTable<'a, 'b> {
 /// ```
 /// TypeConstraint(vec![Type::Int, Type::Char, Type::String, Type::Bool], true)
 /// ```
-#[derive(Debug, PartialEq, Eq)]
-pub struct TypeConstraint(Vec<Type>, bool);
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct TypeConstraint(Vec<Type>);
+
+impl TypeConstraint {
+    /// Given unary operators and types, create a new typeconstraint.
+    /// - 'Generic';' types are converted to 'Any'
+    /// - If Any is included, shortcuts to a single Any (all inclusive)
+    /// - Further type shadowing is not done (costly)
+    pub fn new_from_unops(op_types: Vec<(UnOp, Type)>) -> Self {
+        let mut new_cons = Vec::new();
+        for (_, in_type) in op_types {
+            match in_type {
+                Type::Any | Type::Generic => return TypeConstraint(vec![Type::Any]),
+                other_type => new_cons.push(other_type),
+            }
+        }
+        TypeConstraint(new_cons)
+    }
+
+    /// Given a binary operator and left input, right input types, returns a
+    /// new type constraint for both left and right expressions.
+    pub fn new_from_binops(op_types: Vec<(BinOp, Type, Type)>) -> (Self, Self) {
+        let mut new_left_cons = Vec::new();
+        let mut left_any = false;
+
+        let mut new_right_cons = Vec::new();
+        let mut right_any = false;
+
+        for (_, left_type, right_type) in op_types {
+            if !left_any {
+                match left_type {
+                    Type::Any | Type::Generic => left_any = true,
+                    other_type => new_left_cons.push(other_type),
+                }
+            }
+            if !right_any {
+                match right_type {
+                    Type::Any | Type::Generic => right_any = true,
+                    other_type => new_right_cons.push(other_type),
+                }
+            }
+            if left_any && right_any {
+                break;
+            }
+        }
+
+        (
+            if left_any {
+                TypeConstraint(vec![Type::Any])
+            } else {
+                TypeConstraint(new_left_cons)
+            },
+            if right_any {
+                TypeConstraint(vec![Type::Any])
+            } else {
+                TypeConstraint(new_right_cons)
+            },
+        )
+    }
+
+    /// Check if a type is within the constraint
+    pub fn inside(&self, t: &Type) -> bool {
+        self.0.contains(t)
+    }
+
+    /// Given the type constraint is for the output, find all unary operators
+    /// that conform to the the constraint, and the associated input types.
+    pub fn get_unops(&self) -> Vec<(UnOp, Type)> {
+        UNOPS
+            .clone()
+            .into_iter()
+            .filter_map(|(unop, input, output)| {
+                if self.inside(&output) {
+                    Some((unop, input))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn get_binops(&self) -> Vec<(BinOp, Type, Type)> {
+        BINOPS
+            .clone()
+            .into_iter()
+            .filter_map(|(binop, output, left_input, right_input)| {
+                if self.inside(&output) {
+                    Some((binop, left_input, right_input))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+}
 
 /// Contains a single error within an expression.
 #[derive(Debug, PartialEq, Eq)]
@@ -507,6 +600,42 @@ const KEYWORDS: [&'static str; 32] = [
     "char", "string", "pair", "len", "ord", "chr", "true", "false", "null",
 ];
 
+/// Unary Operations allowed (operator, input type, output type)
+/// - To add overloading, simply add more tuples
+/// - Handled by the type constrain system when analysing expressions
+lazy_static! {
+    static ref UNOPS: [(UnOp, Type, Type); 5] = [
+        (UnOp::Neg, Type::Bool, Type::Bool),
+        (UnOp::Minus, Type::Int, Type::Int),
+        (UnOp::Len, Type::Array(box Type::Any, 1), Type::Int),
+        (UnOp::Ord, Type::Char, Type::Int),
+        (UnOp::Chr, Type::Int, Type::Char)
+    ];
+}
+
+/// Binary operations allowed (operator, left input, right input, output)
+/// - To add overloading, simply add more tuples
+/// - Handled by the type constrain system when analysing expressions
+static BINOPS: [(BinOp, Type, Type, Type); 17] = [
+    (BinOp::Add, Type::Int, Type::Int, Type::Int),
+    (BinOp::Sub, Type::Int, Type::Int, Type::Int),
+    (BinOp::Mul, Type::Int, Type::Int, Type::Int),
+    (BinOp::Div, Type::Int, Type::Int, Type::Int),
+    (BinOp::Mod, Type::Int, Type::Int, Type::Int),
+    (BinOp::Gt, Type::Bool, Type::Int, Type::Int),
+    (BinOp::Gt, Type::Bool, Type::Char, Type::Char),
+    (BinOp::Gte, Type::Bool, Type::Int, Type::Int),
+    (BinOp::Gte, Type::Bool, Type::Char, Type::Char),
+    (BinOp::Lt, Type::Bool, Type::Int, Type::Int),
+    (BinOp::Lt, Type::Bool, Type::Char, Type::Char),
+    (BinOp::Lte, Type::Bool, Type::Int, Type::Int),
+    (BinOp::Lte, Type::Bool, Type::Char, Type::Char),
+    (BinOp::Eq, Type::Bool, Type::Generic, Type::Generic),
+    (BinOp::Ne, Type::Bool, Type::Generic, Type::Generic),
+    (BinOp::And, Type::Bool, Type::Bool, Type::Bool),
+    (BinOp::Or, Type::Bool, Type::Bool, Type::Bool),
+];
+
 /// Gets the current symbol table and returns:
 /// - Symbol table of function identifier to function type
 /// - Vector of functions with correct declarations (no repeated/keyword name/s
@@ -764,6 +893,7 @@ mod tests {
         assert_eq!(local_symb.current.len(), 2);
     }
 
+    #[test]
     fn var_symb_cannot_redefine_variables_in_same_scope() {
         let mut var_symb = VariableSymbolTable::new();
         let mut local_symb = LocalSymbolTable::new_root();
@@ -788,7 +918,7 @@ mod tests {
             var_symb.def_var("var2", Type::Char, "char var2 = 'b'", &mut local_symb),
             Some(SemanticError::RepeatDefinitionVariable(
                 "var2",
-                "int var1 = 9"
+                "char var2 = 'a'"
             ))
         );
 
@@ -1423,5 +1553,217 @@ mod tests {
         assert_eq!(fn_symb_expected, fn_symb);
         assert_eq!(valid_fns_expected, valid_fns);
         assert_eq!(errors_expected, errors);
+    }
+
+    #[test]
+    fn type_constraint_can_detect_inside() {
+        let type_cons = TypeConstraint(vec![Type::Int, Type::Char]);
+
+        assert!(type_cons.inside(&Type::Int));
+        assert!(type_cons.inside(&Type::Char));
+
+        // Any can match any type
+        assert!(type_cons.inside(&Type::Any));
+
+        // Check for constraint
+        assert_eq!(type_cons.inside(&Type::String), false);
+        assert_eq!(
+            type_cons.inside(&Type::Pair(box Type::Char, box Type::Any)),
+            false
+        );
+        assert_eq!(type_cons.inside(&Type::Generic), false);
+        assert_eq!(type_cons.inside(&Type::Array(box Type::Any, 1)), false);
+        assert_eq!(type_cons.inside(&Type::Bool), false);
+    }
+
+    #[test]
+    fn type_constraint_any_matches_all() {
+        let type_cons = TypeConstraint(vec![Type::Any]);
+
+        assert!(type_cons.inside(&Type::Int));
+        assert!(type_cons.inside(&Type::Char));
+        assert!(type_cons.inside(&Type::Bool));
+        assert!(type_cons.inside(&Type::String));
+        assert!(type_cons.inside(&Type::Pair(box Type::Any, box Type::Any)));
+        assert!(type_cons.inside(&Type::Array(box Type::Int, 1)));
+        assert!(type_cons.inside(&Type::Generic));
+        assert!(type_cons.inside(&Type::Any));
+        assert!(type_cons.inside(&Type::Pair(
+            box Type::Array(box Type::Int, 2),
+            box Type::Generic
+        )));
+    }
+
+    #[test]
+    fn type_constraint_empty_matches_nothing() {
+        let type_cons = TypeConstraint(vec![]);
+
+        assert_eq!(type_cons.inside(&Type::Int), false);
+        assert_eq!(type_cons.inside(&Type::Char), false);
+        assert_eq!(type_cons.inside(&Type::Bool), false);
+        assert_eq!(type_cons.inside(&Type::String), false);
+        assert_eq!(
+            type_cons.inside(&Type::Pair(box Type::Any, box Type::Any)),
+            false
+        );
+        assert_eq!(type_cons.inside(&Type::Array(box Type::Int, 1)), false);
+        assert_eq!(type_cons.inside(&Type::Generic), false);
+        assert_eq!(type_cons.inside(&Type::Any), false);
+        assert_eq!(
+            type_cons.inside(&Type::Pair(
+                box Type::Array(box Type::Int, 2),
+                box Type::Generic
+            )),
+            false
+        );
+    }
+
+    #[test]
+    fn type_constraint_gets_unary_ops() {
+        let res = TypeConstraint(vec![Type::Int]).get_unops();
+
+        assert!(res.contains(&(UnOp::Len, Type::Array(box Type::Any, 1))));
+        assert!(res.contains(&(UnOp::Minus, Type::Int)));
+        assert!(res.contains(&(UnOp::Ord, Type::Char)));
+
+        assert_eq!(res.len(), 3);
+    }
+
+    #[test]
+    fn type_constraints_can_constraint_to_pointers() {
+        let ptr_cons = TypeConstraint(vec![
+            Type::Array(box Type::Any, 1),
+            Type::Pair(box Type::Any, box Type::Any),
+        ]);
+
+        assert!(ptr_cons.inside(&Type::Array(box Type::Int, 4)));
+        assert!(ptr_cons.inside(&Type::Array(
+            box Type::Pair(box Type::Char, box Type::Char),
+            1
+        )));
+        assert!(ptr_cons.inside(&Type::Array(box Type::Array(box Type::Bool, 3), 4)));
+        assert!(ptr_cons.inside(&Type::Pair(box Type::Int, box Type::Char)));
+        assert!(ptr_cons.inside(&Type::Pair(
+            box Type::Pair(box Type::Any, box Type::Any),
+            box Type::Pair(box Type::Any, box Type::Any)
+        )));
+        assert!(ptr_cons.inside(&Type::Any));
+
+        assert_eq!(ptr_cons.inside(&Type::Char), false);
+        assert_eq!(ptr_cons.inside(&Type::Bool), false);
+        assert_eq!(ptr_cons.inside(&Type::String), false);
+    }
+
+    #[test]
+    fn type_constraint_gets_binary_ops() {
+        let res_int = TypeConstraint(vec![Type::Int]).get_binops();
+
+        assert!(res_int.contains(&(BinOp::Add, Type::Int, Type::Int)));
+        assert!(res_int.contains(&(BinOp::Sub, Type::Int, Type::Int)));
+        assert!(res_int.contains(&(BinOp::Mul, Type::Int, Type::Int)));
+        assert!(res_int.contains(&(BinOp::Div, Type::Int, Type::Int)));
+        assert!(res_int.contains(&(BinOp::Mod, Type::Int, Type::Int)));
+
+        assert_eq!(res_int.len(), 5);
+
+        let res_bool = TypeConstraint(vec![Type::Bool]).get_binops();
+
+        assert!(res_bool.contains(&(BinOp::Gt, Type::Int, Type::Int)));
+        assert!(res_bool.contains(&(BinOp::Gt, Type::Char, Type::Char)));
+        assert!(res_bool.contains(&(BinOp::Gte, Type::Int, Type::Int)));
+        assert!(res_bool.contains(&(BinOp::Gte, Type::Char, Type::Char)));
+        assert!(res_bool.contains(&(BinOp::Lt, Type::Int, Type::Int)));
+        assert!(res_bool.contains(&(BinOp::Lt, Type::Char, Type::Char)));
+        assert!(res_bool.contains(&(BinOp::Lte, Type::Int, Type::Int)));
+        assert!(res_bool.contains(&(BinOp::Lte, Type::Char, Type::Char)));
+        assert!(res_bool.contains(&(BinOp::Eq, Type::Generic, Type::Generic)));
+        assert!(res_bool.contains(&(BinOp::Ne, Type::Generic, Type::Generic)));
+        assert!(res_bool.contains(&(BinOp::And, Type::Bool, Type::Bool)));
+        assert!(res_bool.contains(&(BinOp::Or, Type::Bool, Type::Bool)));
+
+        assert_eq!(res_bool.len(), 12);
+    }
+
+    #[test]
+    fn type_constraint_gets_operators_with_any() {
+        let res_binops = TypeConstraint(vec![Type::Any]).get_binops();
+
+        assert!(res_binops.contains(&(BinOp::Add, Type::Int, Type::Int)));
+        assert!(res_binops.contains(&(BinOp::Sub, Type::Int, Type::Int)));
+        assert!(res_binops.contains(&(BinOp::Mul, Type::Int, Type::Int)));
+        assert!(res_binops.contains(&(BinOp::Div, Type::Int, Type::Int)));
+        assert!(res_binops.contains(&(BinOp::Mod, Type::Int, Type::Int)));
+        assert!(res_binops.contains(&(BinOp::Gt, Type::Int, Type::Int)));
+        assert!(res_binops.contains(&(BinOp::Gt, Type::Char, Type::Char)));
+        assert!(res_binops.contains(&(BinOp::Gte, Type::Int, Type::Int)));
+        assert!(res_binops.contains(&(BinOp::Gte, Type::Char, Type::Char)));
+        assert!(res_binops.contains(&(BinOp::Lt, Type::Int, Type::Int)));
+        assert!(res_binops.contains(&(BinOp::Lt, Type::Char, Type::Char)));
+        assert!(res_binops.contains(&(BinOp::Lte, Type::Int, Type::Int)));
+        assert!(res_binops.contains(&(BinOp::Lte, Type::Char, Type::Char)));
+        assert!(res_binops.contains(&(BinOp::Eq, Type::Generic, Type::Generic)));
+        assert!(res_binops.contains(&(BinOp::Ne, Type::Generic, Type::Generic)));
+        assert!(res_binops.contains(&(BinOp::And, Type::Bool, Type::Bool)));
+        assert!(res_binops.contains(&(BinOp::Or, Type::Bool, Type::Bool)));
+
+        assert_eq!(res_binops.len(), 17);
+    }
+
+    #[test]
+    fn type_constraint_gets_new_from_unary_operators() {
+        let new_cons = TypeConstraint::new_from_unops(TypeConstraint(vec![Type::Int]).get_unops());
+
+        assert!(new_cons.inside(&Type::Int));
+        assert!(new_cons.inside(&Type::Array(box Type::Any, 1)));
+        assert!(new_cons.inside(&Type::Char));
+
+        assert_eq!(new_cons.inside(&Type::String), false);
+        assert_eq!(
+            new_cons.inside(&Type::Pair(box Type::Any, box Type::Any)),
+            false
+        );
+    }
+
+    #[test]
+    fn type_constraint_gets_new_from_binary_operators() {
+        let (left_cons, right_cons) =
+            TypeConstraint::new_from_binops(TypeConstraint(vec![Type::Bool]).get_binops());
+
+        // due to T == T we should get any (any two types can be compared, must be the same)
+        assert!(left_cons.inside(&Type::Int));
+        assert!(right_cons.inside(&Type::Int));
+        assert!(left_cons.inside(&Type::Bool));
+        assert!(right_cons.inside(&Type::Bool));
+        assert!(left_cons.inside(&Type::Char));
+        assert!(right_cons.inside(&Type::Char));
+        assert!(left_cons.inside(&Type::String));
+        assert!(right_cons.inside(&Type::String));
+        assert!(left_cons.inside(&Type::Pair(box Type::Int, box Type::Char)));
+        assert!(right_cons.inside(&Type::Pair(box Type::Int, box Type::Char)));
+        assert!(left_cons.inside(&Type::Array(box Type::Int, 3)));
+        assert!(right_cons.inside(&Type::Array(box Type::Int, 3)));
+
+        let (left_cons, right_cons) =
+            TypeConstraint::new_from_binops(TypeConstraint(vec![Type::Int]).get_binops());
+
+        // Currently the only binary operators returning integers are +,-,/,%,*
+        assert!(left_cons.inside(&Type::Int));
+        assert!(right_cons.inside(&Type::Int));
+        assert_eq!(left_cons.inside(&Type::Bool), false);
+        assert_eq!(right_cons.inside(&Type::Bool), false);
+        assert_eq!(left_cons.inside(&Type::Char), false);
+        assert_eq!(right_cons.inside(&Type::Char), false);
+        assert_eq!(left_cons.inside(&Type::String), false);
+        assert_eq!(right_cons.inside(&Type::String), false);
+        assert_eq!(
+            left_cons.inside(&Type::Pair(box Type::Int, box Type::Char)),
+            false
+        );
+        assert_eq!(
+            right_cons.inside(&Type::Pair(box Type::Int, box Type::Char)),
+            false
+        );
+        assert_eq!(left_cons.inside(&Type::Array(box Type::Int, 3)), false);
+        assert_eq!(right_cons.inside(&Type::Array(box Type::Int, 3)), false);
     }
 }
