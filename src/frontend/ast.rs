@@ -98,7 +98,7 @@
 pub struct WrapSpan<'a, T>(pub &'a str, pub T);
 
 /// Type specification in WACC.
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, Eq)]
 pub enum Type {
     /// Integer primitive type.
     Int,
@@ -112,14 +112,18 @@ pub enum Type {
     /// String primitive type.
     String,
 
-    /// Typeless pair type. Can be coerced from or to any regular pair type.
+    /// Any type (matches all). Used for type coercion
     /// ```text
     /// pair(pair, pair)
     /// ```
     /// ```
-    /// Type::Pair(box Type::GenericPair, box Type::GenericPair)
+    /// Type::Pair(box Type::Pair(box Type::Any), box Type::Pair(box Type::Any))
     /// ```
-    GenericPair,
+    Any,
+
+    /// Used as a single generic type, must match other generic types in its
+    /// context.
+    Generic,
 
     /// Typed pair type. The arguments to the nameless tuple are the types of
     /// the first and second field of the pair respectively.
@@ -151,6 +155,40 @@ pub enum Type {
     /// Type::Array(box Type::Int, 3)
     /// ```
     Array(Box<Type>, usize),
+}
+
+/// The semantics of type checking are encoded through implementing equality.
+/// - primitive types match eachother
+/// - The generic type matches itself, and 
+/// 
+/// 
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Type::Int, Type::Int)
+            | (Type::Bool, Type::Bool)
+            | (Type::Char, Type::Char)
+            | (Type::String, Type::String)
+            | (Type::Generic, Type::Generic) => true,
+            (Type::Any, _) => true,
+            (_, Type::Any) => true,
+            (Type::Pair(box a1, box a2), Type::Pair(box b1, box b2)) => a1 == b1 && a2 == b2,
+            (Type::Array(box a, dim_a), Type::Array(box b, dim_b)) => {
+                if dim_a == dim_b {
+                    a == b
+                } else if dim_a > dim_b {
+                    &Type::Array(box a.clone(), dim_a - dim_b) == b
+                } else {
+                    a == &Type::Array(box b.clone(), dim_b - dim_a)
+                }
+            }
+            _ => false,
+        }
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
 }
 
 /// All unary operators supported by WACC and used in [expressions](Expr).
@@ -623,3 +661,76 @@ pub struct Program<'a, FunIdRepr, VarIdRepr>(
     pub Vec<WrapSpan<'a, Function<'a, FunIdRepr, VarIdRepr>>>,
     pub Vec<WrapSpan<'a, Stat<'a, FunIdRepr, VarIdRepr>>>,
 );
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    // Tests for the implementation of equality on types
+    #[test]
+    fn type_eq_primitive_types_are_equal() {
+        assert_eq!(Type::Int, Type::Int);
+        assert_eq!(Type::Char, Type::Char);
+        assert_eq!(Type::String, Type::String);
+        assert_eq!(Type::Bool, Type::Bool);
+    }
+
+    #[test]
+    fn type_eq_any_type_matches_anything() {
+            assert_eq!(Type::Any, Type::Int);    
+            assert_eq!(Type::Int, Type::Any, );    
+            assert_eq!(Type::Any, Type::Char);
+            assert_eq!(Type::Char, Type::Any, );
+            assert_eq!(Type::Any, Type::Bool);
+            assert_eq!(Type::Bool, Type::Any, );
+            assert_eq!(Type::Any, Type::String);
+            assert_eq!(Type::String, Type::Any, );
+            assert_eq!(Type::Any, Type::Pair(box Type::Any, box Type::Any));
+            assert_eq!(Type::Pair(box Type::Any, box Type::Any), Type::Any);
+            assert_eq!(Type::Any, Type::Array(box Type::Pair(box Type::Int, box Type::Char), 4));
+            assert_eq!(Type::Array(box Type::Pair(box Type::Int, box Type::Char), 4), Type::Any);
+            assert_eq!(Type::Any, Type::Generic);
+            assert_eq!(Type::Generic, Type::Any, );
+            assert_eq!(Type::Any, Type::Array(box Type::Int, 1));
+            assert_eq!(Type::Array(box Type::Int, 1), Type::Any);
+            assert_eq!(Type::Any, Type::Any);
+    }
+
+    #[test]
+    fn type_eq_generic_type_matches_itself() {
+        assert_eq!(Type::Generic, Type::Generic);
+    }
+
+    #[test]
+    fn type_eq_differently_nested_array_types_are_equal() {
+        assert_eq!(Type::Array(box Type::Array(box Type::Int, 2), 3), Type::Array(box Type::Int, 5));
+        assert_eq!(Type::Array(box Type::Array(box Type::Any, 2), 3), Type::Array(box Type::Int, 5));
+        assert_eq!(Type::Array(box Type::Array(box Type::Any, 2), 3), Type::Array(box Type::Array(box Type::Int, 2), 3));
+        assert_eq!(Type::Array(box Type::Any, 1), Type::Array(box Type::Pair(box Type::Generic, box Type::Int), 3));
+        assert_eq!(Type::Array(box Type::Char, 3), Type::Array(box Type::Array(box Type::Array(box Type::Char, 1), 1), 1))
+    }
+
+    #[test]
+    fn type_eq_differentiates_between_primitive_and_generic_types() {
+        assert_ne!(Type::Int, Type::Bool);
+        assert_ne!(Type::Int, Type::Char);
+        assert_ne!(Type::Int, Type::String);
+        assert_ne!(Type::Int, Type::Generic);
+        assert_ne!(Type::Bool, Type::Int);
+        assert_ne!(Type::Bool, Type::Char);
+        assert_ne!(Type::Bool, Type::String);
+        assert_ne!(Type::Bool, Type::Generic);
+        assert_ne!(Type::Char, Type::Int);
+        assert_ne!(Type::Char, Type::Bool);
+        assert_ne!(Type::Char, Type::String);
+        assert_ne!(Type::Char, Type::Generic);
+        assert_ne!(Type::String, Type::Int);
+        assert_ne!(Type::String, Type::Bool);
+        assert_ne!(Type::String, Type::Char);
+        assert_ne!(Type::String, Type::Generic);
+        assert_ne!(Type::Generic, Type::Int);
+        assert_ne!(Type::Generic, Type::Bool);
+        assert_ne!(Type::Generic, Type::Char);
+        assert_ne!(Type::Generic, Type::String);
+    }
+}
