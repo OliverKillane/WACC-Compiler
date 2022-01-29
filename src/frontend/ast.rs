@@ -253,7 +253,7 @@ pub enum Expr<'a, IdRepr> {
     ///     ),
     /// );
     /// ```
-    Int(u32),
+    Int(i32),
 
     /// Boolean constants
     /// ```text
@@ -481,6 +481,7 @@ pub enum AssignRhs<'a, IdRepr> {
 }
 
 /// Statements for assignment, control flow and definitions.
+// #[derive(Clone)]
 pub enum Stat<'a, IdRepr> {
     /// A _no-operation_ instruction.
     Skip,
@@ -570,10 +571,19 @@ pub enum Stat<'a, IdRepr> {
         WrapSpan<'a, Expr<'a, IdRepr>>,
         Vec<WrapSpan<'a, Stat<'a, IdRepr>>>,
     ),
+
+    /// Block control flow structure.
+    /// ```text
+    /// int n = 0 ;
+    /// begin
+    ///     n = n + 1
+    /// end ;
+    /// ```
+    Block(Vec<WrapSpan<'a, Stat<'a, IdRepr>>>),
 }
 
 /// Formal parameter used in functions, containing the type and identifier.
-pub struct Param<IdRepr>(pub Type, IdRepr);
+pub struct Param<IdRepr>(pub Type, pub IdRepr);
 
 /// Function definition with the return type, name, parameters, and code body.
 /// ```text
