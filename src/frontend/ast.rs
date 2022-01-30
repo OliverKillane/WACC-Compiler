@@ -98,7 +98,7 @@
 pub struct WrapSpan<'a, T>(pub &'a str, pub T);
 
 /// Type specification in WACC.
-#[derive(Clone, Debug, Hash, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Type {
     /// Integer primitive type.
     Int,
@@ -157,23 +157,18 @@ pub enum Type {
     Array(Box<Type>, usize),
 }
 
-/// The semantics of type checking are encoded through implementing equality.
-/// - primitive types match eachother
-/// - Any type matches anything.
-/// - The generic type matches itself, it is used by the semantic analyser,
-///   when propagated as an expected type it is converted to an Any. It is used
-///   to check types for '==' where both sides are an "Any" but must be the
-///   same.
-/// - Array Types match taking into account nesting of array types
-///   (e.g Array(Array(int),1),1) == Array(int, 2) )
-impl PartialEq for Type {
-    fn eq(&self, other: &Self) -> bool {
+impl Type {
+    /// The semantics of type checking/when types can coalesce.
+    /// - primitive types match eachother
+    /// - Any type matches anything.
+    /// - The generic type matches itself, it is used by the semantic analyser,
+    ///   when propagated as an expected type it is converted to an Any. It is used
+    ///   to check types for '==' where both sides are an "Any" but must be the
+    ///   same.
+    /// - Array Types match taking into account nesting of array types
+    ///   (e.g Array(Array(int),1),1) == Array(int, 2) )
+    pub fn coalesce(&self, other: &Self) -> bool {
         match (self, other) {
-            (Type::Int, Type::Int)
-            | (Type::Bool, Type::Bool)
-            | (Type::Char, Type::Char)
-            | (Type::String, Type::String)
-            | (Type::Generic, Type::Generic) => true,
             (Type::Any, _) => true,
             (_, Type::Any) => true,
             (Type::Pair(box a1, box a2), Type::Pair(box b1, box b2)) => a1 == b1 && a2 == b2,
@@ -186,12 +181,8 @@ impl PartialEq for Type {
                     a == &Type::Array(box b.clone(), dim_b - dim_a)
                 }
             }
-            _ => false,
+            (ta, tb) => ta == tb,
         }
-    }
-
-    fn ne(&self, other: &Self) -> bool {
-        !self.eq(other)
     }
 }
 
@@ -295,7 +286,7 @@ pub enum Expr<'a, VarIdRepr> {
     ///     ),
     /// );
     /// ```
-    Int(u32),
+    Int(i32),
 
     /// Boolean constants
     /// ```text
@@ -408,7 +399,7 @@ pub enum Expr<'a, VarIdRepr> {
     ///     ),
     /// )
     /// ``
-    UnOp(UnOp, Box<WrapSpan<'a, Expr<'a, VarIdRepr>>>),
+    UnOp(WrapSpan<'a, UnOp>, Box<WrapSpan<'a, Expr<'a, VarIdRepr>>>),
 
     /// Binary operator application determined by the [BinOp enum](BinOp).
     /// ```text
@@ -433,7 +424,7 @@ pub enum Expr<'a, VarIdRepr> {
     /// ```
     BinOp(
         Box<WrapSpan<'a, Expr<'a, VarIdRepr>>>,
-        BinOp,
+        WrapSpan<'a, BinOp>,
         Box<WrapSpan<'a, Expr<'a, VarIdRepr>>>,
     ),
 }
@@ -673,89 +664,80 @@ mod test {
     // Tests for the implementation of equality on types
     #[test]
     fn type_eq_primitive_types_are_equal() {
-        assert_eq!(Type::Int, Type::Int);
-        assert_eq!(Type::Char, Type::Char);
-        assert_eq!(Type::String, Type::String);
-        assert_eq!(Type::Bool, Type::Bool);
+        assert!(Type::Int.coalesce(&Type::Int));
+        assert!(Type::Char.coalesce(&Type::Char));
+        assert!(Type::String.coalesce(&Type::String));
+        assert!(Type::Bool.coalesce(&Type::Bool));
     }
 
     #[test]
     fn type_eq_any_type_matches_anything() {
-        assert_eq!(Type::Any, Type::Int);
-        assert_eq!(Type::Int, Type::Any,);
-        assert_eq!(Type::Any, Type::Char);
-        assert_eq!(Type::Char, Type::Any,);
-        assert_eq!(Type::Any, Type::Bool);
-        assert_eq!(Type::Bool, Type::Any,);
-        assert_eq!(Type::Any, Type::String);
-        assert_eq!(Type::String, Type::Any,);
-        assert_eq!(Type::Any, Type::Pair(box Type::Any, box Type::Any));
-        assert_eq!(Type::Pair(box Type::Any, box Type::Any), Type::Any);
-        assert_eq!(
-            Type::Any,
-            Type::Array(box Type::Pair(box Type::Int, box Type::Char), 4)
-        );
-        assert_eq!(
-            Type::Array(box Type::Pair(box Type::Int, box Type::Char), 4),
-            Type::Any
-        );
-        assert_eq!(Type::Any, Type::Generic);
-        assert_eq!(Type::Generic, Type::Any,);
-        assert_eq!(Type::Any, Type::Array(box Type::Int, 1));
-        assert_eq!(Type::Array(box Type::Int, 1), Type::Any);
-        assert_eq!(Type::Any, Type::Any);
+        assert!(Type::Any.coalesce(&Type::Int));
+        assert!(Type::Int.coalesce(&Type::Any,));
+        assert!(Type::Any.coalesce(&Type::Char));
+        assert!(Type::Char.coalesce(&Type::Any,));
+        assert!(Type::Any.coalesce(&Type::Bool));
+        assert!(Type::Bool.coalesce(&Type::Any,));
+        assert!(Type::Any.coalesce(&Type::String));
+        assert!(Type::String.coalesce(&Type::Any,));
+        assert!(Type::Any.coalesce(&Type::Pair(box Type::Any, box Type::Any)));
+        assert!(Type::Pair(box Type::Any, box Type::Any).coalesce(&Type::Any));
+        assert!(Type::Any.coalesce(&Type::Array(
+            box Type::Pair(box Type::Int, box Type::Char),
+            4
+        )));
+        assert!(Type::Array(box Type::Pair(box Type::Int, box Type::Char), 4).coalesce(&Type::Any));
+        assert!(Type::Any.coalesce(&Type::Generic));
+        assert!(Type::Generic.coalesce(&Type::Any,));
+        assert!(Type::Any.coalesce(&Type::Array(box Type::Int, 1)));
+        assert!(Type::Array(box Type::Int, 1).coalesce(&Type::Any));
+        assert!(Type::Any.coalesce(&Type::Any));
     }
 
     #[test]
     fn type_eq_generic_type_matches_itself() {
-        assert_eq!(Type::Generic, Type::Generic);
+        assert!(Type::Generic.coalesce(&Type::Generic));
     }
 
     #[test]
     fn type_eq_differently_nested_array_types_are_equal() {
-        assert_eq!(
-            Type::Array(box Type::Array(box Type::Int, 2), 3),
-            Type::Array(box Type::Int, 5)
-        );
-        assert_eq!(
-            Type::Array(box Type::Array(box Type::Any, 2), 3),
-            Type::Array(box Type::Int, 5)
-        );
-        assert_eq!(
-            Type::Array(box Type::Array(box Type::Any, 2), 3),
-            Type::Array(box Type::Array(box Type::Int, 2), 3)
-        );
-        assert_eq!(
-            Type::Array(box Type::Any, 1),
-            Type::Array(box Type::Pair(box Type::Generic, box Type::Int), 3)
-        );
-        assert_eq!(
-            Type::Array(box Type::Char, 3),
-            Type::Array(box Type::Array(box Type::Array(box Type::Char, 1), 1), 1)
-        )
+        assert!(Type::Array(box Type::Array(box Type::Int, 2), 3)
+            .coalesce(&Type::Array(box Type::Int, 5)));
+        assert!(Type::Array(box Type::Array(box Type::Any, 2), 3)
+            .coalesce(&Type::Array(box Type::Int, 5)));
+        assert!(Type::Array(box Type::Array(box Type::Any, 2), 3)
+            .coalesce(&Type::Array(box Type::Array(box Type::Int, 2), 3)));
+        assert!(Type::Array(box Type::Any, 1).coalesce(&Type::Array(
+            box Type::Pair(box Type::Generic, box Type::Int),
+            3
+        )));
+        assert!(Type::Array(box Type::Char, 3).coalesce(&Type::Array(
+            box Type::Array(box Type::Array(box Type::Char, 1), 1),
+            1
+        )))
     }
 
     #[test]
     fn type_eq_differentiates_between_primitive_and_generic_types() {
-        assert_ne!(Type::Int, Type::Bool);
-        assert_ne!(Type::Int, Type::Char);
-        assert_ne!(Type::Int, Type::String);
-        assert_ne!(Type::Int, Type::Generic);
-        assert_ne!(Type::Bool, Type::Int);
-        assert_ne!(Type::Bool, Type::Char);
-        assert_ne!(Type::Bool, Type::String);
-        assert_ne!(Type::Bool, Type::Generic);
-        assert_ne!(Type::Char, Type::Int);
-        assert_ne!(Type::Char, Type::Bool);
-        assert_ne!(Type::Char, Type::String);
-        assert_ne!(Type::Char, Type::Generic);
-        assert_ne!(Type::String, Type::Int);
-        assert_ne!(Type::String, Type::Bool);
-        assert_ne!(Type::String, Type::Char);
-        assert_ne!(Type::String, Type::Generic);
-        assert_ne!(Type::Generic, Type::Int);
-        assert_ne!(Type::Generic, Type::Bool);
-        assert_ne!(Type::Generic, Type::Char);
-        assert_ne!(Type::Generic, Type::String);
+        assert_eq!(Type::Int.coalesce(&Type::Bool), false);
+        assert_eq!(Type::Int.coalesce(&Type::Char), false);
+        assert_eq!(Type::Int.coalesce(&Type::String), false);
+        assert_eq!(Type::Int.coalesce(&Type::Generic), false);
+        assert_eq!(Type::Bool.coalesce(&Type::Int), false);
+        assert_eq!(Type::Bool.coalesce(&Type::Char), false);
+        assert_eq!(Type::Bool.coalesce(&Type::String), false);
+        assert_eq!(Type::Bool.coalesce(&Type::Generic), false);
+        assert_eq!(Type::Char.coalesce(&Type::Int), false);
+        assert_eq!(Type::Char.coalesce(&Type::Bool), false);
+        assert_eq!(Type::Char.coalesce(&Type::String), false);
+        assert_eq!(Type::Char.coalesce(&Type::Generic), false);
+        assert_eq!(Type::String.coalesce(&Type::Int), false);
+        assert_eq!(Type::String.coalesce(&Type::Bool), false);
+        assert_eq!(Type::String.coalesce(&Type::Char), false);
+        assert_eq!(Type::String.coalesce(&Type::Generic), false);
+        assert_eq!(Type::Generic.coalesce(&Type::Int), false);
+        assert_eq!(Type::Generic.coalesce(&Type::Bool), false);
+        assert_eq!(Type::Generic.coalesce(&Type::Char), false);
+        assert_eq!(Type::Generic.coalesce(&Type::String), false);
     }
 }
