@@ -645,3 +645,8 @@ pub struct Program<'a, IdRepr>(
     pub Vec<WrapSpan<'a, Function<'a, IdRepr>>>,
     pub Vec<StatSpan<'a, IdRepr>>,
 );
+
+//"(1 + 1) >= (3 * -2)"
+//"(1 * 1) + (3 * -2)"
+//"(1 + 1) + (3 * -2)"
+//"(ord 'a' == 65) || (true && !false)"
