@@ -188,8 +188,8 @@ impl Type {
     ///   (e.g Array(Array(int),1),1) == Array(int, 2) )
     pub fn coalesce(&self, other: &Self) -> bool {
         match (self, other) {
-            (Type::Any | Type::Generic, _) => true,
-            (_, Type::Any | Type::Generic) => true,
+            (Type::Any | Type::Generic(_), _) => true,
+            (_, Type::Any | Type::Generic(_)) => true,
             (Type::Pair(box a1, box a2), Type::Pair(box b1, box b2)) => {
                 a1.coalesce(b1) && a2.coalesce(b2)
             }
@@ -368,8 +368,8 @@ impl TypeConstraint {
             op == binop
                 && left_type.coalesce(left_in)
                 && right_type.coalesce(right_in)
-                && if left_in == &Type::Generic && right_in == &Type::Generic {
-                    left_type.coalesce(right_type)
+                && if let (Type::Generic(a), Type::Generic(b)) = (left_in, right_in) {
+                    a == b && left_type.coalesce(right_type)
                 } else {
                     true
                 }
@@ -378,15 +378,15 @@ impl TypeConstraint {
 
     /// Get all possible binary operators that could be applied to the inputs
     /// with an output inside the constraint.
-    fn get_possible_binops(&self, left_input: &Type, right_input: &Type) -> Vec<BinOp> {
+    fn get_possible_binops(&self, left_type: &Type, right_type: &Type) -> Vec<BinOp> {
         BINOPS
             .iter()
             .filter_map(|(binop, out, left_in, right_in)| {
                 if self.inside(out)
-                    && left_input.coalesce(left_in)
+                    && left_type.coalesce(left_in)
                     && right_in.coalesce(right_in)
-                    && if left_in == &Type::Generic && right_in == &Type::Generic {
-                        left_input.coalesce(right_input)
+                    && if let (Type::Generic(a), Type::Generic(b)) = (left_in, right_in) {
+                        a == b && left_type.coalesce(right_type)
                     } else {
                         true
                     }
@@ -837,8 +837,8 @@ const BINOPS: [(BinOp, Type, Type, Type); 17] = [
     (BinOp::Lt, Type::Bool, Type::Char, Type::Char),
     (BinOp::Lte, Type::Bool, Type::Int, Type::Int),
     (BinOp::Lte, Type::Bool, Type::Char, Type::Char),
-    (BinOp::Eq, Type::Bool, Type::Generic, Type::Generic),
-    (BinOp::Ne, Type::Bool, Type::Generic, Type::Generic),
+    (BinOp::Eq, Type::Bool, Type::Generic(0), Type::Generic(0)),
+    (BinOp::Ne, Type::Bool, Type::Generic(0), Type::Generic(0)),
     (BinOp::And, Type::Bool, Type::Bool, Type::Bool),
     (BinOp::Or, Type::Bool, Type::Bool, Type::Bool),
 ];
@@ -873,15 +873,15 @@ fn get_binop_output_type(
 /// *Note:* the parameter identifiers are not checked, that is done when the
 /// function body analysis is done.
 fn get_fn_symbols<'a>(
-    fn_defs: Vec<WrapSpan<'a, Function<'a, &'a str, &'a str>>>,
+    fn_defs: Vec<WrapSpan<'a, Function<'a, &'a str>>>,
 ) -> (
     FunctionSymbolTable,
-    Vec<Function<'a, &'a str, &'a str>>,
+    Vec<Function<'a, &'a str>>,
     SemanticErrorSummary<'a>,
 ) {
     let mut fun_symb = FunctionSymbolTable::new();
     let mut def_table: HashMap<&str, &str> = HashMap::new();
-    let mut valid_fun: Vec<Function<'a, &'a str, &'a str>> = Vec::new();
+    let mut valid_fun: Vec<Function<'a, &'a str>> = Vec::new();
     let mut errors: SemanticErrorSummary = Vec::new();
 
     for WrapSpan(fn_def_span, Function(ret_type, fn_name, params, stats)) in fn_defs {
@@ -2029,7 +2029,7 @@ mod tests {
 
         // Any can match any type
         assert!(type_cons.inside(&Type::Any));
-        assert!(type_cons.inside(&Type::Generic));
+        assert!(type_cons.inside(&Type::Generic(0)));
 
         // Check for constraint
         assert_eq!(type_cons.inside(&Type::String), false);
@@ -2051,11 +2051,11 @@ mod tests {
         assert!(type_cons.inside(&Type::String));
         assert!(type_cons.inside(&Type::Pair(box Type::Any, box Type::Any)));
         assert!(type_cons.inside(&Type::Array(box Type::Int, 1)));
-        assert!(type_cons.inside(&Type::Generic));
+        assert!(type_cons.inside(&Type::Generic(0)));
         assert!(type_cons.inside(&Type::Any));
         assert!(type_cons.inside(&Type::Pair(
             box Type::Array(box Type::Int, 2),
-            box Type::Generic
+            box Type::Generic(0)
         )));
     }
 
@@ -2072,12 +2072,12 @@ mod tests {
             false
         );
         assert_eq!(type_cons.inside(&Type::Array(box Type::Int, 1)), false);
-        assert_eq!(type_cons.inside(&Type::Generic), false);
+        assert_eq!(type_cons.inside(&Type::Generic(0)), false);
         assert_eq!(type_cons.inside(&Type::Any), false);
         assert_eq!(
             type_cons.inside(&Type::Pair(
                 box Type::Array(box Type::Int, 2),
-                box Type::Generic
+                box Type::Generic(0)
             )),
             false
         );
@@ -2280,8 +2280,8 @@ mod tests {
             4
         )));
         assert!(Type::Array(box Type::Pair(box Type::Int, box Type::Char), 4).coalesce(&Type::Any));
-        assert!(Type::Any.coalesce(&Type::Generic));
-        assert!(Type::Generic.coalesce(&Type::Any,));
+        assert!(Type::Any.coalesce(&Type::Generic(0)));
+        assert!(Type::Generic(0).coalesce(&Type::Any,));
         assert!(Type::Any.coalesce(&Type::Array(box Type::Int, 1)));
         assert!(Type::Array(box Type::Int, 1).coalesce(&Type::Any));
         assert!(Type::Any.coalesce(&Type::Any));
@@ -2289,7 +2289,7 @@ mod tests {
 
     #[test]
     fn type_coalesce_generic_type_matches_itself() {
-        assert!(Type::Generic.coalesce(&Type::Generic));
+        assert!(Type::Generic(0).coalesce(&Type::Generic(0)));
     }
 
     #[test]
@@ -2301,7 +2301,7 @@ mod tests {
         assert!(Type::Array(box Type::Array(box Type::Any, 2), 3)
             .coalesce(&Type::Array(box Type::Array(box Type::Int, 2), 3)));
         assert!(Type::Array(box Type::Any, 1).coalesce(&Type::Array(
-            box Type::Pair(box Type::Generic, box Type::Int),
+            box Type::Pair(box Type::Generic(0), box Type::Int),
             3
         )));
         assert!(Type::Array(box Type::Char, 3).coalesce(&Type::Array(
