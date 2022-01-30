@@ -8,29 +8,23 @@ use crate::frontend::ast::*;
 use crate::frontend::semantic::semantic_errors::*;
 use std::collections::HashMap;
 
-const KEYWORDS: [&'static str; 32] = [
-    "begin", "end", "is", "skip", "read", "free", "return", "exit", "print", "println", "if",
-    "then", "else", "fi", "while", "do", "done", "newpair", "call", "fst", "snd", "int", "bool",
-    "char", "string", "pair", "len", "ord", "chr", "true", "false", "null",
-];
-
 /// Function symbol table, holds the globally accessible functions identifier
-/// by strings.
+/// (string references) and the types and names of parameters
 #[derive(Debug, PartialEq, Eq)]
-pub struct FunctionSymbolTable(HashMap<String, (Type, Vec<Type>)>);
+pub struct FunctionSymbolTable<'a>(HashMap<&'a str, (Type, Vec<(&'a str, Type)>)>);
 
-impl FunctionSymbolTable {
+impl<'a> FunctionSymbolTable<'a> {
     pub fn new() -> Self {
         Self(HashMap::new())
     }
 
     /// Define a function with the type (Return type, [param types]).
-    pub fn def_fun(&mut self, ident: String, fun_type: (Type, Vec<Type>)) {
+    pub fn def_fun(&mut self, ident: &'a str, fun_type: (Type, Vec<(&'a str, Type)>)) {
         self.0.insert(ident, fun_type);
     }
 
     /// Get the type of a given function by its identifier.
-    pub fn get_fun(&self, ident: &str) -> Option<(Type, Vec<Type>)> {
+    pub fn get_fun(&self, ident: &str) -> Option<(Type, Vec<(&'a str, Type)>)> {
         match self.0.get(ident) {
             Some(fun_type) => Some(fun_type.clone()),
             None => None,
@@ -190,12 +184,12 @@ fn get_fn_symbols<'a>(
             )),
             None => {
                 fun_symb.def_fun(
-                    String::from(fn_name),
+                    fn_name,
                     (
                         ret_type.clone(),
                         params
                             .iter()
-                            .map(|WrapSpan(_, Param(t, _))| t.clone())
+                            .map(|WrapSpan(_, Param(t, name))| (*name, t.clone()))
                             .collect(),
                     ),
                 );
@@ -566,12 +560,12 @@ mod tests {
         let mut fun_symb = FunctionSymbolTable::new();
 
         fun_symb.def_fun(
-            String::from("fun1"),
-            (Type::Int, vec![Type::Int, Type::Char]),
+            "fun1",
+            (Type::Int, vec![("a", Type::Int), ("b", Type::Char)]),
         );
         assert_eq!(
             fun_symb.get_fun("fun1"),
-            Some((Type::Int, vec![Type::Int, Type::Char]))
+            Some((Type::Int, vec![("a", Type::Int), ("b", Type::Char)]))
         );
     }
 
@@ -616,14 +610,14 @@ mod tests {
         let (fn_symb, valid_fns, errors) = get_fn_symbols(fn_defs);
 
         let mut fn_symb_expected = FunctionSymbolTable::new();
-        fn_symb_expected.def_fun(String::from("fun1"), (Type::Int, vec![Type::Int]));
+        fn_symb_expected.def_fun("fun1", (Type::Int, vec![("a", Type::Int)]));
         fn_symb_expected.def_fun(
-            String::from("example"),
-            (Type::Char, vec![Type::Int, Type::String]),
+            "example",
+            (Type::Char, vec![("a", Type::Int), ("b", Type::String)]),
         );
         fn_symb_expected.def_fun(
-            String::from("logical_or"),
-            (Type::Bool, vec![Type::Bool, Type::Bool]),
+            "logical_or",
+            (Type::Bool, vec![("x", Type::Bool), ("y", Type::Bool)]),
         );
 
         let valid_fns_expected = vec![
@@ -701,10 +695,10 @@ mod tests {
         let (fn_symb, valid_fns, errors) = get_fn_symbols(fn_defs);
 
         let mut fn_symb_expected = FunctionSymbolTable::new();
-        fn_symb_expected.def_fun(String::from("fun1"), (Type::Int, vec![Type::Int]));
+        fn_symb_expected.def_fun("fun1", (Type::Int, vec![("a", Type::Int)]));
         fn_symb_expected.def_fun(
-            String::from("example"),
-            (Type::Char, vec![Type::Int, Type::String]),
+            "example",
+            (Type::Char, vec![("a", Type::Int),("b", Type::String)]),
         );
 
         let valid_fns_expected = vec![
@@ -755,7 +749,7 @@ mod tests {
                     "example",
                     vec![
                         WrapSpan("int a", Param(Type::Int, "a")),
-                        WrapSpan("string begin", Param(Type::String, "begin")),
+                        WrapSpan("string str", Param(Type::String, "str")),
                     ],
                     vec![],
                 ),
@@ -777,14 +771,14 @@ mod tests {
         let (fn_symb, valid_fns, errors) = get_fn_symbols(fn_defs);
 
         let mut fn_symb_expected = FunctionSymbolTable::new();
-        fn_symb_expected.def_fun(String::from("fun1"), (Type::Int, vec![Type::Int]));
+        fn_symb_expected.def_fun("fun1", (Type::Int, vec![("a", Type::Int)]));
         fn_symb_expected.def_fun(
-            String::from("example"),
-            (Type::Char, vec![Type::Int, Type::String]),
+            "example",
+            (Type::Char, vec![("a", Type::Int), ("str", Type::String)]),
         );
         fn_symb_expected.def_fun(
-            String::from("logical_or"),
-            (Type::Bool, vec![Type::Bool, Type::Bool]),
+            "logical_or",
+            (Type::Bool, vec![("x", Type::Bool), ("y", Type::Bool)]),
         );
 
         let valid_fns_expected = vec![
@@ -799,7 +793,7 @@ mod tests {
                 "example",
                 vec![
                     WrapSpan("int a", Param(Type::Int, "a")),
-                    WrapSpan("string begin", Param(Type::String, "begin")),
+                    WrapSpan("string str", Param(Type::String, "str")),
                 ],
                 vec![],
             ),
