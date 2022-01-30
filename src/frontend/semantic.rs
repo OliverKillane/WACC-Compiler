@@ -2,25 +2,37 @@
 //! This module takes the provided AST and returns:
 //! - Flat Symbol table of variables (identified by usize number)
 //! - Symbol table of functions (string identifiers maintained)
-//! - AST with renamed variable symbols
+//! - AST with renamed variable symbols (to usize integers)
 //!
 //! ## Error Results
 //! Error printing is handled by the errors module, this module provides it
 //! type, error and location (through string references) information.
 //!
+//! Errors returned can include the [expression errors](ExpressionError) which can
+//! contain multiple errors, and indicates if they are from one part, or the
+//! whole expression.
+//!
 //! ## Expression type checking
 //! Given an expression, we can check it by providing the allowed types. It will
 //! then use the allowed types, types for operators to find any expression errors.
 //!
-//! As the expression is traversed, more restrictions on types are imposed by the
-//! operators used, and the operator used can determine a subexpression's
-//! correctness immediately.
+//! A type constraint system is used, by which constraints can be transformed by
+//! operators and allow for expressions to evaluate to multiple types (e.g
+//! println <expr>).
+//!
+//! Types for operators are defined in the [unops](UNOPS) and [binops](BINOPS)
+//! tables such that any new tuples added to the table can update an operators
+//! semantics with *no other code changes*.
+//!
+//! expressions can have multiple errors in different parts, and rich
+//! suggestions for types and operators are provided.
 
 use std::collections::HashMap;
 
 use super::ast::{BinOp, Expr, Function, Param, Program, Stat, Type, UnOp, WrapSpan};
 
-/// Function symbol table, holds the globally accessible functions.
+/// Function symbol table, holds the globally accessible functions identifier
+/// by strings.
 #[derive(Debug, PartialEq, Eq)]
 pub struct FunctionSymbolTable(HashMap<String, (Type, Vec<Type>)>);
 
@@ -29,12 +41,12 @@ impl FunctionSymbolTable {
         Self(HashMap::new())
     }
 
-    /// Define a function with the type (Return type, [param types])
+    /// Define a function with the type (Return type, [param types]).
     fn def_fun(&mut self, ident: String, fun_type: (Type, Vec<Type>)) {
         self.0.insert(ident, fun_type);
     }
 
-    /// Get the type of a given function
+    /// Get the type of a given function by its identifier.
     fn get_fun(&self, ident: &str) -> Option<(Type, Vec<Type>)> {
         match self.0.get(ident) {
             Some(fun_type) => Some(fun_type.clone()),
@@ -43,7 +55,9 @@ impl FunctionSymbolTable {
     }
 }
 
-/// A flat variable symbol table with all variables renamed to integers, and associated with types.
+/// A flat variable symbol table with all variables renamed to integers,
+/// and associated with types identifiable through usize integers (same as in
+/// the renamed AST).
 pub struct VariableSymbolTable(HashMap<usize, Type>);
 
 impl VariableSymbolTable {
@@ -51,8 +65,8 @@ impl VariableSymbolTable {
         Self(HashMap::new())
     }
 
-    /// Define a variable with a type, identifier, and span of definition.
-    /// Define it within the scope of the local symbol table.
+    /// Define a variable with a type, identifier, and span of definition within
+    /// the scope of the local symbol table.
     fn def_var<'a, 'b>(
         &mut self,
         ident: &'a str,
@@ -75,22 +89,34 @@ impl VariableSymbolTable {
     fn get_type<'a, 'b>(
         &self,
         ident: &'a str,
-        local: &mut LocalSymbolTable<'a, 'b>,
-    ) -> Option<Type> {
+        local: &LocalSymbolTable<'a, 'b>,
+    ) -> Option<(usize, Type)> {
         match local.get_var(ident) {
-            Some((id, _)) => Some(
+            Some((id, _)) => Some((
+                id,
                 self.0
                     .get(&id)
                     .expect("Failure: symbol in local table but not global.")
                     .clone(),
-            ),
+            )),
             None => None,
         }
     }
 }
 
 /// A chainable local symbol table, used to translate the current (and parent)
-/// scope variables to integers for use in the flat variable symbol table and the definition of the variable.
+/// scope variables to integers for use in the flat variable symbol table and
+/// the definition of the variable.
+///
+/// Used as a key to get variables by their string identifiers from the
+/// variable symbol table.
+/// ```
+/// let mut var_symb = VariableSymbolTable::new();
+/// let mut local_symb = LocalSymbolTable::new_root();
+///
+/// // define in current (local_symb) scope
+/// var_symb.def_var("var1", Type::Int, "int var1 = 9", &mut local_symb);
+/// ```
 struct LocalSymbolTable<'a, 'b> {
     current: HashMap<&'a str, (usize, &'a str)>,
     parent: Option<&'b Self>,
@@ -150,99 +176,94 @@ impl<'a, 'b> LocalSymbolTable<'a, 'b> {
     }
 }
 
-/// Holds the type constraints for an expression (concrete types, pointer type).
+/// Holds the type constraints for an expression.
 /// ```text
 /// int a = <exp>
 /// ```
 /// ```
-/// TypeConstraint(vec![Type::Int], false)
+/// TypeConstraint(vec![Type::Int])
 /// ```
 /// ```text
 /// free <exp>
 /// ```
 /// ```
-/// TypeConstraint(vec![], true)
+/// TypeConstraint(vec![Type::Array(box Type::Any, 1), Type::Pair(box Type::Any, box Type::Any)])
 /// ```
 /// ```text
-/// println <exp>
+/// if (<exp> == <exp>)
 /// ```
 /// ```
-/// TypeConstraint(vec![Type::Int, Type::Char, Type::String, Type::Bool], true)
+/// // for both exp:
+/// TypeConstraint(vec![Type::Generic], true)
+///
+/// // for full expression
+/// TypeConstraint(vec![Type::Bool], true)
 /// ```
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TypeConstraint(Vec<Type>);
 
 impl TypeConstraint {
-    /// Given unary operators and types, create a new typeconstraint.
-    /// - 'Generic';' types are converted to 'Any'
-    /// - If Any is included, shortcuts to a single Any (all inclusive)
-    /// - Further type shadowing is not done (costly)
-    pub fn new_from_unops(op_types: Vec<(UnOp, Type)>) -> Self {
-        let mut new_cons = Vec::new();
-        for (_, in_type) in op_types {
-            match in_type {
-                Type::Any | Type::Generic => return TypeConstraint(vec![Type::Any]),
-                other_type => new_cons.push(other_type),
-            }
+    /// Check if a type is within the constraint.
+    ///
+    /// If the type will coalesce to any in the constraint then it is 'inside'.
+    fn inside(&self, check_type: &Type) -> bool {
+        self.0.iter().any(|con_type| con_type.coalesce(check_type))
+    }
+
+    /// Given a unary operator, and the current constraints:
+    /// - If the unary operator output matches the constraints, return the new
+    ///   type constraint with its input types.
+    /// - If the unary operator does not match, check for all possible
+    ///   operators.
+    fn new_from_unop(&self, unop: &UnOp) -> Result<Self, Self> {
+        if self.unop_output_inside(unop) {
+            // unary operator output matches the constraint, so use in
+            // determining new constraint
+            Ok(TypeConstraint(
+                UNOPS
+                    .iter()
+                    .filter_map(|(op, input_type, output_type)| {
+                        if self.inside(output_type) && op == unop {
+                            Some(input_type.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+            ))
+        } else {
+            // unary operator does not work, so attempt with all possible
+            // unary operators
+            Err(TypeConstraint(
+                UNOPS
+                    .iter()
+                    .filter_map(|(_, input_type, output_type)| {
+                        if self.inside(output_type) {
+                            Some(input_type.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+            ))
         }
-        TypeConstraint(new_cons)
     }
 
-    /// Given a binary operator and left input, right input types, returns a
-    /// new type constraint for both left and right expressions.
-    pub fn new_from_binops(op_types: Vec<(BinOp, Type, Type)>) -> (Self, Self) {
-        let mut new_left_cons = Vec::new();
-        let mut left_any = false;
-
-        let mut new_right_cons = Vec::new();
-        let mut right_any = false;
-
-        for (_, left_type, right_type) in op_types {
-            if !left_any {
-                match left_type {
-                    Type::Any | Type::Generic => left_any = true,
-                    other_type => new_left_cons.push(other_type),
-                }
-            }
-            if !right_any {
-                match right_type {
-                    Type::Any | Type::Generic => right_any = true,
-                    other_type => new_right_cons.push(other_type),
-                }
-            }
-            if left_any && right_any {
-                break;
-            }
-        }
-
-        (
-            if left_any {
-                TypeConstraint(vec![Type::Any])
-            } else {
-                TypeConstraint(new_left_cons)
-            },
-            if right_any {
-                TypeConstraint(vec![Type::Any])
-            } else {
-                TypeConstraint(new_right_cons)
-            },
-        )
-    }
-
-    /// Check if a type is within the constraint
-    pub fn inside(&self, t: &Type) -> bool {
-        self.0.contains(t)
-    }
-
-    /// Given the type constraint is for the output, find all unary operators
-    /// that conform to the the constraint, and the associated input types.
-    pub fn get_unops(&self) -> Vec<(UnOp, Type)> {
+    /// Check that unary operator output is inside the constraint.
+    fn unop_output_inside(&self, unop: &UnOp) -> bool {
         UNOPS
-            .clone()
-            .into_iter()
-            .filter_map(|(unop, input, output)| {
-                if self.inside(&output) {
-                    Some((unop, input))
+            .iter()
+            .any(|(op, _, out)| op == unop && self.inside(out))
+    }
+
+    /// Given the constraint and the input type, get all possible unary
+    /// operators that take the input and whose output is inside the constraint.
+    fn get_possible_unops(&self, input_type: &Type) -> Vec<UnOp> {
+        UNOPS
+            .iter()
+            .filter_map(|(unop, in_type, out_type)| {
+                if input_type.coalesce(&in_type) && self.inside(out_type) {
+                    Some(*unop)
                 } else {
                     None
                 }
@@ -250,18 +271,88 @@ impl TypeConstraint {
             .collect()
     }
 
-    pub fn get_binops(&self) -> Vec<(BinOp, Type, Type)> {
+    /// Given the type constraint and the binary operator:
+    /// - If the binary operator is valid, constrain using the binary operator.
+    /// - If the binary operator is invalid, constrain using all binary
+    ///   operators.
+    pub fn new_from_binop(&self, binop: &BinOp) -> Result<(Self, Self), (Self, Self)> {
+        if self.binop_output_inside(binop) {
+            let mut left_cons = Vec::new();
+            let mut right_cons = Vec::new();
+            for (op, output_type, left_input_type, right_input_type) in BINOPS.iter() {
+                if self.inside(output_type) && op == binop {
+                    left_cons.push(left_input_type.clone());
+                    right_cons.push(right_input_type.clone());
+                }
+            }
+            Ok((TypeConstraint(left_cons), TypeConstraint(right_cons)))
+        } else {
+            let mut left_cons = Vec::new();
+            let mut right_cons = Vec::new();
+            for (_, output_type, left_input_type, right_input_type) in BINOPS.iter() {
+                if self.inside(output_type) {
+                    left_cons.push(left_input_type.clone());
+                    right_cons.push(right_input_type.clone());
+                }
+            }
+            Err((TypeConstraint(left_cons), TypeConstraint(right_cons)))
+        }
+    }
+
+    /// Check binary operator output matches constraints.
+    fn binop_output_inside(&self, binop: &BinOp) -> bool {
         BINOPS
-            .clone()
-            .into_iter()
-            .filter_map(|(binop, output, left_input, right_input)| {
-                if self.inside(&output) {
-                    Some((binop, left_input, right_input))
+            .iter()
+            .any(|(op, out, _, _)| op == binop && self.inside(out))
+    }
+
+    /// Given an operators, the concrete input types and the constraint,
+    /// determines if a generic definition is required to match, and if so that
+    /// the right and left coalesce.
+    fn binop_generic_check(&self, left_type: &Type, right_type: &Type, binop: &BinOp) -> bool {
+        BINOPS.iter().any(|(op, _, left_in, right_in)| {
+            op == binop
+                && left_type.coalesce(left_in)
+                && right_type.coalesce(right_in)
+                && if left_in == &Type::Generic && right_in == &Type::Generic {
+                    left_type.coalesce(right_type)
+                } else {
+                    true
+                }
+        })
+    }
+
+    /// Get all possible binary operators that could be applied to the inputs
+    /// with an output inside the constraint.
+    fn get_possible_binops(&self, left_input: &Type, right_input: &Type) -> Vec<BinOp> {
+        BINOPS
+            .iter()
+            .filter_map(|(binop, out, left_in, right_in)| {
+                if self.inside(out)
+                    && left_input.coalesce(left_in)
+                    && right_in.coalesce(right_in)
+                    && if left_in == &Type::Generic && right_in == &Type::Generic {
+                        left_input.coalesce(right_input)
+                    } else {
+                        true
+                    }
+                {
+                    Some(*binop)
                 } else {
                     None
                 }
             })
             .collect()
+    }
+
+    /// Indent all the type constraints (used for type checking array indexing).
+    fn index_constraints(&self, level: usize) -> Self {
+        TypeConstraint(
+            self.0
+                .iter()
+                .map(|t| t.clone().increase_index_depth(level))
+                .collect(),
+        )
     }
 }
 
@@ -270,18 +361,18 @@ impl TypeConstraint {
 pub enum ExprErrType<'a> {
     /// Invalid type, including when no type inference is possible.
     /// ```text
-    /// bool a = 9 + 9
+    /// bool a = 9
     /// ```
     /// ```
-    /// ExpressionError::InvalidType("9 + 9", TypeConstraint(vec![Type::Bool], false), Some(Type::Int))
+    /// ExprErrType::InvalidType("9", TypeConstraint(vec![Type::Bool]), Type::Int)
     /// ```
     /// ```text
-    /// int a = 'a' || 15
+    /// bool a = true || 15
     /// ```
     /// ```
-    /// ExpressionError::InvalidType("'a' || 15", TypeConstraint(vec![Type::Int], false), None)
+    /// ExprErrType::InvalidType("15", TypeConstraint(vec![Type::Bool]), Type::Int))
     /// ```
-    InvalidType(&'a str, TypeConstraint, Option<Type>),
+    InvalidType(&'a str, TypeConstraint, Type),
 
     /// Invalid Binary Operator, using a different operator the expression could be valid.
     /// - int a = <int> || && <= < > >= == != <int>
@@ -290,27 +381,35 @@ pub enum ExprErrType<'a> {
     /// int a = 9 || 8
     /// ```
     /// ```
-    /// ExpressionError::BinOp("||", vec![BinOp::Add, BinOp::Mul, BinOp::Mod, BinOp::Div, BinOp::Sub], BinOp::Or)
+    /// ExprErrType::BinOp("||", vec![BinOp::Add, BinOp::Mul, BinOp::Mod, BinOp::Div, BinOp::Sub], BinOp::Or)
     /// ```
-    BinOp(&'a str, Vec<BinOp>, BinOp),
+    InvalidBinOp(&'a str, Vec<BinOp>, BinOp),
 
     /// Invalid Unary Operator, with different operator, the expression is valid
     /// ```text
     /// bool a = -true
     /// ```
     /// ```
-    /// ExpressionError::UnOp("-", vec![UnOp::Neg], UnOp::Minus)
+    /// ExprErrType::UnOp("-", vec![UnOp::Neg], UnOp::Minus)
     /// ```
-    UnOp(&'a str, Vec<UnOp>, UnOp),
+    InvalidUnOp(&'a str, Vec<UnOp>, UnOp),
 
     /// Use of undefined variable.
     /// ```text
     /// int a = 3 * b
     /// ```
     /// ```
-    /// ExpressionError::UndefinedVar("b")
+    /// ExprErrType::UndefinedVar("b")
     /// ```
     UndefinedVar(&'a str),
+
+    /// No match generic
+    /// ```text
+    /// bool a = 1 == true
+    /// ```
+    /// ```
+    /// ExprErrType::InvalidGeneric("1","==", "true", Type::Int, BinOp::Eq, Type::Bool)
+    InvalidGeneric(&'a str, &'a str, &'a str, Type, BinOp, Type),
 }
 
 /// Determines the expression error wrapping of an expression.
@@ -344,6 +443,50 @@ pub enum ExpressionError<'a> {
     Contains(Vec<ExprErrType<'a>>),
 }
 
+impl<'a> ExpressionError<'a> {
+    /// Create a contains with a single error
+    fn new_contains(err: ExprErrType<'a>) -> Self {
+        Self::Contains(vec![err])
+    }
+
+    /// Convert asn expression error into a list of errors, maintaining it if
+    /// it is already a list.
+    fn to_contains(self) -> Self {
+        match self {
+            ExpressionError::Is(err) => ExpressionError::Contains(vec![err]),
+            exprerror => exprerror,
+        }
+    }
+
+    /// Add a new error onto the end of an existing error, potentially
+    /// converting it into a list of errors.
+    fn append_err(self, new_err: ExprErrType<'a>) -> Self {
+        match self {
+            ExpressionError::Is(err) => ExpressionError::Contains(vec![err, new_err]),
+            ExpressionError::Contains(mut errs) => {
+                errs.push(new_err);
+                ExpressionError::Contains(errs)
+            }
+        }
+    }
+
+    /// Combine two Expression errors together (appending lists)
+    fn add_errs(self, other: Self) -> Self {
+        match (self, other) {
+            (ExpressionError::Contains(mut errs1), ExpressionError::Contains(mut errs2)) => {
+                errs1.append(&mut errs2);
+                ExpressionError::Contains(errs1)
+            }
+            (ExpressionError::Is(err1), ExpressionError::Is(err2)) => {
+                ExpressionError::Contains(vec![err1, err2])
+            }
+            (ExpressionError::Is(err), errs) => errs.append_err(err),
+            (errs, ExpressionError::Is(err)) => errs.append_err(err),
+        }
+    }
+}
+
+/// Semantic errors with their spans
 type SemanticErrorSummary<'a> = Vec<WrapSpan<'a, SemanticError<'a>>>;
 
 /// Semantic errors and their types.
@@ -600,10 +743,10 @@ const KEYWORDS: [&'static str; 32] = [
     "char", "string", "pair", "len", "ord", "chr", "true", "false", "null",
 ];
 
-/// Unary Operations allowed (operator, input type, output type)
-/// - To add overloading, simply add more tuples
-/// - Handled by the type constrain system when analysing expressions
 lazy_static! {
+    /// Unary Operations allowed (operator, input type, output type)
+    /// - To add overloading, simply add more tuples
+    /// - Handled by the type constrain system when analysing expressions
     static ref UNOPS: [(UnOp, Type, Type); 5] = [
         (UnOp::Neg, Type::Bool, Type::Bool),
         (UnOp::Minus, Type::Int, Type::Int),
@@ -613,7 +756,17 @@ lazy_static! {
     ];
 }
 
-/// Binary operations allowed (operator, left input, right input, output)
+/// Given a unary operator and input type gets the output type.
+fn get_unop_output_type(unop: &UnOp, input_type: &Type) -> Option<Type> {
+    for (op, in_type, out_type) in UNOPS.iter() {
+        if unop == op && in_type.coalesce(input_type) {
+            return Some(out_type.clone());
+        }
+    }
+    None
+}
+
+/// Binary operations allowed (operator, output, left input, right input)
 /// - To add overloading, simply add more tuples
 /// - Handled by the type constrain system when analysing expressions
 static BINOPS: [(BinOp, Type, Type, Type); 17] = [
@@ -635,6 +788,23 @@ static BINOPS: [(BinOp, Type, Type, Type); 17] = [
     (BinOp::And, Type::Bool, Type::Bool, Type::Bool),
     (BinOp::Or, Type::Bool, Type::Bool, Type::Bool),
 ];
+
+/// Given a binary operator and both input types gets the output type.
+fn get_binop_output_type(
+    binop: &BinOp,
+    left_input_type: &Type,
+    right_input_type: &Type,
+) -> Option<Type> {
+    for (op, left_in_type, right_in_type, out_type) in BINOPS.iter() {
+        if binop == op
+            && left_in_type.coalesce(left_input_type)
+            && right_in_type.coalesce(right_input_type)
+        {
+            return Some(out_type.clone());
+        }
+    }
+    None
+}
 
 /// Gets the current symbol table and returns:
 /// - Symbol table of function identifier to function type
@@ -692,52 +862,269 @@ fn get_fn_symbols<'a>(
     (fun_symb, valid_fun, errors)
 }
 
-fn analyse_scope<'a>(
-    scope: Vec<WrapSpan<'a, Stat<'a, String, &'a str>>>,
-    local_symb: &LocalSymbolTable,
-    var_symb: &mut VariableSymbolTable,
-    fun_symb: &FunctionSymbolTable,
-    term: bool,
-) -> (
-    Vec<WrapSpan<'a, Stat<'a, String, usize>>>,
-    SemanticErrorSummary<'a>,
-    bool,
-) {
-    todo!()
-}
+fn analyse_expression<'a, 'b>(
+    WrapSpan(span, expr): WrapSpan<'a, Expr<'a, &'a str>>,
+    type_cons: TypeConstraint,
+    local_symb: &LocalSymbolTable<'a, 'b>,
+    var_symb: &VariableSymbolTable,
+) -> Result<(Type, WrapSpan<'a, Expr<'a, usize>>), ExpressionError<'a>> {
+    // primitive check of base cases for expr (for conciseness)
+    let prim_check = |prim_type: Type,
+                      prim_expr: Expr<'a, usize>,
+                      span: &'a str,
+                      type_cons: TypeConstraint|
+     -> Result<(Type, WrapSpan<'a, Expr<'a, usize>>), ExpressionError<'a>> {
+        if type_cons.inside(&prim_type) {
+            Ok((prim_type, WrapSpan(span, prim_expr)))
+        } else {
+            Err(ExpressionError::Is(ExprErrType::InvalidType(
+                span, type_cons, prim_type,
+            )))
+        }
+    };
 
-fn analyse_expr<'a>(
-    expr: WrapSpan<'a, Expr<'a, &'a str>>,
-    cons: TypeConstraint,
-    local_symb: &LocalSymbolTable,
-    var_symb: &mut VariableSymbolTable,
-) -> SemanticErrorSummary<'a> {
-    todo!()
-}
+    match expr {
+        Expr::Null => prim_check(
+            Type::Pair(box Type::Any, box Type::Any),
+            Expr::Null,
+            span,
+            type_cons,
+        ),
+        Expr::Int(i) => prim_check(Type::Int, Expr::Int(i), span, type_cons),
+        Expr::Bool(b) => prim_check(Type::Bool, Expr::Bool(b), span, type_cons),
+        Expr::Char(c) => prim_check(Type::Char, Expr::Char(c), span, type_cons),
+        Expr::String(s) => prim_check(Type::String, Expr::String(s), span, type_cons),
+        Expr::Var(var_id) => match var_symb.get_type(var_id, &local_symb) {
+            Some((var_rename, var_type)) => {
+                if type_cons.inside(&var_type) {
+                    Ok((var_type, WrapSpan(span, Expr::Var(var_rename))))
+                } else {
+                    Err(ExpressionError::Is(ExprErrType::InvalidType(
+                        span, type_cons, var_type,
+                    )))
+                }
+            }
+            None => Err(ExpressionError::Is(ExprErrType::UndefinedVar(var_id))),
+        },
+        Expr::ArrayElem(var_id, indexes) => {
+            // To get expected type for the variable, increase the
+            // indentation of the constraints by the index_dim. unless ANY
+            let index_level = indexes.len();
+            let indexed_type_cons = type_cons.index_constraints(index_level);
 
-pub fn semantic_analysis<'a>(
-    prog: Program<'a, &'a str, &'a str>,
-) -> Result<
-    (
-        FunctionSymbolTable,
-        VariableSymbolTable,
-        Program<'a, String, usize>,
-    ),
-    SemanticErrorSummary<'a>,
-> {
-    todo!()
-}
+            // check the expressions indexing
+            let index_exprs: Vec<
+                Result<(Type, WrapSpan<'a, Expr<'a, usize>>), ExpressionError<'a>>,
+            > = indexes
+                .into_iter()
+                .map(|wrapped_exp: WrapSpan<'a, Expr<'a, &'a str>>| {
+                    analyse_expression(
+                        wrapped_exp,
+                        TypeConstraint(vec![Type::Int]),
+                        local_symb,
+                        var_symb,
+                    )
+                })
+                .collect();
 
-/*
-  Todo:
-  1. Remove references to ExpressionError (the old version)
-  2. Wrap local and variable table and impl add and find
-  3. comment the function prototypes just above ^^
-  4. analyse_expr
-  5. get_fn_symbols
-  6. analyse_scope
-  7. semantic_analysis
-*/
+            // check the identifier
+            match var_symb.get_type(var_id, &local_symb) {
+                Some((var_rename, var_type)) => {
+                    // Get all errors from the indexes
+                    let mut errors = vec![];
+                    let mut correct = vec![];
+                    for res in index_exprs {
+                        match res {
+                            Ok((_, expr)) => correct.push(expr),
+                            Err(ExpressionError::Is(err)) => errors.push(err),
+                            Err(ExpressionError::Contains(mut errs)) => errors.append(&mut errs),
+                        }
+                    }
+
+                    if indexed_type_cons.inside(&var_type) {
+                        // the type of the
+                        if errors.len() == 0 {
+                            // The variable is the correct type and all indexing expressions are correctly typed
+                            Ok(
+                                (var_type.reduce_index_depth(index_level).expect("expression reduced index could not match, despite the increased matching type constraints"), 
+                                WrapSpan(span, Expr::ArrayElem(var_rename, correct)))
+                            )
+                        } else {
+                            // Some of the expressions were erroneous e.g a[true]['a']
+                            Err(ExpressionError::Contains(errors))
+                        }
+                    } else {
+                        if errors.len() == 0 {
+                            match var_type.clone().reduce_index_depth(index_level) {
+                                // The subexpression is valid, but the whole expression evaluates to the wrong type
+                                Some(t) => Err(ExpressionError::Is(ExprErrType::InvalidType(
+                                    span, type_cons, t,
+                                ))),
+                                // The indexing is wrong for the variable being indexed, but all indexing expressions are well typed
+                                None => {
+                                    Err(ExpressionError::Contains(vec![ExprErrType::InvalidType(
+                                        var_id, type_cons, var_type,
+                                    )]))
+                                }
+                            }
+                        } else {
+                            // The variable being indexed is the wrong type, and there are errors in some of the indexing expressions.
+                            errors.push(ExprErrType::InvalidType(var_id, type_cons, var_type));
+                            Err(ExpressionError::Contains(errors))
+                        }
+                    }
+                }
+                None => {
+                    let mut errors = vec![ExprErrType::UndefinedVar(var_id)];
+                    for res in index_exprs {
+                        match res {
+                            Ok(_) => (),
+                            Err(ExpressionError::Is(err)) => errors.push(err),
+                            Err(ExpressionError::Contains(mut errs)) => errors.append(&mut errs),
+                        }
+                    }
+                    // The variable being indexed is undefined, if any errors occur in the indexing expressions they are passed forwards
+                    Err(ExpressionError::Contains(errors))
+                }
+            }
+        }
+        Expr::UnOp(WrapSpan(unop_span, unop), box inner_expr) => {
+            match type_cons.new_from_unop(&unop) {
+                Ok(inner_cons) => {
+                    match analyse_expression(inner_expr, inner_cons, local_symb, var_symb) {
+                        Ok((inner_type, inner)) => Ok((get_unop_output_type(&unop, &inner_type).expect("The operator type was correct, and the inner expression matched so it must have an output type"), WrapSpan(span, Expr::UnOp(WrapSpan(unop_span, unop), box inner)))),
+                        Err(err) => Err(err.to_contains()),
+                    }
+                }
+                Err(inner_cons) => {
+                    match analyse_expression(inner_expr, inner_cons, local_symb, var_symb) {
+                        Ok((inner_type, _)) => {
+                            Err(ExpressionError::Contains(vec![ExprErrType::InvalidUnOp(
+                                unop_span,
+                                type_cons.get_possible_unops(&inner_type),
+                                unop,
+                            )]))
+                        }
+                        Err(ExpressionError::Is(ExprErrType::InvalidType(
+                            inner_span,
+                            inner_cons,
+                            inner_type,
+                        ))) => match get_unop_output_type(&unop, &inner_type) {
+                            Some(out_type) => Err(ExpressionError::Is(ExprErrType::InvalidType(
+                                span, type_cons, out_type,
+                            ))),
+                            None => Err(ExpressionError::Contains(vec![
+                                ExprErrType::InvalidUnOp(
+                                    unop_span,
+                                    type_cons.get_possible_unops(&inner_type),
+                                    unop,
+                                ),
+                                ExprErrType::InvalidType(inner_span, inner_cons, inner_type),
+                            ])),
+                        },
+                        Err(other) => {
+                            Err(other.append_err(ExprErrType::InvalidUnOp(unop_span, vec![], unop)))
+                        }
+                    }
+                }
+            }
+        }
+        Expr::BinOp(
+            box WrapSpan(left_span, left_expr),
+            WrapSpan(binop_span, binop),
+            box WrapSpan(right_span, right_expr),
+        ) => {
+            match type_cons.new_from_binop(&binop) {
+                Ok((left_cons, right_cons)) => {
+                    match (
+                        analyse_expression(
+                            WrapSpan(left_span, left_expr),
+                            left_cons,
+                            local_symb,
+                            var_symb,
+                        ),
+                        analyse_expression(
+                            WrapSpan(right_span, right_expr),
+                            right_cons,
+                            local_symb,
+                            var_symb,
+                        ),
+                    ) {
+                        (Ok((left_type, left)), Ok((right_type, right))) => {
+                            if type_cons.binop_generic_check(&left_type, &right_type, &binop) {
+                                Ok((
+                                    get_binop_output_type(&binop, &left_type, &right_type)
+                                        .expect("Types matched, so must have an output type"),
+                                    WrapSpan(
+                                        span,
+                                        Expr::BinOp(
+                                            box left,
+                                            WrapSpan(binop_span, binop),
+                                            box right,
+                                        ),
+                                    ),
+                                ))
+                            } else {
+                                Err(ExpressionError::Is(ExprErrType::InvalidGeneric(
+                                    left_span, binop_span, right_span, left_type, binop, right_type,
+                                )))
+                            }
+                        }
+                        (Ok(_), Err(err)) => Err(err.to_contains()),
+                        (Err(err), Ok(_)) => Err(err.to_contains()),
+                        (Err(err1), Err(err2)) => Err(err1.add_errs(err2)),
+                    }
+                }
+                Err((left_cons, right_cons)) => {
+                    // the operator is invalid, searching with constraint from all binary operators
+                    match (
+                        analyse_expression(
+                            WrapSpan(left_span, left_expr),
+                            left_cons,
+                            local_symb,
+                            var_symb,
+                        ),
+                        analyse_expression(
+                            WrapSpan(right_span, right_expr),
+                            right_cons,
+                            local_symb,
+                            var_symb,
+                        ),
+                    ) {
+                        (Ok((left_type, _)), Ok((right_type, _))) => {
+                            Err(ExpressionError::Contains(vec![ExprErrType::InvalidBinOp(
+                                binop_span,
+                                type_cons.get_possible_binops(&left_type, &right_type),
+                                binop,
+                            )]))
+                        }
+                        (Ok((left_type, _)), Err(err)) => {
+                            Err(err.append_err(ExprErrType::InvalidBinOp(
+                                binop_span,
+                                type_cons.get_possible_binops(&left_type, &Type::Any),
+                                binop,
+                            )))
+                        }
+                        (Err(err), Ok((right_type, _))) => {
+                            Err(err.append_err(ExprErrType::InvalidBinOp(
+                                binop_span,
+                                type_cons.get_possible_binops(&Type::Any, &right_type),
+                                binop,
+                            )))
+                        }
+                        (Err(left_err), Err(right_err)) => Err(left_err
+                            .add_errs(right_err)
+                            .append_err(ExprErrType::InvalidBinOp(
+                                binop_span,
+                                type_cons.get_possible_binops(&Type::Any, &Type::Any),
+                                binop,
+                            ))),
+                    }
+                }
+            }
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -922,8 +1309,14 @@ mod tests {
             ))
         );
 
-        assert_eq!(var_symb.get_type("var1", &mut local_symb), Some(Type::Int));
-        assert_eq!(var_symb.get_type("var2", &mut local_symb), Some(Type::Char));
+        assert_eq!(
+            var_symb.get_type("var1", &mut local_symb),
+            Some((0, Type::Int))
+        );
+        assert_eq!(
+            var_symb.get_type("var2", &mut local_symb),
+            Some((1, Type::Char))
+        );
 
         assert_eq!(local_symb.current.len(), 2);
         assert_eq!(var_symb.0.len(), 2);
@@ -945,8 +1338,14 @@ mod tests {
 
         let mut symb_child = LocalSymbolTable::new_child(&local_symb);
 
-        assert_eq!(var_symb.get_type("var1", &mut symb_child), Some(Type::Int));
-        assert_eq!(var_symb.get_type("var2", &mut symb_child), Some(Type::Char));
+        assert_eq!(
+            var_symb.get_type("var1", &mut symb_child),
+            Some((0, Type::Int))
+        );
+        assert_eq!(
+            var_symb.get_type("var2", &mut symb_child),
+            Some((1, Type::Char))
+        );
     }
 
     #[test]
@@ -987,11 +1386,11 @@ mod tests {
 
             assert_eq!(
                 var_symb.get_type("var3", &mut symb_child),
-                Some(Type::String)
+                Some((2, Type::String))
             );
             assert_eq!(
                 var_symb.get_type("var4", &mut symb_child),
-                Some(Type::Pair(box Type::Int, box Type::Int))
+                Some((3, Type::Pair(box Type::Int, box Type::Int)))
             );
         }
 
@@ -1035,8 +1434,14 @@ mod tests {
                 var_symb.def_var("var3", Type::Char, "char var3 = 'a'", &mut child_symb),
                 None
             );
-            assert_eq!(var_symb.get_type("var1", &mut child_symb), Some(Type::Int));
-            assert_eq!(var_symb.get_type("var3", &mut child_symb), Some(Type::Char));
+            assert_eq!(
+                var_symb.get_type("var1", &mut child_symb),
+                Some((0, Type::Int))
+            );
+            assert_eq!(
+                var_symb.get_type("var3", &mut child_symb),
+                Some((1, Type::Char))
+            );
             assert_eq!(var_symb.0.len(), 2);
         }
 
@@ -1046,8 +1451,14 @@ mod tests {
                 var_symb.def_var("var3", Type::Int, "int var1 = 3", &mut child_symb),
                 None
             );
-            assert_eq!(var_symb.get_type("var1", &mut child_symb), Some(Type::Int));
-            assert_eq!(var_symb.get_type("var3", &mut child_symb), Some(Type::Int));
+            assert_eq!(
+                var_symb.get_type("var1", &mut child_symb),
+                Some((0, Type::Int))
+            );
+            assert_eq!(
+                var_symb.get_type("var3", &mut child_symb),
+                Some((2, Type::Int))
+            );
             assert_eq!(var_symb.0.len(), 3);
         }
     }
@@ -1564,6 +1975,7 @@ mod tests {
 
         // Any can match any type
         assert!(type_cons.inside(&Type::Any));
+        assert!(type_cons.inside(&Type::Generic));
 
         // Check for constraint
         assert_eq!(type_cons.inside(&Type::String), false);
@@ -1571,7 +1983,6 @@ mod tests {
             type_cons.inside(&Type::Pair(box Type::Char, box Type::Any)),
             false
         );
-        assert_eq!(type_cons.inside(&Type::Generic), false);
         assert_eq!(type_cons.inside(&Type::Array(box Type::Any, 1)), false);
         assert_eq!(type_cons.inside(&Type::Bool), false);
     }
@@ -1620,11 +2031,11 @@ mod tests {
 
     #[test]
     fn type_constraint_gets_unary_ops() {
-        let res = TypeConstraint(vec![Type::Int]).get_unops();
+        let res = TypeConstraint(vec![Type::Int]).get_possible_unops(&Type::Any);
 
-        assert!(res.contains(&(UnOp::Len, Type::Array(box Type::Any, 1))));
-        assert!(res.contains(&(UnOp::Minus, Type::Int)));
-        assert!(res.contains(&(UnOp::Ord, Type::Char)));
+        assert!(res.contains(&(UnOp::Len)));
+        assert!(res.contains(&(UnOp::Minus)));
+        assert!(res.contains(&(UnOp::Ord)));
 
         assert_eq!(res.len(), 3);
     }
@@ -1656,114 +2067,136 @@ mod tests {
 
     #[test]
     fn type_constraint_gets_binary_ops() {
-        let res_int = TypeConstraint(vec![Type::Int]).get_binops();
+        let res_int = TypeConstraint(vec![Type::Int]).get_possible_binops(&Type::Any, &Type::Any);
 
-        assert!(res_int.contains(&(BinOp::Add, Type::Int, Type::Int)));
-        assert!(res_int.contains(&(BinOp::Sub, Type::Int, Type::Int)));
-        assert!(res_int.contains(&(BinOp::Mul, Type::Int, Type::Int)));
-        assert!(res_int.contains(&(BinOp::Div, Type::Int, Type::Int)));
-        assert!(res_int.contains(&(BinOp::Mod, Type::Int, Type::Int)));
+        assert!(res_int.contains(&(BinOp::Add)));
+        assert!(res_int.contains(&(BinOp::Sub)));
+        assert!(res_int.contains(&(BinOp::Mul)));
+        assert!(res_int.contains(&(BinOp::Div)));
+        assert!(res_int.contains(&(BinOp::Mod)));
 
         assert_eq!(res_int.len(), 5);
 
-        let res_bool = TypeConstraint(vec![Type::Bool]).get_binops();
+        let res_bool = TypeConstraint(vec![Type::Bool]).get_possible_binops(&Type::Any, &Type::Any);
 
-        assert!(res_bool.contains(&(BinOp::Gt, Type::Int, Type::Int)));
-        assert!(res_bool.contains(&(BinOp::Gt, Type::Char, Type::Char)));
-        assert!(res_bool.contains(&(BinOp::Gte, Type::Int, Type::Int)));
-        assert!(res_bool.contains(&(BinOp::Gte, Type::Char, Type::Char)));
-        assert!(res_bool.contains(&(BinOp::Lt, Type::Int, Type::Int)));
-        assert!(res_bool.contains(&(BinOp::Lt, Type::Char, Type::Char)));
-        assert!(res_bool.contains(&(BinOp::Lte, Type::Int, Type::Int)));
-        assert!(res_bool.contains(&(BinOp::Lte, Type::Char, Type::Char)));
-        assert!(res_bool.contains(&(BinOp::Eq, Type::Generic, Type::Generic)));
-        assert!(res_bool.contains(&(BinOp::Ne, Type::Generic, Type::Generic)));
-        assert!(res_bool.contains(&(BinOp::And, Type::Bool, Type::Bool)));
-        assert!(res_bool.contains(&(BinOp::Or, Type::Bool, Type::Bool)));
+        assert!(res_bool.contains(&(BinOp::Gt)));
+        assert!(res_bool.contains(&(BinOp::Gt)));
+        assert!(res_bool.contains(&(BinOp::Gte)));
+        assert!(res_bool.contains(&(BinOp::Gte)));
+        assert!(res_bool.contains(&(BinOp::Lt)));
+        assert!(res_bool.contains(&(BinOp::Lt)));
+        assert!(res_bool.contains(&(BinOp::Lte)));
+        assert!(res_bool.contains(&(BinOp::Lte)));
+        assert!(res_bool.contains(&(BinOp::Eq)));
+        assert!(res_bool.contains(&(BinOp::Ne)));
+        assert!(res_bool.contains(&(BinOp::And)));
+        assert!(res_bool.contains(&(BinOp::Or)));
 
         assert_eq!(res_bool.len(), 12);
     }
 
     #[test]
     fn type_constraint_gets_operators_with_any() {
-        let res_binops = TypeConstraint(vec![Type::Any]).get_binops();
+        let res_binops =
+            TypeConstraint(vec![Type::Any]).get_possible_binops(&Type::Any, &Type::Any);
 
-        assert!(res_binops.contains(&(BinOp::Add, Type::Int, Type::Int)));
-        assert!(res_binops.contains(&(BinOp::Sub, Type::Int, Type::Int)));
-        assert!(res_binops.contains(&(BinOp::Mul, Type::Int, Type::Int)));
-        assert!(res_binops.contains(&(BinOp::Div, Type::Int, Type::Int)));
-        assert!(res_binops.contains(&(BinOp::Mod, Type::Int, Type::Int)));
-        assert!(res_binops.contains(&(BinOp::Gt, Type::Int, Type::Int)));
-        assert!(res_binops.contains(&(BinOp::Gt, Type::Char, Type::Char)));
-        assert!(res_binops.contains(&(BinOp::Gte, Type::Int, Type::Int)));
-        assert!(res_binops.contains(&(BinOp::Gte, Type::Char, Type::Char)));
-        assert!(res_binops.contains(&(BinOp::Lt, Type::Int, Type::Int)));
-        assert!(res_binops.contains(&(BinOp::Lt, Type::Char, Type::Char)));
-        assert!(res_binops.contains(&(BinOp::Lte, Type::Int, Type::Int)));
-        assert!(res_binops.contains(&(BinOp::Lte, Type::Char, Type::Char)));
-        assert!(res_binops.contains(&(BinOp::Eq, Type::Generic, Type::Generic)));
-        assert!(res_binops.contains(&(BinOp::Ne, Type::Generic, Type::Generic)));
-        assert!(res_binops.contains(&(BinOp::And, Type::Bool, Type::Bool)));
-        assert!(res_binops.contains(&(BinOp::Or, Type::Bool, Type::Bool)));
+        assert!(res_binops.contains(&(BinOp::Add)));
+        assert!(res_binops.contains(&(BinOp::Sub)));
+        assert!(res_binops.contains(&(BinOp::Mul)));
+        assert!(res_binops.contains(&(BinOp::Div)));
+        assert!(res_binops.contains(&(BinOp::Mod)));
+        assert!(res_binops.contains(&(BinOp::Gt)));
+        assert!(res_binops.contains(&(BinOp::Gt)));
+        assert!(res_binops.contains(&(BinOp::Gte)));
+        assert!(res_binops.contains(&(BinOp::Gte)));
+        assert!(res_binops.contains(&(BinOp::Lt)));
+        assert!(res_binops.contains(&(BinOp::Lt)));
+        assert!(res_binops.contains(&(BinOp::Lte)));
+        assert!(res_binops.contains(&(BinOp::Lte)));
+        assert!(res_binops.contains(&(BinOp::Eq)));
+        assert!(res_binops.contains(&(BinOp::Ne)));
+        assert!(res_binops.contains(&(BinOp::And)));
+        assert!(res_binops.contains(&(BinOp::Or)));
 
         assert_eq!(res_binops.len(), 17);
     }
 
     #[test]
-    fn type_constraint_gets_new_from_unary_operators() {
-        let new_cons = TypeConstraint::new_from_unops(TypeConstraint(vec![Type::Int]).get_unops());
-
-        assert!(new_cons.inside(&Type::Int));
-        assert!(new_cons.inside(&Type::Array(box Type::Any, 1)));
-        assert!(new_cons.inside(&Type::Char));
-
-        assert_eq!(new_cons.inside(&Type::String), false);
+    fn type_constraints_determines_if_unop_is_applicable() {
         assert_eq!(
-            new_cons.inside(&Type::Pair(box Type::Any, box Type::Any)),
-            false
+            TypeConstraint(vec![Type::Int]).new_from_unop(&UnOp::Ord),
+            Ok(TypeConstraint(vec![Type::Char]))
         );
+        assert_eq!(
+            TypeConstraint(vec![Type::Char]).new_from_unop(&UnOp::Ord),
+            Err(TypeConstraint(vec![Type::Int]))
+        );
+        match TypeConstraint(vec![Type::Int]).new_from_unop(&UnOp::Chr) {
+            Ok(_) => assert!(false), // operator chr produces char, not int,
+            Err(type_cons) => {
+                type_cons.inside(&Type::Int);
+                type_cons.inside(&Type::Array(box Type::Char, 4));
+                type_cons.inside(&Type::Char);
+            }
+        }
     }
 
     #[test]
     fn type_constraint_gets_new_from_binary_operators() {
-        let (left_cons, right_cons) =
-            TypeConstraint::new_from_binops(TypeConstraint(vec![Type::Bool]).get_binops());
+        match TypeConstraint(vec![Type::Bool]).new_from_binop(&BinOp::Add) {
+            Ok(_) => assert!(false), // Add does not produce a boolean
+            Err((left_cons, right_cons)) => {
+                // due to T == T we should get any (any two types can be compared, must be the same)
+                assert!(left_cons.inside(&Type::Int));
+                assert!(right_cons.inside(&Type::Int));
+                assert!(left_cons.inside(&Type::Bool));
+                assert!(right_cons.inside(&Type::Bool));
+                assert!(left_cons.inside(&Type::Char));
+                assert!(right_cons.inside(&Type::Char));
+                println!("{:?} ::: {:?}", left_cons, right_cons);
+                assert!(left_cons.inside(&Type::String));
+                assert!(right_cons.inside(&Type::String));
+                assert!(left_cons.inside(&Type::Pair(box Type::Int, box Type::Char)));
+                assert!(right_cons.inside(&Type::Pair(box Type::Int, box Type::Char)));
+                assert!(left_cons.inside(&Type::Array(box Type::Int, 3)));
+                assert!(right_cons.inside(&Type::Array(box Type::Int, 3)));
+            }
+        }
 
-        // due to T == T we should get any (any two types can be compared, must be the same)
-        assert!(left_cons.inside(&Type::Int));
-        assert!(right_cons.inside(&Type::Int));
-        assert!(left_cons.inside(&Type::Bool));
-        assert!(right_cons.inside(&Type::Bool));
-        assert!(left_cons.inside(&Type::Char));
-        assert!(right_cons.inside(&Type::Char));
-        assert!(left_cons.inside(&Type::String));
-        assert!(right_cons.inside(&Type::String));
-        assert!(left_cons.inside(&Type::Pair(box Type::Int, box Type::Char)));
-        assert!(right_cons.inside(&Type::Pair(box Type::Int, box Type::Char)));
-        assert!(left_cons.inside(&Type::Array(box Type::Int, 3)));
-        assert!(right_cons.inside(&Type::Array(box Type::Int, 3)));
+        match TypeConstraint(vec![Type::Int]).new_from_binop(&BinOp::And) {
+            Ok(_) => assert!(false), // and produces a boolean not an int
+            Err((left_cons, right_cons)) => {
+                // Currently the only binary operators returning integers are +,-,/,%,*
+                assert!(left_cons.inside(&Type::Int));
+                assert!(right_cons.inside(&Type::Int));
+                assert_eq!(left_cons.inside(&Type::Bool), false);
+                assert_eq!(right_cons.inside(&Type::Bool), false);
+                assert_eq!(left_cons.inside(&Type::Char), false);
+                assert_eq!(right_cons.inside(&Type::Char), false);
+                assert_eq!(left_cons.inside(&Type::String), false);
+                assert_eq!(right_cons.inside(&Type::String), false);
+                assert_eq!(
+                    left_cons.inside(&Type::Pair(box Type::Int, box Type::Char)),
+                    false
+                );
+                assert_eq!(
+                    right_cons.inside(&Type::Pair(box Type::Int, box Type::Char)),
+                    false
+                );
+                assert_eq!(left_cons.inside(&Type::Array(box Type::Int, 3)), false);
+                assert_eq!(right_cons.inside(&Type::Array(box Type::Int, 3)), false);
+            }
+        }
+    }
 
-        let (left_cons, right_cons) =
-            TypeConstraint::new_from_binops(TypeConstraint(vec![Type::Int]).get_binops());
+    #[test]
+    fn type_constraints_can_index_constraints() {
+        let type_cons = TypeConstraint(vec![Type::Int]);
 
-        // Currently the only binary operators returning integers are +,-,/,%,*
-        assert!(left_cons.inside(&Type::Int));
-        assert!(right_cons.inside(&Type::Int));
-        assert_eq!(left_cons.inside(&Type::Bool), false);
-        assert_eq!(right_cons.inside(&Type::Bool), false);
-        assert_eq!(left_cons.inside(&Type::Char), false);
-        assert_eq!(right_cons.inside(&Type::Char), false);
-        assert_eq!(left_cons.inside(&Type::String), false);
-        assert_eq!(right_cons.inside(&Type::String), false);
-        assert_eq!(
-            left_cons.inside(&Type::Pair(box Type::Int, box Type::Char)),
-            false
-        );
-        assert_eq!(
-            right_cons.inside(&Type::Pair(box Type::Int, box Type::Char)),
-            false
-        );
-        assert_eq!(left_cons.inside(&Type::Array(box Type::Int, 3)), false);
-        assert_eq!(right_cons.inside(&Type::Array(box Type::Int, 3)), false);
+        let new_type_cons = type_cons.index_constraints(3);
+
+        assert_eq!(new_type_cons.inside(&Type::Int), false);
+        assert!(new_type_cons.inside(&Type::Array(box Type::Int, 3)));
+        assert!(new_type_cons.inside(&Type::Array(box Type::Any, 1)));
     }
 }
