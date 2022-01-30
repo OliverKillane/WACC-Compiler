@@ -161,13 +161,12 @@ impl<'a, 'b> LocalSymbolTable<'a, 'b> {
 
 /// Gets the current symbol table and returns:
 /// - Symbol table of function identifier to function type
-/// - Vector of functions with correct declarations (no repeated/keyword name/s
+/// - Vector of functions with correct declarations (no repeated name/s
 ///   for function or parameters), these functions can be further analysed.
 /// - Vector of errors from invalid functions.
 ///
 /// The errors considered are:
 /// - Function name is repeated, cannot process further semantic error thrown.
-/// - Function name is keyword is reported, but analyser can continue.
 ///
 /// *Note:* the parameter identifiers are not checked, that is done when the
 /// function body analysis is done.
@@ -190,13 +189,6 @@ fn get_fn_symbols<'a>(
                 SemanticError::RepeatDefinitionFunction(fn_name, orig),
             )),
             None => {
-                if KEYWORDS.contains(&fn_name) {
-                    errors.push(WrapSpan(
-                        fn_def_span,
-                        SemanticError::KeywordFunctionName(fn_name),
-                    ))
-                }
-
                 fun_symb.def_fun(
                     String::from(fn_name),
                     (
@@ -744,125 +736,6 @@ mod tests {
     }
 
     #[test]
-    fn get_fn_symbols_detects_keyword_named_functions() {
-        let fn_defs = vec![
-            WrapSpan(
-                "int fun1(int a)",
-                Function(
-                    Type::Int,
-                    "fun1",
-                    vec![WrapSpan("int a", Param(Type::Int, "a"))],
-                    vec![],
-                ),
-            ),
-            WrapSpan(
-                "char example(int a, string b)",
-                Function(
-                    Type::Char,
-                    "example",
-                    vec![
-                        WrapSpan("int a", Param(Type::Int, "a")),
-                        WrapSpan("string b", Param(Type::String, "b")),
-                    ],
-                    vec![],
-                ),
-            ),
-            WrapSpan(
-                "bool begin(bool x, bool y)",
-                Function(
-                    Type::Bool,
-                    "begin",
-                    vec![
-                        WrapSpan("bool x", Param(Type::Bool, "x")),
-                        WrapSpan("bool y", Param(Type::Bool, "y")),
-                    ],
-                    vec![],
-                ),
-            ),
-            WrapSpan(
-                "bool fi(bool x, bool y)",
-                Function(
-                    Type::Bool,
-                    "fi",
-                    vec![
-                        WrapSpan("bool x", Param(Type::Bool, "x")),
-                        WrapSpan("bool y", Param(Type::Bool, "y")),
-                    ],
-                    vec![],
-                ),
-            ),
-        ];
-
-        let (fn_symb, valid_fns, errors) = get_fn_symbols(fn_defs);
-
-        let mut fn_symb_expected = FunctionSymbolTable::new();
-        fn_symb_expected.def_fun(String::from("fun1"), (Type::Int, vec![Type::Int]));
-        fn_symb_expected.def_fun(
-            String::from("example"),
-            (Type::Char, vec![Type::Int, Type::String]),
-        );
-        fn_symb_expected.def_fun(
-            String::from("begin"),
-            (Type::Bool, vec![Type::Bool, Type::Bool]),
-        );
-        fn_symb_expected.def_fun(
-            String::from("fi"),
-            (Type::Bool, vec![Type::Bool, Type::Bool]),
-        );
-
-        let valid_fns_expected = vec![
-            Function(
-                Type::Int,
-                "fun1",
-                vec![WrapSpan("int a", Param(Type::Int, "a"))],
-                vec![],
-            ),
-            Function(
-                Type::Char,
-                "example",
-                vec![
-                    WrapSpan("int a", Param(Type::Int, "a")),
-                    WrapSpan("string b", Param(Type::String, "b")),
-                ],
-                vec![],
-            ),
-            Function(
-                Type::Bool,
-                "begin",
-                vec![
-                    WrapSpan("bool x", Param(Type::Bool, "x")),
-                    WrapSpan("bool y", Param(Type::Bool, "y")),
-                ],
-                vec![],
-            ),
-            Function(
-                Type::Bool,
-                "fi",
-                vec![
-                    WrapSpan("bool x", Param(Type::Bool, "x")),
-                    WrapSpan("bool y", Param(Type::Bool, "y")),
-                ],
-                vec![],
-            ),
-        ];
-
-        let errors_expected: SemanticErrorSummary = vec![
-            WrapSpan(
-                "bool begin(bool x, bool y)",
-                SemanticError::KeywordFunctionName("begin"),
-            ),
-            WrapSpan(
-                "bool fi(bool x, bool y)",
-                SemanticError::KeywordFunctionName("fi"),
-            ),
-        ];
-
-        assert_eq!(fn_symb_expected, fn_symb);
-        assert_eq!(valid_fns_expected, valid_fns);
-        assert_eq!(errors_expected, errors);
-    }
-
-    #[test]
     fn get_fn_symbols_ignores_parameter_names() {
         // As noted in get_fn_symbols, parameter naming issues are ignored and checked later.
         let fn_defs = vec![
@@ -942,112 +815,6 @@ mod tests {
         ];
 
         let errors_expected: SemanticErrorSummary = vec![];
-
-        assert_eq!(fn_symb_expected, fn_symb);
-        assert_eq!(valid_fns_expected, valid_fns);
-        assert_eq!(errors_expected, errors);
-    }
-
-    #[test]
-    fn get_fn_symbols_can_combine_multiple_errors() {
-        let fn_defs = vec![
-            WrapSpan(
-                "int fun1(int a)",
-                Function(
-                    Type::Int,
-                    "fun1",
-                    vec![WrapSpan("int a", Param(Type::Int, "a"))],
-                    vec![],
-                ),
-            ),
-            WrapSpan(
-                "char example(int a, string b)",
-                Function(
-                    Type::Char,
-                    "example",
-                    vec![
-                        WrapSpan("int a", Param(Type::Int, "a")),
-                        WrapSpan("string b", Param(Type::String, "b")),
-                    ],
-                    vec![],
-                ),
-            ),
-            WrapSpan(
-                "bool begin(bool x, bool y)",
-                Function(
-                    Type::Bool,
-                    "begin",
-                    vec![
-                        WrapSpan("bool x", Param(Type::Bool, "x")),
-                        WrapSpan("bool y", Param(Type::Bool, "y")),
-                    ],
-                    vec![],
-                ),
-            ),
-            WrapSpan(
-                "char begin(char x, bool y)",
-                Function(
-                    Type::Char,
-                    "begin",
-                    vec![
-                        WrapSpan("char x", Param(Type::Char, "x")),
-                        WrapSpan("bool y", Param(Type::Bool, "y")),
-                    ],
-                    vec![],
-                ),
-            ),
-        ];
-
-        let (fn_symb, valid_fns, errors) = get_fn_symbols(fn_defs);
-
-        let mut fn_symb_expected = FunctionSymbolTable::new();
-        fn_symb_expected.def_fun(String::from("fun1"), (Type::Int, vec![Type::Int]));
-        fn_symb_expected.def_fun(
-            String::from("example"),
-            (Type::Char, vec![Type::Int, Type::String]),
-        );
-        fn_symb_expected.def_fun(
-            String::from("begin"),
-            (Type::Bool, vec![Type::Bool, Type::Bool]),
-        );
-
-        let valid_fns_expected = vec![
-            Function(
-                Type::Int,
-                "fun1",
-                vec![WrapSpan("int a", Param(Type::Int, "a"))],
-                vec![],
-            ),
-            Function(
-                Type::Char,
-                "example",
-                vec![
-                    WrapSpan("int a", Param(Type::Int, "a")),
-                    WrapSpan("string b", Param(Type::String, "b")),
-                ],
-                vec![],
-            ),
-            Function(
-                Type::Bool,
-                "begin",
-                vec![
-                    WrapSpan("bool x", Param(Type::Bool, "x")),
-                    WrapSpan("bool y", Param(Type::Bool, "y")),
-                ],
-                vec![],
-            ),
-        ];
-
-        let errors_expected: SemanticErrorSummary = vec![
-            WrapSpan(
-                "bool begin(bool x, bool y)",
-                SemanticError::KeywordFunctionName("begin"),
-            ),
-            WrapSpan(
-                "char begin(char x, bool y)",
-                SemanticError::RepeatDefinitionFunction("begin", "bool begin(bool x, bool y)"),
-            ),
-        ];
 
         assert_eq!(fn_symb_expected, fn_symb);
         assert_eq!(valid_fns_expected, valid_fns);
