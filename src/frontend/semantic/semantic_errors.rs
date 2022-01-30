@@ -174,7 +174,7 @@ pub enum SemanticError<'a> {
     UndefinedVariableAssignment(&'a str),
 
     /// Variable and assigned type do not match.
-    /// (Variable name, span of variable assignment, expected type, found type)
+    /// (Variable name, expected type, expression errors)
     /// ```text
     /// begin
     ///     int a = true
@@ -182,15 +182,15 @@ pub enum SemanticError<'a> {
     /// end
     /// ```
     /// ```
-    /// AssignmentMismatch("a", vec![ExpressionError("true", Type::Int, Type::Bool)])
-    /// AssignmentMismatch("b",
+    /// AssignmentMismatch("a", Type::Bool, vec![ExpressionError("true", Type::Int, Type::Bool)])
+    /// AssignmentMismatch("b", Type::Int,
     ///     vec![
     ///         ExpressionError("bool", Type::Int, Type::Bool),
     ///         ExpressionError("true || false", Type::Int, Type::Bool)
     ///     ]
     /// )
     /// ```
-    AssignmentMismatch(&'a str, ExpressionError<'a>),
+    AssignmentMismatch(&'a str, Type, ExpressionError<'a>),
 
     /// Function of same name is defined twice
     /// (Function name, span of original definition)
@@ -225,6 +225,22 @@ pub enum SemanticError<'a> {
     /// ```
     RepeatDefinitionVariable(&'a str, &'a str),
 
+    /// The number of arguments provided is too small or large
+    /// (function name, expected length, found length)
+    /// ```text
+    /// begin
+    ///     int fun1(int a, int b) is
+    ///         return 9
+    ///     end
+    ///     
+    ///     int a = call fun1(3)
+    /// end
+    /// ```
+    /// ```
+    /// FunctionParametersLengthMismatch("fun1", 2, 1)
+    /// ```
+    FunctionParametersLengthMismatch(&'a str, usize, usize),
+
     /// Function argument types do not match parameters.
     /// (Function name, [ (param name, expression problems) ] )
     /// ```text
@@ -239,10 +255,10 @@ pub enum SemanticError<'a> {
     /// ```
     /// FunctionParametersMismatch("function", vec![Type::Int, Type::Char], vec![Type::Bool, Type::Bool])
     /// ```
-    FunctionParametersMismatch(&'a str, Vec<(&'a str, ExpressionError<'a>)>),
+    FunctionParametersTypeMismatch(&'a str, Vec<(&'a str, ExpressionError<'a>)>),
 
     /// Function return does not match function return type.
-    /// (Function name, expected type, found type)
+    /// (Function name, expected type, expression errors)
     /// ```text
     /// begin
     ///     bool function(int a) is
@@ -253,9 +269,9 @@ pub enum SemanticError<'a> {
     /// end
     /// ```
     /// ```
-    /// FunctionReturnMismatch("function", Type::Bool, Type::Int)
+    /// FunctionReturnMismatch("function", Type::Bool, ExpressionError::Is(ExprErrType::InvalidType("a", TypeConstraint::new(Type::Bool), Type::Int)))
     /// ```
-    FunctionReturnMismatch(&'a str, ExpressionError<'a>),
+    FunctionReturnMismatch(&'a str, Type, ExpressionError<'a>),
 
     /// Function has a control flow that does not end in return or exit.
     /// (Function name)
@@ -290,50 +306,6 @@ pub enum SemanticError<'a> {
     /// FunctionNoReturnOrExit("function")
     /// ```
     FunctionNoReturnOrExit(&'a str),
-
-    /// Function name is a reserved keyword
-    /// (Function name)
-    /// ```text
-    /// begin
-    ///     bool begin(int a) is
-    ///         return a
-    ///     end
-    ///
-    ///     skip
-    /// end
-    /// ```
-    /// ```
-    /// KeywordFunctionName("begin")
-    /// ```
-    KeywordFunctionName(&'a str),
-
-    /// Parameter name is a reserved keyword
-    /// (Function name, Parameter name)
-    /// ```text
-    /// begin
-    ///     bool function(int true) is
-    ///         return a
-    ///     end
-    ///
-    ///     skip
-    /// end
-    /// ```
-    /// ```
-    /// KeywordParameterName("function", "true")
-    /// ```
-    KeywordParameterName(&'a str, &'a str),
-
-    /// Variable name is a reserved keyword
-    /// (Variable name)
-    /// ```text
-    /// begin
-    ///     int begin = 4
-    /// end
-    /// ```
-    /// ```
-    /// KeywordVariableName("begin")
-    /// ```
-    KeywordVariableName(&'a str),
 
     /// Read statement invalid (wrong type)
     /// (variable/lvalue identifier, type found)
