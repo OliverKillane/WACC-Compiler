@@ -2069,28 +2069,28 @@ mod tests {
     fn type_constraint_gets_binary_ops() {
         let res_int = TypeConstraint(vec![Type::Int]).get_possible_binops(&Type::Any, &Type::Any);
 
-        assert!(res_int.contains(&(BinOp::Add)));
-        assert!(res_int.contains(&(BinOp::Sub)));
-        assert!(res_int.contains(&(BinOp::Mul)));
-        assert!(res_int.contains(&(BinOp::Div)));
-        assert!(res_int.contains(&(BinOp::Mod)));
+        assert!(res_int.contains(&BinOp::Add));
+        assert!(res_int.contains(&BinOp::Sub));
+        assert!(res_int.contains(&BinOp::Mul));
+        assert!(res_int.contains(&BinOp::Div));
+        assert!(res_int.contains(&BinOp::Mod));
 
         assert_eq!(res_int.len(), 5);
 
         let res_bool = TypeConstraint(vec![Type::Bool]).get_possible_binops(&Type::Any, &Type::Any);
 
-        assert!(res_bool.contains(&(BinOp::Gt)));
-        assert!(res_bool.contains(&(BinOp::Gt)));
-        assert!(res_bool.contains(&(BinOp::Gte)));
-        assert!(res_bool.contains(&(BinOp::Gte)));
-        assert!(res_bool.contains(&(BinOp::Lt)));
-        assert!(res_bool.contains(&(BinOp::Lt)));
-        assert!(res_bool.contains(&(BinOp::Lte)));
-        assert!(res_bool.contains(&(BinOp::Lte)));
-        assert!(res_bool.contains(&(BinOp::Eq)));
-        assert!(res_bool.contains(&(BinOp::Ne)));
-        assert!(res_bool.contains(&(BinOp::And)));
-        assert!(res_bool.contains(&(BinOp::Or)));
+        assert!(res_bool.contains(&BinOp::Gt));
+        assert!(res_bool.contains(&BinOp::Gt));
+        assert!(res_bool.contains(&BinOp::Gte));
+        assert!(res_bool.contains(&BinOp::Gte));
+        assert!(res_bool.contains(&BinOp::Lt));
+        assert!(res_bool.contains(&BinOp::Lt));
+        assert!(res_bool.contains(&BinOp::Lte));
+        assert!(res_bool.contains(&BinOp::Lte));
+        assert!(res_bool.contains(&BinOp::Eq));
+        assert!(res_bool.contains(&BinOp::Ne));
+        assert!(res_bool.contains(&BinOp::And));
+        assert!(res_bool.contains(&BinOp::Or));
 
         assert_eq!(res_bool.len(), 12);
     }
@@ -2100,23 +2100,23 @@ mod tests {
         let res_binops =
             TypeConstraint(vec![Type::Any]).get_possible_binops(&Type::Any, &Type::Any);
 
-        assert!(res_binops.contains(&(BinOp::Add)));
-        assert!(res_binops.contains(&(BinOp::Sub)));
-        assert!(res_binops.contains(&(BinOp::Mul)));
-        assert!(res_binops.contains(&(BinOp::Div)));
-        assert!(res_binops.contains(&(BinOp::Mod)));
-        assert!(res_binops.contains(&(BinOp::Gt)));
-        assert!(res_binops.contains(&(BinOp::Gt)));
-        assert!(res_binops.contains(&(BinOp::Gte)));
-        assert!(res_binops.contains(&(BinOp::Gte)));
-        assert!(res_binops.contains(&(BinOp::Lt)));
-        assert!(res_binops.contains(&(BinOp::Lt)));
-        assert!(res_binops.contains(&(BinOp::Lte)));
-        assert!(res_binops.contains(&(BinOp::Lte)));
-        assert!(res_binops.contains(&(BinOp::Eq)));
-        assert!(res_binops.contains(&(BinOp::Ne)));
-        assert!(res_binops.contains(&(BinOp::And)));
-        assert!(res_binops.contains(&(BinOp::Or)));
+        assert!(res_binops.contains(&BinOp::Add));
+        assert!(res_binops.contains(&BinOp::Sub));
+        assert!(res_binops.contains(&BinOp::Mul));
+        assert!(res_binops.contains(&BinOp::Div));
+        assert!(res_binops.contains(&BinOp::Mod));
+        assert!(res_binops.contains(&BinOp::Gt));
+        assert!(res_binops.contains(&BinOp::Gt));
+        assert!(res_binops.contains(&BinOp::Gte));
+        assert!(res_binops.contains(&BinOp::Gte));
+        assert!(res_binops.contains(&BinOp::Lt));
+        assert!(res_binops.contains(&BinOp::Lt));
+        assert!(res_binops.contains(&BinOp::Lte));
+        assert!(res_binops.contains(&BinOp::Lte));
+        assert!(res_binops.contains(&BinOp::Eq));
+        assert!(res_binops.contains(&BinOp::Ne));
+        assert!(res_binops.contains(&BinOp::And));
+        assert!(res_binops.contains(&BinOp::Or));
 
         assert_eq!(res_binops.len(), 17);
     }
@@ -2200,3 +2200,11 @@ mod tests {
         assert!(new_type_cons.inside(&Type::Array(box Type::Any, 1)));
     }
 }
+
+/*
+  1. Add more type info to InvalidBinOp and InvalidUnOp
+  2. Write tests for expression
+  3. Write statement checker
+  4. Write block checker
+  5. write function linkup
+*/
