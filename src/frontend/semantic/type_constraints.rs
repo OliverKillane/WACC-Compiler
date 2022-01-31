@@ -16,39 +16,43 @@ lazy_static! {
     /// - To add overloading, simply add more tuples
     /// - Operator application will use first tuple to match
     /// - Handled by the type constrain system when analysing expressions
-    static ref UNOPS: [(UnOp, Type, Type); 5] = [
+    static ref UNOPS: [(UnOp, Type, Type); 7] = [
         (UnOp::Neg, Type::Bool, Type::Bool),
         (UnOp::Minus, Type::Int, Type::Int),
         (UnOp::Len, Type::Int, Type::Array(box Type::Any, 1)),
         (UnOp::Ord, Type::Int, Type::Char),
-        (UnOp::Chr, Type::Char, Type::Int)
+        (UnOp::Chr, Type::Char, Type::Int),
+        (UnOp::Fst, Type::Generic(0), Type::Pair(box Type::Generic(0), box Type::Any)),
+        (UnOp::Fst, Type::Generic(0), Type::Pair(box Type::Any, box Type::Generic(0))),
     ];
 }
 
-/// Binary operations allowed (operator, output, left input, right input)
-/// - To add overloading, simply add more tuples
-/// - Operator application will use first tuple to match
-/// - Handled by the type constrain system when analysing expressions
-const BINOPS: [(BinOp, Type, Type, Type); 17] = [
-    (BinOp::Add, Type::Int, Type::Int, Type::Int),
-    (BinOp::Sub, Type::Int, Type::Int, Type::Int),
-    (BinOp::Mul, Type::Int, Type::Int, Type::Int),
-    (BinOp::Div, Type::Int, Type::Int, Type::Int),
-    (BinOp::Mod, Type::Int, Type::Int, Type::Int),
-    (BinOp::Gt, Type::Bool, Type::Int, Type::Int),
-    (BinOp::Gt, Type::Bool, Type::Char, Type::Char),
-    (BinOp::Gte, Type::Bool, Type::Int, Type::Int),
-    (BinOp::Gte, Type::Bool, Type::Char, Type::Char),
-    (BinOp::Lt, Type::Bool, Type::Int, Type::Int),
-    (BinOp::Lt, Type::Bool, Type::Char, Type::Char),
-    (BinOp::Lte, Type::Bool, Type::Int, Type::Int),
-    (BinOp::Lte, Type::Bool, Type::Char, Type::Char),
-    (BinOp::Eq, Type::Bool, Type::Generic(0), Type::Generic(0)),
-    (BinOp::Ne, Type::Bool, Type::Generic(0), Type::Generic(0)),
-    (BinOp::And, Type::Bool, Type::Bool, Type::Bool),
-    (BinOp::Or, Type::Bool, Type::Bool, Type::Bool),
+lazy_static! {
+    /// Binary operations allowed (operator, output, left input, right input)
+    /// - To add overloading, simply add more tuples
+    /// - Operator application will use first tuple to match
+    /// - Handled by the type constrain system when analysing expressions
+    static ref BINOPS: [(BinOp, Type, Type, Type); 18] = [
+        (BinOp::Add, Type::Int, Type::Int, Type::Int),
+        (BinOp::Sub, Type::Int, Type::Int, Type::Int),
+        (BinOp::Mul, Type::Int, Type::Int, Type::Int),
+        (BinOp::Div, Type::Int, Type::Int, Type::Int),
+        (BinOp::Mod, Type::Int, Type::Int, Type::Int),
+        (BinOp::Gt, Type::Bool, Type::Int, Type::Int),
+        (BinOp::Gt, Type::Bool, Type::Char, Type::Char),
+        (BinOp::Gte, Type::Bool, Type::Int, Type::Int),
+        (BinOp::Gte, Type::Bool, Type::Char, Type::Char),
+        (BinOp::Lt, Type::Bool, Type::Int, Type::Int),
+        (BinOp::Lt, Type::Bool, Type::Char, Type::Char),
+        (BinOp::Lte, Type::Bool, Type::Int, Type::Int),
+        (BinOp::Lte, Type::Bool, Type::Char, Type::Char),
+        (BinOp::Eq, Type::Bool, Type::Generic(0), Type::Generic(0)),
+        (BinOp::Ne, Type::Bool, Type::Generic(0), Type::Generic(0)),
+        (BinOp::And, Type::Bool, Type::Bool, Type::Bool),
+        (BinOp::Or, Type::Bool, Type::Bool, Type::Bool),
+        (BinOp::Newpair, Type::Pair(box Type::Generic(0), box Type::Generic(1)), Type::Generic(0), Type::Generic(1)),
 ];
-
+}
 /// Traverse through types until a match or not can be discerned. If generic is
 /// used, generic matches will result in new concrete types for the generic.
 ///
@@ -232,6 +236,25 @@ pub fn de_index(t: &Type, dim: usize) -> Option<Type> {
             }
         }
         _ => None,
+    }
+}
+
+/// Given two concrete (non-generic) types, can the second be coerced into the 
+/// first
+pub fn can_coerce(main_type: &Type, into_type: &Type) -> bool {
+    match (main_type, into_type) {
+        (Type::Any, _) | (_, Type::Any) => true,
+        (Type::Pair(box a1, box a2), Type::Pair(box b1, box b2)) => can_coerce(a1, b1) && can_coerce(a2, b2),
+        (Type::Array(box a, dim_a), Type::Array(box b, dim_b)) => {
+            if dim_a == dim_b {
+                can_coerce(a, b)
+            } else if dim_a > dim_b {
+                can_coerce(&Type::Array(box a.clone(), dim_a - dim_b), b)
+            } else {
+                can_coerce(a, &Type::Array(box b.clone(), dim_b - dim_a))
+            }
+        }
+        (a,b) => a == b
     }
 }
 
@@ -795,17 +818,17 @@ mod tests {
     fn binop_match_correctly_identifies_errors() {
         assert_eq!(
             binop_match(&BinOp::Add, &Type::Int, &Type::Char),
-            Err((vec![(Type::Int, Type::Int)], vec![]))
+            Err((vec![(Type::Int, Type::Int)], vec![&BinOp::Newpair]))
         );
         assert_eq!(
             binop_match(&BinOp::Eq, &Type::Int, &Type::Char),
-            Err((vec![(Type::Generic(0), Type::Generic(0))], vec![]))
+            Err((vec![(Type::Generic(0), Type::Generic(0))], vec![&BinOp::Newpair]))
         );
         assert_eq!(
             binop_match(&BinOp::Lt, &Type::Int, &Type::Char),
             Err((
                 vec![(Type::Int, Type::Int), (Type::Char, Type::Char)],
-                vec![]
+                vec![&BinOp::Newpair]
             ))
         );
     }
@@ -851,5 +874,24 @@ mod tests {
             unop_match(&UnOp::Ord, &Type::Int),
             Err((vec![Type::Char], vec![&UnOp::Minus, &UnOp::Chr]))
         );
+    }
+
+    #[test]
+    fn can_coerce_matches_any_correctly() {
+        assert!(can_coerce(&Type::Int, &Type::Any ));
+        assert!(can_coerce(&Type::Any, &Type::Int));
+        assert!(can_coerce(&Type::Any ,&Type::String ));
+        assert!(can_coerce(&Type::String ,&Type::Any ));
+        assert!(can_coerce(&Type::Bool ,&Type::Any ));
+        assert!(can_coerce(&Type::Any ,&Type::Bool ));
+        assert!(can_coerce(&Type::Any ,&Type::Char ));
+        assert!(can_coerce(&Type::Char ,&Type::Any ));
+    }
+
+    #[test]
+    fn can_coerce_matches_arrays_and_pairs_correctly() {
+        assert!(can_coerce(&Type::Pair(box Type::Array(box Type::Int, 3), box Type::Char), &Type::Pair(box Type::Array(box Type::Any, 2), box Type::Any)));
+        assert!(can_coerce(&Type::Array(box Type::Char, 3), &Type::Array(box Type::Array(box Type::Char, 1), 2)));
+        assert!(can_coerce(&Type::Array(box Type::Array(box Type::Char, 2), 1), &Type::Array(box Type::Array(box Type::Char, 1), 2)));
     }
 }

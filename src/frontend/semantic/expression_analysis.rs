@@ -7,7 +7,7 @@ pub fn analyse_expression<'a, 'b>(
     expr: Expr<'a, &'a str>,
     local_symb: &LocalSymbolTable<'a, 'b>,
     var_symb: &VariableSymbolTable,
-) -> Result<(Type, Expr<'a, usize>), Vec<ExprError<'a>>> {
+) -> Result<(Type, Expr<'a, usize>), Vec<SemanticError<'a>>> {
     match expr {
         Expr::Null => Ok((Type::Pair(box Type::Any, box Type::Any), Expr::Null)),
         Expr::Int(n) => Ok((Type::Int, Expr::Int(n))),
@@ -16,7 +16,7 @@ pub fn analyse_expression<'a, 'b>(
         Expr::String(s) => Ok((Type::String, Expr::String(s))),
         Expr::Var(name) => match var_symb.get_type(name, local_symb) {
             Some((rename, t)) => Ok((t, Expr::Var(rename))),
-            None => Err(vec![ExprError::UndefinedVariable(name)]),
+            None => Err(vec![SemanticError::UndefinedVariableUse(name)]),
         },
         Expr::ArrayElem(name, indexes) => {
             let mut correct_indexes = Vec::new();
@@ -28,7 +28,7 @@ pub fn analyse_expression<'a, 'b>(
                     Ok((Type::Int, new_index_expr)) => {
                         correct_indexes.push(WrapSpan(span, new_index_expr))
                     }
-                    Ok((_, _)) => errors.push(ExprError::InvalidIndex(span)),
+                    Ok((_, _)) => errors.push(SemanticError::InvalidIndex(span)),
                     Err(mut errs) => errors.append(&mut errs),
                 }
             }
@@ -37,7 +37,7 @@ pub fn analyse_expression<'a, 'b>(
                 Some((rename, t)) => match de_index(&t, index_dim) {
                     Some(de_ind_t) => Some((rename, de_ind_t)),
                     None => {
-                        errors.push(ExprError::InvalidVariableType(
+                        errors.push(SemanticError::InvalidVariableType(
                             name,
                             vec![Type::Array(box Type::Any, index_dim)],
                             t,
@@ -46,7 +46,7 @@ pub fn analyse_expression<'a, 'b>(
                     }
                 },
                 None => {
-                    errors.push(ExprError::UndefinedVariable(name));
+                    errors.push(SemanticError::UndefinedVariableUse(name));
                     None
                 }
             };
@@ -64,7 +64,7 @@ pub fn analyse_expression<'a, 'b>(
                         unop_t,
                         Expr::UnOp(WrapSpan(op_span, op), box WrapSpan(inner_span, ast)),
                     )),
-                    Err((pot_types, pot_ops)) => Err(vec![ExprError::InvalidUnOp(
+                    Err((pot_types, pot_ops)) => Err(vec![SemanticError::InvalidUnOp(
                         op_span, inner_span, pot_types, pot_ops, inner_t, op,
                     )]),
                 },
@@ -90,7 +90,7 @@ pub fn analyse_expression<'a, 'b>(
                                 box WrapSpan(right_span, right_ast),
                             ),
                         )),
-                        Err((pot_types, pot_ops)) => Err(vec![ExprError::InvalidBinOp(
+                        Err((pot_types, pot_ops)) => Err(vec![SemanticError::InvalidBinOp(
                             left_span,
                             op_span,
                             right_span,

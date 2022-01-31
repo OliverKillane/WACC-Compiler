@@ -174,7 +174,7 @@ fn get_fn_symbols<'a>(
     let mut fun_symb = FunctionSymbolTable::new();
     let mut def_table: HashMap<&str, &str> = HashMap::new();
     let mut valid_fun: Vec<Function<'a, &'a str>> = Vec::new();
-    let mut errors: SemanticErrorSummary = Vec::new();
+    let mut errors: SemanticErrorSummary<'a> = Vec::new();
 
     for WrapSpan(fn_def_span, Function(ret_type, fn_name, params, stats)) in fn_defs {
         match def_table.insert(fn_name, fn_def_span) {
