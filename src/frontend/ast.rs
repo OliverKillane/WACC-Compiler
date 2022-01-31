@@ -184,6 +184,10 @@ pub enum UnOp {
     Ord,
     /// Gets the character associated with a given integer ascii value.
     Chr,
+    /// Getting first from a pair
+    Fst,
+    /// Getting second from a pair
+    Snd,
 }
 
 /// Binary Operators supported by WACC available for use in [expressions](Expr).
@@ -215,6 +219,8 @@ pub enum BinOp {
     And,
     /// Logical disjunction/or (||).
     Or,
+    /// Create a pair
+    Newpair,
 }
 
 /// Expression Data Type
@@ -468,26 +474,6 @@ pub enum AssignRhs<'a, IdRepr> {
     /// int[] int_arr = [2, 3 + 3, 4 * 7, 0] ;
     /// ```
     Array(Vec<ExprSpan<'a, IdRepr>>),
-
-    /// Assigns to a new pair.
-    /// ```text
-    /// pair(int, bool) a_pair = newpair(3 + 3, true && false) ;
-    /// ```
-    NewPair(ExprSpan<'a, IdRepr>, ExprSpan<'a, IdRepr>),
-
-    /// Assign the first element of a given pair.
-    /// ```text
-    /// pair(int, bool) a_pair = newpair(1, true) ;
-    /// int a_fst = fst a_pair ;
-    /// ```
-    PairFst(ExprSpan<'a, IdRepr>),
-
-    /// Assign the second element of a given pair.
-    /// ```text
-    /// pair(int, bool) a_pair = newpair(1, true) ;
-    /// bool a_snd = snd a_pair ;
-    /// ```
-    PairSnd(ExprSpan<'a, IdRepr>),
 
     /// Assign the return value of a function, with arguments.
     /// ```text
