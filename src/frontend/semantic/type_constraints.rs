@@ -12,20 +12,22 @@ use std::collections::HashMap;
 use crate::frontend::ast::*;
 
 lazy_static! {
-    /// Unary Operations allowed (operator, input type, output type)
+    /// Unary Operations allowed (operator, output type, input type)
     /// - To add overloading, simply add more tuples
+    /// - Operator application will use first tuple to match
     /// - Handled by the type constrain system when analysing expressions
     static ref UNOPS: [(UnOp, Type, Type); 5] = [
         (UnOp::Neg, Type::Bool, Type::Bool),
         (UnOp::Minus, Type::Int, Type::Int),
-        (UnOp::Len, Type::Array(box Type::Any, 1), Type::Int),
-        (UnOp::Ord, Type::Char, Type::Int),
-        (UnOp::Chr, Type::Int, Type::Char)
+        (UnOp::Len, Type::Int, Type::Array(box Type::Any, 1)),
+        (UnOp::Ord, Type::Int, Type::Char),
+        (UnOp::Chr, Type::Char, Type::Int)
     ];
 }
 
 /// Binary operations allowed (operator, output, left input, right input)
 /// - To add overloading, simply add more tuples
+/// - Operator application will use first tuple to match
 /// - Handled by the type constrain system when analysing expressions
 const BINOPS: [(BinOp, Type, Type, Type); 17] = [
     (BinOp::Add, Type::Int, Type::Int, Type::Int),
@@ -55,11 +57,16 @@ const BINOPS: [(BinOp, Type, Type, Type); 17] = [
 /// can define the concrete types of generics in the current context.
 /// 
 /// (must match, type to match) -> Result(Correct concrete type, wrong - should have been type)
+/// 
+/// As a precondition the check type must not be generic, it must be a concrete
+/// type!
 fn type_match(type_truth: &Type, check_type: &Type, generics: &mut HashMap<GenericId, Type>) -> Result<Type, Type> {
     match (type_truth, check_type) {
-        // Any matches anything, and can be used for type coersion
+        // Any type is acceptable
         (Type::Any, t) => Ok(t.clone()),
-        (_, Type::Any) => Ok(Type::Any),
+
+        // Type must match a generic (either add to generics or if already define 
+        // match against it.)
         (Type::Generic(a), t) => {
             match generics.get(a) {
             Some(conc_type) => {
@@ -73,7 +80,25 @@ fn type_match(type_truth: &Type, check_type: &Type, generics: &mut HashMap<Gener
                 generics.insert(*a, t.clone());
                 Ok(t.clone())
             },}
-        }
+        },
+
+        // When matched with any, any generics contained inside must be updated.
+        (Type::Pair(box a, box b), Type::Any) => {
+            type_match(a, &Type::Any, generics).expect("Any must match anything");
+            type_match(b, &Type::Any, generics).expect("Any must match anything");
+            Ok(Type::Any)
+        },
+
+        // When matched with an any, any generics contained inside must be updated.
+        (Type::Array(box a, _), Type::Any) => {
+            type_match(&a, &Type::Any, generics).expect("Any must match anything");
+            Ok(Type::Any)
+        },
+
+        // If the type is Any, then is matches, but is not narrowed.
+        (_, Type::Any) => Ok(Type::Any),
+
+        // Checking inside of arrays and pairs
         (Type::Pair(box a1, box a2), Type::Pair(box b1, box b2)) => {
             match (type_match(a1, b1, generics), type_match(a2, b2, generics)) {
                 (Err(t1), Err(t2)) => Err(Type::Pair(box t1, box t2)),
@@ -100,6 +125,8 @@ fn type_match(type_truth: &Type, check_type: &Type, generics: &mut HashMap<Gener
                 }
             }
         }
+
+        // Primitive types must be equal
         (a, b) => if a == b {
             Ok(b.clone())
         } else {
@@ -108,21 +135,65 @@ fn type_match(type_truth: &Type, check_type: &Type, generics: &mut HashMap<Gener
     }
 }
 
-
-pub fn binop_match(binop: &BinOp, left_type: &Type, right_type: &Type) -> Result<Type, (Vec<(Type, Type)>, Vec<BinOp>)> {
-    todo!()
+/// Use the provided generics hashmap to set concrete values for all generic 
+/// types in the type.
+fn apply_generics(generic_type: &Type, generics: &HashMap<GenericId, Type>) -> Type {
+    match generic_type {
+        Type::Generic(n) => generics.get(&n).expect("Generic was added to the hashmap, and should still be there").clone(),
+        Type::Pair(box a, box b) => Type::Pair(box apply_generics(a, generics), box apply_generics(b, generics)),
+        Type::Array(box a, n) => Type::Array(box apply_generics(a, generics), *n),
+        t => t.clone()
+    }
 }
 
-pub fn binop_match_left(binop: &BinOp, left_type: &Type) -> Result<Type, (Vec<Type>, Vec<BinOp>)> {
-    todo!()
+/// Match a binary operator and two input types.
+/// - On success, return the output type
+/// - On failure output the potential input types for the operator, and 
+///   potential operators for the input type.
+pub fn binop_match(binop: &BinOp, left_type: &Type, right_type: &Type) -> Result<Type, (Vec<(Type, Type)>, Vec<&'static BinOp>)> {
+    let mut generics = HashMap::with_capacity(0);
+    let mut possible_types = Vec::new();
+    let mut possible_binops = Vec::new();
+
+    for (op, output, left, right) in BINOPS.iter() {
+        generics.clear();
+        if binop == op {
+            match (type_match(left, left_type, &mut generics), type_match(right, right_type, &mut generics)) {
+                (Ok(_), Ok(_)) => return Ok(apply_generics(output, &generics)),
+                _ => possible_types.push((left.clone(), right.clone())),
+            };
+        } else {
+            match (type_match(left, left_type, &mut generics), type_match(right, right_type, &mut generics)) {
+                (Ok(_), Ok(_)) => possible_binops.push(op),
+                _ => (),
+            }
+        }
+    }
+    Err((possible_types, possible_binops))
 }
 
-pub fn binop_match_right(binop: &BinOp, right_type: &Type) -> Result<Type, (Vec<Type>, Vec<BinOp>)> {
-    todo!()
-}
-
-pub fn unop_match(unop: &UnOp, expr_type: &Type) -> Result<Type, (Vec<Type>, Vec<UnOp>)> {
-    todo!()
+/// Match a unary operator and two input types.
+/// - On success, return the output type
+/// - On failure output the potential input types for the operator, and 
+///   potential operators for the input type.
+pub fn unop_match(unop: &UnOp, expr_type: &Type) -> Result<Type, (Vec<Type>, Vec<&'static UnOp>)> {
+    let mut generics = HashMap::with_capacity(0);
+    let mut possible_types = Vec::new();
+    let mut possible_unops = Vec::new();
+    for (op, out, input) in UNOPS.iter() {
+        if op == unop {
+            match type_match(input, expr_type, &mut generics) {
+                Ok(_) => return Ok(apply_generics(out, & generics)),
+                Err(t) => possible_types.push(t),
+            }
+        } else {
+            match type_match(input, expr_type, &mut generics) {
+                Ok(_) => possible_unops.push(op),
+                _ => (),
+            }
+        }
+    }
+    Err((possible_types, possible_unops))
 }
 
 
@@ -231,5 +302,56 @@ mod tests {
         assert_eq!(generics.get(&1), Some(&Type::Char));
 
         assert_eq!(type_match(&Type::Pair(box Type::Array(box Type::Generic(0), 2), box Type::Generic(1)), &Type::Pair(box Type::Array(box Type::Array(box Type::Int, 1), 1), box Type::String), &mut generics), Err(Type::Pair(box Type::Array(box Type::Array(box Type::Int, 1), 1), box Type::Char)));
+    }
+
+
+    #[test]
+    fn apply_generics_correct() {
+
+        let generics = HashMap::from([
+            (0, Type::Int),
+            (1, Type::Char),
+            (2, Type::Array(box Type::Char, 3))
+        ]);
+
+        assert_eq!(apply_generics(&Type::Generic(0), &generics), Type::Int);
+        assert_eq!(apply_generics(&Type::Generic(1), &generics), Type::Char);
+        assert_eq!(apply_generics(&Type::Generic(2), &generics), Type::Array(box Type::Char, 3));
+        assert_eq!(apply_generics(&Type::Pair(box Type::Generic(1), box Type::Generic(0)), &generics), Type::Pair(box Type::Char, box Type::Int));
+        assert_eq!(apply_generics(&Type::Pair(box Type::Generic(1), box Type::Generic(2)), &generics), Type::Pair(box Type::Char, box Type::Array(box Type::Char, 3)));
+    }
+    
+    #[test]
+    fn binop_match_matches_correct_applications() {
+        assert_eq!(binop_match(&BinOp::Add, &Type::Int, &Type::Int), Ok(Type::Int));
+        assert_eq!(binop_match(&BinOp::Gt, &Type::Char, &Type::Char), Ok(Type::Bool));
+        assert_eq!(binop_match(&BinOp::Or, &Type::Bool, &Type::Bool), Ok(Type::Bool));
+        assert_eq!(binop_match(&BinOp::Eq, &Type::Pair(box Type::Int, box Type::Char), &Type::Pair(box Type::Int, box Type::Char)), Ok(Type::Bool));
+    }
+
+    #[test]
+    fn binop_match_correctly_identifies_errors() {
+        assert_eq!(binop_match(&BinOp::Add, &Type::Int, &Type::Char), Err((vec![(Type::Int, Type::Int)], vec![])));
+        assert_eq!(binop_match(&BinOp::Eq, &Type::Int, &Type::Char), Err((vec![(Type::Generic(0), Type::Generic(0))], vec![])));
+        assert_eq!(binop_match(&BinOp::Lt, &Type::Int, &Type::Char), Err((vec![(Type::Int, Type::Int), (Type::Char, Type::Char)], vec![])));
+    }
+
+    #[test]
+    fn unop_match_matches_correct_applications() {
+        assert_eq!(unop_match(&UnOp::Len, &Type::Array(box Type::Int, 3)), Ok(Type::Int));
+        assert_eq!(unop_match(&UnOp::Neg, &Type::Bool), Ok(Type::Bool));
+        assert_eq!(unop_match(&UnOp::Minus, &Type::Int), Ok(Type::Int));
+        assert_eq!(unop_match(&UnOp::Chr, &Type::Int), Ok(Type::Char));
+        assert_eq!(unop_match(&UnOp::Ord, &Type::Char), Ok(Type::Int));
+    }
+
+    #[test]
+    fn unop_match_correctly_identifies_errors() {
+        assert_eq!(unop_match(&UnOp::Len, &Type::Int), Err((vec![Type::Array(box Type::Any, 1)], vec![&UnOp::Minus, &UnOp::Chr])));
+        assert_eq!(unop_match(&UnOp::Neg, &Type::Int), Err((vec![Type::Bool], vec![&UnOp::Minus, &UnOp::Chr])));
+        assert_eq!(unop_match(&UnOp::Neg, &Type::Array(box Type::Any, 1)), Err((vec![Type::Bool], vec![&UnOp::Len])));
+        assert_eq!(unop_match(&UnOp::Minus, &Type::Char), Err((vec![Type::Int], vec![&UnOp::Ord])));
+        assert_eq!(unop_match(&UnOp::Chr, &Type::Char), Err((vec![Type::Int], vec![&UnOp::Ord])));
+        assert_eq!(unop_match(&UnOp::Ord, &Type::Int), Err((vec![Type::Char], vec![&UnOp::Minus, &UnOp::Chr])));
     }
 }
