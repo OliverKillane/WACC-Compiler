@@ -38,7 +38,7 @@ pub enum SemanticError<'a> {
     /// (function name in span, expected type, found type)
     InvalidCallType(&'a str, Type, Type),
 
-    /// Invalid array literal (when an array literal is assigned to a non array 
+    /// Invalid array literal (when an array literal is assigned to a non array
     /// type).
     /// int a = [1,2,3,4]
     InvalidArrayLiteral(Vec<&'a str>),

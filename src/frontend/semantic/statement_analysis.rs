@@ -37,7 +37,7 @@ fn analyse_block<'a, 'b>(
     todo!()
 }
 
-/// Given the type of the internal expressions to return, the assignment and 
+/// Given the type of the internal expressions to return, the assignment and
 /// symbol tables, determines if errors are present.
 
 fn analyse_rhs<'a, 'b>(
@@ -65,14 +65,15 @@ fn analyse_rhs<'a, 'b>(
             }
         }
         AssignRhs::Array(vals) => {
-
             // check if assignment is possible
             match de_index(expected, 1) {
                 Some(expr_expected) => {
                     let mut correct = Vec::new();
                     let mut errors = Vec::new();
-                    vals.into_iter().for_each(|WrapSpan(expr_span, expr)| {
-                        match analyse_expression(expr, local_symb, var_symb) {
+                    vals.into_iter().for_each(
+                        |WrapSpan(expr_span, expr)| match analyse_expression(
+                            expr, local_symb, var_symb,
+                        ) {
                             Ok((expr_type, ast)) => {
                                 if can_coerce(&expr_expected, &expr_type) {
                                     correct.push(WrapSpan(expr_span, ast))
@@ -85,16 +86,18 @@ fn analyse_rhs<'a, 'b>(
                                 }
                             }
                             Err(mut errs) => errors.append(&mut errs),
-                        }
-                    });
-        
+                        },
+                    );
+
                     if errors.len() == 0 {
                         Ok(AssignRhs::Array(correct))
                     } else {
                         Err(errors)
                     }
-                },
-                None => Err(vec![SemanticError::InvalidArrayLiteral(vals.into_iter().map(|WrapSpan(span, _)| span).collect())]),
+                }
+                None => Err(vec![SemanticError::InvalidArrayLiteral(
+                    vals.into_iter().map(|WrapSpan(span, _)| span).collect(),
+                )]),
             }
         }
         AssignRhs::Call(fun_name, args) => {
@@ -124,16 +127,22 @@ fn analyse_rhs<'a, 'b>(
                     }
 
                     if check_args {
-                        args.into_iter().zip(param_types.into_iter()).for_each(|(WrapSpan(expr_span, expr), (param_name, param_type))| {
-                            match analyse_expression(expr, local_symb, var_symb) {
-                                Ok((expr_type, ast)) => if can_coerce(&param_type, &expr_type) {
-                                    correct.push(WrapSpan(expr_span, ast))
-                                } else {
-                                    errors.push(SemanticError::FunctionArgumentTypeInvalid(expr_span, param_name, param_type, expr_type))
-                                },
-                                Err(mut errs) => errors.append(&mut errs),
-                            }
-                        });
+                        args.into_iter().zip(param_types.into_iter()).for_each(
+                            |(WrapSpan(expr_span, expr), (param_name, param_type))| {
+                                match analyse_expression(expr, local_symb, var_symb) {
+                                    Ok((expr_type, ast)) => {
+                                        if can_coerce(&param_type, &expr_type) {
+                                            correct.push(WrapSpan(expr_span, ast))
+                                        } else {
+                                            errors.push(SemanticError::FunctionArgumentTypeInvalid(
+                                                expr_span, param_name, param_type, expr_type,
+                                            ))
+                                        }
+                                    }
+                                    Err(mut errs) => errors.append(&mut errs),
+                                }
+                            },
+                        );
                     }
 
                     if errors.len() == 0 {
@@ -241,13 +250,12 @@ mod tests {
             ))
         );
 
-        var_symb
-            .def_var(
-                "a",
-                Type::Pair(box Type::Int, box Type::Int),
-                "pair(int,int) a = newpair(5,5)",
-                &mut local_symb,
-            );
+        var_symb.def_var(
+            "a",
+            Type::Pair(box Type::Int, box Type::Int),
+            "pair(int,int) a = newpair(5,5)",
+            &mut local_symb,
+        );
 
         // with a variable
         assert_eq!(
@@ -306,13 +314,12 @@ mod tests {
             ),
         );
 
-        var_symb
-            .def_var(
-                "pair_a",
-                Type::Pair(box Type::Int, box Type::Int),
-                "pair(int,int) a = newpair(5,5)",
-                &mut local_symb,
-            );
+        var_symb.def_var(
+            "pair_a",
+            Type::Pair(box Type::Int, box Type::Int),
+            "pair(int,int) a = newpair(5,5)",
+            &mut local_symb,
+        );
 
         // Errors:
         // - The return type of fun1 is int (expects char)
@@ -325,29 +332,17 @@ mod tests {
             &mut var_symb,
         ) {
             Err(errs) => {
-                assert!(errs.contains(&SemanticError::InvalidCallType("fun1", Type::Char, Type::Int)));
-                assert!(errs.contains(&SemanticError::FunctionParametersLengthMismatch("fun1", 2, 1)));
-            },
-            _ => assert!(false),
-        }
-
-
-        // Errors:
-        // - The first argument is a pair(int,int) should be an int
-        // - The second argument is a bool, should be an int
-        match analyse_rhs(
-            &Type::Int,
-            AssignRhs::Call("fun1", vec![WrapSpan("pair_a", Expr::Var("pair_a")), WrapSpan("true", Expr::Bool(true))]),
-            &fun_symb,
-            &mut local_symb,
-            &mut var_symb,
-        ) {
-            Err(errs) => {
-
-                // FunctionArgumentTypeInvalid("a", "a", Int, Pair(Int, Int)), FunctionArgumentTypeInvalid("true", "b", Int, Bool)
-                assert!(errs.contains(&SemanticError::FunctionArgumentTypeInvalid("pair_a", "a", Type::Int, Type::Pair(box Type::Int, box Type::Int))));
-                assert!(errs.contains(&SemanticError::FunctionArgumentTypeInvalid("true", "b", Type::Int, Type::Bool)));
-            },
+                assert!(errs.contains(&SemanticError::InvalidCallType(
+                    "fun1",
+                    Type::Char,
+                    Type::Int
+                )));
+                assert!(
+                    errs.contains(&SemanticError::FunctionParametersLengthMismatch(
+                        "fun1", 2, 1
+                    ))
+                );
+            }
             _ => assert!(false),
         }
 
@@ -356,18 +351,60 @@ mod tests {
         // - The second argument is a bool, should be an int
         match analyse_rhs(
             &Type::Int,
-            AssignRhs::Call("fun1", vec![WrapSpan("pair_j", Expr::Var("pair_j")), WrapSpan("true", Expr::Bool(true))]),
+            AssignRhs::Call(
+                "fun1",
+                vec![
+                    WrapSpan("pair_a", Expr::Var("pair_a")),
+                    WrapSpan("true", Expr::Bool(true)),
+                ],
+            ),
             &fun_symb,
             &mut local_symb,
             &mut var_symb,
         ) {
             Err(errs) => {
-                println!("{:?}", errs);
                 // FunctionArgumentTypeInvalid("a", "a", Int, Pair(Int, Int)), FunctionArgumentTypeInvalid("true", "b", Int, Bool)
+                assert!(errs.contains(&SemanticError::FunctionArgumentTypeInvalid(
+                    "pair_a",
+                    "a",
+                    Type::Int,
+                    Type::Pair(box Type::Int, box Type::Int)
+                )));
+                assert!(errs.contains(&SemanticError::FunctionArgumentTypeInvalid(
+                    "true",
+                    "b",
+                    Type::Int,
+                    Type::Bool
+                )));
+            }
+            _ => assert!(false),
+        }
 
+        // Errors:
+        // - The first argument is a pair(int,int) should be an int
+        // - The second argument is a bool, should be an int
+        match analyse_rhs(
+            &Type::Int,
+            AssignRhs::Call(
+                "fun1",
+                vec![
+                    WrapSpan("pair_j", Expr::Var("pair_j")),
+                    WrapSpan("true", Expr::Bool(true)),
+                ],
+            ),
+            &fun_symb,
+            &mut local_symb,
+            &mut var_symb,
+        ) {
+            Err(errs) => {
                 assert!(errs.contains(&SemanticError::UndefinedVariableUse("pair_j")));
-                assert!(errs.contains(&SemanticError::FunctionArgumentTypeInvalid("true", "b", Type::Int, Type::Bool)));
-            },
+                assert!(errs.contains(&SemanticError::FunctionArgumentTypeInvalid(
+                    "true",
+                    "b",
+                    Type::Int,
+                    Type::Bool
+                )));
+            }
             _ => assert!(false),
         }
     }
@@ -381,11 +418,57 @@ mod tests {
         var_symb.def_var("a", Type::Int, "int a = 9", &mut local_symb);
         var_symb.def_var("b", Type::Char, "char b = 'a'", &mut local_symb);
 
-        assert_eq!(analyse_rhs(&Type::Array(box Type::Int, 1), AssignRhs::Array(vec![WrapSpan("3", Expr::Int(3)), WrapSpan("3", Expr::Int(3)), WrapSpan("3", Expr::Int(3)), WrapSpan("3", Expr::Int(3))]), &fun_symb, &mut local_symb, &mut var_symb), Ok(AssignRhs::Array(vec![WrapSpan("3", Expr::Int(3)), WrapSpan("3", Expr::Int(3)), WrapSpan("3", Expr::Int(3)), WrapSpan("3", Expr::Int(3))])));
-        assert_eq!(analyse_rhs(&Type::Array(box Type::Int, 1), AssignRhs::Array(vec![WrapSpan("a", Expr::Var("a")), WrapSpan("3", Expr::Int(3)), WrapSpan("3", Expr::Int(3)), WrapSpan("3", Expr::Int(3))]), &fun_symb, &mut local_symb, &mut var_symb), Ok(AssignRhs::Array(vec![WrapSpan("a", Expr::Var(0)), WrapSpan("3", Expr::Int(3)), WrapSpan("3", Expr::Int(3)), WrapSpan("3", Expr::Int(3))])));
-        assert_eq!(analyse_rhs(&Type::Array(box Type::Char, 1), AssignRhs::Array(vec![WrapSpan("b", Expr::Var("b"))]), &fun_symb, &mut local_symb, &mut var_symb), Ok(AssignRhs::Array(vec![WrapSpan("b", Expr::Var(1))])));
+        assert_eq!(
+            analyse_rhs(
+                &Type::Array(box Type::Int, 1),
+                AssignRhs::Array(vec![
+                    WrapSpan("3", Expr::Int(3)),
+                    WrapSpan("3", Expr::Int(3)),
+                    WrapSpan("3", Expr::Int(3)),
+                    WrapSpan("3", Expr::Int(3))
+                ]),
+                &fun_symb,
+                &mut local_symb,
+                &mut var_symb
+            ),
+            Ok(AssignRhs::Array(vec![
+                WrapSpan("3", Expr::Int(3)),
+                WrapSpan("3", Expr::Int(3)),
+                WrapSpan("3", Expr::Int(3)),
+                WrapSpan("3", Expr::Int(3))
+            ]))
+        );
+        assert_eq!(
+            analyse_rhs(
+                &Type::Array(box Type::Int, 1),
+                AssignRhs::Array(vec![
+                    WrapSpan("a", Expr::Var("a")),
+                    WrapSpan("3", Expr::Int(3)),
+                    WrapSpan("3", Expr::Int(3)),
+                    WrapSpan("3", Expr::Int(3))
+                ]),
+                &fun_symb,
+                &mut local_symb,
+                &mut var_symb
+            ),
+            Ok(AssignRhs::Array(vec![
+                WrapSpan("a", Expr::Var(0)),
+                WrapSpan("3", Expr::Int(3)),
+                WrapSpan("3", Expr::Int(3)),
+                WrapSpan("3", Expr::Int(3))
+            ]))
+        );
+        assert_eq!(
+            analyse_rhs(
+                &Type::Array(box Type::Char, 1),
+                AssignRhs::Array(vec![WrapSpan("b", Expr::Var("b"))]),
+                &fun_symb,
+                &mut local_symb,
+                &mut var_symb
+            ),
+            Ok(AssignRhs::Array(vec![WrapSpan("b", Expr::Var(1))]))
+        );
     }
-
 
     fn analyse_rhs_can_check_invalid_array_literals() {
         let mut var_symb = VariableSymbolTable::new();
@@ -396,18 +479,42 @@ mod tests {
         var_symb.def_var("b", Type::Char, "char b = 'a'", &mut local_symb);
 
         // the array is the wrong type
-        match analyse_rhs(&Type::Int, AssignRhs::Array(vec![WrapSpan("3", Expr::Int(3)), WrapSpan("3", Expr::Int(3)), WrapSpan("3", Expr::Int(3)), WrapSpan("3", Expr::Int(3))]), &fun_symb, &mut local_symb, &mut var_symb) {
+        match analyse_rhs(
+            &Type::Int,
+            AssignRhs::Array(vec![
+                WrapSpan("3", Expr::Int(3)),
+                WrapSpan("3", Expr::Int(3)),
+                WrapSpan("3", Expr::Int(3)),
+                WrapSpan("3", Expr::Int(3)),
+            ]),
+            &fun_symb,
+            &mut local_symb,
+            &mut var_symb,
+        ) {
             Err(errs) => {
-                assert!(errs.contains(&SemanticError::InvalidArrayLiteral(vec!["3","3","3","3"])));
-            },
+                assert!(errs.contains(&SemanticError::InvalidArrayLiteral(vec![
+                    "3", "3", "3", "3"
+                ])));
+            }
             _ => assert!(false),
         }
 
         // variable b is a char not an int
-        match analyse_rhs(&Type::Array(box Type::Int, 1), AssignRhs::Array(vec![WrapSpan("b", Expr::Var("b")), WrapSpan("3", Expr::Int(3)), WrapSpan("3", Expr::Int(3)), WrapSpan("3", Expr::Int(3))]), &fun_symb, &mut local_symb, &mut var_symb) {
+        match analyse_rhs(
+            &Type::Array(box Type::Int, 1),
+            AssignRhs::Array(vec![
+                WrapSpan("b", Expr::Var("b")),
+                WrapSpan("3", Expr::Int(3)),
+                WrapSpan("3", Expr::Int(3)),
+                WrapSpan("3", Expr::Int(3)),
+            ]),
+            &fun_symb,
+            &mut local_symb,
+            &mut var_symb,
+        ) {
             Err(errs) => {
                 assert!(errs.contains(&SemanticError::InvalidType("b", Type::Int, Type::Char)));
-            },
+            }
             _ => assert!(false),
         }
     }

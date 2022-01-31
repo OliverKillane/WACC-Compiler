@@ -18,7 +18,7 @@ impl<'a> FunctionSymbolTable<'a> {
         Self(HashMap::new())
     }
 
-    /// Define a function with the type (Return type, [param types]). The if a 
+    /// Define a function with the type (Return type, [param types]). The if a
     /// function is already in the table it is replaced.
     pub fn def_fun(&mut self, ident: &'a str, fun_type: (Type, Vec<(&'a str, Type)>)) {
         self.0.insert(ident, fun_type);
