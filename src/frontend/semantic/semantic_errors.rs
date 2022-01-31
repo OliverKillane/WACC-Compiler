@@ -24,20 +24,20 @@ pub enum ExprError<'a> {
     InvalidVariableType(&'a str, Vec<Type>, Type),
 
     /// A binary operator is applied incorrectly
-    /// (span of whole binary application, possible input types, possible operators, found types, found operator)
-    InvalidBinOp(&'a str, Vec<(Type, Type)>, Vec<BinOp>, (Type, Type), BinOp),
-
-    /// Left of a binary operator is incorrect
-    /// (span of left, possible types, possible binops, found type, found binop)
-    InvalidBinOpLeft(&'a str, Vec<Type>, Vec<BinOp>, Type, BinOp),
-
-    /// Left of a binary operator is incorrect
-    /// (span of right, possible types, possible binops, found type, found binop)
-    InvalidBinOpRight(&'a str, Vec<Type>, Vec<BinOp>, Type, BinOp),
+    /// (span of left, span of op, span of right, possible input types, possible operators, found types, found operator)
+    InvalidBinOp(
+        &'a str,
+        &'a str,
+        &'a str,
+        Vec<(Type, Type)>,
+        Vec<&'static BinOp>,
+        (Type, Type),
+        BinOp,
+    ),
 
     /// Invalid unary operator application
-    /// (span of application, possible types, possible unops, found type, found unop)
-    InvalidUnOp(&'a str, Vec<Type>, Vec<BinOp>, Type, UnOp),
+    /// (span of operator, span inner expr, possible types, possible unops, found type, found unop)
+    InvalidUnOp(&'a str, &'a str, Vec<Type>, Vec<&'static UnOp>, Type, UnOp),
 }
 
 /// Semantic errors with their spans
