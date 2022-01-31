@@ -7,6 +7,8 @@
 //! assert_eq!(TypeConstraint::new(Type::Array(box Type::Any, 1)).inside(Type::array(box Type::char, 2)), true)
 //!```
 
+use std::collections::HashMap;
+
 use crate::frontend::ast::*;
 
 lazy_static! {
@@ -45,196 +47,189 @@ const BINOPS: [(BinOp, Type, Type, Type); 17] = [
     (BinOp::Or, Type::Bool, Type::Bool, Type::Bool),
 ];
 
-impl Type {
-    /// If the other type can match the current style, they coalesce.
-    /// - primitive types match eachother
-    /// - Any type matches anything.
-    /// - The generic type matches itself, it is used by the semantic analyser,
-    ///   when propagated as an expected type it is converted to an Any. It is used
-    ///   to check types for '==' where both sides are an "Any" but must be the
-    ///   same.
-    /// - Array Types match taking into account nesting of array types
-    ///   (e.g Array(Array(int),1),1) == Array(int, 2) )
-    pub fn coalesce(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Type::Any | Type::Generic(_), _) => true,
-            (Type::Pair(box a1, box a2), Type::Pair(box b1, box b2)) => {
-                a1.coalesce(b1) && a2.coalesce(b2)
+/// Traverse through types until a match or not can be discerned. If generic is
+/// used, generic matches will result in new concrete types for the generic.
+/// 
+/// The check type should never be generic as this is only use by operators.
+/// 
+/// can define the concrete types of generics in the current context.
+/// 
+/// (must match, type to match) -> Result(Correct concrete type, wrong - should have been type)
+fn type_match(type_truth: &Type, check_type: &Type, generics: &mut HashMap<GenericId, Type>) -> Result<Type, Type> {
+    match (type_truth, check_type) {
+        // Any matches anything, and can be used for type coersion
+        (Type::Any, t) => Ok(t.clone()),
+        (_, Type::Any) => Ok(Type::Any),
+        (Type::Generic(a), t) => {
+            match generics.get(a) {
+            Some(conc_type) => {
+                let gen_type = conc_type.clone();
+                match type_match(&gen_type, t, generics) {
+                    Ok(conc_type) => Ok(conc_type),
+                    Err(t) => Err(t),
+                }
+            },
+            None => {
+                generics.insert(*a, t.clone());
+                Ok(t.clone())
+            },}
+        }
+        (Type::Pair(box a1, box a2), Type::Pair(box b1, box b2)) => {
+            match (type_match(a1, b1, generics), type_match(a2, b2, generics)) {
+                (Err(t1), Err(t2)) => Err(Type::Pair(box t1, box t2)),
+                (Err(t1), Ok(a2_conc)) => Err(Type::Pair(box t1, box a2_conc)),
+                (Ok(a1_conc), Err(t2)) => Err(Type::Pair(box a1_conc, box t2)),
+                (Ok(a1_conc), Ok(a2_conc)) => Ok(Type::Pair(box a1_conc, box a2_conc)),
             }
-            (Type::Array(box a, dim_a), Type::Array(box b, dim_b)) => {
-                if dim_a == dim_b {
-                    a.coalesce(b)
-                } else if dim_a > dim_b {
-                    (&Type::Array(box a.clone(), dim_a - dim_b)).coalesce(b)
-                } else {
-                    a.coalesce(&Type::Array(box b.clone(), dim_b - dim_a))
+        }
+        (Type::Array(box a, dim_a), Type::Array(box b, dim_b)) => {
+            if dim_a == dim_b {
+                match type_match(a, b, generics) {
+                    Ok(a_conc) => Ok(Type::Array(box a_conc, *dim_b)),
+                    Err(t) => Err(Type::Array(box t, *dim_a)),
+                }
+            } else if dim_a > dim_b {
+                match type_match(&Type::Array(box a.clone(), dim_a - dim_b), b, generics) {
+                    Ok(a_conc) => Ok(Type::Array(box a_conc, *dim_b)),
+                    Err(t) => Err(Type::Array(box t, *dim_b)),
+                }
+            } else {
+                match type_match(a, &Type::Array(box b.clone(), dim_b - dim_a), generics) {
+                    Ok(a_conc) => Ok(Type::Array(box a_conc, *dim_a)),
+                    Err(t) => Err(Type::Array(box t, *dim_a)),
                 }
             }
-            (ta, tb) => ta == tb,
         }
-    }
-
-    /// Reduce the indexing depth of a type.
-    /// ```
-    /// assert_eq!(Type::Array(Type::Int, 4).reduce_index_depth(4), Type::Int)
-    /// ```
-    pub fn reduce_index_depth(self, levels: usize) -> Option<Self> {
-        if let Type::Array(box t, dim) = self {
-            if levels == dim {
-                Some(t)
-            } else if levels < dim {
-                Some(Type::Array(box t, dim - levels))
-            } else {
-                t.reduce_index_depth(levels - dim)
-            }
+        (a, b) => if a == b {
+            Ok(b.clone())
         } else {
-            None
-        }
-    }
-
-    /// Index index depth of a type
-    pub fn increase_index_depth(self, levels: usize) -> Self {
-        Type::Array(box self, levels)
+            Err(a.clone())
+        },
     }
 }
+
+
+pub fn binop_match(binop: &BinOp, left_type: &Type, right_type: &Type) -> Result<Type, (Vec<(Type, Type)>, Vec<BinOp>)> {
+    todo!()
+}
+
+pub fn binop_match_left(binop: &BinOp, left_type: &Type) -> Result<Type, (Vec<Type>, Vec<BinOp>)> {
+    todo!()
+}
+
+pub fn binop_match_right(binop: &BinOp, right_type: &Type) -> Result<Type, (Vec<Type>, Vec<BinOp>)> {
+    todo!()
+}
+
+pub fn unop_match(unop: &UnOp, expr_type: &Type) -> Result<Type, (Vec<Type>, Vec<UnOp>)> {
+    todo!()
+}
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // Tests for the implementation of equality on types
     #[test]
-    fn type_coalesce_primitive_types_are_equal() {
-        assert!(Type::Int.coalesce(&Type::Int));
-        assert!(Type::Char.coalesce(&Type::Char));
-        assert!(Type::String.coalesce(&Type::String));
-        assert!(Type::Bool.coalesce(&Type::Bool));
+    fn type_match_matches_primitives() {
+        let mut generics = HashMap::new();
+
+        assert_eq!(type_match(&Type::Int, &Type::Int, &mut generics), Ok(Type::Int));
+        assert_eq!(type_match(&Type::Char, &Type::Char, &mut generics), Ok(Type::Char));
+        assert_eq!(type_match(&Type::Bool, &Type::Bool, &mut generics), Ok(Type::Bool));
+        assert_eq!(type_match(&Type::String, &Type::String, &mut generics), Ok(Type::String));
     }
 
     #[test]
-    fn type_coalesce_any_type_matches_anything() {
-        assert!(Type::Any.coalesce(&Type::Int));
-        assert!(Type::Any.coalesce(&Type::Char));
-        assert!(Type::Any.coalesce(&Type::Bool));
-        assert!(Type::Any.coalesce(&Type::String));
-        assert!(Type::Any.coalesce(&Type::Pair(box Type::Any, box Type::Any)));
-        assert!(Type::Any.coalesce(&Type::Array(
-            box Type::Pair(box Type::Int, box Type::Char),
-            4
-        )));
-        assert!(Type::Any.coalesce(&Type::Generic(0)));
-        assert!(Type::Generic(0).coalesce(&Type::Any,));
-        assert!(Type::Any.coalesce(&Type::Array(box Type::Int, 1)));
-        assert!(Type::Any.coalesce(&Type::Any));
+    fn type_match_does_not_match_different_primitives() {
+        let mut generics = HashMap::new();
+
+        assert_eq!(type_match(&Type::Int, &Type::Char, &mut generics), Err(Type::Int));
+        assert_eq!(type_match(&Type::Char, &Type::Bool, &mut generics), Err(Type::Char));
+        assert_eq!(type_match(&Type::Bool, &Type::String, &mut generics), Err(Type::Bool));
+        assert_eq!(type_match(&Type::String, &Type::Int, &mut generics), Err(Type::String));
     }
 
     #[test]
-    fn type_coalesce_generic_type_matches_itself() {
-        assert!(Type::Generic(0).coalesce(&Type::Generic(0)));
+    fn type_match_matches_pairs() {
+        let mut generics = HashMap::new();
+
+        assert_eq!(type_match(&Type::Pair(box Type::Int, box Type::Int), &Type::Pair(box Type::Int, box Type::Int), &mut generics), Ok(Type::Pair(box Type::Int, box Type::Int)));
+        assert_eq!(type_match(&Type::Pair(box Type::Char, box Type::Char), &Type::Pair(box Type::Char, box Type::Char), &mut generics), Ok(Type::Pair(box Type::Char, box Type::Char )));
+        assert_eq!(type_match(&Type::Pair(box Type::Bool, box Type::Bool), &Type::Pair(box Type::Bool, box Type::Bool), &mut generics), Ok(Type::Pair(box Type::Bool, box Type::Bool)));
+        assert_eq!(type_match(&Type::Pair(box Type::String, box Type::String), &Type::Pair(box Type::String, box Type::String ), &mut generics), Ok(Type::Pair(box Type::String, box Type::String)));
+
+        assert_eq!(type_match(&Type::Pair(box Type::Int, box Type::String), &Type::Pair(box Type::Int, box Type::String), &mut generics), Ok(Type::Pair(box Type::Int, box Type::String)));
+        assert_eq!(type_match(&Type::Pair(box Type::Char, box Type::String), &Type::Pair(box Type::Char, box Type::String), &mut generics), Ok(Type::Pair(box Type::Char, box Type::String )));
+        assert_eq!(type_match(&Type::Pair(box Type::Char, box Type::Bool), &Type::Pair(box Type::Char, box Type::Bool), &mut generics), Ok(Type::Pair(box Type::Char, box Type::Bool )));
+        assert_eq!(type_match(&Type::Pair(box Type::Bool, box Type::Int), &Type::Pair(box Type::Bool, box Type::Int), &mut generics), Ok(Type::Pair(box Type::Bool, box Type::Int)));
+        assert_eq!(type_match(&Type::Pair(box Type::String, box Type::Bool), &Type::Pair(box Type::String, box Type::Bool ), &mut generics), Ok(Type::Pair(box Type::String, box Type::Bool)));
     }
 
     #[test]
-    fn type_coalesce_differently_nested_array_types_are_equal() {
-        assert!(Type::Array(box Type::Array(box Type::Int, 2), 3)
-            .coalesce(&Type::Array(box Type::Int, 5)));
-        assert!(Type::Array(box Type::Array(box Type::Any, 2), 3)
-            .coalesce(&Type::Array(box Type::Int, 5)));
-        assert!(Type::Array(box Type::Array(box Type::Any, 2), 3)
-            .coalesce(&Type::Array(box Type::Array(box Type::Int, 2), 3)));
-        assert!(Type::Array(box Type::Any, 1).coalesce(&Type::Array(
-            box Type::Pair(box Type::Generic(0), box Type::Int),
-            3
-        )));
-        assert!(Type::Array(box Type::Char, 3).coalesce(&Type::Array(
-            box Type::Array(box Type::Array(box Type::Char, 1), 1),
-            1
-        )))
+    fn type_match_does_not_match_different_nested_pairs() {
+        let mut generics = HashMap::new();
+
+        assert_eq!(type_match(&Type::Pair(box Type::Int, box Type::Pair(box Type::Int, box Type::String)), &Type::Pair(box Type::Char, box Type::Pair(box Type::Bool, box Type::Int)), &mut generics), Err(Type::Pair(box Type::Int, box Type::Pair(box Type::Int, box Type::String))));
+        assert_eq!(type_match(&Type::Pair(box Type::Char, box Type::Pair(box Type::Bool, box Type::Int)), &Type::Pair(box Type::Pair(box Type::Int, box Type::Pair(box Type::Int, box Type::String)), box Type::Bool ), &mut generics), Err(Type::Pair(box Type::Char, box Type::Pair(box Type::Bool, box Type::Int))));
+        assert_eq!(type_match(&Type::Pair(box Type::Char, box Type::Bool), &Type::Pair(box Type::Pair(box Type::Int, box Type::Pair(box Type::Int, box Type::String)), box Type::Bool), &mut generics), Err(Type::Pair(box Type::Char, box Type::Bool )));
+        assert_eq!(type_match(&Type::Pair(box Type::Bool, box Type::Pair(box Type::Int, box Type::Pair(box Type::Int, box Type::String))), &Type::Pair(box Type::Int, box Type::Pair(box Type::Int, box Type::String)), &mut generics), Err(Type::Pair(box Type::Bool, box Type::Pair(box Type::Int, box Type::Pair(box Type::Int, box Type::String)))));
+        assert_eq!(type_match(&Type::Pair(box Type::Pair(box Type::Int, box Type::Pair(box Type::Int, box Type::String)), box Type::Bool), &Type::Pair(box Type::Char, box Type::Pair(box Type::Bool, box Type::Int)), &mut generics), Err(Type::Pair(box Type::Pair(box Type::Int, box Type::Pair(box Type::Int, box Type::String)), box Type::Bool)));
     }
 
     #[test]
-    fn type_coalesce_differentiates_between_primitive_types() {
-        assert_eq!(Type::Int.coalesce(&Type::Bool), false);
-        assert_eq!(Type::Int.coalesce(&Type::Char), false);
-        assert_eq!(Type::Int.coalesce(&Type::String), false);
-        assert_eq!(Type::Bool.coalesce(&Type::Int), false);
-        assert_eq!(Type::Bool.coalesce(&Type::Char), false);
-        assert_eq!(Type::Bool.coalesce(&Type::String), false);
-        assert_eq!(Type::Char.coalesce(&Type::Int), false);
-        assert_eq!(Type::Char.coalesce(&Type::Bool), false);
-        assert_eq!(Type::Char.coalesce(&Type::String), false);
-        assert_eq!(Type::String.coalesce(&Type::Int), false);
-        assert_eq!(Type::String.coalesce(&Type::Bool), false);
-        assert_eq!(Type::String.coalesce(&Type::Char), false);
+    fn type_matches_arrays() {
+        let mut generics = HashMap::new();
+
+        assert_eq!(type_match(&Type::Array(box Type::Int, 3) , &Type::Array(box Type::Int, 3), &mut generics), Ok(Type::Array(box Type::Int, 3)));
+        assert_eq!(type_match(&Type::Array(box Type::Char, 2) , &Type::Array(box Type::Char, 2), &mut generics), Ok(Type::Array(box Type::Char, 2)));
+        assert_eq!(type_match(&Type::Array(box Type::String, 2) , &Type::Array(box Type::String, 2), &mut generics), Ok(Type::Array(box Type::String, 2)));
+        assert_eq!(type_match(&Type::Array(box Type::Pair(box Type::Int, box Type::String), 2) , &Type::Array(box Type::Pair(box Type::Int, box Type::String), 2), &mut generics), Ok(Type::Array(box Type::Pair(box Type::Int, box Type::String), 2)));
+        assert_eq!(type_match(&Type::Array(box Type::Pair(box Type::Int, box Type::Array(box Type::Pair(box Type::Int, box Type::String), 2)), 2) , &Type::Array(box Type::Pair(box Type::Int, box Type::Array(box Type::Pair(box Type::Int, box Type::String), 2)), 2), &mut generics), Ok(Type::Array(box Type::Pair(box Type::Int, box Type::Array(box Type::Pair(box Type::Int, box Type::String), 2)), 2)));
     }
 
     #[test]
-    fn type_reduce_index_reduces() {
-        assert_eq!(
-            Type::Array(box Type::Int, 3).reduce_index_depth(3),
-            Some(Type::Int)
-        );
-        assert_eq!(
-            Type::Array(box Type::Array(box Type::Int, 2), 3).reduce_index_depth(5),
-            Some(Type::Int)
-        );
-        assert_eq!(
-            Type::Array(box Type::Array(box Type::Int, 2), 3).reduce_index_depth(4),
-            Some(Type::Array(box Type::Int, 1))
-        );
-        assert_eq!(
-            Type::Array(
-                box Type::Array(
-                    box Type::Array(box Type::Array(box Type::Array(box Type::Any, 1), 1), 1),
-                    1
-                ),
-                1
-            )
-            .reduce_index_depth(4),
-            Some(Type::Array(box Type::Any, 1))
-        );
+    fn type_matches_same_but_differently_nested_arrays() {
+        let mut generics = HashMap::new();
+
+        assert_eq!(type_match(&Type::Array(box Type::Array(box Type::Array(box Type::Int, 1), 1), 1) , &Type::Array(box Type::Int, 3), &mut generics), Ok(Type::Array(box Type::Array(box Type::Array(box Type::Int, 1), 1), 1) ));
+        assert_eq!(type_match(&Type::Array(box Type::Array(box Type::Int, 2), 1) , &Type::Array(box Type::Int, 3), &mut generics), Ok(Type::Array(box Type::Array(box Type::Int, 2), 1)));
+        assert_eq!(type_match(&Type::Array(box Type::Int, 3) , &Type::Array(box Type::Array(box Type::Array(box Type::Int, 1), 1), 1), &mut generics), Ok(Type::Array(box Type::Array(box Type::Array(box Type::Int, 1), 1), 1) ));
     }
 
     #[test]
-    fn type_reduce_index_throw_none_if_impossible() {
-        assert_eq!(
-            Type::Array(box Type::Int, 3).reduce_index_depth(3),
-            Some(Type::Int)
-        );
-        assert_eq!(
-            Type::Array(box Type::Array(box Type::Int, 2), 3).reduce_index_depth(7),
-            None
-        );
-        assert_eq!(
-            Type::Array(box Type::Array(box Type::Int, 2), 3).reduce_index_depth(10),
-            None
-        );
-        assert_eq!(
-            Type::Array(
-                box Type::Array(
-                    box Type::Array(box Type::Array(box Type::Array(box Type::Any, 1), 1), 1),
-                    1
-                ),
-                1
-            )
-            .reduce_index_depth(7),
-            None
-        );
-        assert_eq!(Type::Int.reduce_index_depth(1), None);
+    fn type_matches_does_not_match_different_arrays() {
+        let mut generics = HashMap::new();
+
+        assert_eq!(type_match(&Type::Array(box Type::Int, 3) , &Type::Array(box Type::Pair(box Type::Int, box Type::Array(box Type::Pair(box Type::Int, box Type::String), 2)), 2), &mut generics), Err(Type::Array(box Type::Array(box Type::Int, 1), 2)));
+        assert_eq!(type_match(&Type::Array(box Type::Char, 2) , &Type::Array(box Type::String, 2), &mut generics), Err(Type::Array(box Type::Char, 2)));
+        assert_eq!(type_match(&Type::Array(box Type::String, 2) , &Type::Array(box Type::Pair(box Type::Int, box Type::String), 2), &mut generics), Err(Type::Array(box Type::String, 2)));
+        assert_eq!(type_match(&Type::Array(box Type::Pair(box Type::Int, box Type::String), 2) , &Type::Array(box Type::Char, 2), &mut generics), Err(Type::Array(box Type::Pair(box Type::Int, box Type::String), 2)));
+        assert_eq!(type_match(&Type::Array(box Type::Pair(box Type::Int, box Type::Array(box Type::Pair(box Type::Int, box Type::String), 2)), 2) , &Type::Array(box Type::Int, 3), &mut generics), Err(Type::Array(box Type::Pair(box Type::Int, box Type::Array(box Type::Pair(box Type::Int, box Type::String), 2)), 2)));
     }
 
     #[test]
-    fn type_increase_index_increases_index() {
-        assert_eq!(
-            Type::Int.increase_index_depth(4),
-            Type::Array(box Type::Int, 4)
-        );
-        assert_eq!(
-            Type::Char.increase_index_depth(2),
-            Type::Array(box Type::Char, 2)
-        );
-        assert_eq!(
-            Type::Any.increase_index_depth(3),
-            Type::Array(box Type::Any, 3)
-        );
+    fn type_matches_any_matches_anything() {
+        let mut generics = HashMap::new();
+
+        assert_eq!(type_match(&Type::Any , &Type::Array(box Type::Int, 3), &mut generics), Ok(Type::Array(box Type::Int, 3)));
+        assert_eq!(type_match(&Type::Any, &Type::Array(box Type::Char, 2), &mut generics), Ok(Type::Array(box Type::Char, 2)));
+        assert_eq!(type_match(&Type::Any, &Type::Array(box Type::String, 2), &mut generics), Ok(Type::Array(box Type::String, 2)));
+        assert_eq!(type_match(&Type::Any, &Type::Array(box Type::Pair(box Type::Int, box Type::String), 2), &mut generics), Ok(Type::Array(box Type::Pair(box Type::Int, box Type::String), 2)));
+        assert_eq!(type_match(&Type::Any, &Type::Array(box Type::Pair(box Type::Int, box Type::Array(box Type::Pair(box Type::Int, box Type::String), 2)), 2), &mut generics), Ok(Type::Array(box Type::Pair(box Type::Int, box Type::Array(box Type::Pair(box Type::Int, box Type::String), 2)), 2)));
+    }
+
+    #[test]
+    fn type_match_generics_constrain_types() {
+        let mut generics = HashMap::new();
+
+        // The only match is for generic 0 to be an Int
+        assert_eq!(type_match(&Type::Array(box Type::Generic(0), 3) , &Type::Array(box Type::Int, 3), &mut generics), Ok(Type::Array(box Type::Int, 3)));
+        assert_eq!(generics.get(&0), Some(&Type::Int));
+
+        assert_eq!(type_match(&Type::Pair(box Type::Array(box Type::Generic(0), 2), box Type::Generic(1)), &Type::Pair(box Type::Array(box Type::Array(box Type::Int, 1), 1), box Type::Char), &mut generics), Ok(Type::Pair(box Type::Array(box Type::Array(box Type::Int, 1), 1), box Type::Char)));
+        assert_eq!(generics.get(&1), Some(&Type::Char));
+
+        assert_eq!(type_match(&Type::Pair(box Type::Array(box Type::Generic(0), 2), box Type::Generic(1)), &Type::Pair(box Type::Array(box Type::Array(box Type::Int, 1), 1), box Type::String), &mut generics), Err(Type::Pair(box Type::Array(box Type::Array(box Type::Int, 1), 1), box Type::Char)));
     }
 }

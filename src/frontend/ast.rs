@@ -99,7 +99,7 @@ pub struct WrapSpan<'a, T>(pub &'a str, pub T);
 
 /// Identifier for the generic type, used to differentiate between
 /// different generic types.
-type GenericId = u64;
+pub type GenericId = u64;
 
 /// Type specification in WACC.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
