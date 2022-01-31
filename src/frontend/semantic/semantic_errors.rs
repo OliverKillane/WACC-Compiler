@@ -23,9 +23,25 @@ pub enum SemanticError<'a> {
     /// (span of indexing expression)
     InvalidIndex(&'a str),
 
-    /// A variable was used that was not the correct type
-    /// (span of variable, possible types, found type)
-    InvalidVariableType(&'a str, Vec<Type>, Type),
+    /// Invalid type for expression
+    /// (span of expression, expected type, found type)
+    ///
+    /// e.g a: int
+    /// a[0] <- invalid variable type
+    InvalidVariableType(&'a str, Type, Type),
+
+    /// Invalid type for expression
+    /// (span of expression, expected type, found type)
+    InvalidType(&'a str, Type, Type),
+
+    /// Value of function call is invalid
+    /// (function name in span, expected type, found type)
+    InvalidCallType(&'a str, Type, Type),
+
+    /// Invalid array literal (when an array literal is assigned to a non array 
+    /// type).
+    /// int a = [1,2,3,4]
+    InvalidArrayLiteral(Vec<&'a str>),
 
     /// A binary operator is applied incorrectly
     /// (span of left, span of op, span of right, possible input types, possible operators, found types, found operator)
@@ -60,8 +76,8 @@ pub enum SemanticError<'a> {
     FunctionParametersLengthMismatch(&'a str, usize, usize),
 
     /// Invalid function argument
-    /// (span of argument, type expected, type found)
-    FunctionArgumentTypeInvalid(&'a str, Type, Type),
+    /// (span of argument, name of parameter type expected, type found)
+    FunctionArgumentTypeInvalid(&'a str, &'a str, Type, Type),
 
     /// Function return type is incorrect
     /// (span of return expression, type expected, type found)
@@ -72,12 +88,12 @@ pub enum SemanticError<'a> {
     FunctionNoReturnOrExit(&'a str),
 
     /// Read statement invalid (wrong type)
-    /// (variable/lvalue identifier, Result(type found, expression had errors))
-    ReadStatementMismatch(&'a str, Result<Type, Vec<SemanticError<'a>>>),
+    /// (variable/lvalue identifier, type found)
+    ReadStatementMismatch(&'a str, Type),
 
     /// Free statement invalid (wrong type)
-    /// (span of expression, Result(type found, expression had errors))
-    FreeStatementMismatch(&'a str, Result<Type, Vec<SemanticError<'a>>>),
+    /// (span of expression, type found)
+    FreeStatementMismatch(&'a str, Type),
 
     /// Exit Statement Invalid (wrong type)
     /// (span of expression, type found)

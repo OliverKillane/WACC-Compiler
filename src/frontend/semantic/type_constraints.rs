@@ -239,12 +239,14 @@ pub fn de_index(t: &Type, dim: usize) -> Option<Type> {
     }
 }
 
-/// Given two concrete (non-generic) types, can the second be coerced into the 
+/// Given two concrete (non-generic) types, can the second be coerced into the
 /// first
 pub fn can_coerce(main_type: &Type, into_type: &Type) -> bool {
     match (main_type, into_type) {
         (Type::Any, _) | (_, Type::Any) => true,
-        (Type::Pair(box a1, box a2), Type::Pair(box b1, box b2)) => can_coerce(a1, b1) && can_coerce(a2, b2),
+        (Type::Pair(box a1, box a2), Type::Pair(box b1, box b2)) => {
+            can_coerce(a1, b1) && can_coerce(a2, b2)
+        }
         (Type::Array(box a, dim_a), Type::Array(box b, dim_b)) => {
             if dim_a == dim_b {
                 can_coerce(a, b)
@@ -254,7 +256,7 @@ pub fn can_coerce(main_type: &Type, into_type: &Type) -> bool {
                 can_coerce(a, &Type::Array(box b.clone(), dim_b - dim_a))
             }
         }
-        (a,b) => a == b
+        (a, b) => a == b,
     }
 }
 
@@ -822,7 +824,10 @@ mod tests {
         );
         assert_eq!(
             binop_match(&BinOp::Eq, &Type::Int, &Type::Char),
-            Err((vec![(Type::Generic(0), Type::Generic(0))], vec![&BinOp::Newpair]))
+            Err((
+                vec![(Type::Generic(0), Type::Generic(0))],
+                vec![&BinOp::Newpair]
+            ))
         );
         assert_eq!(
             binop_match(&BinOp::Lt, &Type::Int, &Type::Char),
@@ -878,20 +883,29 @@ mod tests {
 
     #[test]
     fn can_coerce_matches_any_correctly() {
-        assert!(can_coerce(&Type::Int, &Type::Any ));
+        assert!(can_coerce(&Type::Int, &Type::Any));
         assert!(can_coerce(&Type::Any, &Type::Int));
-        assert!(can_coerce(&Type::Any ,&Type::String ));
-        assert!(can_coerce(&Type::String ,&Type::Any ));
-        assert!(can_coerce(&Type::Bool ,&Type::Any ));
-        assert!(can_coerce(&Type::Any ,&Type::Bool ));
-        assert!(can_coerce(&Type::Any ,&Type::Char ));
-        assert!(can_coerce(&Type::Char ,&Type::Any ));
+        assert!(can_coerce(&Type::Any, &Type::String));
+        assert!(can_coerce(&Type::String, &Type::Any));
+        assert!(can_coerce(&Type::Bool, &Type::Any));
+        assert!(can_coerce(&Type::Any, &Type::Bool));
+        assert!(can_coerce(&Type::Any, &Type::Char));
+        assert!(can_coerce(&Type::Char, &Type::Any));
     }
 
     #[test]
     fn can_coerce_matches_arrays_and_pairs_correctly() {
-        assert!(can_coerce(&Type::Pair(box Type::Array(box Type::Int, 3), box Type::Char), &Type::Pair(box Type::Array(box Type::Any, 2), box Type::Any)));
-        assert!(can_coerce(&Type::Array(box Type::Char, 3), &Type::Array(box Type::Array(box Type::Char, 1), 2)));
-        assert!(can_coerce(&Type::Array(box Type::Array(box Type::Char, 2), 1), &Type::Array(box Type::Array(box Type::Char, 1), 2)));
+        assert!(can_coerce(
+            &Type::Pair(box Type::Array(box Type::Int, 3), box Type::Char),
+            &Type::Pair(box Type::Array(box Type::Any, 2), box Type::Any)
+        ));
+        assert!(can_coerce(
+            &Type::Array(box Type::Char, 3),
+            &Type::Array(box Type::Array(box Type::Char, 1), 2)
+        ));
+        assert!(can_coerce(
+            &Type::Array(box Type::Array(box Type::Char, 2), 1),
+            &Type::Array(box Type::Array(box Type::Char, 1), 2)
+        ));
     }
 }

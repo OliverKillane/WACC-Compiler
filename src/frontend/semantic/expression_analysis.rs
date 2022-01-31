@@ -39,7 +39,7 @@ pub fn analyse_expression<'a, 'b>(
                     None => {
                         errors.push(SemanticError::InvalidVariableType(
                             name,
-                            vec![Type::Array(box Type::Any, index_dim)],
+                            Type::Array(box Type::Any, index_dim),
                             t,
                         ));
                         None
