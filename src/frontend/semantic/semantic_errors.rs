@@ -1,141 +1,43 @@
-//! Semantic errors account for expression (operator and type mismatches), as 
+//! Semantic errors account for expression (operator and type mismatches), as
 //! well as control flow (require termination and return), variable and function
 //! definition (and more).
-//! 
-//! The semantic analyser can find multiple semantic errors, including multiple 
+//!
+//! The semantic analyser can find multiple semantic errors, including multiple
 //! in a single statement or expression.
 
-use crate::frontend::semantic::type_constraints::*;
 use crate::frontend::ast::*;
+use crate::frontend::semantic::type_constraints::*;
 
-/// Contains a single error within an expression.
+/// Contains all errors which can occur in expressions
 #[derive(Debug, PartialEq, Eq)]
-pub enum ExprErrType<'a> {
-    /// Invalid type, including when no type inference is possible.
-    /// ```text
-    /// bool a = 9
-    /// ```
-    /// ```
-    /// ExprErrType::InvalidType("9", TypeConstraint(vec![Type::Bool]), Type::Int)
-    /// ```
-    /// ```text
-    /// bool a = true || 15
-    /// ```
-    /// ```
-    /// ExprErrType::InvalidType("15", TypeConstraint(vec![Type::Bool]), Type::Int))
-    /// ```
-    InvalidType(&'a str, TypeConstraint, Type),
+pub enum ExprError<'a> {
+    /// An undefined variable is used.
+    /// (span of variable use)
+    UndefinedVariable(&'a str),
 
-    /// Invalid Binary Operator, using a different operator the expression could be valid.
-    /// - int a = <int> || && <= < > >= == != <int>
-    /// - bool a = <bool> + / % * <bool>
-    /// ```text
-    /// int a = 9 || 8
-    /// ```
-    /// ```
-    /// ExprErrType::BinOp("||", vec![BinOp::Add, BinOp::Mul, BinOp::Mod, BinOp::Div, BinOp::Sub], BinOp::Or)
-    /// ```
-    InvalidBinOp(&'a str, Vec<BinOp>, BinOp),
+    /// Invalid Index (A non-integer was used as an index)
+    /// (span of indexing expression)
+    InvalidIndex(&'a str),
 
-    /// Invalid Unary Operator, with different operator, the expression is valid
-    /// ```text
-    /// bool a = -true
-    /// ```
-    /// ```
-    /// ExprErrType::UnOp("-", vec![UnOp::Neg], UnOp::Minus)
-    /// ```
-    InvalidUnOp(&'a str, Vec<UnOp>, UnOp),
+    /// A variable was used that was not the correct type
+    /// (span of variable, possible types, found type)
+    InvalidVariableType(&'a str, Vec<Type>, Type),
 
-    /// Use of undefined variable.
-    /// ```text
-    /// int a = 3 * b
-    /// ```
-    /// ```
-    /// ExprErrType::UndefinedVar("b")
-    /// ```
-    UndefinedVar(&'a str),
+    /// A binary operator is applied incorrectly
+    /// (span of whole binary application, possible input types, possible operators, found types, found operator)
+    InvalidBinOp(&'a str, Vec<(Type, Type)>, Vec<BinOp>, (Type, Type), BinOp),
 
-    /// No match generic
-    /// ```text
-    /// bool a = 1 == true
-    /// ```
-    /// ```
-    /// ExprErrType::InvalidGeneric("1","==", "true", Type::Int, BinOp::Eq, Type::Bool)
-    InvalidGeneric(&'a str, &'a str, &'a str, Type, BinOp, Type),
-}
+    /// Left of a binary operator is incorrect
+    /// (span of left, possible types, possible binops, found type, found binop)
+    InvalidBinOpLeft(&'a str, Vec<Type>, Vec<BinOp>, Type, BinOp),
 
-/// Determines the expression error wrapping of an expression.
-#[derive(Debug, PartialEq, Eq)]
-pub enum ExpressionError<'a> {
-    /// When the entire expression is erroneous.
-    /// ```text
-    /// int a = bool
-    /// ```
-    /// ```
-    /// ExpressionError::Is(ExprErrType::InvalidType("bool", TypeConstraint(vec![Type::Int], false), Some(Type::Bool)))
-    /// ```
-    /// ```text
-    /// char a = - true
-    /// ```
-    /// ```
-    /// ExpressionError::Is(ExprErrType::InvalidType("- true", TypeConstraint(vec![Type::Char], false), None))
-    /// ```
-    Is(ExprErrType<'a>),
+    /// Left of a binary operator is incorrect
+    /// (span of right, possible types, possible binops, found type, found binop)
+    InvalidBinOpRight(&'a str, Vec<Type>, Vec<BinOp>, Type, BinOp),
 
-    /// The expression contains some errors, not all of the expression is erroneous
-    /// ```text
-    /// int a = (1 + true) + (3 * 'a')
-    /// ```
-    /// ```
-    /// ExpressionError::Contains(vec![
-    ///     ExprErrType::InvalidType("true", TypeConstraint(vec![Type::Int], false), Some(Type::Bool)),
-    ///     ExprErrType::InvalidType("'a'", TypeConstraint(vec![Type::Int], false), Some(Type::Char)),
-    /// ])
-    /// ```
-    Contains(Vec<ExprErrType<'a>>),
-}
-
-impl<'a> ExpressionError<'a> {
-    /// Create a contains with a single error
-    pub fn new_contains(err: ExprErrType<'a>) -> Self {
-        Self::Contains(vec![err])
-    }
-
-    /// Convert asn expression error into a list of errors, maintaining it if
-    /// it is already a list.
-    pub fn to_contains(self) -> Self {
-        match self {
-            ExpressionError::Is(err) => ExpressionError::Contains(vec![err]),
-            exprerror => exprerror,
-        }
-    }
-
-    /// Add a new error onto the end of an existing error, potentially
-    /// converting it into a list of errors.
-    pub fn append_err(self, new_err: ExprErrType<'a>) -> Self {
-        match self {
-            ExpressionError::Is(err) => ExpressionError::Contains(vec![err, new_err]),
-            ExpressionError::Contains(mut errs) => {
-                errs.push(new_err);
-                ExpressionError::Contains(errs)
-            }
-        }
-    }
-
-    /// Combine two Expression errors together (appending lists)
-    pub fn add_errs(self, other: Self) -> Self {
-        match (self, other) {
-            (ExpressionError::Contains(mut errs1), ExpressionError::Contains(mut errs2)) => {
-                errs1.append(&mut errs2);
-                ExpressionError::Contains(errs1)
-            }
-            (ExpressionError::Is(err1), ExpressionError::Is(err2)) => {
-                ExpressionError::Contains(vec![err1, err2])
-            }
-            (ExpressionError::Is(err), errs) => errs.append_err(err),
-            (errs, ExpressionError::Is(err)) => errs.append_err(err),
-        }
-    }
+    /// Invalid unary operator application
+    /// (span of application, possible types, possible unops, found type, found unop)
+    InvalidUnOp(&'a str, Vec<Type>, Vec<BinOp>, Type, UnOp),
 }
 
 /// Semantic errors with their spans
@@ -161,7 +63,8 @@ pub enum SemanticError<'a> {
     /// ```
     UndefinedFunction(&'a str),
 
-    /// Variable assigned without definition.
+    /// Variable assigned incorrectly, either undefined assignment or
+    /// expression errors.
     /// (Variable name - reference to source code)
     /// ```text
     /// begin
@@ -169,28 +72,17 @@ pub enum SemanticError<'a> {
     /// end
     /// ```
     /// ```
-    /// UndefinedVariableAssignment("a")
+    /// UndefinedVariableAssignment(Some("a"), vec![])
     /// ```
-    UndefinedVariableAssignment(&'a str),
-
-    /// Variable and assigned type do not match.
-    /// (Variable name, expected type, expression errors)
     /// ```text
     /// begin
-    ///     int a = true
-    ///     int b = (1 + true) * (1 + (true || false))
+    ///     a = 3 + true
     /// end
     /// ```
     /// ```
-    /// AssignmentMismatch("a", Type::Bool, vec![ExpressionError("true", Type::Int, Type::Bool)])
-    /// AssignmentMismatch("b", Type::Int,
-    ///     vec![
-    ///         ExpressionError("bool", Type::Int, Type::Bool),
-    ///         ExpressionError("true || false", Type::Int, Type::Bool)
-    ///     ]
-    /// )
+    /// UndefinedVariableAssignment(Some("a"), vec![ExprError::InvalidBinOpRight("true", vec![Type::Int], vec![], Type::Bool, BinOp::Add)])
     /// ```
-    AssignmentMismatch(&'a str, Type, ExpressionError<'a>),
+    InvalidVariableAssignment(Option<&'a str>, Vec<ExprError<'a>>),
 
     /// Function of same name is defined twice
     /// (Function name, span of original definition)
@@ -252,26 +144,11 @@ pub enum SemanticError<'a> {
     ///     int a = call function(true, true)
     /// end
     /// ```
-    /// ```
-    /// FunctionParametersMismatch("function", vec![Type::Int, Type::Char], vec![Type::Bool, Type::Bool])
-    /// ```
-    FunctionParametersTypeMismatch(&'a str, Vec<(&'a str, ExpressionError<'a>)>),
+    InvalidFunctionArguments(&'a str, Vec<(&'a str, Vec<ExprError<'a>>)>),
 
     /// Function return does not match function return type.
-    /// (Function name, expected type, expression errors)
-    /// ```text
-    /// begin
-    ///     bool function(int a) is
-    ///         return a
-    ///     end
-    ///
-    ///     skip
-    /// end
-    /// ```
-    /// ```
-    /// FunctionReturnMismatch("function", Type::Bool, ExpressionError::Is(ExprErrType::InvalidType("a", TypeConstraint::new(Type::Bool), Type::Int)))
-    /// ```
-    FunctionReturnMismatch(&'a str, Type, ExpressionError<'a>),
+    /// (Function name, Result(type, expression's errors), expected type)
+    InvalidFunctionReturn(&'a str, Result<Type, Vec<ExprError<'a>>>, Type),
 
     /// Function has a control flow that does not end in return or exit.
     /// (Function name)
@@ -308,30 +185,24 @@ pub enum SemanticError<'a> {
     FunctionNoReturnOrExit(&'a str),
 
     /// Read statement invalid (wrong type)
-    /// (variable/lvalue identifier, type found)
+    /// (variable/lvalue identifier, Result(type found, expression had errors))
     /// ```text
     /// begin
     ///     int[] a = [9,3,4] ;
     ///     read a
     /// end
     /// ```
-    /// ```
-    /// ReadStatementMismatch("a", Type::Array(box Type::Int, 1))
-    /// ```
-    ReadStatementMismatch(&'a str, Type),
+    ReadStatementMismatch(&'a str, Result<Type, Vec<ExprError<'a>>>),
 
     /// Free statement invalid (wrong type)
-    /// (span of expression, expression errors found)
+    /// (span of expression, Result(type found, expression had errors))
     /// ```text
     /// begin
     ///     int a = 4 ;
     ///     free a
     /// end
     /// ```
-    /// ```
-    /// FreeStatementMismatch("a", vec![ExpressionError("a", )])
-    /// ```
-    FreeStatementMismatch(&'a str, ExpressionError<'a>),
+    FreeStatementMismatch(&'a str, Result<Type, Vec<ExprError<'a>>>),
 
     /// Exit Statement Invalid (wrong type)
     /// (span of expression, type found)
@@ -340,15 +211,12 @@ pub enum SemanticError<'a> {
     ///     exit (true || false)
     /// end
     /// ```
-    /// ```
-    /// ExitStatementMismatch("")
-    /// ```
-    ExitStatementMismatch(&'a str, ExpressionError<'a>),
+    ExitStatementMismatch(&'a str, Result<Type, Vec<ExprError<'a>>>),
 
     /// Print/Println Statement invalid (wrong type).
     /// Currently all types can be printed, this is here for extensibility.
     /// (span of print/println statement, type found)
-    PrintStatementMisMatch(&'a str, ExpressionError<'a>),
+    PrintStatementMisMatch(&'a str, Result<Type, Vec<ExprError<'a>>>),
 
     /// Return statement outside of a function
     /// Only occurs in the main code block.

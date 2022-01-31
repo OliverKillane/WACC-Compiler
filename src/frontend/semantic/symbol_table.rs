@@ -1,7 +1,7 @@
 //! The three required symbol tables for semantic analysis:
 //! - Function symbol table containing function identifiers and types
 //! - Variable symbol table mapping renamed variables to types
-//! - Local symbol table using scope to map strings to renamed identifiers 
+//! - Local symbol table using scope to map strings to renamed identifiers
 //!   (used as a key into the global variable table)
 
 use crate::frontend::ast::*;
@@ -698,7 +698,7 @@ mod tests {
         fn_symb_expected.def_fun("fun1", (Type::Int, vec![("a", Type::Int)]));
         fn_symb_expected.def_fun(
             "example",
-            (Type::Char, vec![("a", Type::Int),("b", Type::String)]),
+            (Type::Char, vec![("a", Type::Int), ("b", Type::String)]),
         );
 
         let valid_fns_expected = vec![
