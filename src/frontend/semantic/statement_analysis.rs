@@ -568,10 +568,7 @@ mod tests {
                     "fun4",
                     vec![WrapSpan(
                         "fst a",
-                        Expr::UnOp(
-                            UnOp::Fst,
-                            box WrapSpan("a", Expr::Var("a"))
-                        )
+                        Expr::UnOp(UnOp::Fst, box WrapSpan("a", Expr::Var("a")))
                     )]
                 ),
                 &fun_symb,

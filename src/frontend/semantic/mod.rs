@@ -53,10 +53,10 @@ use self::{
 
 use super::ast::{Program, WrapSpan};
 
-/// Analyses a program, either returning a flat variable and function symbol table 
+/// Analyses a program, either returning a flat variable and function symbol table
 /// and an ast, or a tuple of error (function defs, main body, function errors)
-/// 
-/// 
+///
+///
 pub fn analyse_semantics<'a>(
     Program(fn_defs, main_block): Program<'a, &'a str>,
 ) -> Result<

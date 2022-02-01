@@ -413,11 +413,7 @@ pub enum Expr<'a, IdRepr> {
     ///     ),
     /// )
     /// ```
-    BinOp(
-        Box<ExprSpan<'a, IdRepr>>,
-        BinOp,
-        Box<ExprSpan<'a, IdRepr>>,
-    ),
+    BinOp(Box<ExprSpan<'a, IdRepr>>, BinOp, Box<ExprSpan<'a, IdRepr>>),
 }
 
 /// Alias for WarpSpans around expressions

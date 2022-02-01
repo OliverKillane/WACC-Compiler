@@ -1,12 +1,12 @@
-//! Expression analysis 
-//! 
+//! Expression analysis
+//!
 //! Analyses WACC expressions
-//! 
-//! Analyse expressions expressions, performing variable reference renaming and 
-//! determining the type of the expression for use in further analysis 
-//! (e.g statements). 
-//! 
-//! Extensively pushes forwards with finding errors, potentially from every 
+//!
+//! Analyse expressions expressions, performing variable reference renaming and
+//! determining the type of the expression for use in further analysis
+//! (e.g statements).
+//!
+//! Extensively pushes forwards with finding errors, potentially from every
 //! leaf node of an expression tree.
 use super::{
     super::ast::{Expr, Type, WrapSpan},
@@ -15,9 +15,8 @@ use super::{
     type_constraints::{binop_match, de_index, unop_match},
 };
 
-
 /// Recursively analyse a given expression:
-/// - If the expression is valid, return the renamed ast and the type of the 
+/// - If the expression is valid, return the renamed ast and the type of the
 ///   expression.
 /// - If the expression is invalid, a collection of semantic errors are returned
 ///   (these may be from inner expressions)
@@ -27,7 +26,6 @@ pub fn analyse_expression<'a, 'b>(
     var_symb: &VariableSymbolTable,
 ) -> Result<(Type, Expr<'a, usize>), Vec<SemanticError<'a>>> {
     match expr {
-
         // Primitive expression checking (will always succeed)
         Expr::Null => Ok((Type::Pair(box Type::Any, box Type::Any), Expr::Null)),
         Expr::Int(n) => Ok((Type::Int, Expr::Int(n))),
@@ -35,16 +33,16 @@ pub fn analyse_expression<'a, 'b>(
         Expr::Char(c) => Ok((Type::Char, Expr::Char(c))),
         Expr::String(s) => Ok((Type::String, Expr::String(s))),
 
-        // If variable defined, rename and return type, otherwise return undefined 
+        // If variable defined, rename and return type, otherwise return undefined
         // error
         Expr::Var(name) => match var_symb.get_type(name, local_symb) {
             Some((rename, t)) => Ok((t, Expr::Var(rename))),
             None => Err(vec![SemanticError::UndefinedVariableUse(name)]),
         },
 
-        // An array indexing (e.g a[0][1]), checks all indexing expressions are 
-        // integers, reporting an errors in those expressions, and check both 
-        // that the variable is defined, and is an array deep enough to be 
+        // An array indexing (e.g a[0][1]), checks all indexing expressions are
+        // integers, reporting an errors in those expressions, and check both
+        // that the variable is defined, and is an array deep enough to be
         // indexed.
         Expr::ArrayElem(name, indexes) => {
             let mut correct_indexes = Vec::new();
@@ -86,16 +84,13 @@ pub fn analyse_expression<'a, 'b>(
             }
         }
 
-        // Unary operator checking, using the unop_matching functionality from 
-        // type_constraint.rs. If the internal contains errors, these are passed 
+        // Unary operator checking, using the unop_matching functionality from
+        // type_constraint.rs. If the internal contains errors, these are passed
         // upwards.
         Expr::UnOp(op, box WrapSpan(inner_span, inner_expr)) => {
             match analyse_expression(inner_expr, local_symb, var_symb) {
                 Ok((inner_t, ast)) => match unop_match(&op, &inner_t) {
-                    Ok(unop_t) => Ok((
-                        unop_t,
-                        Expr::UnOp(op, box WrapSpan(inner_span, ast)),
-                    )),
+                    Ok(unop_t) => Ok((unop_t, Expr::UnOp(op, box WrapSpan(inner_span, ast)))),
                     Err((pot_types, pot_ops)) => Err(vec![SemanticError::InvalidUnOp(
                         inner_span, pot_types, pot_ops, inner_t, op,
                     )]),
@@ -104,12 +99,12 @@ pub fn analyse_expression<'a, 'b>(
             }
         }
 
-        // Binary operator checking, using the binop_matching functionality from 
-        // type_constraint.rs. If either side contains errors these are 
+        // Binary operator checking, using the binop_matching functionality from
+        // type_constraint.rs. If either side contains errors these are
         // passed forwards. Otherwise type checking occurs.
         Expr::BinOp(
             box WrapSpan(left_span, left_expr),
-           op,
+            op,
             box WrapSpan(right_span, right_expr),
         ) => {
             match (
@@ -159,22 +154,12 @@ mod tests {
 
         let expr1: Expr<&str> = Expr::Int(9);
 
-        match analyse_expression(expr1.clone(), &local_symb, &var_symb) {
-            Ok((Type::Int, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
         match analyse_expression(expr1, &local_symb, &var_symb) {
             Ok((Type::Int, _)) => assert!(true),
             _ => assert!(false),
         }
 
         let expr2: Expr<&str> = Expr::Char('a');
-
-        match analyse_expression(expr2.clone(), &local_symb, &var_symb) {
-            Ok((Type::Char, _)) => assert!(true),
-            _ => assert!(false),
-        }
 
         match analyse_expression(expr2, &local_symb, &var_symb) {
             Ok((Type::Char, _)) => assert!(true),
@@ -183,22 +168,12 @@ mod tests {
 
         let expr3: Expr<&str> = Expr::Bool(true);
 
-        match analyse_expression(expr3.clone(), &local_symb, &var_symb) {
-            Ok((Type::Bool, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
         match analyse_expression(expr3, &local_symb, &var_symb) {
             Ok((Type::Bool, _)) => assert!(true),
             _ => assert!(false),
         }
 
         let expr4: Expr<&str> = Expr::String(String::from("\"hello world\""));
-
-        match analyse_expression(expr4.clone(), &local_symb, &var_symb) {
-            Ok((Type::String, _)) => assert!(true),
-            _ => assert!(false),
-        }
 
         match analyse_expression(expr4, &local_symb, &var_symb) {
             Ok((Type::String, _)) => assert!(true),
@@ -213,50 +188,30 @@ mod tests {
 
         let expr1: Expr<&str> = Expr::Int(9);
 
-        match analyse_expression(expr1.clone(), &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
-        }
-
         match analyse_expression(expr1, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Int, _)) => assert!(true),
+            _ => assert!(false),
         }
 
         let expr2: Expr<&str> = Expr::Char('a');
 
-        match analyse_expression(expr2.clone(), &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
-        }
-
         match analyse_expression(expr2, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
+            Ok((Type::Char, _)) => assert!(true),
             _ => assert!(true),
         }
 
         let expr3: Expr<&str> = Expr::Bool(true);
 
-        match analyse_expression(expr3.clone(), &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
-        }
-
         match analyse_expression(expr3, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Bool, _)) => assert!(true),
+            _ => assert!(false),
         }
 
         let expr4: Expr<&str> = Expr::String(String::from("\"hello world\""));
 
-        match analyse_expression(expr4.clone(), &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
-        }
-
         match analyse_expression(expr4, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::String, _)) => assert!(true),
+            _ => assert!(false),
         }
     }
 
@@ -265,82 +220,32 @@ mod tests {
         let local_symb = LocalSymbolTable::new_root();
         let var_symb = VariableSymbolTable::new();
 
-        let expr1: Expr<&str> =
-            Expr::UnOp(UnOp::Minus, box WrapSpan("3", Expr::Int(3)));
-
-        match analyse_expression(expr1.clone(), &local_symb, &var_symb) {
-            Ok((Type::Int, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
-        match analyse_expression(expr1.clone(), &local_symb, &var_symb) {
-            Ok((Type::Int, _)) => assert!(true),
-            _ => assert!(false),
-        }
+        let expr1: Expr<&str> = Expr::UnOp(UnOp::Minus, box WrapSpan("3", Expr::Int(3)));
 
         match analyse_expression(expr1, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
-        }
-
-        let expr2: Expr<&str> = Expr::UnOp(
-            UnOp::Neg,
-            box WrapSpan("true", Expr::Bool(true)),
-        );
-
-        match analyse_expression(expr2.clone(), &local_symb, &var_symb) {
-            Ok((Type::Bool, _)) => assert!(true),
+            Ok((Type::Int, _)) => assert!(true),
             _ => assert!(false),
         }
 
-        match analyse_expression(expr2.clone(), &local_symb, &var_symb) {
-            Ok((Type::Bool, _)) => assert!(true),
-            _ => assert!(false),
-        }
+        let expr2: Expr<&str> = Expr::UnOp(UnOp::Neg, box WrapSpan("true", Expr::Bool(true)));
 
         match analyse_expression(expr2, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
-        }
-
-        let expr3: Expr<&str> = Expr::UnOp(
-            UnOp::Ord,
-            box WrapSpan("'a'", Expr::Char('a')),
-        );
-
-        match analyse_expression(expr3.clone(), &local_symb, &var_symb) {
-            Ok((Type::Int, _)) => assert!(true),
+            Ok((Type::Bool, _)) => assert!(true),
             _ => assert!(false),
         }
 
-        match analyse_expression(expr3.clone(), &local_symb, &var_symb) {
-            Ok((Type::Int, _)) => assert!(true),
-            _ => assert!(false),
-        }
+        let expr3: Expr<&str> = Expr::UnOp(UnOp::Ord, box WrapSpan("'a'", Expr::Char('a')));
 
         match analyse_expression(expr3, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
-        }
-
-        let expr4: Expr<&str> = Expr::UnOp(
-            UnOp::Chr,
-            box WrapSpan("97", Expr::Int(97)),
-        );
-
-        match analyse_expression(expr4.clone(), &local_symb, &var_symb) {
-            Ok((Type::Char, _)) => assert!(true),
+            Ok((Type::Int, _)) => assert!(true),
             _ => assert!(false),
         }
 
-        match analyse_expression(expr4.clone(), &local_symb, &var_symb) {
-            Ok((Type::Char, _)) => assert!(true),
-            _ => assert!(false),
-        }
+        let expr4: Expr<&str> = Expr::UnOp(UnOp::Chr, box WrapSpan("97", Expr::Int(97)));
 
         match analyse_expression(expr4, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Char, _)) => assert!(true),
+            _ => assert!(false),
         }
     }
 
@@ -363,19 +268,9 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr1.clone(), &local_symb, &var_symb) {
-            Ok((Type::Int, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
-        match analyse_expression(expr1.clone(), &local_symb, &var_symb) {
-            Ok((Type::Int, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
         match analyse_expression(expr1, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Int, _)) => assert!(true),
+            _ => assert!(false),
         }
 
         let expr2: Expr<&str> = Expr::UnOp(
@@ -392,19 +287,9 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr2.clone(), &local_symb, &var_symb) {
-            Ok((Type::Char, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
-        match analyse_expression(expr2.clone(), &local_symb, &var_symb) {
-            Ok((Type::Char, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
         match analyse_expression(expr2, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Char, _)) => assert!(true),
+            _ => assert!(false),
         }
     }
 
@@ -436,19 +321,9 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr1.clone(), &local_symb, &var_symb) {
-            Ok((Type::Bool, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
-        match analyse_expression(expr1.clone(), &local_symb, &var_symb) {
-            Ok((Type::Bool, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
         match analyse_expression(expr1, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Bool, _)) => assert!(true),
+            _ => assert!(false),
         }
 
         let expr2: Expr<&str> = Expr::BinOp(
@@ -474,19 +349,9 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr2.clone(), &local_symb, &var_symb) {
-            Ok((Type::Int, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
-        match analyse_expression(expr2.clone(), &local_symb, &var_symb) {
-            Ok((Type::Int, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
         match analyse_expression(expr2, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Int, _)) => assert!(true),
+            _ => assert!(false),
         }
 
         let expr3: Expr<&str> = Expr::BinOp(
@@ -512,19 +377,9 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr3.clone(), &local_symb, &var_symb) {
-            Ok((Type::Int, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
-        match analyse_expression(expr3.clone(), &local_symb, &var_symb) {
-            Ok((Type::Int, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
         match analyse_expression(expr3, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Int, _)) => assert!(true),
+            _ => assert!(false),
         }
 
         let expr4: Expr<&str> = Expr::BinOp(
@@ -533,10 +388,7 @@ mod tests {
                 Expr::BinOp(
                     box WrapSpan(
                         "ord 'a'",
-                        Expr::UnOp(
-                            UnOp::Ord,
-                            box WrapSpan("'a'", Expr::Char('a')),
-                        ),
+                        Expr::UnOp(UnOp::Ord, box WrapSpan("'a'", Expr::Char('a'))),
                     ),
                     BinOp::Eq,
                     box WrapSpan("65", Expr::Int(65)),
@@ -550,28 +402,15 @@ mod tests {
                     BinOp::And,
                     box WrapSpan(
                         "!false",
-                        Expr::UnOp(
-                            UnOp::Neg,
-                            box WrapSpan("false", Expr::Bool(false)),
-                        ),
+                        Expr::UnOp(UnOp::Neg, box WrapSpan("false", Expr::Bool(false))),
                     ),
                 ),
             ),
         );
 
-        match analyse_expression(expr4.clone(), &local_symb, &var_symb) {
-            Ok((Type::Bool, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
-        match analyse_expression(expr4.clone(), &local_symb, &var_symb) {
-            Ok((Type::Bool, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
         match analyse_expression(expr4, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Bool, _)) => assert!(true),
+            _ => assert!(false),
         }
 
         let expr5: Expr<&str> = Expr::BinOp(
@@ -582,10 +421,7 @@ mod tests {
                     BinOp::Eq,
                     box WrapSpan(
                         "ord 'a'",
-                        Expr::UnOp(
-                            UnOp::Ord,
-                            box WrapSpan("'a''", Expr::Char('a')),
-                        ),
+                        Expr::UnOp(UnOp::Ord, box WrapSpan("'a''", Expr::Char('a'))),
                     ),
                 ),
             ),
@@ -597,28 +433,15 @@ mod tests {
                     BinOp::And,
                     box WrapSpan(
                         "!false",
-                        Expr::UnOp(
-                            UnOp::Neg,
-                            box WrapSpan("false", Expr::Bool(false)),
-                        ),
+                        Expr::UnOp(UnOp::Neg, box WrapSpan("false", Expr::Bool(false))),
                     ),
                 ),
             ),
         );
 
-        match analyse_expression(expr5.clone(), &local_symb, &var_symb) {
-            Ok((Type::Bool, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
-        match analyse_expression(expr5.clone(), &local_symb, &var_symb) {
-            Ok((Type::Bool, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
         match analyse_expression(expr5, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Bool, _)) => assert!(true),
+            _ => assert!(false),
         }
     }
 
@@ -639,10 +462,7 @@ mod tests {
                     BinOp::Eq,
                     box WrapSpan(
                         "ord 'a'",
-                        Expr::UnOp(
-                            UnOp::Ord,
-                            box WrapSpan("'a''", Expr::Char('a')),
-                        ),
+                        Expr::UnOp(UnOp::Ord, box WrapSpan("'a''", Expr::Char('a'))),
                     ),
                 ),
             ),
@@ -654,33 +474,15 @@ mod tests {
                     BinOp::And,
                     box WrapSpan(
                         "!false",
-                        Expr::UnOp(
-                            UnOp::Neg,
-                            box WrapSpan("false", Expr::Bool(false)),
-                        ),
+                        Expr::UnOp(UnOp::Neg, box WrapSpan("false", Expr::Bool(false))),
                     ),
                 ),
             ),
         );
 
-        println!(
-            "{:?}",
-            analyse_expression(expr1.clone(), &local_symb, &var_symb)
-        );
-
-        match analyse_expression(expr1.clone(), &local_symb, &var_symb) {
-            Ok((Type::Bool, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
-        match analyse_expression(expr1.clone(), &local_symb, &var_symb) {
-            Ok((Type::Bool, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
         match analyse_expression(expr1, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Bool, _)) => assert!(true),
+            _ => assert!(false),
         }
 
         var_symb
@@ -693,10 +495,7 @@ mod tests {
                 Expr::BinOp(
                     box WrapSpan(
                         "ord 'a'",
-                        Expr::UnOp(
-                            UnOp::Ord,
-                            box WrapSpan("'a'", Expr::Char('a')),
-                        ),
+                        Expr::UnOp(UnOp::Ord, box WrapSpan("'a'", Expr::Char('a'))),
                     ),
                     BinOp::Eq,
                     box WrapSpan("65", Expr::Int(65)),
@@ -710,28 +509,15 @@ mod tests {
                     BinOp::And,
                     box WrapSpan(
                         "!false",
-                        Expr::UnOp(
-                            UnOp::Neg,
-                            box WrapSpan("false", Expr::Bool(false)),
-                        ),
+                        Expr::UnOp(UnOp::Neg, box WrapSpan("false", Expr::Bool(false))),
                     ),
                 ),
             ),
         );
 
-        match analyse_expression(expr4.clone(), &local_symb, &var_symb) {
-            Ok((Type::Bool, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
-        match analyse_expression(expr4.clone(), &local_symb, &var_symb) {
-            Ok((Type::Bool, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
         match analyse_expression(expr4, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Bool, _)) => assert!(true),
+            _ => assert!(false),
         }
     }
 
@@ -756,16 +542,6 @@ mod tests {
             _ => assert!(false),
         }
 
-        match analyse_expression(expr1.clone(), &local_symb, &var_symb) {
-            Ok((Type::Int, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
-        match analyse_expression(expr1, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
-        }
-
         var_symb
             .def_var(
                 "array2",
@@ -787,19 +563,9 @@ mod tests {
             )],
         );
 
-        match analyse_expression(expr2.clone(), &local_symb, &var_symb) {
-            Ok((Type::Array(box Type::Int, 1), _)) => assert!(true),
-            _ => assert!(false),
-        }
-
-        match analyse_expression(expr2.clone(), &local_symb, &var_symb) {
-            Ok((Type::Array(box Type::Int, 1), _)) => assert!(true),
-            _ => assert!(false),
-        }
-
         match analyse_expression(expr2, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Array(box Type::Int, 1), _)) => assert!(true),
+            _ => assert!(false),
         }
 
         var_symb
@@ -821,19 +587,9 @@ mod tests {
             ],
         );
 
-        match analyse_expression(expr3.clone(), &local_symb, &var_symb) {
-            Ok((Type::Int, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
-        match analyse_expression(expr3.clone(), &local_symb, &var_symb) {
-            Ok((Type::Int, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
         match analyse_expression(expr3, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Int, _)) => assert!(true),
+            _ => assert!(false),
         }
 
         let expr3: Expr<&str> = Expr::ArrayElem(
@@ -854,19 +610,9 @@ mod tests {
             ],
         );
 
-        match analyse_expression(expr3.clone(), &local_symb, &var_symb) {
-            Ok((Type::Int, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
-        match analyse_expression(expr3.clone(), &local_symb, &var_symb) {
-            Ok((Type::Int, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
         match analyse_expression(expr3, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Int, _)) => assert!(true),
+            _ => assert!(false),
         }
     }
 
@@ -890,19 +636,9 @@ mod tests {
             box WrapSpan("pair1", Expr::Var("pair1")),
         );
 
-        match analyse_expression(expr1.clone(), &local_symb, &var_symb) {
-            Ok((Type::Bool, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
-        match analyse_expression(expr1.clone(), &local_symb, &var_symb) {
-            Ok((Type::Bool, _)) => assert!(true),
-            _ => assert!(false),
-        }
-
         match analyse_expression(expr1, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Bool, _)) => assert!(true),
+            _ => assert!(false),
         }
 
         var_symb
@@ -932,19 +668,76 @@ mod tests {
             )],
         );
 
-        match analyse_expression(expr2.clone(), &local_symb, &var_symb) {
-            Ok((Type::Pair(box Type::Int, box Type::Int), _)) => assert!(true),
-            _ => assert!(false),
-        }
-
-        match analyse_expression(expr2.clone(), &local_symb, &var_symb) {
-            Ok((Type::Pair(box Type::Int, box Type::Int), _)) => assert!(true),
-            _ => assert!(false),
-        }
-
         match analyse_expression(expr2, &local_symb, &var_symb) {
-            Err(_) => assert!(true),
-            _ => assert!(true),
+            Ok((Type::Pair(box Type::Int, box Type::Int), _)) => assert!(true),
+            _ => assert!(false),
+        }
+
+        let expr3: Expr<&str> = Expr::BinOp(
+            box WrapSpan(
+                "5 + 5",
+                Expr::BinOp(
+                    box WrapSpan("5", Expr::Int(5)),
+                    BinOp::Add,
+                    box WrapSpan("5", Expr::Int(5)),
+                ),
+            ),
+            BinOp::Newpair,
+            box WrapSpan(
+                "newpair(5+5, 'a')",
+                Expr::BinOp(
+                    box WrapSpan(
+                        "5 + 5",
+                        Expr::BinOp(
+                            box WrapSpan("5", Expr::Int(5)),
+                            BinOp::Add,
+                            box WrapSpan("5", Expr::Int(5)),
+                        ),
+                    ),
+                    BinOp::Newpair,
+                    box WrapSpan("'a'", Expr::Char('a')),
+                ),
+            ),
+        );
+
+        match analyse_expression(expr3, &local_symb, &var_symb) {
+            Ok((Type::Pair(box Type::Int, box Type::Pair(box Type::Int, box Type::Char)), _)) => {
+                assert!(true)
+            }
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn analyse_expression_correctly_matches_fst_and_snd() {
+        let mut local_symb = LocalSymbolTable::new_root();
+        let mut var_symb = VariableSymbolTable::new();
+
+        var_symb
+            .def_var(
+                "pair1",
+                &Type::Pair(box Type::Int, box Type::Array(box Type::Bool, 2)),
+                "pair(int, bool[][]) pair1 = newpair(9, array1)",
+                &mut local_symb,
+            )
+            .expect("variable not yet defined");
+
+        // example of newpair(snd pair1, fst pair1) <- swapping pair elements
+        let expr1: Expr<&str> = Expr::BinOp(
+            box WrapSpan(
+                "snd pair1",
+                Expr::UnOp(UnOp::Snd, box WrapSpan("pair1", Expr::Var("pair1"))),
+            ),
+            BinOp::Newpair,
+            box WrapSpan(
+                "fst pair1",
+                Expr::UnOp(UnOp::Fst, box WrapSpan("pair1", Expr::Var("pair1"))),
+            ),
+        );
+
+        match analyse_expression(expr1, &local_symb, &var_symb) {
+            Ok((Type::Pair(box Type::Array(box Type::Bool, 2), box Type::Int), _)) => assert!(true),
+            _ => assert!(false),
         }
     }
 }
