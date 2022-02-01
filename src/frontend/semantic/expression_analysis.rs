@@ -1,3 +1,13 @@
+//! Expression analysis 
+//! 
+//! Analyses WACC expressions
+//! 
+//! Analyse expressions expressions, performing variable reference renaming and 
+//! determining the type of the expression for use in further analysis 
+//! (e.g statements). 
+//! 
+//! Extensively pushes forwards with finding errors, potentially from every 
+//! leaf node of an expression tree.
 use super::{
     super::ast::{Expr, Type, WrapSpan},
     semantic_errors::SemanticError,
@@ -5,21 +15,37 @@ use super::{
     type_constraints::{binop_match, de_index, unop_match},
 };
 
+
+/// Recursively analyse a given expression:
+/// - If the expression is valid, return the renamed ast and the type of the 
+///   expression.
+/// - If the expression is invalid, a collection of semantic errors are returned
+///   (these may be from inner expressions)
 pub fn analyse_expression<'a, 'b>(
     expr: Expr<'a, &'a str>,
     local_symb: &LocalSymbolTable<'a, 'b>,
     var_symb: &VariableSymbolTable,
 ) -> Result<(Type, Expr<'a, usize>), Vec<SemanticError<'a>>> {
     match expr {
+
+        // Primitive expression checking (will always succeed)
         Expr::Null => Ok((Type::Pair(box Type::Any, box Type::Any), Expr::Null)),
         Expr::Int(n) => Ok((Type::Int, Expr::Int(n))),
         Expr::Bool(b) => Ok((Type::Bool, Expr::Bool(b))),
         Expr::Char(c) => Ok((Type::Char, Expr::Char(c))),
         Expr::String(s) => Ok((Type::String, Expr::String(s))),
+
+        // If variable defined, rename and return type, otherwise return undefined 
+        // error
         Expr::Var(name) => match var_symb.get_type(name, local_symb) {
             Some((rename, t)) => Ok((t, Expr::Var(rename))),
             None => Err(vec![SemanticError::UndefinedVariableUse(name)]),
         },
+
+        // An array indexing (e.g a[0][1]), checks all indexing expressions are 
+        // integers, reporting an errors in those expressions, and check both 
+        // that the variable is defined, and is an array deep enough to be 
+        // indexed.
         Expr::ArrayElem(name, indexes) => {
             let mut correct_indexes = Vec::new();
             let mut errors = Vec::new();
@@ -59,6 +85,10 @@ pub fn analyse_expression<'a, 'b>(
                 Err(errors)
             }
         }
+
+        // Unary operator checking, using the unop_matching functionality from 
+        // type_constraint.rs. If the internal contains errors, these are passed 
+        // upwards.
         Expr::UnOp(WrapSpan(op_span, op), box WrapSpan(inner_span, inner_expr)) => {
             match analyse_expression(inner_expr, local_symb, var_symb) {
                 Ok((inner_t, ast)) => match unop_match(&op, &inner_t) {
@@ -73,6 +103,10 @@ pub fn analyse_expression<'a, 'b>(
                 Err(errs) => Err(errs),
             }
         }
+
+        // Binary operator checking, using the binop_matching functionality from 
+        // type_constraint.rs. If either side contains errors these are 
+        // passed forwards. Otherwise type checking occurs.
         Expr::BinOp(
             box WrapSpan(left_span, left_expr),
             WrapSpan(op_span, op),

@@ -3,6 +3,8 @@
 //! - Variable symbol table mapping renamed variables to types
 //! - Local symbol table using scope to map strings to renamed identifiers
 //!   (used as a key into the global variable table)
+//! 
+//! 
 
 use super::{
     super::ast::{Function, Param, Type, WrapSpan},

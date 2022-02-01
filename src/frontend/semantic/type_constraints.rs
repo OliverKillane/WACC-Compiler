@@ -23,7 +23,7 @@ lazy_static! {
         (UnOp::Ord, Type::Int, Type::Char),
         (UnOp::Chr, Type::Char, Type::Int),
         (UnOp::Fst, Type::Generic(0), Type::Pair(box Type::Generic(0), box Type::Any)),
-        (UnOp::Fst, Type::Generic(0), Type::Pair(box Type::Any, box Type::Generic(0))),
+        (UnOp::Snd, Type::Generic(0), Type::Pair(box Type::Any, box Type::Generic(0))),
     ];
 }
 
@@ -51,7 +51,7 @@ lazy_static! {
         (BinOp::And, Type::Bool, Type::Bool, Type::Bool),
         (BinOp::Or, Type::Bool, Type::Bool, Type::Bool),
         (BinOp::Newpair, Type::Pair(box Type::Generic(0), box Type::Generic(1)), Type::Generic(0), Type::Generic(1)),
-];
+    ];
 }
 /// Traverse through types until a match or not can be discerned. If generic is
 /// used, generic matches will result in new concrete types for the generic.
