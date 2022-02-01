@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use super::super::ast::*;
+use super::super::ast::{Type, UnOp, BinOp, GenericId};
 
 lazy_static! {
     /// Unary Operations allowed (operator, output type, input type)
@@ -206,6 +206,7 @@ pub fn unop_match(unop: &UnOp, expr_type: &Type) -> Result<Type, (Vec<Type>, Vec
     let mut possible_types = Vec::new();
     let mut possible_unops = Vec::new();
     for (op, out, input) in UNOPS.iter() {
+        generics.clear();
         if op == unop {
             match type_match(input, expr_type, &mut generics) {
                 Ok(_) => return Ok(apply_generics(out, &generics)),

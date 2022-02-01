@@ -3,10 +3,10 @@
 //! Parameters have their own scope and are declared as errors separately
 
 use super::{
-    super::ast::*,
-    semantic_errors::*,
-    statement_analysis::*,
-    symbol_table::*,
+    super::ast::{WrapSpan, Function, Param},
+    semantic_errors::SemanticError,
+    statement_analysis::analyse_block,
+    symbol_table::{VariableSymbolTable, FunctionSymbolTable, LocalSymbolTable},
 };
 
 /// Determine if there are any semantic errors in a function:

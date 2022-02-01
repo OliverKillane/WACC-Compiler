@@ -5,7 +5,7 @@
 //! The semantic analyser can find multiple semantic errors, including multiple
 //! in a single statement or expression.
 
-use super::super::ast::*;
+use super::super::ast::{Type, UnOp, BinOp, WrapSpan};
 
 /// Contains all errors which can occur in expressions
 #[derive(Debug, PartialEq, Eq)]
