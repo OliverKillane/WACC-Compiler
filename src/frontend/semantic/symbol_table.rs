@@ -194,7 +194,10 @@ pub fn get_fn_symbols<'a>(
                             .collect(),
                     ),
                 );
-                valid_fun.push(WrapSpan(fn_def_span, Function(ret_type, fn_name, params, stats)))
+                valid_fun.push(WrapSpan(
+                    fn_def_span,
+                    Function(ret_type, fn_name, params, stats),
+                ))
             }
         }
     }
@@ -622,30 +625,39 @@ mod tests {
         );
 
         let valid_fns_expected = vec![
-            WrapSpan("int fun1(int a)", Function(
-                Type::Int,
-                "fun1",
-                vec![WrapSpan("int a", Param(Type::Int, "a"))],
-                vec![],
-            )),
-            WrapSpan("char example(int a, string b)", Function(
-                Type::Char,
-                "example",
-                vec![
-                    WrapSpan("int a", Param(Type::Int, "a")),
-                    WrapSpan("string b", Param(Type::String, "b")),
-                ],
-                vec![],
-            )),
-            WrapSpan("bool logical_or(bool x, bool y)", Function(
-                Type::Bool,
-                "logical_or",
-                vec![
-                    WrapSpan("bool x", Param(Type::Bool, "x")),
-                    WrapSpan("bool y", Param(Type::Bool, "y")),
-                ],
-                vec![],
-            )),
+            WrapSpan(
+                "int fun1(int a)",
+                Function(
+                    Type::Int,
+                    "fun1",
+                    vec![WrapSpan("int a", Param(Type::Int, "a"))],
+                    vec![],
+                ),
+            ),
+            WrapSpan(
+                "char example(int a, string b)",
+                Function(
+                    Type::Char,
+                    "example",
+                    vec![
+                        WrapSpan("int a", Param(Type::Int, "a")),
+                        WrapSpan("string b", Param(Type::String, "b")),
+                    ],
+                    vec![],
+                ),
+            ),
+            WrapSpan(
+                "bool logical_or(bool x, bool y)",
+                Function(
+                    Type::Bool,
+                    "logical_or",
+                    vec![
+                        WrapSpan("bool x", Param(Type::Bool, "x")),
+                        WrapSpan("bool y", Param(Type::Bool, "y")),
+                    ],
+                    vec![],
+                ),
+            ),
         ];
 
         let errors_expected: SemanticErrorSummary = vec![];
@@ -703,26 +715,35 @@ mod tests {
         );
 
         let valid_fns_expected = vec![
-            WrapSpan("int fun1(int a)", Function(
-                Type::Int,
-                "fun1",
-                vec![WrapSpan("int a", Param(Type::Int, "a"))],
-                vec![],
-            )),
-            WrapSpan("char example(int a, string b)", Function(
-                Type::Char,
-                "example",
-                vec![
-                    WrapSpan("int a", Param(Type::Int, "a")),
-                    WrapSpan("string b", Param(Type::String, "b")),
-                ],
-                vec![],
-            )),
+            WrapSpan(
+                "int fun1(int a)",
+                Function(
+                    Type::Int,
+                    "fun1",
+                    vec![WrapSpan("int a", Param(Type::Int, "a"))],
+                    vec![],
+                ),
+            ),
+            WrapSpan(
+                "char example(int a, string b)",
+                Function(
+                    Type::Char,
+                    "example",
+                    vec![
+                        WrapSpan("int a", Param(Type::Int, "a")),
+                        WrapSpan("string b", Param(Type::String, "b")),
+                    ],
+                    vec![],
+                ),
+            ),
         ];
 
         let errors_expected: SemanticErrorSummary = vec![WrapSpan(
             "bool fun1(bool x, bool y)",
-            vec![SemanticError::RepeatDefinitionFunction("fun1", "int fun1(int a)")],
+            vec![SemanticError::RepeatDefinitionFunction(
+                "fun1",
+                "int fun1(int a)",
+            )],
         )];
 
         assert_eq!(fn_symb_expected, fn_symb);
@@ -783,30 +804,39 @@ mod tests {
         );
 
         let valid_fns_expected = vec![
-            WrapSpan("int fun1(int a)", Function(
-                Type::Int,
-                "fun1",
-                vec![WrapSpan("int a", Param(Type::Int, "a"))],
-                vec![],
-            )),
-            WrapSpan("char example(int a, string begin)", Function(
-                Type::Char,
-                "example",
-                vec![
-                    WrapSpan("int a", Param(Type::Int, "a")),
-                    WrapSpan("string str", Param(Type::String, "str")),
-                ],
-                vec![],
-            )),
-            WrapSpan("bool logical_or(bool x, bool y)", Function(
-                Type::Bool,
-                "logical_or",
-                vec![
-                    WrapSpan("bool x", Param(Type::Bool, "x")),
-                    WrapSpan("bool y", Param(Type::Bool, "y")),
-                ],
-                vec![],
-            )),
+            WrapSpan(
+                "int fun1(int a)",
+                Function(
+                    Type::Int,
+                    "fun1",
+                    vec![WrapSpan("int a", Param(Type::Int, "a"))],
+                    vec![],
+                ),
+            ),
+            WrapSpan(
+                "char example(int a, string begin)",
+                Function(
+                    Type::Char,
+                    "example",
+                    vec![
+                        WrapSpan("int a", Param(Type::Int, "a")),
+                        WrapSpan("string str", Param(Type::String, "str")),
+                    ],
+                    vec![],
+                ),
+            ),
+            WrapSpan(
+                "bool logical_or(bool x, bool y)",
+                Function(
+                    Type::Bool,
+                    "logical_or",
+                    vec![
+                        WrapSpan("bool x", Param(Type::Bool, "x")),
+                        WrapSpan("bool y", Param(Type::Bool, "y")),
+                    ],
+                    vec![],
+                ),
+            ),
         ];
 
         let errors_expected: SemanticErrorSummary = vec![];

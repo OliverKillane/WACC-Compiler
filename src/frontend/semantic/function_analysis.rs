@@ -3,16 +3,19 @@
 //! Parameters have their own scope and are declared as errors separately
 
 use crate::frontend::ast::*;
-use crate::frontend::semantic::symbol_table::*;
 use crate::frontend::semantic::semantic_errors::*;
 use crate::frontend::semantic::statement_analysis::*;
+use crate::frontend::semantic::symbol_table::*;
 
 /// Determine if there are any semantic errors in a function:
 /// - If correct, return a renamed ast and update the variable symbol table
-/// - If incorrect return function  name and the statements with errors 
+/// - If incorrect return function  name and the statements with errors
 ///   attached.
-pub fn analyse_function<'a,'b>(
-    WrapSpan(def_span, Function(ret_type, name, parameters, block)): WrapSpan<'a, Function<'a, &'a str>>,
+pub fn analyse_function<'a, 'b>(
+    WrapSpan(def_span, Function(ret_type, name, parameters, block)): WrapSpan<
+        'a,
+        Function<'a, &'a str>,
+    >,
     var_symb: &mut VariableSymbolTable,
     fun_symb: &FunctionSymbolTable<'a>,
 ) -> Result<WrapSpan<'a, Function<'a, usize>>, (&'a str, Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>)>
@@ -31,21 +34,30 @@ pub fn analyse_function<'a,'b>(
         }
     }
 
-    match analyse_block(block, fun_symb,&mut LocalSymbolTable::new_child(&local_symb), var_symb, &Some(ret_type.clone())) {
+    match analyse_block(
+        block,
+        fun_symb,
+        &mut LocalSymbolTable::new_child(&local_symb),
+        var_symb,
+        &Some(ret_type.clone()),
+    ) {
         Ok((block_ast, terminated)) => {
             if !terminated {
                 param_errors.push(SemanticError::FunctionNoReturnOrExit(name))
             }
 
             if param_errors.len() == 0 {
-                Ok(WrapSpan(def_span, Function(ret_type, name, param_correct, block_ast)))
+                Ok(WrapSpan(
+                    def_span,
+                    Function(ret_type, name, param_correct, block_ast),
+                ))
             } else {
                 Err((name, vec![WrapSpan(def_span, param_errors)]))
             }
-        },
+        }
         Err(mut errs) => {
             errs.push(WrapSpan(def_span, param_errors));
             Err((name, errs))
-        },
+        }
     }
 }
