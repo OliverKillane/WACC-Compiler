@@ -97,15 +97,23 @@ pub enum SemanticError<'a> {
 
     /// Exit Statement Invalid (wrong type)
     /// (span of expression, type found)
-    ExitStatementMismatch(&'a str, Result<Type, Vec<SemanticError<'a>>>),
+    ExitStatementMismatch(&'a str, Type),
 
     /// Print/Println Statement invalid (wrong type).
     /// Currently all types can be printed, this is here for extensibility.
     /// (span of print/println statement, type found)
     PrintStatementMisMatch(&'a str, Type, Type),
 
+    /// If statement must take a bool
+    /// (span of expression, type found)
+    InvalidIfCondition(&'a str, Type),
+
+    /// If statement must take a bool
+    /// (span of expression, type found)
+    InvalidWhileCondition(&'a str, Type),
+
     /// Return statement outside of a function Only occurs in the main block.
     ReturnStatementMisplaced,
 }
 
-pub type SemanticErrorSummary<'a> = Vec<WrapSpan<'a, SemanticError<'a>>>;
+pub type SemanticErrorSummary<'a> = Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>;

@@ -48,17 +48,17 @@ impl VariableSymbolTable {
     pub fn def_var<'a, 'b>(
         &mut self,
         ident: &'a str,
-        var_type: Type,
+        var_type: &Type,
         span: &'a str,
         local: &mut LocalSymbolTable<'a, 'b>,
-    ) -> Option<SemanticError<'a>> {
+    ) -> Result<usize, SemanticError<'a>> {
         match local.in_scope(ident) {
-            Some(def) => Some(SemanticError::RepeatDefinitionVariable(ident, def)),
+            Some(def) => Err(SemanticError::RepeatDefinitionVariable(ident, def)),
             None => {
                 let id = self.0.len();
-                self.0.insert(id, var_type);
+                self.0.insert(id, var_type.clone());
                 local.add_var(ident, id, span);
-                None
+                Ok(id)
             }
         }
     }
@@ -165,23 +165,23 @@ impl<'a, 'b> LocalSymbolTable<'a, 'b> {
 ///
 /// *Note:* the parameter identifiers are not checked, that is done when the
 /// function body analysis is done.
-fn get_fn_symbols<'a>(
+pub fn get_fn_symbols<'a>(
     fn_defs: Vec<WrapSpan<'a, Function<'a, &'a str>>>,
 ) -> (
     FunctionSymbolTable,
-    Vec<Function<'a, &'a str>>,
-    SemanticErrorSummary<'a>,
+    Vec<WrapSpan<'a, Function<'a, &'a str>>>,
+    Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>,
 ) {
     let mut fun_symb = FunctionSymbolTable::new();
     let mut def_table: HashMap<&str, &str> = HashMap::new();
-    let mut valid_fun: Vec<Function<'a, &'a str>> = Vec::new();
-    let mut errors: SemanticErrorSummary<'a> = Vec::new();
+    let mut valid_fun = Vec::new();
+    let mut errors = Vec::new();
 
     for WrapSpan(fn_def_span, Function(ret_type, fn_name, params, stats)) in fn_defs {
         match def_table.insert(fn_name, fn_def_span) {
             Some(orig) => errors.push(WrapSpan(
                 fn_def_span,
-                SemanticError::RepeatDefinitionFunction(fn_name, orig),
+                vec![SemanticError::RepeatDefinitionFunction(fn_name, orig)],
             )),
             None => {
                 fun_symb.def_fun(
@@ -194,7 +194,7 @@ fn get_fn_symbols<'a>(
                             .collect(),
                     ),
                 );
-                valid_fun.push(Function::<'a>(ret_type, fn_name, params, stats))
+                valid_fun.push(WrapSpan(fn_def_span, Function(ret_type, fn_name, params, stats)))
             }
         }
     }
@@ -344,12 +344,12 @@ mod tests {
         let mut local_symb = LocalSymbolTable::new_root();
 
         assert_eq!(
-            var_symb.def_var("var1", Type::Int, "int var1 = 9", &mut local_symb),
-            None
+            var_symb.def_var("var1", &Type::Int, "int var1 = 9", &mut local_symb),
+            Ok(0)
         );
         assert_eq!(
-            var_symb.def_var("var2", Type::Char, "char var2 = 'a'", &mut local_symb),
-            None
+            var_symb.def_var("var2", &Type::Char, "char var2 = 'a'", &mut local_symb),
+            Ok(1)
         );
 
         assert_eq!(local_symb.current.len(), 2);
@@ -361,24 +361,24 @@ mod tests {
         let mut local_symb = LocalSymbolTable::new_root();
 
         assert_eq!(
-            var_symb.def_var("var1", Type::Int, "int var1 = 9", &mut local_symb),
-            None
+            var_symb.def_var("var1", &Type::Int, "int var1 = 9", &mut local_symb),
+            Ok(0)
         );
         assert_eq!(
-            var_symb.def_var("var2", Type::Char, "char var2 = 'a'", &mut local_symb),
-            None
+            var_symb.def_var("var2", &Type::Char, "char var2 = 'a'", &mut local_symb),
+            Ok(1)
         );
 
         assert_eq!(
-            var_symb.def_var("var1", Type::Bool, "bool var1 = true", &mut local_symb),
-            Some(SemanticError::RepeatDefinitionVariable(
+            var_symb.def_var("var1", &Type::Bool, "bool var1 = true", &mut local_symb),
+            Err(SemanticError::RepeatDefinitionVariable(
                 "var1",
                 "int var1 = 9"
             ))
         );
         assert_eq!(
-            var_symb.def_var("var2", Type::Char, "char var2 = 'b'", &mut local_symb),
-            Some(SemanticError::RepeatDefinitionVariable(
+            var_symb.def_var("var2", &Type::Char, "char var2 = 'b'", &mut local_symb),
+            Err(SemanticError::RepeatDefinitionVariable(
                 "var2",
                 "char var2 = 'a'"
             ))
@@ -403,12 +403,12 @@ mod tests {
         let mut local_symb = LocalSymbolTable::new_root();
 
         assert_eq!(
-            var_symb.def_var("var1", Type::Int, "int var1 = 9", &mut local_symb),
-            None
+            var_symb.def_var("var1", &Type::Int, "int var1 = 9", &mut local_symb),
+            Ok(0)
         );
         assert_eq!(
-            var_symb.def_var("var2", Type::Char, "char var2 = 'a'", &mut local_symb),
-            None
+            var_symb.def_var("var2", &Type::Char, "char var2 = 'a'", &mut local_symb),
+            Ok(1)
         );
 
         let mut symb_child = LocalSymbolTable::new_child(&local_symb);
@@ -429,12 +429,12 @@ mod tests {
         let mut parent_symb = LocalSymbolTable::new_root();
 
         assert_eq!(
-            var_symb.def_var("var1", Type::Int, "int var1 = 9", &mut parent_symb),
-            None
+            var_symb.def_var("var1", &Type::Int, "int var1 = 9", &mut parent_symb),
+            Ok(0)
         );
         assert_eq!(
-            var_symb.def_var("var2", Type::Char, "char var2 = 'a'", &mut parent_symb),
-            None
+            var_symb.def_var("var2", &Type::Char, "char var2 = 'a'", &mut parent_symb),
+            Ok(1)
         );
 
         {
@@ -443,20 +443,20 @@ mod tests {
             assert_eq!(
                 var_symb.def_var(
                     "var3",
-                    Type::String,
+                    &Type::String,
                     "string var3 = \"hello world\"",
                     &mut symb_child
                 ),
-                None
+                Ok(2)
             );
             assert_eq!(
                 var_symb.def_var(
                     "var4",
-                    Type::Pair(box Type::Int, box Type::Int),
+                    &Type::Pair(box Type::Int, box Type::Int),
                     "pair(int, int) var3 = null",
                     &mut symb_child
                 ),
-                None
+                Ok(3)
             );
 
             assert_eq!(
@@ -479,15 +479,15 @@ mod tests {
         let mut parent_symb = LocalSymbolTable::new_root();
 
         assert_eq!(
-            var_symb.def_var("var1", Type::Int, "int var1 = 5", &mut parent_symb),
-            None
+            var_symb.def_var("var1", &Type::Int, "int var1 = 5", &mut parent_symb),
+            Ok(0)
         );
 
         let mut child_symb = LocalSymbolTable::new_child(&parent_symb);
 
         assert_eq!(
-            var_symb.def_var("var1", Type::Char, "char var1 = 'a'", &mut child_symb),
-            None
+            var_symb.def_var("var1", &Type::Char, "char var1 = 'a'", &mut child_symb),
+            Ok(1)
         );
 
         assert_eq!(var_symb.0.len(), 2);
@@ -499,15 +499,15 @@ mod tests {
         let mut parent_symb = LocalSymbolTable::new_root();
 
         assert_eq!(
-            var_symb.def_var("var1", Type::Int, "int var1 = 5", &mut parent_symb),
-            None
+            var_symb.def_var("var1", &Type::Int, "int var1 = 5", &mut parent_symb),
+            Ok(0)
         );
 
         {
             let mut child_symb = LocalSymbolTable::new_child(&parent_symb);
             assert_eq!(
-                var_symb.def_var("var3", Type::Char, "char var3 = 'a'", &mut child_symb),
-                None
+                var_symb.def_var("var3", &Type::Char, "char var3 = 'a'", &mut child_symb),
+                Ok(1)
             );
             assert_eq!(
                 var_symb.get_type("var1", &mut child_symb),
@@ -523,8 +523,8 @@ mod tests {
         {
             let mut child_symb = LocalSymbolTable::new_child(&parent_symb);
             assert_eq!(
-                var_symb.def_var("var3", Type::Int, "int var1 = 3", &mut child_symb),
-                None
+                var_symb.def_var("var3", &Type::Int, "int var1 = 3", &mut child_symb),
+                Ok(2)
             );
             assert_eq!(
                 var_symb.get_type("var1", &mut child_symb),
@@ -544,12 +544,12 @@ mod tests {
         let mut local_symb = LocalSymbolTable::new_root();
 
         assert_eq!(
-            var_symb.def_var("var1", Type::Int, "int var1 = 5", &mut local_symb),
-            None
+            var_symb.def_var("var1", &Type::Int, "int var1 = 5", &mut local_symb),
+            Ok(0)
         );
         assert_eq!(
-            var_symb.def_var("var1", Type::Char, "char var1 = 'a'", &mut local_symb),
-            Some(SemanticError::RepeatDefinitionVariable(
+            var_symb.def_var("var1", &Type::Char, "char var1 = 'a'", &mut local_symb),
+            Err(SemanticError::RepeatDefinitionVariable(
                 "var1",
                 "int var1 = 5"
             ))
@@ -622,13 +622,13 @@ mod tests {
         );
 
         let valid_fns_expected = vec![
-            Function(
+            WrapSpan("int fun1(int a)", Function(
                 Type::Int,
                 "fun1",
                 vec![WrapSpan("int a", Param(Type::Int, "a"))],
                 vec![],
-            ),
-            Function(
+            )),
+            WrapSpan("char example(int a, string b)", Function(
                 Type::Char,
                 "example",
                 vec![
@@ -636,8 +636,8 @@ mod tests {
                     WrapSpan("string b", Param(Type::String, "b")),
                 ],
                 vec![],
-            ),
-            Function(
+            )),
+            WrapSpan("bool logical_or(bool x, bool y)", Function(
                 Type::Bool,
                 "logical_or",
                 vec![
@@ -645,7 +645,7 @@ mod tests {
                     WrapSpan("bool y", Param(Type::Bool, "y")),
                 ],
                 vec![],
-            ),
+            )),
         ];
 
         let errors_expected: SemanticErrorSummary = vec![];
@@ -703,13 +703,13 @@ mod tests {
         );
 
         let valid_fns_expected = vec![
-            Function(
+            WrapSpan("int fun1(int a)", Function(
                 Type::Int,
                 "fun1",
                 vec![WrapSpan("int a", Param(Type::Int, "a"))],
                 vec![],
-            ),
-            Function(
+            )),
+            WrapSpan("char example(int a, string b)", Function(
                 Type::Char,
                 "example",
                 vec![
@@ -717,12 +717,12 @@ mod tests {
                     WrapSpan("string b", Param(Type::String, "b")),
                 ],
                 vec![],
-            ),
+            )),
         ];
 
         let errors_expected: SemanticErrorSummary = vec![WrapSpan(
             "bool fun1(bool x, bool y)",
-            SemanticError::RepeatDefinitionFunction("fun1", "int fun1(int a)"),
+            vec![SemanticError::RepeatDefinitionFunction("fun1", "int fun1(int a)")],
         )];
 
         assert_eq!(fn_symb_expected, fn_symb);
@@ -783,13 +783,13 @@ mod tests {
         );
 
         let valid_fns_expected = vec![
-            Function(
+            WrapSpan("int fun1(int a)", Function(
                 Type::Int,
                 "fun1",
                 vec![WrapSpan("int a", Param(Type::Int, "a"))],
                 vec![],
-            ),
-            Function(
+            )),
+            WrapSpan("char example(int a, string begin)", Function(
                 Type::Char,
                 "example",
                 vec![
@@ -797,8 +797,8 @@ mod tests {
                     WrapSpan("string str", Param(Type::String, "str")),
                 ],
                 vec![],
-            ),
-            Function(
+            )),
+            WrapSpan("bool logical_or(bool x, bool y)", Function(
                 Type::Bool,
                 "logical_or",
                 vec![
@@ -806,7 +806,7 @@ mod tests {
                     WrapSpan("bool y", Param(Type::Bool, "y")),
                 ],
                 vec![],
-            ),
+            )),
         ];
 
         let errors_expected: SemanticErrorSummary = vec![];

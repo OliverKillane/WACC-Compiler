@@ -591,7 +591,7 @@ mod tests {
         let mut local_symb = LocalSymbolTable::new_root();
         let mut var_symb = VariableSymbolTable::new();
 
-        var_symb.def_var("var1", Type::Int, "int var1 = 9", &mut local_symb);
+        var_symb.def_var("var1", &Type::Int, "int var1 = 9", &mut local_symb);
 
         let expr1: Expr<&str> = Expr::BinOp(
             box WrapSpan(
@@ -645,7 +645,7 @@ mod tests {
             _ => assert!(true),
         }
 
-        var_symb.def_var("var2", Type::Bool, "bool var2 = true", &mut local_symb);
+        var_symb.def_var("var2", &Type::Bool, "bool var2 = true", &mut local_symb);
 
         let expr4: Expr<&str> = Expr::BinOp(
             box WrapSpan(
@@ -702,7 +702,7 @@ mod tests {
 
         var_symb.def_var(
             "array1",
-            Type::Array(box Type::Int, 1),
+            &Type::Array(box Type::Int, 1),
             "int[] array1 = [1,2,3,4]",
             &mut local_symb,
         );
@@ -726,7 +726,7 @@ mod tests {
 
         var_symb.def_var(
             "array2",
-            Type::Array(box Type::Int, 2),
+            &Type::Array(box Type::Int, 2),
             "int[][] array1 = [a,b,c]",
             &mut local_symb,
         );
@@ -760,11 +760,11 @@ mod tests {
 
         var_symb.def_var(
             "array2",
-            Type::Array(box Type::Int, 2),
+            &Type::Array(box Type::Int, 2),
             "int[][] array1 = [a,b,c]",
             &mut local_symb,
         );
-        var_symb.def_var("num1", Type::Int, "int num1 = 9", &mut local_symb);
+        var_symb.def_var("num1", &Type::Int, "int num1 = 9", &mut local_symb);
 
         let expr3: Expr<&str> = Expr::ArrayElem(
             "array2",
@@ -837,7 +837,7 @@ mod tests {
 
         var_symb.def_var(
             "pair1",
-            Type::Pair(box Type::Int, box Type::Int),
+            &Type::Pair(box Type::Int, box Type::Int),
             "pair(int, int) pair1 = newpair(9,9)",
             &mut local_symb,
         );
@@ -865,7 +865,7 @@ mod tests {
 
         var_symb.def_var(
             "pair_array",
-            Type::Array(box Type::Pair(box Type::Int, box Type::Int), 1),
+            &Type::Array(box Type::Pair(box Type::Int, box Type::Int), 1),
             "pair(int, int)[] pair_array = [pair1]",
             &mut local_symb,
         );
