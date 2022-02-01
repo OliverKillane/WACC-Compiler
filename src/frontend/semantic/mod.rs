@@ -6,8 +6,8 @@ pub mod symbol_table;
 pub mod type_constraints;
 
 use self::{
+    function_analysis::analyse_function,
     semantic_errors::SemanticError,
-    function_analysis::analyse_function, 
     statement_analysis::analyse_block,
     symbol_table::{get_fn_symbols, LocalSymbolTable, VariableSymbolTable},
 };

@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use super::super::ast::{Type, UnOp, BinOp, GenericId};
+use super::super::ast::{BinOp, GenericId, Type, UnOp};
 
 lazy_static! {
     /// Unary Operations allowed (operator, output type, input type)

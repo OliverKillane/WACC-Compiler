@@ -5,7 +5,7 @@
 //!   (used as a key into the global variable table)
 
 use super::{
-    super::ast::{Type, WrapSpan, Function, Param},
+    super::ast::{Function, Param, Type, WrapSpan},
     semantic_errors::SemanticError,
 };
 
@@ -210,7 +210,7 @@ pub fn get_fn_symbols<'a>(
 
 #[cfg(test)]
 mod tests {
-    use super::{*, super::semantic_errors::SemanticErrorSummary};
+    use super::{super::semantic_errors::SemanticErrorSummary, *};
 
     #[test]
     fn local_symb_can_add_and_find_vars_in_current_scope() {

@@ -219,7 +219,7 @@ pub enum BinOp {
     And,
     /// Logical disjunction/or (||).
     Or,
-    /// Create a pair
+    /// Create a pair from two values
     Newpair,
 }
 
@@ -271,7 +271,7 @@ pub enum Expr<'a, IdRepr> {
     /// WrapSpan(
     ///     "int a = 9",
     ///     Stat::Def(
-    ///         Type::Bool,
+    ///         Type::Int,
     ///         "a",
     ///         AssignRhs::Expr(WrapSpan("9", Expr::Int(9))),
     ///     ),
@@ -301,9 +301,9 @@ pub enum Expr<'a, IdRepr> {
     /// ```
     /// ```
     /// WrapSpan(
-    ///     "int a = 'a'",
+    ///     "char a = 'a'",
     ///     Stat::Def(
-    ///         Type::Int,
+    ///         Type::Char,
     ///         "a",
     ///         AssignRhs::Expr(WrapSpan("'a'", Expr::Char('a'))),
     ///     ),
@@ -319,7 +319,7 @@ pub enum Expr<'a, IdRepr> {
     /// WrapSpan(
     ///     "string a = \"hello world\"",
     ///     Stat::Def(
-    ///         Type::Int,
+    ///         Type::String,
     ///         "a",
     ///         AssignRhs::Expr(WrapSpan("\"hello world\"", Expr::String(String::from("hello world")))),
     ///     ),
@@ -631,8 +631,3 @@ pub struct Program<'a, IdRepr>(
     pub Vec<WrapSpan<'a, Function<'a, IdRepr>>>,
     pub Vec<StatSpan<'a, IdRepr>>,
 );
-
-//"(1 + 1) >= (3 * -2)"
-//"(1 * 1) + (3 * -2)"
-//"(1 + 1) + (3 * -2)"
-//"(ord 'a' == 65) || (true && !false)"

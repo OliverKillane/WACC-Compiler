@@ -2,11 +2,11 @@
 //! AST or the errors produced.
 
 use super::{
-    super::ast::{Stat, Type, WrapSpan, StatSpan, AssignLhs, AssignRhs},
+    super::ast::{AssignLhs, AssignRhs, Stat, StatSpan, Type, WrapSpan},
     expression_analysis::analyse_expression,
     semantic_errors::SemanticError,
-    symbol_table::{FunctionSymbolTable, VariableSymbolTable, LocalSymbolTable},
-    type_constraints::{de_index, can_coerce}
+    symbol_table::{FunctionSymbolTable, LocalSymbolTable, VariableSymbolTable},
+    type_constraints::{can_coerce, de_index},
 };
 
 /// Analyse a vector of statements
@@ -459,7 +459,10 @@ fn analyse_lhs<'a, 'b>(
 
 #[cfg(test)]
 mod tests {
-    use super::{*, super::super::ast::{Expr, UnOp, BinOp}};
+    use super::{
+        super::super::ast::{BinOp, Expr, UnOp},
+        *,
+    };
 
     #[test]
     fn analyse_rhs_can_check_valid_function_calls() {
@@ -538,12 +541,14 @@ mod tests {
             ))
         );
 
-        var_symb.def_var(
-            "a",
-            &Type::Pair(box Type::Int, box Type::Int),
-            "pair(int,int) a = newpair(5,5)",
-            &mut local_symb,
-        ).expect("variable not yet defined");
+        var_symb
+            .def_var(
+                "a",
+                &Type::Pair(box Type::Int, box Type::Int),
+                "pair(int,int) a = newpair(5,5)",
+                &mut local_symb,
+            )
+            .expect("variable not yet defined");
 
         // with a variable
         assert_eq!(
@@ -602,12 +607,14 @@ mod tests {
             ),
         );
 
-        var_symb.def_var(
-            "pair_a",
-            &Type::Pair(box Type::Int, box Type::Int),
-            "pair(int,int) a = newpair(5,5)",
-            &mut local_symb,
-        ).expect("variable not yet defined");
+        var_symb
+            .def_var(
+                "pair_a",
+                &Type::Pair(box Type::Int, box Type::Int),
+                "pair(int,int) a = newpair(5,5)",
+                &mut local_symb,
+            )
+            .expect("variable not yet defined");
 
         // Errors:
         // - The return type of fun1 is int (expects char)
@@ -703,8 +710,12 @@ mod tests {
         let fun_symb = FunctionSymbolTable::new();
         let mut local_symb = LocalSymbolTable::new_root();
 
-        var_symb.def_var("a", &Type::Int, "int a = 9", &mut local_symb).expect("variable not yet defined");
-        var_symb.def_var("b", &Type::Char, "char b = 'a'", &mut local_symb).expect("variable not yet defined");
+        var_symb
+            .def_var("a", &Type::Int, "int a = 9", &mut local_symb)
+            .expect("variable not yet defined");
+        var_symb
+            .def_var("b", &Type::Char, "char b = 'a'", &mut local_symb)
+            .expect("variable not yet defined");
 
         assert_eq!(
             analyse_rhs(
@@ -763,8 +774,12 @@ mod tests {
         let fun_symb = FunctionSymbolTable::new();
         let mut local_symb = LocalSymbolTable::new_root();
 
-        var_symb.def_var("a", &Type::Int, "int a = 9", &mut local_symb).expect("variable not yet defined");
-        var_symb.def_var("b", &Type::Char, "char b = 'a'", &mut local_symb).expect("variable not yet defined");
+        var_symb
+            .def_var("a", &Type::Int, "int a = 9", &mut local_symb)
+            .expect("variable not yet defined");
+        var_symb
+            .def_var("b", &Type::Char, "char b = 'a'", &mut local_symb)
+            .expect("variable not yet defined");
 
         // the array is the wrong type
         match analyse_rhs(
