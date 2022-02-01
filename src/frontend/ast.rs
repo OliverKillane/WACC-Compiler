@@ -99,7 +99,7 @@ pub struct WrapSpan<'a, T>(pub &'a str, pub T);
 
 /// Identifier for the generic type, used to differentiate between
 /// different generic types.
-type GenericId = u64;
+pub type GenericId = u64;
 
 /// Type specification in WACC.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -184,6 +184,10 @@ pub enum UnOp {
     Ord,
     /// Gets the character associated with a given integer ascii value.
     Chr,
+    /// Getting first from a pair
+    Fst,
+    /// Getting second from a pair
+    Snd,
 }
 
 /// Binary Operators supported by WACC available for use in [expressions](Expr).
@@ -215,6 +219,8 @@ pub enum BinOp {
     And,
     /// Logical disjunction/or (||).
     Or,
+    /// Create a pair from two values
+    Newpair,
 }
 
 /// Expression Data Type
@@ -265,7 +271,7 @@ pub enum Expr<'a, IdRepr> {
     /// WrapSpan(
     ///     "int a = 9",
     ///     Stat::Def(
-    ///         Type::Bool,
+    ///         Type::Int,
     ///         "a",
     ///         AssignRhs::Expr(WrapSpan("9", Expr::Int(9))),
     ///     ),
@@ -295,9 +301,9 @@ pub enum Expr<'a, IdRepr> {
     /// ```
     /// ```
     /// WrapSpan(
-    ///     "int a = 'a'",
+    ///     "char a = 'a'",
     ///     Stat::Def(
-    ///         Type::Int,
+    ///         Type::Char,
     ///         "a",
     ///         AssignRhs::Expr(WrapSpan("'a'", Expr::Char('a'))),
     ///     ),
@@ -313,7 +319,7 @@ pub enum Expr<'a, IdRepr> {
     /// WrapSpan(
     ///     "string a = \"hello world\"",
     ///     Stat::Def(
-    ///         Type::Int,
+    ///         Type::String,
     ///         "a",
     ///         AssignRhs::Expr(WrapSpan("\"hello world\"", Expr::String(String::from("hello world")))),
     ///     ),
@@ -469,26 +475,6 @@ pub enum AssignRhs<'a, IdRepr> {
     /// ```
     Array(Vec<ExprSpan<'a, IdRepr>>),
 
-    /// Assigns to a new pair.
-    /// ```text
-    /// pair(int, bool) a_pair = newpair(3 + 3, true && false) ;
-    /// ```
-    NewPair(ExprSpan<'a, IdRepr>, ExprSpan<'a, IdRepr>),
-
-    /// Assign the first element of a given pair.
-    /// ```text
-    /// pair(int, bool) a_pair = newpair(1, true) ;
-    /// int a_fst = fst a_pair ;
-    /// ```
-    PairFst(ExprSpan<'a, IdRepr>),
-
-    /// Assign the second element of a given pair.
-    /// ```text
-    /// pair(int, bool) a_pair = newpair(1, true) ;
-    /// bool a_snd = snd a_pair ;
-    /// ```
-    PairSnd(ExprSpan<'a, IdRepr>),
-
     /// Assign the return value of a function, with arguments.
     /// ```text
     /// int add(int a, int b) is
@@ -603,7 +589,8 @@ pub enum Stat<'a, IdRepr> {
 pub type StatSpan<'a, IdRepr> = WrapSpan<'a, Stat<'a, IdRepr>>;
 
 /// Formal parameter used in functions, containing the type and identifier.
-pub struct Param<IdRepr>(pub Type, IdRepr);
+#[derive(Debug, PartialEq, Eq)]
+pub struct Param<IdRepr>(pub Type, pub IdRepr);
 
 /// Function definition with the return type, name, parameters, and code body.
 /// ```text
@@ -629,6 +616,7 @@ pub struct Param<IdRepr>(pub Type, IdRepr);
 ///     )
 /// )
 /// ```
+#[derive(Debug, PartialEq, Eq)]
 pub struct Function<'a, IdRepr>(
     pub Type,
     pub &'a str,
