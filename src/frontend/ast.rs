@@ -390,7 +390,7 @@ pub enum Expr<'a, IdRepr> {
     ///     ),
     /// )
     /// ```
-    UnOp(WrapSpan<'a, UnOp>, Box<ExprSpan<'a, IdRepr>>),
+    UnOp(UnOp, Box<ExprSpan<'a, IdRepr>>),
 
     /// Binary operator application determined by the [BinOp enum](BinOp).
     /// ```text
@@ -415,7 +415,7 @@ pub enum Expr<'a, IdRepr> {
     /// ```
     BinOp(
         Box<ExprSpan<'a, IdRepr>>,
-        WrapSpan<'a, BinOp>,
+        BinOp,
         Box<ExprSpan<'a, IdRepr>>,
     ),
 }

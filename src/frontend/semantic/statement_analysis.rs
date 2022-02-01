@@ -519,7 +519,7 @@ mod tests {
                         "newpair(5,5)",
                         Expr::BinOp(
                             box WrapSpan("5", Expr::Int(5)),
-                            WrapSpan("newpair", BinOp::Newpair),
+                            BinOp::Newpair,
                             box WrapSpan("5", Expr::Int(5))
                         )
                     )]
@@ -534,7 +534,7 @@ mod tests {
                     "newpair(5,5)",
                     Expr::BinOp(
                         box WrapSpan("5", Expr::Int(5)),
-                        WrapSpan("newpair", BinOp::Newpair),
+                        BinOp::Newpair,
                         box WrapSpan("5", Expr::Int(5))
                     )
                 )]
@@ -569,7 +569,7 @@ mod tests {
                     vec![WrapSpan(
                         "fst a",
                         Expr::UnOp(
-                            WrapSpan("fst", UnOp::Fst),
+                            UnOp::Fst,
                             box WrapSpan("a", Expr::Var("a"))
                         )
                     )]
@@ -582,7 +582,7 @@ mod tests {
                 "fun4",
                 vec![WrapSpan(
                     "fst a",
-                    Expr::UnOp(WrapSpan("fst", UnOp::Fst), box WrapSpan("a", Expr::Var(0)))
+                    Expr::UnOp(UnOp::Fst, box WrapSpan("a", Expr::Var(0)))
                 )]
             ))
         );

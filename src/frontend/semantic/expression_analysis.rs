@@ -89,15 +89,15 @@ pub fn analyse_expression<'a, 'b>(
         // Unary operator checking, using the unop_matching functionality from 
         // type_constraint.rs. If the internal contains errors, these are passed 
         // upwards.
-        Expr::UnOp(WrapSpan(op_span, op), box WrapSpan(inner_span, inner_expr)) => {
+        Expr::UnOp(op, box WrapSpan(inner_span, inner_expr)) => {
             match analyse_expression(inner_expr, local_symb, var_symb) {
                 Ok((inner_t, ast)) => match unop_match(&op, &inner_t) {
                     Ok(unop_t) => Ok((
                         unop_t,
-                        Expr::UnOp(WrapSpan(op_span, op), box WrapSpan(inner_span, ast)),
+                        Expr::UnOp(op, box WrapSpan(inner_span, ast)),
                     )),
                     Err((pot_types, pot_ops)) => Err(vec![SemanticError::InvalidUnOp(
-                        op_span, inner_span, pot_types, pot_ops, inner_t, op,
+                        inner_span, pot_types, pot_ops, inner_t, op,
                     )]),
                 },
                 Err(errs) => Err(errs),
@@ -109,7 +109,7 @@ pub fn analyse_expression<'a, 'b>(
         // passed forwards. Otherwise type checking occurs.
         Expr::BinOp(
             box WrapSpan(left_span, left_expr),
-            WrapSpan(op_span, op),
+           op,
             box WrapSpan(right_span, right_expr),
         ) => {
             match (
@@ -122,13 +122,12 @@ pub fn analyse_expression<'a, 'b>(
                             t,
                             Expr::BinOp(
                                 box WrapSpan(left_span, left_ast),
-                                WrapSpan(op_span, op),
+                                op,
                                 box WrapSpan(right_span, right_ast),
                             ),
                         )),
                         Err((pot_types, pot_ops)) => Err(vec![SemanticError::InvalidBinOp(
                             left_span,
-                            op_span,
                             right_span,
                             pot_types,
                             pot_ops,
@@ -267,7 +266,7 @@ mod tests {
         let var_symb = VariableSymbolTable::new();
 
         let expr1: Expr<&str> =
-            Expr::UnOp(WrapSpan("-", UnOp::Minus), box WrapSpan("3", Expr::Int(3)));
+            Expr::UnOp(UnOp::Minus, box WrapSpan("3", Expr::Int(3)));
 
         match analyse_expression(expr1.clone(), &local_symb, &var_symb) {
             Ok((Type::Int, _)) => assert!(true),
@@ -285,7 +284,7 @@ mod tests {
         }
 
         let expr2: Expr<&str> = Expr::UnOp(
-            WrapSpan("!", UnOp::Neg),
+            UnOp::Neg,
             box WrapSpan("true", Expr::Bool(true)),
         );
 
@@ -305,7 +304,7 @@ mod tests {
         }
 
         let expr3: Expr<&str> = Expr::UnOp(
-            WrapSpan("ord", UnOp::Ord),
+            UnOp::Ord,
             box WrapSpan("'a'", Expr::Char('a')),
         );
 
@@ -325,7 +324,7 @@ mod tests {
         }
 
         let expr4: Expr<&str> = Expr::UnOp(
-            WrapSpan("chr", UnOp::Chr),
+            UnOp::Chr,
             box WrapSpan("97", Expr::Int(97)),
         );
 
@@ -351,14 +350,14 @@ mod tests {
         let var_symb = VariableSymbolTable::new();
 
         let expr1: Expr<&str> = Expr::UnOp(
-            WrapSpan("-", UnOp::Minus),
+            UnOp::Minus,
             box WrapSpan(
                 "ord chr 'a'",
                 Expr::UnOp(
-                    WrapSpan("ord", UnOp::Ord),
+                    UnOp::Ord,
                     box WrapSpan(
                         "chr 'a'",
-                        Expr::UnOp(WrapSpan("chr", UnOp::Chr), box WrapSpan("9", Expr::Int(9))),
+                        Expr::UnOp(UnOp::Chr, box WrapSpan("9", Expr::Int(9))),
                     ),
                 ),
             ),
@@ -380,14 +379,14 @@ mod tests {
         }
 
         let expr2: Expr<&str> = Expr::UnOp(
-            WrapSpan("chr", UnOp::Chr),
+            UnOp::Chr,
             box WrapSpan(
                 "ord chr 'a'",
                 Expr::UnOp(
-                    WrapSpan("ord", UnOp::Ord),
+                    UnOp::Ord,
                     box WrapSpan(
                         "chr 'a'",
-                        Expr::UnOp(WrapSpan("chr", UnOp::Chr), box WrapSpan("9", Expr::Int(9))),
+                        Expr::UnOp(UnOp::Chr, box WrapSpan("9", Expr::Int(9))),
                     ),
                 ),
             ),
@@ -419,19 +418,19 @@ mod tests {
                 "1 + 1",
                 Expr::BinOp(
                     box WrapSpan("1", Expr::Int(1)),
-                    WrapSpan("+", BinOp::Add),
+                    BinOp::Add,
                     box WrapSpan("1", Expr::Int(1)),
                 ),
             ),
-            WrapSpan(">=", BinOp::Gte),
+            BinOp::Gte,
             box WrapSpan(
                 "3 * -2",
                 Expr::BinOp(
                     box WrapSpan("3", Expr::Int(3)),
-                    WrapSpan("*", BinOp::Mul),
+                    BinOp::Mul,
                     box WrapSpan(
                         "-2",
-                        Expr::UnOp(WrapSpan("-", UnOp::Minus), box WrapSpan("2", Expr::Int(2))),
+                        Expr::UnOp(UnOp::Minus, box WrapSpan("2", Expr::Int(2))),
                     ),
                 ),
             ),
@@ -457,19 +456,19 @@ mod tests {
                 "1 + 1",
                 Expr::BinOp(
                     box WrapSpan("1", Expr::Int(1)),
-                    WrapSpan("*", BinOp::Mul),
+                    BinOp::Mul,
                     box WrapSpan("1", Expr::Int(1)),
                 ),
             ),
-            WrapSpan(">=", BinOp::Add),
+            BinOp::Add,
             box WrapSpan(
                 "3 * -2",
                 Expr::BinOp(
                     box WrapSpan("3", Expr::Int(3)),
-                    WrapSpan("*", BinOp::Mul),
+                    BinOp::Mul,
                     box WrapSpan(
                         "-2",
-                        Expr::UnOp(WrapSpan("-", UnOp::Minus), box WrapSpan("2", Expr::Int(2))),
+                        Expr::UnOp(UnOp::Minus, box WrapSpan("2", Expr::Int(2))),
                     ),
                 ),
             ),
@@ -495,19 +494,19 @@ mod tests {
                 "1 + 1",
                 Expr::BinOp(
                     box WrapSpan("1", Expr::Int(1)),
-                    WrapSpan("+", BinOp::Add),
+                    BinOp::Add,
                     box WrapSpan("1", Expr::Int(1)),
                 ),
             ),
-            WrapSpan("+", BinOp::Add),
+            BinOp::Add,
             box WrapSpan(
                 "3 * -2",
                 Expr::BinOp(
                     box WrapSpan("3", Expr::Int(3)),
-                    WrapSpan("*", BinOp::Mul),
+                    BinOp::Mul,
                     box WrapSpan(
                         "-2",
-                        Expr::UnOp(WrapSpan("-", UnOp::Minus), box WrapSpan("2", Expr::Int(2))),
+                        Expr::UnOp(UnOp::Minus, box WrapSpan("2", Expr::Int(2))),
                     ),
                 ),
             ),
@@ -535,24 +534,24 @@ mod tests {
                     box WrapSpan(
                         "ord 'a'",
                         Expr::UnOp(
-                            WrapSpan("ord", UnOp::Ord),
+                            UnOp::Ord,
                             box WrapSpan("'a'", Expr::Char('a')),
                         ),
                     ),
-                    WrapSpan("==", BinOp::Eq),
+                    BinOp::Eq,
                     box WrapSpan("65", Expr::Int(65)),
                 ),
             ),
-            WrapSpan("||", BinOp::Or),
+            BinOp::Or,
             box WrapSpan(
                 "true && !false",
                 Expr::BinOp(
                     box WrapSpan("true", Expr::Bool(true)),
-                    WrapSpan("&&", BinOp::And),
+                    BinOp::And,
                     box WrapSpan(
                         "!false",
                         Expr::UnOp(
-                            WrapSpan("!", UnOp::Neg),
+                            UnOp::Neg,
                             box WrapSpan("false", Expr::Bool(false)),
                         ),
                     ),
@@ -580,26 +579,26 @@ mod tests {
                 "97 >= ord 'a'",
                 Expr::BinOp(
                     box WrapSpan("97", Expr::Int(97)),
-                    WrapSpan("==", BinOp::Eq),
+                    BinOp::Eq,
                     box WrapSpan(
                         "ord 'a'",
                         Expr::UnOp(
-                            WrapSpan("ord", UnOp::Ord),
+                            UnOp::Ord,
                             box WrapSpan("'a''", Expr::Char('a')),
                         ),
                     ),
                 ),
             ),
-            WrapSpan("||", BinOp::Or),
+            BinOp::Or,
             box WrapSpan(
                 "true && !false",
                 Expr::BinOp(
                     box WrapSpan("true", Expr::Bool(true)),
-                    WrapSpan("&&", BinOp::And),
+                    BinOp::And,
                     box WrapSpan(
                         "!false",
                         Expr::UnOp(
-                            WrapSpan("!", UnOp::Neg),
+                            UnOp::Neg,
                             box WrapSpan("false", Expr::Bool(false)),
                         ),
                     ),
@@ -637,26 +636,26 @@ mod tests {
                 "chr var1 >= ord 'a'",
                 Expr::BinOp(
                     box WrapSpan("var1", Expr::Var("var1")),
-                    WrapSpan("==", BinOp::Eq),
+                    BinOp::Eq,
                     box WrapSpan(
                         "ord 'a'",
                         Expr::UnOp(
-                            WrapSpan("ord", UnOp::Ord),
+                            UnOp::Ord,
                             box WrapSpan("'a''", Expr::Char('a')),
                         ),
                     ),
                 ),
             ),
-            WrapSpan("||", BinOp::Or),
+            BinOp::Or,
             box WrapSpan(
                 "true && !false",
                 Expr::BinOp(
                     box WrapSpan("true", Expr::Bool(true)),
-                    WrapSpan("&&", BinOp::And),
+                    BinOp::And,
                     box WrapSpan(
                         "!false",
                         Expr::UnOp(
-                            WrapSpan("!", UnOp::Neg),
+                            UnOp::Neg,
                             box WrapSpan("false", Expr::Bool(false)),
                         ),
                     ),
@@ -695,24 +694,24 @@ mod tests {
                     box WrapSpan(
                         "ord 'a'",
                         Expr::UnOp(
-                            WrapSpan("ord", UnOp::Ord),
+                            UnOp::Ord,
                             box WrapSpan("'a'", Expr::Char('a')),
                         ),
                     ),
-                    WrapSpan("==", BinOp::Eq),
+                    BinOp::Eq,
                     box WrapSpan("65", Expr::Int(65)),
                 ),
             ),
-            WrapSpan("||", BinOp::Or),
+            BinOp::Or,
             box WrapSpan(
                 "true && !false",
                 Expr::BinOp(
                     box WrapSpan("true", Expr::Bool(true)),
-                    WrapSpan("&&", BinOp::And),
+                    BinOp::And,
                     box WrapSpan(
                         "!false",
                         Expr::UnOp(
-                            WrapSpan("!", UnOp::Neg),
+                            UnOp::Neg,
                             box WrapSpan("false", Expr::Bool(false)),
                         ),
                     ),
@@ -782,7 +781,7 @@ mod tests {
                 "5 * 5",
                 Expr::BinOp(
                     box WrapSpan("5", Expr::Int(5)),
-                    WrapSpan("*", BinOp::Mul),
+                    BinOp::Mul,
                     box WrapSpan("5", Expr::Int(5)),
                 ),
             )],
@@ -814,7 +813,7 @@ mod tests {
                     "5 * 5",
                     Expr::BinOp(
                         box WrapSpan("5", Expr::Int(5)),
-                        WrapSpan("*", BinOp::Mul),
+                        BinOp::Mul,
                         box WrapSpan("5", Expr::Int(5)),
                     ),
                 ),
@@ -844,7 +843,7 @@ mod tests {
                     "5 * 5",
                     Expr::BinOp(
                         box WrapSpan("5", Expr::Int(5)),
-                        WrapSpan("*", BinOp::Mul),
+                        BinOp::Mul,
                         box WrapSpan("5", Expr::Int(5)),
                     ),
                 ),
@@ -887,7 +886,7 @@ mod tests {
 
         let expr1: Expr<&str> = Expr::BinOp(
             box WrapSpan("pair1", Expr::Var("pair1")),
-            WrapSpan("==", BinOp::Eq),
+            BinOp::Eq,
             box WrapSpan("pair1", Expr::Var("pair1")),
         );
 
@@ -923,11 +922,11 @@ mod tests {
                     box WrapSpan(
                         "len pair_array",
                         Expr::UnOp(
-                            WrapSpan("len", UnOp::Len),
+                            UnOp::Len,
                             box WrapSpan("pair_array", Expr::Var("pair_array")),
                         ),
                     ),
-                    WrapSpan("-", BinOp::Sub),
+                    BinOp::Sub,
                     box WrapSpan("1", Expr::Int(1)),
                 ),
             )],

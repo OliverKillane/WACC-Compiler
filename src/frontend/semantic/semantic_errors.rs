@@ -43,9 +43,8 @@ pub enum SemanticError<'a> {
     InvalidArrayLiteral(Vec<&'a str>),
 
     /// A binary operator is applied incorrectly
-    /// (span of left, span of op, span of right, possible input types, possible operators, found types, found operator)
+    /// (span of the left, span of right, possible input types, possible operators, found types, found operator)
     InvalidBinOp(
-        &'a str,
         &'a str,
         &'a str,
         Vec<(Type, Type)>,
@@ -55,8 +54,8 @@ pub enum SemanticError<'a> {
     ),
 
     /// Invalid unary operator application
-    /// (span of operator, span inner expr, possible types, possible unops, found type, found unop)
-    InvalidUnOp(&'a str, &'a str, Vec<Type>, Vec<&'static UnOp>, Type, UnOp),
+    /// (span of operation, possible types, possible unops, found type, found unop)
+    InvalidUnOp(&'a str, Vec<Type>, Vec<&'static UnOp>, Type, UnOp),
 
     /// Variable redefined in the same scope.
     /// (Variable name, original definition)
