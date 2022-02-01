@@ -5,8 +5,7 @@
 //! The semantic analyser can find multiple semantic errors, including multiple
 //! in a single statement or expression.
 
-use crate::frontend::ast::*;
-use crate::frontend::semantic::type_constraints::*;
+use super::super::ast::*;
 
 /// Contains all errors which can occur in expressions
 #[derive(Debug, PartialEq, Eq)]

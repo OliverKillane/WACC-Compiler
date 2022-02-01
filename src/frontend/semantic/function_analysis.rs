@@ -2,10 +2,12 @@
 //!
 //! Parameters have their own scope and are declared as errors separately
 
-use crate::frontend::ast::*;
-use crate::frontend::semantic::semantic_errors::*;
-use crate::frontend::semantic::statement_analysis::*;
-use crate::frontend::semantic::symbol_table::*;
+use super::{
+    super::ast::*,
+    semantic_errors::*,
+    statement_analysis::*,
+    symbol_table::*,
+};
 
 /// Determine if there are any semantic errors in a function:
 /// - If correct, return a renamed ast and update the variable symbol table

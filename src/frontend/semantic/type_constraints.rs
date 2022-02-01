@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use crate::frontend::ast::*;
+use super::super::ast::*;
 
 lazy_static! {
     /// Unary Operations allowed (operator, output type, input type)

@@ -4,8 +4,11 @@
 //! - Local symbol table using scope to map strings to renamed identifiers
 //!   (used as a key into the global variable table)
 
-use crate::frontend::ast::*;
-use crate::frontend::semantic::semantic_errors::*;
+use super::{
+    super::ast::*,
+    semantic_errors::*,
+};
+
 use std::collections::HashMap;
 
 /// Function symbol table, holds the globally accessible functions identifier

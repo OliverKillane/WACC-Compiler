@@ -1,10 +1,13 @@
 //! Analyse a block of instructions to get all errors, return either a modified
 //! AST or the errors produced.
-use crate::frontend::ast::*;
-use crate::frontend::semantic::expression_analysis::*;
-use crate::frontend::semantic::semantic_errors::*;
-use crate::frontend::semantic::symbol_table::*;
-use crate::frontend::semantic::type_constraints::*;
+
+use super::{
+    super::ast::*,
+    expression_analysis::*,
+    semantic_errors::*,
+    symbol_table::*,
+    type_constraints::*
+};
 
 /// Analyse a vector of statements
 pub fn analyse_block<'a, 'b>(

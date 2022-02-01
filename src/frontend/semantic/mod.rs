@@ -5,12 +5,10 @@ pub mod statement_analysis;
 pub mod symbol_table;
 pub mod type_constraints;
 
-use crate::frontend::semantic::{
-    function_analysis::analyse_function, statement_analysis::analyse_block,
-};
-
 use self::{
-    semantic_errors::{SemanticError, SemanticErrorSummary},
+    semantic_errors::SemanticError,
+    function_analysis::analyse_function, 
+    statement_analysis::analyse_block,
     symbol_table::{get_fn_symbols, LocalSymbolTable, VariableSymbolTable},
 };
 

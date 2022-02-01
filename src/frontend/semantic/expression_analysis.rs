@@ -1,7 +1,10 @@
-use crate::frontend::ast::*;
-use crate::frontend::semantic::semantic_errors::*;
-use crate::frontend::semantic::symbol_table::*;
-use crate::frontend::semantic::type_constraints::*;
+
+use super::{
+    super::ast::*,
+    semantic_errors::*,
+    symbol_table::*,
+    type_constraints::*,
+};
 
 pub fn analyse_expression<'a, 'b>(
     expr: Expr<'a, &'a str>,
