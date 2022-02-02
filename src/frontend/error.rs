@@ -22,6 +22,7 @@ impl<'l> SummaryComponent<'l> {
             declaration: None,
             message,
             shorthand: None,
+            note: None,
         }
     }
 
@@ -31,6 +32,10 @@ impl<'l> SummaryComponent<'l> {
 
     fn add_shorthand(&mut self, shorthand: String) {
         self.shorthand = Some(shorthand);
+    }
+
+    fn add_note(&mut self, note: String) {
+        self.note = Some(note);
     }
 }
 
