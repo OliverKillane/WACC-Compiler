@@ -1,159 +1,231 @@
 use std::collections::HashMap;
 
+/// The representation of an identifier of a variable.
 type VarRepr = u32;
+
+/// The id of a block in a [block graph](BlockGraph).
 type BlockId = usize;
 
+/// A common container for all types of expressions.
+#[derive(Debug, PartialEq, Eq)]
 enum Expr {
-    DWordExpr(DWordExprBox), //
-    ByteExpr(ByteExpr),
+    /// A [number expression](NumExpr)
+    Num(NumExpr),
+    /// A [boolean expression](BoolExpr)
+    Bool(BoolExpr),
+    /// A [pointer expression](PtrExpr)
+    Ptr(PtrExpr),
 }
 
-// Encodes integers, pairs, arrays, strings and pointers
-enum DWordExpr {
-    // null pair/integer constant
-    Const(i32),
+/// Types of arithmetic operations on [numeric expressions](NumExpr).
+#[derive(Debug, PartialEq, Eq)]
+enum ArithOp {
+    /// Addition (+).
+    Add,
+    /// Subtraction (-).
+    Sub,
+    /// Signed multiplication (*).
+    Mul,
+    /// Signed division (/).
+    Div,
+    /// Signed modulo (%).
+    Mod,
+}
 
-    // Value inside the variable
+/// Size of the [numeric expression](NumExpr).
+#[derive(Debug, PartialEq, Eq)]
+enum NumSize {
+    /// Signifies a 4-byte expression, for example an int
+    DWord,
+    /// Signifies a 2-byte expression
+    Word,
+    /// Signifies a 1-byte expression, for example a char
+    Byte,
+}
+
+/// A numeric expression. Can represent for example
+/// character or integer expressions.
+#[derive(Debug, PartialEq, Eq)]
+enum NumExpr {
+    /// A number constant. The value must fit within the given expression size.
+    Const(NumSize, i32),
+    /// A reference to a variable. The variable must have a numeric type in
+    /// the symbol table attached to each [function](Function) or to [program](Program).
+    /// The size of the expression is determined based on the entry in the symbol table.
     Var(VarRepr),
+    /// Dereference of a number under a given pointer.
+    Deref(NumSize, PtrExpr),
 
-    // Ascii index of a character
-    Ord(ByteExprBox),
+    /// An arithmetic operation expression. The sizes of the two sub-expressions
+    /// must be the same. The size of the expression is equal to the size of the
+    /// two sub-expressions.
+    ArithOp(Box<NumExpr>, ArithOp, Box<NumExpr>),
+    /// A cast from one expression size to another.
+    Cast(NumSize, Box<NumExpr>),
 
-    // Arithmetic operations on integers
-    Add(DWordExprBox, DWordExprBox),
-    Sub(DWordExprBox, DWordExprBox),
-    Mul(DWordExprBox, DWordExprBox),
-    Div(DWordExprBox, DWordExprBox),
-    Mod(DWordExprBox, DWordExprBox),
-
-    // Call to a function that returns an integer/pair/array
+    /// A call to a [function](Function). The function must have a numeric output type.
+    /// The size of the expression is determined based on the type of the function.
+    /// The number and types of the argument expressions must match the ones of
+    /// the function parameters.
     Call(String, Vec<Expr>),
-
-    // Allocation of an array containing integers/pairs/arrays
-    MallocDWordArray(Vec<DWordExpr>),
-    // Pointer to an element of an array containing integers/pairs/arrays
-    IndexDWordArray(DWordExprBox, DWordExprBox),
-    // Length of an array containing integers/pairs/arrays
-    DWordArrayLen(DWordExprBox),
-
-    // Allocation of an array containing characters/booleans (or a string)
-    MallocByteArray(Vec<ByteExpr>),
-    // Pointer to an element of an array containing characters/booleans
-    IndexByteArray(DWordExprBox, DWordExprBox),
-    // Length of an array containing characters/booleans (or a string)
-    ByteArrayLen(DWordExprBox),
-
-    // Allocation of a pair
-    MallocPair(Expr, Expr),
-    // First element of a pair
-    PairFirst(DWordExprBox),
-    // Second element of a pair
-    PairSecond(DWordExprBox),
-
-    // Dereference of a pointer to an integer/pair/array
-    Deref(DWordExprBox),
 }
 
-type DWordExprBox = Box<DWordExpr>;
+/// Types of boolean operations on [boolean expressions](BoolExpr).
+#[derive(Debug, PartialEq, Eq)]
+enum BoolOp {
+    /// Conjunction (&&).
+    And,
+    /// Disjunction (||).
+    Or,
+    /// Exclusive or (^).
+    Xor,
+}
 
-enum ByteExpr {
-    // Character/boolean constant
-    Const(u8),
-
-    // Value inside the variable
+/// A boolean expression.
+#[derive(Debug, PartialEq, Eq)]
+enum BoolExpr {
+    /// A boolean constant. Can be either true or false.
+    Const(bool),
+    /// A reference to a variable. The variable must have a boolean type in
+    /// the symbol table attached to each [function](Function) or to [program](Program).
     Var(VarRepr),
+    /// Dereference of a boolean under a given pointer.
+    Deref(PtrExpr),
 
-    // Dereference of a pointer to an integer/pair/array
-    Deref(DWordExprBox),
+    /// Tests whether the numeric expression evaluates to zero.
+    TestZero(NumExpr),
+    /// Tests whether the numeric expression evaluates to a positive signed value.
+    TestPositive(NumExpr),
+    /// Check if two pointers point to the same address.
+    PtrEq(PtrExpr, PtrExpr),
 
-    // Character with a given ascii number
-    Chr(DWordExprBox),
-
-    // Call to a function returning a character/boolean
+    /// A boolean operation expression.
+    BoolOp(Box<BoolExpr>, BoolOp, Box<BoolExpr>),
+    /// A boolean negation expression.
+    Not(Box<BoolExpr>),
+    /// A call to a [function](Function). The function must have a boolean output type.
+    /// The number and types of the argument expressions must match the ones of
+    /// the function parameters.
     Call(String, Vec<Expr>),
-
-    // Less than operation between integers
-    DWordLt(DWordExprBox, DWordExprBox),
-    // Less than operation between characters
-    ByteLt(ByteExprBox, ByteExprBox),
-    // Equality between integers/arrays/pairs
-    DWordEq(DWordExprBox, DWordExprBox),
-    // Equality between characters/booleans
-    ByteEq(ByteExprBox, ByteExprBox),
-
-    // Logical and
-    And(ByteExprBox, ByteExprBox),
-    // Logical or
-    Or(ByteExprBox, ByteExprBox),
-    // Logical negation
-    Neg(ByteExprBox),
 }
 
-type ByteExprBox = Box<ByteExpr>;
+/// A pointer manipulation expressiion.
+#[derive(Debug, PartialEq, Eq)]
+enum PtrExpr {
+    /// A reference to a variable. The variable must have a pointer type in
+    /// the symbol table attached to each [function](Function) or to [program](Program).
+    Var(VarRepr),
+    /// Dereference of a pointer under a given pointer.
+    Deref(Box<PtrExpr>),
 
+    /// An offset of a pointer. Can be used for example to index an array or
+    /// get an element out of a pair.
+    Offset(Box<PtrExpr>, Box<NumExpr>),
+
+    /// Allocates a container on a heap with given items inside it. An array
+    /// for example can be represented as the first element being a dword with
+    /// the size of the array, and the rest of the expressions being the items
+    /// in that array.
+    Malloc(Vec<Expr>),
+    /// A call to a [function](Function). The function must have a pointer output type.
+    /// The number and types of the argument expressions must match the ones of
+    /// the function parameters.
+    Call(String, Vec<Expr>),
+}
+
+/// An execution statement.
+#[derive(Debug, PartialEq, Eq)]
 enum Stat {
-    // Assignment of a DWord Expression to a varialbe
-    AssignDWordVar(VarRepr, DWordExpr),
-    // Assignment of a Byte Expression to a varialbe
-    AssignByteVar(VarRepr, ByteExpr),
-    // Assignment of a DWord Expression to a DWord under a pointer
-    AssignDWordPtr(DWordExpr, DWordExpr),
-    // Assignment of a Byte Expression to a Byte under a pointer
-    AssignBytePtr(DWordExpr, ByteExpr),
+    /// Assigns the value of an expression to a variable. The variable must have
+    /// a matching type in the symbol table attached to each
+    /// [function](Function) or to [program](Program).
+    AssignVar(VarRepr, Expr),
+    /// Assigns the value of an expression to an address to which the pointer
+    /// expression points to.
+    AssignPtr(PtrExpr, Expr),
 
-    // Read an integer into a variable
-    ReadDWordVar(VarRepr),
-    // Read a character into a variable
-    ReadByteVar(VarRepr),
-    // Read an integer into a DWord pointer
-    ReadDWordPtr(DWordExpr),
-    // Read a character into a Byte pointer
-    ReadBytePtr(DWordExpr),
+    /// Reads an integer into a variable. The variable must have a numeric dword type.
+    ReadIntVar(VarRepr),
+    /// Reads an ascii value of a character into a variable. The variable must
+    /// have a numeric byte type.
+    ReadCharVar(VarRepr),
+    /// Reads an integer into an address under the pointer. The pointer is assumed
+    /// to point to a dword.
+    ReadIntPtr(PtrExpr),
+    /// Reads an ascii value of a character into an address under the pointer.
+    /// The pointer is assumed to point to a byte.
+    ReadCharPtr(PtrExpr),
 
-    // Free an array of integers/pairs/arrays
-    FreeDWordArray(DWordExpr),
-    // Free an array of characters/booleans
-    FreeByteArray(DWordExpr),
-    // Free a pair
-    FreePair(DWordExpr),
+    /// Frees a malloced structure with a size given by the number expression.
+    Free(PtrExpr, NumExpr),
 
-    // Print an integer
-    PrintInt(DWordExpr),
-    // Print a character
-    PrintChar(ByteExpr),
-    // Print a boolean
-    PrintBool(ByteExpr),
-    // Print a string/character array
-    PrintStr(DWordExpr),
-    // Print a pointer (regular array/pair)
-    PrintPtr(DWordExpr),
-    // Print a newline character
+    /// Prints a raw value of an expression according to that expression's string format.
+    PrintExpr(Expr),
+    /// Prints the value of a number expression as a character. The expression must have
+    /// a byte size.
+    PrintChar(NumExpr),
+    /// Prints the value of a consecutive sequence of characters to which the pointer
+    /// points to. The number of characters is given by the numeric expression.
+    PrintStr(PtrExpr, NumExpr),
+    /// Prints an end-of-line character/sequence of characters, according to the platform
+    /// specifications.
     PrintEol(),
 }
 
+/// An action to be performed after a block of statements is executed.
+#[derive(Debug, PartialEq, Eq)]
 enum BlockEnding {
-    // Conditional jump - if the expression is non-zero then do the first jump,
-    // otherwise do the second jump
-    CondJump(ByteExpr, BlockId, BlockId),
-    // Unconditional jump - jump to the given block
-    Jump(BlockId),
-    // Return an integer/array/pair
-    DWordReturn(DWordExpr),
-    // Return a character/boolean
-    ByteReturn(ByteExpr),
-    // Exit with a given value
-    Exit(DWordExpr),
+    /// Represents a conditional jump. The boolean expressions in the vector are
+    /// evaluated consecutively. If a boolean expression is true, then the
+    /// execution moves tho the block with a given [block id](BlockId). If all checks
+    /// fail, then the execution jumps to the other block id.
+    CondJumps(Vec<(BoolExpr, BlockId)>, BlockId),
+    /// Represents an exit statement. Causes the program to exit the execution with
+    /// an exit code given in the numeric expression. The expression must have a byte size.
+    Exit(NumExpr),
+    /// Returns a value of an expression. Cannot be used in a block in the
+    /// main program. If used in a function, must have the type and size of the expression
+    /// matching the output type of the function.
+    Return(Expr),
 }
 
-struct Block(Vec<Stat>, BlockEnding);
-
+/// A block of statements. Contains the blocks that have conditional jumps to it. The
+/// list of statements must not be empty.
+#[derive(Debug, PartialEq, Eq)]
+struct Block(Vec<BlockId>, Vec<Stat>, BlockEnding);
+/// A graph of blocks. The index of the block in the block graph signifies the
+/// [block id](BlockId) of that block.
 type BlockGraph = Vec<Block>;
 
-enum Param {
-    DWord(VarRepr),
-    Byte(VarRepr),
+/// Type of an expression.
+#[derive(Debug, PartialEq, Eq)]
+enum Type {
+    /// A numeric expression type, with the given expression size.
+    Num(NumSize),
+    /// A boolean expression type.
+    Bool,
+    /// A pointer expression type.
+    Ptr,
 }
 
-struct Function(Vec<Param>, BlockGraph);
+/// A function. Contains the return type of the function, the types and identifiers
+/// for the arguments, the table of types for local variables used and the
+/// [block graph](BlockGraph) for its body. The execution starts off from the
+/// first block in the block graph.
+#[derive(Debug, PartialEq, Eq)]
+struct Function(
+    Type,
+    Vec<(Type, VarRepr)>,
+    HashMap<VarRepr, Type>,
+    BlockGraph,
+);
 
-struct Program(HashMap<String, Function>, BlockGraph);
+/// An entire program. Contains the definitions of functions, the table of types
+/// for local variables used and the [block graph](BlockGraph) for its body.
+/// The execution starts off from the first block in the block graph.
+#[derive(Debug, PartialEq, Eq)]
+struct Program(
+    HashMap<String, Function>,
+    HashMap<VarRepr, Type>,
+    BlockGraph,
+);
