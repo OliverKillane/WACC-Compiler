@@ -1,11 +1,11 @@
 use std::fmt::Display;
 
-enum SummaryType {
+pub enum SummaryType {
     Error,
     Warning,
 }
 
-struct SummaryComponent<'l> {
+pub struct SummaryComponent<'l> {
     summary_type: SummaryType,
     span: &'l str,
     declaration: Option<&'l str>,
@@ -15,7 +15,7 @@ struct SummaryComponent<'l> {
 }
 
 impl<'l> SummaryComponent<'l> {
-    fn new(summary_type: SummaryType, span: &'l str, message: String) -> Self {
+    pub fn new(summary_type: SummaryType, span: &'l str, message: String) -> Self {
         Self {
             summary_type,
             span,
@@ -26,15 +26,15 @@ impl<'l> SummaryComponent<'l> {
         }
     }
 
-    fn add_declaration(&mut self, declaration: &'l str) {
+    pub fn add_declaration(&mut self, declaration: &'l str) {
         self.declaration = Some(declaration);
     }
 
-    fn add_shorthand(&mut self, shorthand: String) {
+    pub fn add_shorthand(&mut self, shorthand: String) {
         self.shorthand = Some(shorthand);
     }
 
-    fn add_note(&mut self, note: String) {
+    pub fn add_note(&mut self, note: String) {
         self.note = Some(note);
     }
 }
@@ -45,14 +45,14 @@ pub struct SummaryCell<'l> {
 }
 
 impl<'l> SummaryCell<'l> {
-    fn new(span: &'l str) -> Self {
+    pub fn new(span: &'l str) -> Self {
         SummaryCell {
             span,
             components: Vec::new(),
         }
     }
 
-    fn add_component(&mut self, component: SummaryComponent<'l>) {
+    pub fn add_component(&mut self, component: SummaryComponent<'l>) {
         self.components.push(component);
     }
 }
@@ -68,7 +68,7 @@ pub struct Summary<'l> {
 }
 
 impl<'l> Summary<'l> {
-    fn new(input: &'l str, stage: SummaryStage) -> Self {
+    pub fn new(input: &'l str, stage: SummaryStage) -> Self {
         Self {
             input,
             stage,
@@ -76,7 +76,7 @@ impl<'l> Summary<'l> {
         }
     }
 
-    fn add_cell(&mut self, cell: SummaryCell<'l>) {
+    pub fn add_cell(&mut self, cell: SummaryCell<'l>) {
         self.cells.push(cell);
     }
 }
