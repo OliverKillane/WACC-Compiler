@@ -18,10 +18,12 @@ pub fn analyse_function<'a, 'b>(
         'a,
         Function<'a, &'a str>,
     >,
-    var_symb: &mut VariableSymbolTable,
     fun_symb: &FunctionSymbolTable<'a>,
-) -> Result<WrapSpan<'a, Function<'a, usize>>, (&'a str, Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>)>
-{
+) -> Result<
+    (WrapSpan<'a, Function<'a, usize>>, VariableSymbolTable),
+    (&'a str, Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>),
+> {
+    let mut var_symb = VariableSymbolTable::new();
     let mut param_errors = Vec::new();
     let mut param_correct = Vec::new();
 
@@ -40,7 +42,7 @@ pub fn analyse_function<'a, 'b>(
         block,
         fun_symb,
         &mut LocalSymbolTable::new_child(&local_symb),
-        var_symb,
+        &mut var_symb,
         &Some(ret_type.clone()),
     ) {
         Ok((block_ast, terminated)) => {
@@ -49,9 +51,9 @@ pub fn analyse_function<'a, 'b>(
             }
 
             if param_errors.len() == 0 {
-                Ok(WrapSpan(
-                    def_span,
-                    Function(ret_type, name, param_correct, block_ast),
+                Ok((
+                    WrapSpan(def_span, Function(ret_type, name, param_correct, block_ast)),
+                    var_symb,
                 ))
             } else {
                 Err((name, vec![WrapSpan(def_span, param_errors)]))

@@ -44,6 +44,8 @@ mod statement_analysis;
 pub mod symbol_table;
 mod type_constraints;
 
+use std::collections::HashMap;
+
 use self::{
     function_analysis::analyse_function,
     semantic_errors::SemanticError,
@@ -51,16 +53,27 @@ use self::{
     symbol_table::{get_fn_symbols, LocalSymbolTable, VariableSymbolTable},
 };
 
-use super::ast::{Program, WrapSpan};
+use super::ast::{Function, Program, StatSpan, WrapSpan};
 
 /// Analyses a program, either returning a flat variable and function symbol table
 /// and an ast, or a tuple of error (function defs, main body, function errors)
 ///
+/// On success returns:
+/// - Main program body and variable symbol table
+/// - Hashmap of string function identifier to the function body and its
+///   variable symbol table
 ///
+/// On Failure Returns:
+/// - Vector of semantic errors in function definitions
+/// - Vector of semantic errors in main program block
+/// - Vector of (function name, vector of semantic errors)
 pub fn analyse_semantics<'a>(
     Program(fn_defs, main_block): Program<'a, &'a str>,
 ) -> Result<
-    (Program<'a, usize>, VariableSymbolTable),
+    (
+        (Vec<StatSpan<'a, usize>>, VariableSymbolTable),
+        HashMap<&'a str, (WrapSpan<'a, Function<'a, usize>>, VariableSymbolTable)>,
+    ),
     (
         Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>,
         Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>,
@@ -70,31 +83,33 @@ pub fn analyse_semantics<'a>(
     // get function definitions
     let (fun_symb, filtered_fn_defs, fun_def_errs) = get_fn_symbols(fn_defs);
 
-    // create flat symbol table
-    let mut var_symb = VariableSymbolTable::new();
-
     let mut errors = Vec::new();
-    let mut correct = Vec::new();
+    let mut correct = HashMap::with_capacity(filtered_fn_defs.len());
 
     // traverse and analyse functions
-    for function in filtered_fn_defs {
-        match analyse_function(function, &mut var_symb, &fun_symb) {
-            Ok(fun_ast) => correct.push(fun_ast),
+    for WrapSpan(fun_name, fun) in filtered_fn_defs {
+        match analyse_function(WrapSpan(fun_name, fun), &fun_symb) {
+            Ok(res) => {
+                correct
+                    .insert(fun_name, res)
+                    .expect("no duplicated in filtered function definitions");
+            }
             Err(fun_err) => errors.push(fun_err),
         }
     }
 
+    let mut main_var_symb = VariableSymbolTable::new();
     // analyse main code block
     match analyse_block(
         main_block,
         &fun_symb,
         &mut LocalSymbolTable::new_root(),
-        &mut var_symb,
+        &mut main_var_symb,
         &None,
     ) {
         Ok((block_ast, _)) => {
             if errors.len() == 0 && fun_def_errs.len() == 0 {
-                Ok((Program(correct, block_ast), var_symb))
+                Ok(((block_ast, main_var_symb), correct))
             } else {
                 Err((fun_def_errs, vec![], errors))
             }
