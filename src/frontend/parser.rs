@@ -37,10 +37,10 @@ mod tests;
 type TreeResult<'a, T> = IResult<&'a str, T, ErrorTree<&'a str>>;
 
 fn span<'a, F: 'a, O, E: ParseError<&'a str>>(
-    inner: F,
+    mut inner: F,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, WrapSpan<'a, O>, E>
 where
-    F: Fn(&'a str) -> IResult<&'a str, O, E>,
+    F: FnMut(&'a str) -> IResult<&'a str, O, E>,
 {
     move |input| {
         let (rest, ret) = inner(input)?;
@@ -81,7 +81,7 @@ fn parse_func(input: &str) -> IResult<&str, Function<&str>, ErrorTree<&str>> {
             ),
             preceded(Lexer::Is.parser(), parse_stats(Lexer::End)),
         )),
-        |(t, id, params, block)| Function(t, id.to_string(), params, block),
+        |(t, id, params, block)| Function(t, id, params, block),
     )(input)
 }
 
