@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 /// The representation of an identifier of a variable.
-type VarRepr = u32;
+pub type VarRepr = u32;
 
 /// The id of a block in a [block graph](BlockGraph).
-type BlockId = usize;
+pub type BlockId = usize;
 
 /// A common container for all types of expressions.
 #[derive(Debug, PartialEq, Eq)]
-enum Expr {
+pub enum Expr {
     /// A [number expression](NumExpr)
     Num(NumExpr),
     /// A [boolean expression](BoolExpr)
@@ -19,7 +19,7 @@ enum Expr {
 
 /// Types of arithmetic operations on [numeric expressions](NumExpr).
 #[derive(Debug, PartialEq, Eq)]
-enum ArithOp {
+pub enum ArithOp {
     /// Addition (+).
     Add,
     /// Subtraction (-).
@@ -34,7 +34,7 @@ enum ArithOp {
 
 /// Size of the [numeric expression](NumExpr).
 #[derive(Debug, PartialEq, Eq)]
-enum NumSize {
+pub enum NumSize {
     /// Signifies a 4-byte expression, for example an int
     DWord,
     /// Signifies a 2-byte expression
@@ -46,7 +46,7 @@ enum NumSize {
 /// A numeric expression. Can represent for example
 /// character or integer expressions.
 #[derive(Debug, PartialEq, Eq)]
-enum NumExpr {
+pub enum NumExpr {
     /// A number constant. The value must fit within the given expression size.
     Const(NumSize, i32),
     /// A reference to a variable. The variable must have a numeric type in
@@ -72,7 +72,7 @@ enum NumExpr {
 
 /// Types of boolean operations on [boolean expressions](BoolExpr).
 #[derive(Debug, PartialEq, Eq)]
-enum BoolOp {
+pub enum BoolOp {
     /// Conjunction (&&).
     And,
     /// Disjunction (||).
@@ -83,7 +83,7 @@ enum BoolOp {
 
 /// A boolean expression.
 #[derive(Debug, PartialEq, Eq)]
-enum BoolExpr {
+pub enum BoolExpr {
     /// A boolean constant. Can be either true or false.
     Const(bool),
     /// A reference to a variable. The variable must have a boolean type in
@@ -111,7 +111,7 @@ enum BoolExpr {
 
 /// A pointer manipulation expressiion.
 #[derive(Debug, PartialEq, Eq)]
-enum PtrExpr {
+pub enum PtrExpr {
     /// A reference to a variable. The variable must have a pointer type in
     /// the symbol table attached to each [function](Function) or to [program](Program).
     Var(VarRepr),
@@ -135,7 +135,7 @@ enum PtrExpr {
 
 /// An execution statement.
 #[derive(Debug, PartialEq, Eq)]
-enum Stat {
+pub enum Stat {
     /// Assigns the value of an expression to a variable. The variable must have
     /// a matching type in the symbol table attached to each
     /// [function](Function) or to [program](Program).
@@ -174,7 +174,7 @@ enum Stat {
 
 /// An action to be performed after a block of statements is executed.
 #[derive(Debug, PartialEq, Eq)]
-enum BlockEnding {
+pub enum BlockEnding {
     /// Represents a conditional jump. The boolean expressions in the vector are
     /// evaluated consecutively. If a boolean expression is true, then the
     /// execution moves tho the block with a given [block id](BlockId). If all checks
@@ -192,14 +192,14 @@ enum BlockEnding {
 /// A block of statements. Contains the blocks that have conditional jumps to it. The
 /// list of statements must not be empty.
 #[derive(Debug, PartialEq, Eq)]
-struct Block(Vec<BlockId>, Vec<Stat>, BlockEnding);
+pub struct Block(pub Vec<BlockId>, pub Vec<Stat>, pub BlockEnding);
 /// A graph of blocks. The index of the block in the block graph signifies the
 /// [block id](BlockId) of that block.
-type BlockGraph = Vec<Block>;
+pub type BlockGraph = Vec<Block>;
 
 /// Type of an expression.
 #[derive(Debug, PartialEq, Eq)]
-enum Type {
+pub enum Type {
     /// A numeric expression type, with the given expression size.
     Num(NumSize),
     /// A boolean expression type.
@@ -213,19 +213,19 @@ enum Type {
 /// [block graph](BlockGraph) for its body. The execution starts off from the
 /// first block in the block graph.
 #[derive(Debug, PartialEq, Eq)]
-struct Function(
-    Type,
-    Vec<(Type, VarRepr)>,
-    HashMap<VarRepr, Type>,
-    BlockGraph,
+pub struct Function(
+    pub Type,
+    pub Vec<(Type, VarRepr)>,
+    pub HashMap<VarRepr, Type>,
+    pub BlockGraph,
 );
 
 /// An entire program. Contains the definitions of functions, the table of types
 /// for local variables used and the [block graph](BlockGraph) for its body.
 /// The execution starts off from the first block in the block graph.
 #[derive(Debug, PartialEq, Eq)]
-struct Program(
-    HashMap<String, Function>,
-    HashMap<VarRepr, Type>,
-    BlockGraph,
+pub struct Program(
+    pub HashMap<String, Function>,
+    pub HashMap<VarRepr, Type>,
+    pub BlockGraph,
 );
