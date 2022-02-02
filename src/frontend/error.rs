@@ -3,7 +3,6 @@ use std::fmt::Display;
 enum SummaryType {
     Error,
     Warning,
-    Note,
 }
 
 struct SummaryComponent<'l> {
@@ -12,6 +11,7 @@ struct SummaryComponent<'l> {
     declaration: Option<&'l str>,
     message: String,
     shorthand: Option<String>,
+    note: Option<String>,
 }
 
 impl<'l> SummaryComponent<'l> {
