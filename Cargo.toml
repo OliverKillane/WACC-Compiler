@@ -13,3 +13,6 @@ path = "src/main.rs"
 nom = "7.1.0"
 nom-supreme = "0.6.0"
 clap = "3.0.5"
+colored = "2.0.0"
+textwrap = {version = "0.14.2", features = ["hyphenation"]}
+hyphenation = {version = "0.8.4", features = ["embed_en-us"]}
