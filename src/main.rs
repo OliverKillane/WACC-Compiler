@@ -3,6 +3,7 @@
 #![feature(box_syntax)]
 #![feature(box_patterns)]
 #![feature(let_chains)]
+#![feature(map_try_insert)]
 #![allow(dead_code)]
 //! The group 33 WACC Compiler project.
 //!

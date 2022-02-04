@@ -1,7 +1,7 @@
 use colored::{Color, Colorize};
-use hyphenation::{Language, Load, Standard};
+use hyphenation::Load;
 use std::{
-    cmp::min,
+    cmp::{max, min},
     collections::{HashMap, LinkedList},
     fmt::{Display, Write},
 };
@@ -33,7 +33,7 @@ impl ToString for SummaryType {
 
 pub struct SummaryComponent<'l> {
     summary_type: SummaryType,
-    summary_code: &'static str,
+    summary_code: u32,
     span: &'l str,
     declaration: Option<&'l str>,
     message: String,
@@ -44,7 +44,7 @@ pub struct SummaryComponent<'l> {
 impl<'l> SummaryComponent<'l> {
     pub fn new(
         summary_type: SummaryType,
-        summary_code: &'static str,
+        summary_code: u32,
         span: &'l str,
         message: String,
     ) -> Self {
@@ -72,15 +72,43 @@ impl<'l> SummaryComponent<'l> {
     }
 }
 
-pub struct SummaryCell<'l> {
-    span: &'l str,
-    components: Vec<SummaryComponent<'l>>,
+static NOTE_COLOR: Color = Color::Blue;
+impl<'l> SummaryComponent<'l> {
+    fn fmt_message(&self) -> String {
+        format!(
+            "{}: {}",
+            format!("{}[{}]", self.summary_type.to_string(), self.summary_code)
+                .color(self.summary_type)
+                .bold(),
+            &self.message
+        )
+    }
+
+    fn fmt_note(&self) -> Option<String> {
+        Some(format!(
+            "{}: {}",
+            "note".color(Color::Blue).bold(),
+            self.note.as_ref()?
+        ))
+    }
 }
 
-struct SummaryRef<'l> {
+pub struct SummaryCell<'l> {
     span: &'l str,
-    text: String,
-    color: Color,
+    components: LinkedList<SummaryComponent<'l>>,
+}
+
+impl<'l> SummaryCell<'l> {
+    pub fn new(span: &'l str) -> Self {
+        SummaryCell {
+            span,
+            components: LinkedList::new(),
+        }
+    }
+
+    pub fn add_component(&mut self, component: SummaryComponent<'l>) {
+        self.components.push_back(component);
+    }
 }
 
 fn get_relative_range(input: &str, span: &str) -> Option<(usize, usize)> {
@@ -100,137 +128,209 @@ fn get_relative_range(input: &str, span: &str) -> Option<(usize, usize)> {
     }
 }
 
-fn get_coords(
-    input: &str,
-    input_lines: &Vec<&str>,
-    input_lines_positions: &Vec<usize>,
-    span: &str,
-) -> Option<(usize, usize)> {
-    let (input_pos, _) = get_relative_range(input, span)?;
-    let line_num = input_lines_positions
-        .binary_search(&input_pos)
-        .unwrap_or_else(|idx| idx - 1);
-    assert!(
-        line_num < input_lines_positions.len(),
-        "span before the first input line position"
-    );
-    let (line_pos, _) = get_relative_range(input_lines[line_num], span)?;
-    Some((line_num, line_pos))
+struct SpanLocator<'l> {
+    input: &'l str,
+    input_lines: Vec<(usize, usize)>,
+}
+
+impl<'l> SpanLocator<'l> {
+    fn new(input: &'l str) -> Self {
+        SpanLocator {
+            input,
+            input_lines: input
+                .lines()
+                .map(|line| get_relative_range(input, line).unwrap())
+                .collect(),
+        }
+    }
+
+    fn get_coords(&self, span: &str) -> Option<(usize, usize)> {
+        let (input_pos, _) = get_relative_range(self.input, span)?;
+        let line_num = self
+            .input_lines
+            .binary_search_by(|(line_start, _)| line_start.cmp(&input_pos))
+            .unwrap_or_else(|idx| idx - 1);
+        assert!(
+            line_num != usize::MAX,
+            "span before the first input line position"
+        );
+        let (line_pos, _) = get_relative_range(
+            &self.input[self.input_lines[line_num].0..self.input_lines[line_num].1],
+            span,
+        )?;
+        Some((line_num, line_pos))
+    }
+}
+
+struct SummaryCellFmtMeta<'l> {
+    span_locator: SpanLocator<'l>,
+    dictionary: hyphenation::Standard,
+}
+
+impl<'l> SummaryCellFmtMeta<'l> {
+    fn new(input: &'l str) -> Self {
+        SummaryCellFmtMeta {
+            span_locator: SpanLocator::new(input),
+            dictionary: hyphenation::Standard::from_embedded(hyphenation::Language::EnglishUS)
+                .unwrap(),
+        }
+    }
 }
 
 static DECLARED_COLOR: Color = Color::BrightBlue;
 impl<'l> SummaryCell<'l> {
-    pub fn new(span: &'l str) -> Self {
-        SummaryCell {
-            span,
-            components: Vec::new(),
-        }
-    }
-
-    pub fn add_component(&mut self, component: SummaryComponent<'l>) {
-        self.components.push(component);
-    }
-
-    fn messages(&self) -> LinkedList<String> {
+    fn fmt_messages(&self, metadata: &SummaryCellFmtMeta, width: usize) -> String {
+        let text_wrapper_options = Options::new(width).word_splitter(metadata.dictionary.clone());
         self.components
             .iter()
-            .map(|component| {
-                format!(
-                    "{}: {}",
-                    format!(
-                        "{}[{}]",
-                        component.summary_type.to_string(),
-                        component.summary_code
-                    )
-                    .color(component.summary_type)
-                    .bold(),
-                    &component.message
+            .enumerate()
+            .map(|(index, component)| {
+                let index = (index + 1).to_string() + ". ";
+                let indent: String = (0..index.len()).map(|_| ' ').collect();
+                fill(
+                    &(index.bold().to_string() + &component.fmt_message()),
+                    text_wrapper_options.clone().subsequent_indent(&indent),
+                ) + "\n"
+            })
+            .collect()
+    }
+
+    fn fmt_refs_wrapped_line(
+        &self,
+        annotations_prefix: &str,
+        line: String,
+        metadata: &SummaryCellFmtMeta,
+        components: LinkedList<&SummaryComponent>,
+    ) -> String {
+        todo!()
+    }
+
+    fn fmt_refs_line(
+        &self,
+        metadata: &SummaryCellFmtMeta,
+        max_line_num: usize,
+        line_num: usize,
+        components: LinkedList<&SummaryComponent>,
+        width: usize,
+    ) -> String {
+        let max_line_num_width = max_line_num.to_string().len();
+        let line_num_repr = line_num.to_string();
+        let line_num_repr: String = (0..max_line_num_width - line_num_repr.len())
+            .map(|_| ' ')
+            .collect::<String>()
+            + &line_num_repr;
+        let line_num_prefix = format!(" {} | ", line_num);
+        let blank_prefix = format!(
+            " {} | ",
+            (0..max_line_num_width).map(|_| ' ').collect::<String>()
+        );
+
+        let (statement_line_span_begin, statement_line_span_end) =
+            metadata.span_locator.input_lines[line_num];
+        let statement_line =
+            &metadata.span_locator.input[statement_line_span_begin..statement_line_span_end];
+
+        let wrapped_statement_line = fill(
+            statement_line,
+            Options::new(width - line_num_prefix.len()).word_splitter(metadata.dictionary.clone()),
+        );
+        let wrapped_statement_line_locator = SpanLocator::new(&wrapped_statement_line);
+        let mut wrapped_lines_components = HashMap::new();
+        for component in components {
+            let (line_num, _) = wrapped_statement_line_locator
+                .get_coords(component.span)
+                .expect("Component span not within the bounds of statement line");
+            wrapped_lines_components.try_insert(line_num, LinkedList::new());
+            wrapped_lines_components
+                .get_mut(&line_num)
+                .unwrap()
+                .push_back(component);
+        }
+
+        let wrapped_statement_line_lines: Vec<&str> = wrapped_statement_line.lines().collect();
+
+        let mut wrapped_lines_components = wrapped_lines_components.into_iter().collect::<Vec<_>>();
+        wrapped_lines_components.sort_by_key(|(line_num, _)| *line_num);
+        wrapped_lines_components
+            .into_iter()
+            .map(|(line_num, components)| {
+                self.fmt_refs_wrapped_line(
+                    &blank_prefix,
+                    if line_num == 0 {
+                        &line_num_prefix
+                    } else {
+                        &blank_prefix
+                    }
+                    .to_string()
+                        + wrapped_statement_line_lines[line_num],
+                    metadata,
+                    components,
                 )
             })
             .collect()
     }
 
-    fn refs(&self) -> Vec<SummaryRef<'l>> {
-        let declarations = self
-            .components
-            .iter()
-            .enumerate()
-            .filter_map(|(index, component)| {
-                component.declaration.map(|declaration| SummaryRef {
-                    span: declaration,
-                    text: format!("[{}] first declared here", index),
-                    color: DECLARED_COLOR,
-                })
-            });
-        let shorthands = self
-            .components
-            .iter()
-            .enumerate()
-            .map(|(index, component)| SummaryRef {
-                span: component.span,
-                text: format!(
-                    "[{}] {}",
-                    index + 1,
-                    component.shorthand.as_ref().unwrap_or(&String::new())
-                ),
-                color: component.summary_type.into(),
-            });
-        declarations.chain(shorthands).collect()
-    }
-
-    fn notes(&self) -> Vec<String> {
-        self.components
-            .iter()
-            .enumerate()
-            .filter_map(|(index, component)| {
-                component
-                    .note
-                    .as_ref()
-                    .map(|note| format!("[{}] {}: {}", index + 1, "note".bold(), note))
+    fn fmt_refs(&self, metadata: &SummaryCellFmtMeta, width: usize) -> String {
+        let mut max_line_num = 0;
+        let mut lines_refs = HashMap::new();
+        for component in &self.components {
+            let (line_num, _) = metadata
+                .span_locator
+                .get_coords(component.span)
+                .expect("Component span not within the bounds of input");
+            lines_refs.try_insert(line_num, LinkedList::new());
+            lines_refs.get_mut(&line_num).unwrap().push_back(component);
+            max_line_num = max(max_line_num, line_num);
+        }
+        let mut lines_refs = lines_refs.into_iter().collect::<Vec<_>>();
+        lines_refs.sort_by_key(|(line_num, _)| *line_num);
+        lines_refs
+            .into_iter()
+            .map(|(line_num, components)| {
+                self.fmt_refs_line(metadata, max_line_num, line_num, components, width)
             })
             .collect()
     }
 
-    fn fmt_messages(
-        &self,
-        input: &str,
-        input_lines: &Vec<&str>,
-        input_lines_positions: &Vec<usize>,
-        width: usize,
-    ) -> String {
-        let dictionary = Standard::from_embedded(Language::EnglishUS).unwrap();
-        let text_wrapper_options = Options::new(width).word_splitter(dictionary);
-        self.messages()
+    fn fmt_notes(&self, metadata: &SummaryCellFmtMeta, width: usize) -> String {
+        let text_wrapper_options = Options::new(width).word_splitter(metadata.dictionary.clone());
+        self.components
             .iter()
             .enumerate()
-            .map(move |(index, message)| {
-                let index = (index + 1).to_string() + ". ";
-                let index_len = index.len();
-                fill(
-                    &(index.bold().to_string() + message)[..],
-                    text_wrapper_options
-                        .clone()
-                        .subsequent_indent(&(0..index_len).map(|_| ' ').collect::<String>()[..]),
-                ) + "\n"
+            .filter_map(|(index, component)| {
+                let index = format!(" [{}] ", index + 1);
+                let indent: String = (0..index.len()).map(|_| ' ').collect();
+                Some(
+                    fill(
+                        &format!("{}{}", index.bold(), component.fmt_note()?),
+                        text_wrapper_options.clone().subsequent_indent(&indent),
+                    ) + "\n",
+                )
             })
-            .collect::<String>()
+            .collect()
     }
 
-    fn fmt(&self, filepath: &str, input: &str, stage: SummaryStage, width: usize) -> String {
-        let (input_lines, input_lines_positions): (Vec<&str>, Vec<usize>) = input
-            .lines()
-            .map(|line| (line, get_relative_range(input, line).unwrap().0))
-            .unzip();
-        let (span_line, span_column) =
-            get_coords(input, &input_lines, &input_lines_positions, self.span).unwrap();
+    fn fmt(&self, filepath: &str, input: &str, stage: SummaryStage, mut width: usize) -> String {
+        let lines_count = input.lines().count();
+        let max_line_count_width = lines_count.to_string().len();
+        let code_offset = 4 + 20;
+        if width < max_line_count_width + code_offset {
+            width = usize::MAX;
+        }
+
+        let metadata = SummaryCellFmtMeta::new(input);
+        let (span_line, span_column) = metadata
+            .span_locator
+            .get_coords(self.span)
+            .expect("Span not within the bounds of input");
         format!(
             "{}:{}:{}\n{}\n{}\n{}\n",
             filepath,
             span_line,
             span_column,
-            self.fmt_messages(input, &input_lines, &input_lines_positions, width),
-            "",
-            ""
+            self.fmt_messages(&metadata, width),
+            self.fmt_refs(&metadata, width),
+            self.fmt_notes(&metadata, width)
         )
     }
 }
@@ -300,13 +400,19 @@ fn test() {
     summary.set_sep('-');
 
     let mut cell = SummaryCell::new(b);
-    for _ in (0..10) {
-        cell.add_component(SummaryComponent::new(
-            SummaryType::Error,
-            "E200",
+    for i in (0..10) {
+        let mut component = SummaryComponent::new(
+            if i % 2 == 0 {
+                SummaryType::Error
+            } else {
+                SummaryType::Warning
+            },
+            200,
             &b[3..4],
             "This is a sample error message".to_string(),
-        ));
+        );
+        component.set_note("This is a sample note".to_string());
+        cell.add_component(component);
     }
     summary.add_cell(cell);
 
