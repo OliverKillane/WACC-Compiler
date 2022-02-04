@@ -1,3 +1,6 @@
+use super::prelude::*;
+use super::span_utils::*;
+
 use colored::{Color, Colorize};
 use hyphenation::Load;
 use std::{
@@ -7,158 +10,40 @@ use std::{
 };
 use textwrap::{fill, Options};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SummaryType {
-    Error,
-    Warning,
-}
-
-impl Into<Color> for SummaryType {
-    fn into(self) -> Color {
+impl SummaryType {
+    fn color(&self) -> Color {
         match self {
             Self::Error => Color::Red,
             Self::Warning => Color::Yellow,
         }
     }
-}
 
-impl ToString for SummaryType {
-    fn to_string(&self) -> String {
+    fn to_str(&self) -> &'static str {
         match self {
-            Self::Error => String::from("error"),
-            Self::Warning => String::from("warning"),
+            Self::Error => "error",
+            Self::Warning => "warning",
         }
-    }
-}
-
-pub struct SummaryComponent<'l> {
-    summary_type: SummaryType,
-    summary_code: u32,
-    span: &'l str,
-    declaration: Option<&'l str>,
-    message: String,
-    shorthand: Option<String>,
-    note: Option<String>,
-}
-
-impl<'l> SummaryComponent<'l> {
-    pub fn new(
-        summary_type: SummaryType,
-        summary_code: u32,
-        span: &'l str,
-        message: String,
-    ) -> Self {
-        Self {
-            summary_type,
-            summary_code,
-            span,
-            declaration: None,
-            message,
-            shorthand: None,
-            note: None,
-        }
-    }
-
-    pub fn set_declaration(&mut self, declaration: &'l str) {
-        self.declaration = Some(declaration);
-    }
-
-    pub fn set_shorthand(&mut self, shorthand: String) {
-        self.shorthand = Some(shorthand);
-    }
-
-    pub fn set_note(&mut self, note: String) {
-        self.note = Some(note);
     }
 }
 
 static NOTE_COLOR: Color = Color::Blue;
 impl<'l> SummaryComponent<'l> {
-    fn fmt_message(&self) -> String {
+    pub(super) fn fmt_message(&self) -> String {
         format!(
             "{}: {}",
-            format!("{}[{}]", self.summary_type.to_string(), self.summary_code)
-                .color(self.summary_type)
+            format!("{}[{}]", self.summary_type.to_str(), self.summary_code)
+                .color(self.summary_type.color())
                 .bold(),
             &self.message
         )
     }
 
-    fn fmt_note(&self) -> Option<String> {
+    pub(super) fn fmt_note(&self) -> Option<String> {
         Some(format!(
             "{}: {}",
             "note".color(Color::Blue).bold(),
             self.note.as_ref()?
         ))
-    }
-}
-
-pub struct SummaryCell<'l> {
-    span: &'l str,
-    components: LinkedList<SummaryComponent<'l>>,
-}
-
-impl<'l> SummaryCell<'l> {
-    pub fn new(span: &'l str) -> Self {
-        SummaryCell {
-            span,
-            components: LinkedList::new(),
-        }
-    }
-
-    pub fn add_component(&mut self, component: SummaryComponent<'l>) {
-        self.components.push_back(component);
-    }
-}
-
-fn get_relative_range(input: &str, span: &str) -> Option<(usize, usize)> {
-    let input_begin = input.as_ptr() as usize;
-    let input_end = input_begin + input.len();
-
-    let span_begin = span.as_ptr() as usize;
-    let span_end = span_begin + span.len();
-
-    if input_begin > span_begin || input_end <= span_begin {
-        None
-    } else {
-        Some((
-            span_begin - input_begin,
-            min(span_end, input_end) - input_begin,
-        ))
-    }
-}
-
-struct SpanLocator<'l> {
-    input: &'l str,
-    input_lines: Vec<(usize, usize)>,
-}
-
-impl<'l> SpanLocator<'l> {
-    fn new(input: &'l str) -> Self {
-        SpanLocator {
-            input,
-            input_lines: input
-                .lines()
-                .map(|line| get_relative_range(input, line).unwrap())
-                .collect(),
-        }
-    }
-
-    fn get_coords(&self, span: &str) -> Option<(usize, usize)> {
-        let (input_pos, _) = get_relative_range(self.input, span)?;
-        let line_num = self
-            .input_lines
-            .binary_search_by(|(line_start, _)| line_start.cmp(&input_pos))
-            .unwrap_or_else(|idx| idx - 1);
-        assert!(
-            line_num != usize::MAX,
-            "span before the first input line position"
-        );
-        let (line_pos, _) = get_relative_range(
-            &self.input[self.input_lines[line_num].0..self.input_lines[line_num].1],
-            span,
-        )?;
-        Some((line_num, line_pos))
     }
 }
 
@@ -225,11 +110,7 @@ impl<'l> SummaryCell<'l> {
             (0..max_line_num_width).map(|_| ' ').collect::<String>()
         );
 
-        let (statement_line_span_begin, statement_line_span_end) =
-            metadata.span_locator.input_lines[line_num];
-        let statement_line =
-            &metadata.span_locator.input[statement_line_span_begin..statement_line_span_end];
-
+        let statement_line = metadata.span_locator.get_input_line(line_num).unwrap();
         let wrapped_statement_line = fill(
             statement_line,
             Options::new(width - line_num_prefix.len()).word_splitter(metadata.dictionary.clone()),
@@ -323,48 +204,10 @@ impl<'l> SummaryCell<'l> {
             .span_locator
             .get_coords(self.span)
             .expect("Span not within the bounds of input");
-        format!(
-            "{}:{}:{}\n{}\n{}\n{}\n",
-            filepath,
-            span_line,
-            span_column,
-            self.fmt_messages(&metadata, width),
-            self.fmt_refs(&metadata, width),
-            self.fmt_notes(&metadata, width)
-        )
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SummaryStage {
-    Parser = 100,
-    Semantic = 200,
-}
-pub struct Summary<'l> {
-    filepath: &'l str,
-    input: &'l str,
-    stage: SummaryStage,
-    cells: Vec<SummaryCell<'l>>,
-    sep: Option<char>,
-}
-
-impl<'l> Summary<'l> {
-    pub fn new(filepath: &'l str, input: &'l str, stage: SummaryStage) -> Self {
-        Self {
-            filepath,
-            input,
-            stage,
-            cells: Vec::new(),
-            sep: None,
-        }
-    }
-
-    pub fn set_sep(&mut self, sep: char) {
-        self.sep = Some(sep);
-    }
-
-    pub fn add_cell(&mut self, cell: SummaryCell<'l>) {
-        self.cells.push(cell);
+        format!("{}:{}:{}\n", filepath, span_line, span_column)
+            + &self.fmt_messages(&metadata, width)
+            + &self.fmt_refs(&metadata, width)
+            + &self.fmt_notes(&metadata, width)
     }
 }
 
