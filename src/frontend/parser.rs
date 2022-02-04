@@ -529,7 +529,7 @@ fn parse_str(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
     delimited(tag("\""), esc_or_empty, tag("\""))(input)
 }
 
-fn parse_str(input: &str) -> IResult<&str, &str, ErrorTree<&str>>  {
+fn parse_str(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
     let esc = escaped(none_of("\\\"\'"), '\\', one_of("'0nt\"b\\rf"));
     let esc_or_empty = alt((esc, tag("")));
     delimited(tag("\""), esc_or_empty, tag("\""))(input)
