@@ -431,6 +431,8 @@ fn parse_unary(op: &str) -> UnOp {
         "len" => UnOp::Len,
         "ord" => UnOp::Ord,
         "chr" => UnOp::Chr,
+        "fst" => UnOp::Fst,
+        "snd" => UnOp::Snd,
         _ => unreachable!(),
     }
 }
@@ -508,4 +510,10 @@ pub fn convert_error_tree<'a>(path: &'a str, input: &'a str, err: ErrorTree<&'a 
     let mut s = Summary::new(path, input, SummaryStage::Parser);
     s.add_cell(summary_cell);
     s
+}
+
+fn parse_str(input: &str) -> IResult<&str, &str, ErrorTree<&str>>  {
+    let esc = escaped(none_of("\\\"\'"), '\\', one_of("'0nt\"b\\rf"));
+    let esc_or_empty = alt((esc, tag("")));
+    delimited(tag("\""), esc_or_empty, tag("\""))(input)
 }
