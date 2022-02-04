@@ -1,0 +1,15 @@
+# simple integer variable declaration and assignment
+
+# Output:
+# #empty#
+
+# Exit:
+# 20
+
+# Program:
+
+begin
+  int x = 10 ;
+  x = 20 ;
+  exit x
+end

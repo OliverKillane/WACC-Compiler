@@ -1,0 +1,14 @@
+# attempt dereference of a null pair by setting an element of it
+
+# Output:
+# #runtime_error#
+
+# Exit:
+# 255
+
+# Program:
+
+begin
+	pair(int, int) p = null ;
+	fst p = 1
+end

@@ -1,0 +1,16 @@
+# program with function that has same parameter name as function 
+# and also returns to same named variable
+
+# Output:
+# 99
+
+# Program:
+
+begin
+  int f(int f) is
+    return f
+  end
+  
+  int f = call f(99);
+  println f
+end

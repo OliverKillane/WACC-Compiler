@@ -1,0 +1,36 @@
+# Deeply nested conditional statement
+
+# Output:
+# correct
+
+# Program:
+
+begin
+  int a = 13;	
+  if a == 13 
+  then 
+    if a > 5
+    then
+      if a < 10
+      then 
+        println "incorrect"
+      else
+        if a > 12
+        then
+          if a > 13
+          then
+            println "incorrect"
+          else
+            println "correct"
+          fi
+        else 
+          println "incorrect"
+        fi
+      fi
+    else
+      println "incorrect"
+    fi
+  else 
+    println "incorrect"
+  fi
+end

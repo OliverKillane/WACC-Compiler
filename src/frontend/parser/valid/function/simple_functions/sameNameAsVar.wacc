@@ -1,0 +1,15 @@
+# program with function that has same name as a variable
+
+# Output:
+# 5
+
+# Program:
+
+begin
+  int f() is
+    return 5
+  end
+  
+  int f = call f();
+  println f
+end

@@ -1,0 +1,27 @@
+# function body missing return or exit statement on a path
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+begin
+  bool f ( bool b ) is
+    if ( b ) then
+      return b
+    else
+      skip
+    fi
+  end
+  bool g ( bool b ) is
+    if ( b ) then
+      skip
+    else
+      return b
+    fi
+  end
+  bool c = call f ( false ) ;
+  bool d = call g ( true )
+end

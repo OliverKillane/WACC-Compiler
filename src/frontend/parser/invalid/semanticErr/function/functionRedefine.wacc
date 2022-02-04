@@ -1,0 +1,21 @@
+# attempted redefinition of function
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+	int f() is
+		return 0 
+	end 
+  int f() is
+    return 1
+  end
+  int x = call f();
+  println x
+end
+	

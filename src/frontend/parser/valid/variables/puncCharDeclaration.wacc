@@ -1,0 +1,10 @@
+# simple punctuation character variable declaration
+
+# Output:
+# #empty#
+
+# Program:
+
+begin
+  char c = '!'
+end

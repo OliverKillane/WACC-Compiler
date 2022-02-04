@@ -1,0 +1,10 @@
+# subtraction expressions should not be whitespace sensitive
+
+# Output:
+# -1
+
+# Program:
+
+begin
+  println 1-2
+end

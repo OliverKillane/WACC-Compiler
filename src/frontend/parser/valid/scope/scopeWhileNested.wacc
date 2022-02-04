@@ -1,0 +1,26 @@
+# variable scoping nested within a while-loop
+
+# Output:
+# counting... 5
+# counting... 4
+# counting... 3
+# counting... 2
+# counting... 1
+# 0 Boom!
+
+# Program:
+
+begin
+  int x = 5 ;
+  while x > 0 do
+    begin
+      string x = "counting... " ;
+      print x
+    end ;
+    println x ;
+    x = x - 1
+  done ;
+  print x ;
+  println " Boom!"
+end
+

@@ -1,0 +1,15 @@
+# while missing opening do
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+begin
+  while false
+    skip
+  done
+end

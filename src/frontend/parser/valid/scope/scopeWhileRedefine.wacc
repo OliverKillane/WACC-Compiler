@@ -1,0 +1,25 @@
+# variable scoping test that redefines a variable within a while-loop
+
+# Output:
+# counting... 5
+# counting... 4
+# counting... 3
+# counting... 2
+# counting... 1
+# 0 Boom!
+
+# Program:
+
+begin
+  int x = 5 ;
+  string y = " Boom!" ;
+  while x > 0 do
+    string y = "counting... " ;
+    print y;
+    println x;
+    x = x - 1
+  done ;
+  print x;
+  println y
+end
+
