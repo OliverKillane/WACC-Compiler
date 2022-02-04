@@ -2,11 +2,11 @@
 use crate::frontend::ast::*;
 use nom::{
     branch::alt,
-    bytes::complete::{is_a, is_not, take_while, take_until, escaped_transform, escaped},
+    bytes::complete::{escaped, escaped_transform, is_a, is_not, take_until, take_while},
     character::{
         complete::{
-            alpha1, alphanumeric1, anychar, char, digit1, multispace0, multispace1,
-            not_line_ending, one_of, space0, none_of,
+            alpha1, alphanumeric1, anychar, char, digit1, multispace0, multispace1, none_of,
+            not_line_ending, one_of, space0,
         },
         is_alphabetic, is_alphanumeric,
     },
@@ -25,6 +25,8 @@ use nom_supreme::{
 
 #[cfg(test)]
 mod tests;
+
+type TreeResult<'a, T> = IResult<&'a str, T, ErrorTree<&'a str>>;
 
 fn ws<'a, F: 'a, O>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, ErrorTree<&str>>
 where
@@ -217,9 +219,7 @@ fn parse_lhs(input: &str) -> IResult<&str, AssignLhs<&str>, ErrorTree<&str>> {
     ))(input)
 }
 
-fn parse_array_elem(
-    input: &str,
-) -> IResult<&str, (&str, Vec<WrapSpan<Expr<&str>>>), ErrorTree<&str>> {
+fn parse_array_elem(input: &str) -> TreeResult<(&str, Vec<WrapSpan<Expr<&str>>>)> {
     tuple((
         parse_ident,
         many1(delimited(ws(char('[')), parse_expr, ws(char(']')))),
@@ -245,7 +245,6 @@ fn parse_rhs(input: &str) -> IResult<&str, AssignRhs<&str>, ErrorTree<&str>> {
         map(call, |(id, es)| AssignRhs::Call(id, es)),
         map(parse_expr, AssignRhs::Expr),
         map(array_liter, AssignRhs::Array),
-        
     ))(input)
 }
 
@@ -323,27 +322,28 @@ fn parse_literal_keywords(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, Er
     }
 }
 
-
-fn _escaped<'a, F: 'a>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, String, ErrorTree<&'a str>>
+fn _escaped<'a, F: 'a>(
+    inner: F,
+) -> impl FnMut(&'a str) -> IResult<&'a str, String, ErrorTree<&'a str>>
 where
     F: FnMut(&'a str) -> IResult<&'a str, &'a str, ErrorTree<&str>>,
 {
     escaped_transform(
-      inner,
-      '\\',
-      alt((
-        value('\0', tag("0")),
-        value('\x08', tag("b")),
-        value('\t', tag("t")),
-        value('\n', tag("n")),
-        value('\x0c', tag("f")),
-        value('\r', tag("r")),
-        value('\"', tag("\"")),
-        // value('\'', tag("'")),
-        value('\\', tag("\\")),
-      ))
+        inner,
+        '\\',
+        alt((
+            value('\0', tag("0")),
+            value('\x08', tag("b")),
+            value('\t', tag("t")),
+            value('\n', tag("n")),
+            value('\x0c', tag("f")),
+            value('\r', tag("r")),
+            value('\"', tag("\"")),
+            // value('\'', tag("'")),
+            value('\\', tag("\\")),
+        )),
     )
-  }
+}
 
 fn parse_expr_atom(input: &str) -> IResult<&str, Expr<&str>, ErrorTree<&str>> {
     let new_pair = delimited(
@@ -362,14 +362,10 @@ fn parse_expr_atom(input: &str) -> IResult<&str, Expr<&str>, ErrorTree<&str>> {
             )),
             |n: &str| Expr::Int(n.parse::<i32>().unwrap()),
         )),
-        map(
-            ws(parse_quoted),
-            |s| Expr::Char(s.chars().next().unwrap_or_default()),
-        ),
-        map(
-            ws(parse_str),
-            |s| Expr::String(s.to_string()),
-        ),
+        map(ws(parse_quoted), |s| {
+            Expr::Char(s.chars().next().unwrap_or_default())
+        }),
+        map(ws(parse_str), |s| Expr::String(s.to_string())),
         map(parse_array_elem, |(id, e)| Expr::ArrayElem(id, e)),
         map(parse_literal_keywords, |e| e.1),
         map(delimited(ws(char('(')), parse_expr, ws(char(')'))), |e| e.1),
@@ -396,7 +392,7 @@ fn parse_bin_op<'a>(
     let (op, expr2) = tup;
     // input[..input.len() - rest.len()];
     WrapSpan(
-        &"",
+        "",
         Expr::BinOp(
             box expr1,
             match op {
@@ -420,13 +416,13 @@ fn parse_bin_op<'a>(
     )
 }
 
-fn parse_quoted(input: &str) -> IResult<&str, &str, ErrorTree<&str>>  {
+fn parse_quoted(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
     let esc = escaped(none_of("\\\'\""), '\\', one_of("'0nt\"b\\rf"));
     let esc_or_empty = alt((esc, tag("")));
     delimited(tag("'"), esc_or_empty, tag("'"))(input)
 }
 
-fn parse_str(input: &str) -> IResult<&str, &str, ErrorTree<&str>>  {
+fn parse_str(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
     let esc = escaped(none_of("\\\"\'"), '\\', one_of("'0nt\"b\\rf"));
     let esc_or_empty = alt((esc, tag("")));
     delimited(tag("\""), esc_or_empty, tag("\""))(input)
