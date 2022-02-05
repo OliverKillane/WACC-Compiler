@@ -4,6 +4,7 @@
 #![feature(box_patterns)]
 #![feature(let_chains)]
 #![feature(map_try_insert)]
+#![feature(iter_intersperse)]
 #![allow(dead_code)]
 //! The group 33 WACC Compiler project.
 //!

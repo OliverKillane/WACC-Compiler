@@ -43,11 +43,8 @@ impl<'l> SpanLocator<'l> {
             .input_lines
             .binary_search_by(|(line_start, _)| line_start.cmp(&input_pos))
             .unwrap_or_else(|idx| idx - 1);
-        if line_num != usize::MAX {
-            Some(line_num)
-        } else {
-            None
-        }
+        assert!(line_num < self.input_lines.len());
+        Some(line_num)
     }
 
     pub fn get_input_line(&self, line_num: usize) -> Option<&str> {

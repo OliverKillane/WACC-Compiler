@@ -1,5 +1,7 @@
 use std::collections::LinkedList;
 
+use super::span_utils::get_relative_range;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SummaryType {
     Error,
@@ -49,6 +51,7 @@ impl<'l> SummaryComponent<'l> {
 
 pub struct SummaryCell<'l> {
     pub(super) span: &'l str,
+    pub(super) title: Option<String>,
     pub(super) components: LinkedList<SummaryComponent<'l>>,
 }
 
@@ -56,11 +59,18 @@ impl<'l> SummaryCell<'l> {
     pub fn new(span: &'l str) -> Self {
         SummaryCell {
             span,
+            title: None,
             components: LinkedList::new(),
         }
     }
 
+    pub fn set_title(&mut self, title: String) {
+        self.title = Some(title);
+    }
+
     pub fn add_component(&mut self, component: SummaryComponent<'l>) {
+        #[cfg(debug_assertions)]
+        get_relative_range(self.span, component.span).expect("Component span not within the cell");
         self.components.push_back(component);
     }
 }
@@ -94,6 +104,16 @@ impl<'l> Summary<'l> {
     }
 
     pub fn add_cell(&mut self, cell: SummaryCell<'l>) {
+        #[cfg(debug_assertions)]
+        {
+            get_relative_range(self.input, cell.span).expect("Cell span not within the input");
+            for component in &cell.components {
+                if let Some(declaration) = component.declaration {
+                    get_relative_range(self.input, declaration)
+                        .expect("Declaration not within the input");
+                }
+            }
+        }
         self.cells.push(cell);
     }
 }
