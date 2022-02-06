@@ -632,7 +632,7 @@ impl<'l> Display for Summary<'l> {
             cell_strings
                 .into_iter()
                 .intersperse(if let Some(sep) = self.sep {
-                    format!("\n{}\n\n", sep.to_string().repeat(max_cell_width))
+                    sep.to_string().repeat(max_cell_width) + "\n"
                 } else {
                     "\n".to_string()
                 })
@@ -1236,9 +1236,7 @@ mod test {
                    | |
                    | V
                    | [1]
-                
                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
                 test/test.txt:1:1
                 1. error[200]:
                  1 | a b
@@ -1246,9 +1244,7 @@ mod test {
                    | |
                    | V
                    | [1]
-                
                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
                 test/test.txt:1:1
                 1. error[200]:
                  1 | a b
