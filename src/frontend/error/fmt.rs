@@ -14,6 +14,8 @@ use std::{
 use unicode_width::UnicodeWidthChar;
 
 impl SummaryType {
+    /// Produces a color for a summary type. Not implemented as Into not to
+    /// make the function public.
     fn color(&self) -> Color {
         match self {
             Self::Error => Color::Red,
@@ -21,6 +23,8 @@ impl SummaryType {
         }
     }
 
+    /// Produces a string for a summary type. Not implemented as ToString not to
+    /// make the function public.
     fn get_str(&self) -> &'static str {
         match self {
             Self::Error => "error",
@@ -31,6 +35,8 @@ impl SummaryType {
 
 static NOTE_COLOR: Color = Color::Blue;
 impl<'l> SummaryComponent<'l> {
+    /// Produces a formatted message for a component in the notes section of the
+    /// error cell.
     fn fmt_message(&self, index: usize) -> (String, String, usize, String) {
         (
             format!("{} ", format!("{}.", index).bold()),
@@ -45,6 +51,8 @@ impl<'l> SummaryComponent<'l> {
         )
     }
 
+    /// Produces a formatted shorthand for a component in the notes section of the
+    /// error cell.
     fn fmt_shorthand(&self, index: usize) -> String {
         if let Some(shorthand) = self.shorthand.as_ref()
             && !shorthand.trim_matches(&[' ', '\t', '\n'][..]).is_empty() {
@@ -54,6 +62,8 @@ impl<'l> SummaryComponent<'l> {
         }
     }
 
+    /// Produces a formatted note for a component in the notes section of the
+    /// error cell.
     fn fmt_note(&self, index: usize) -> Option<String> {
         Some(format!(
             "{} {}: {}",
@@ -68,6 +78,7 @@ static DECLARED_COLOR: Color = Color::BrightBlue;
 static EXCLUDED_COLOR: Color = Color::BrightBlack;
 static TITLE_COLOR: Color = Color::Magenta;
 impl<'l> SummaryCell<'l> {
+    /// Formats the full messages section of a single error cell.
     fn fmt_messages(components: &[&SummaryComponent<'l>], input_locator: &SpanLocator) -> String {
         let (max_prefix, messages) = components
             .iter()
@@ -94,6 +105,7 @@ impl<'l> SummaryCell<'l> {
             .collect()
     }
 
+    /// Simplifies the error cell components before formatting them line-by-line.
     fn get_annotations(
         components: &[&SummaryComponent<'l>],
     ) -> LinkedList<(&'l str, String, Color)> {
@@ -121,6 +133,8 @@ impl<'l> SummaryCell<'l> {
             )
             .collect()
     }
+
+    /// Groups the spans in a single error cell into lines.
     fn group_annotations(
         input_locator: &SpanLocator,
         annotations: Vec<(&'l str, String, Color)>,
@@ -134,6 +148,7 @@ impl<'l> SummaryCell<'l> {
         line_nums
     }
 
+    /// Colors the given text and underlines the given ranges accordingly.
     fn fmt_colored_underlines(
         text: &str,
         color: Option<Color>,
@@ -169,6 +184,7 @@ impl<'l> SummaryCell<'l> {
         }
     }
 
+    /// Takes care of underlining the code in a single code presentation line.
     #[allow(clippy::too_many_arguments)]
     fn fmt_refs_line_underlines(
         line: &str,
@@ -259,6 +275,7 @@ impl<'l> SummaryCell<'l> {
         full_refs
     }
 
+    /// Puts spaces between the spans that are too close in a single code presentaiton line.
     fn fmt_refs_line_spread_out(
         line: &mut String,
         unincluded_prefix: &mut usize,
@@ -308,6 +325,7 @@ impl<'l> SummaryCell<'l> {
         }
     }
 
+    /// Formats a single code presentation line of the error cell.
     fn fmt_refs_line(
         line: &str,
         selected_prefix: (usize, Color),
@@ -458,6 +476,7 @@ impl<'l> SummaryCell<'l> {
         full_refs
     }
 
+    /// Formats the code presentation section of the error cell.
     fn fmt_refs(
         components: &[&SummaryComponent<'l>],
         span: &str,
@@ -532,6 +551,7 @@ impl<'l> SummaryCell<'l> {
             .collect()
     }
 
+    /// Formats the notes section of the error cell.
     fn fmt_notes(components: &[&SummaryComponent<'l>], input_locator: &SpanLocator) -> String {
         components
             .iter()
@@ -540,6 +560,7 @@ impl<'l> SummaryCell<'l> {
             .collect()
     }
 
+    /// Formats a single error cell.
     fn fmt(&self, filepath: &str, input: &str) -> String {
         let input_locator = SpanLocator::new(input);
         let mut components = self.components.iter().collect::<Vec<_>>();
@@ -569,6 +590,7 @@ impl<'l> SummaryCell<'l> {
 static DEFAULT_SUMMARY_WIDTH: usize = 80;
 static MAIN_HEADER_COLOR: Color = Color::Cyan;
 impl<'l> Display for Summary<'l> {
+    /// Produces a string for the entire summary.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut width = f.width().unwrap_or(DEFAULT_SUMMARY_WIDTH);
         let preamble = format!(
@@ -616,6 +638,12 @@ impl<'l> Display for Summary<'l> {
                 })
                 .collect::<String>()
         )
+    }
+}
+
+impl<'l> Summary<'l> {
+    fn code(&self) -> u32 {
+        self.stage as u32
     }
 }
 
@@ -687,6 +715,18 @@ mod test {
             .downcast_ref::<&str>()
             .unwrap()
             .to_string()
+    }
+
+    #[test]
+    fn test_code() {
+        assert_eq!(
+            Summary::new("test/test.txt", "abc", SummaryStage::Parser).code(),
+            100
+        );
+        assert_eq!(
+            Summary::new("test/test.txt", "abc", SummaryStage::Semantic).code(),
+            200
+        );
     }
 
     #[test]
