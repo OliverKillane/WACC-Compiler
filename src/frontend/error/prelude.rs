@@ -25,6 +25,7 @@ impl<'l> SummaryComponent<'l> {
         span: &'l str,
         message: String,
     ) -> Self {
+        assert!(span.len() > 0);
         Self {
             summary_type,
             summary_code,
@@ -37,6 +38,7 @@ impl<'l> SummaryComponent<'l> {
     }
 
     pub fn set_declaration(&mut self, declaration: &'l str) {
+        assert!(declaration.len() > 0);
         self.declaration = Some(declaration);
     }
 
@@ -57,6 +59,7 @@ pub struct SummaryCell<'l> {
 
 impl<'l> SummaryCell<'l> {
     pub fn new(span: &'l str) -> Self {
+        assert!(span.len() > 0);
         SummaryCell {
             span,
             title: None,
@@ -90,6 +93,7 @@ pub struct Summary<'l> {
 
 impl<'l> Summary<'l> {
     pub fn new(filepath: &'l str, input: &'l str, stage: SummaryStage) -> Self {
+        assert!(input.len() > 0);
         Self {
             filepath,
             input,

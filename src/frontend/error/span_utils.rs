@@ -28,7 +28,10 @@ impl<'l> SpanLocator<'l> {
             input,
             input_lines: input
                 .lines()
-                .map(|line| get_relative_range(input, line).unwrap())
+                .map(|line| {
+                    let (line_begin, line_end) = get_relative_range(input, line).unwrap();
+                    (line_begin, min(line_end + 1, input.len())) // Because lines() doesn't include newlines
+                })
                 .collect(),
         }
     }
@@ -41,7 +44,7 @@ impl<'l> SpanLocator<'l> {
         let (input_pos, _) = self.get_range(span)?;
         let line_num = self
             .input_lines
-            .binary_search_by(|(line_start, _)| line_start.cmp(&input_pos))
+            .binary_search_by_key(&input_pos, |(line_start, _)| *line_start)
             .unwrap_or_else(|idx| idx - 1);
         assert!(line_num < self.input_lines.len());
         Some(line_num)
@@ -59,7 +62,8 @@ impl<'l> SpanLocator<'l> {
             input: &self.input[self.input_lines[line_num].0..self.input_lines[line_num].1],
             input_lines: Vec::new(),
         }
-        .get_range(span)?;
+        .get_range(span)
+        .unwrap();
         Some((line_num, line_pos))
     }
 }
