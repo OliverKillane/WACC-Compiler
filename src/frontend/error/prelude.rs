@@ -2,12 +2,22 @@ use std::collections::LinkedList;
 
 use super::span_utils::get_relative_range;
 
+/// Summary type for the [error cell component](SummaryComponent).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SummaryType {
+    /// An error type for the component.
     Error,
+    /// A warning type for the component.
     Warning,
 }
 
+/// Error cell component. Represents an expression at which a specific error has
+/// occured. Contains the [type of the summary](SummaryType), the internal code
+/// of the summary to distinguish between different summaries, a span for the
+/// expression at which the error occured, an optional first declaration of the
+/// item causing the problem, a full error message displayed above the code
+/// presentation, an optional shorthand message that will be displayed within
+/// the code presentation and an optional "note" message.
 pub struct SummaryComponent<'l> {
     pub(super) summary_type: SummaryType,
     pub(super) summary_code: u32,
@@ -19,6 +29,7 @@ pub struct SummaryComponent<'l> {
 }
 
 impl<'l> SummaryComponent<'l> {
+    /// Creates a new error component.
     pub fn new(
         summary_type: SummaryType,
         summary_code: u32,
@@ -37,20 +48,27 @@ impl<'l> SummaryComponent<'l> {
         }
     }
 
+    /// Sets a declaration of the item causing a problem to be the given span
+    /// within the input code.
     pub fn set_declaration(&mut self, declaration: &'l str) {
         assert!(declaration.len() > 0);
         self.declaration = Some(declaration);
     }
 
+    /// Sets a shorthand message for the component to be the given string.
     pub fn set_shorthand(&mut self, shorthand: String) {
         self.shorthand = Some(shorthand);
     }
 
+    /// Sets a "note" message to be the given string.
     pub fn set_note(&mut self, note: String) {
         self.note = Some(note);
     }
 }
 
+/// An error cell. Contains the span of the statement containing all the
+/// [expressions with errors](SummaryComponent), an optional title for the
+/// error in the error cell and the expression components.
 pub struct SummaryCell<'l> {
     pub(super) span: &'l str,
     pub(super) title: Option<String>,
@@ -58,6 +76,7 @@ pub struct SummaryCell<'l> {
 }
 
 impl<'l> SummaryCell<'l> {
+    /// Creates a new error cell.
     pub fn new(span: &'l str) -> Self {
         assert!(span.len() > 0);
         SummaryCell {
@@ -67,10 +86,12 @@ impl<'l> SummaryCell<'l> {
         }
     }
 
+    /// Sets a new title for the error cell.
     pub fn set_title(&mut self, title: String) {
         self.title = Some(title);
     }
 
+    /// Adds a new [expression with error](SummaryComponent) to the error cell.
     pub fn add_component(&mut self, component: SummaryComponent<'l>) {
         #[cfg(debug_assertions)]
         get_relative_range(self.span, component.span).expect("Component span not within the cell");
@@ -78,11 +99,20 @@ impl<'l> SummaryCell<'l> {
     }
 }
 
+/// Stage at which the error occured. The integer values of the errors signify
+/// the error code returned by the binary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SummaryStage {
+    /// A parser error.
     Parser = 100,
+    /// A semantic analysis error.
     Semantic = 200,
 }
+
+/// Full error summary. Contains the filepath to the file on which the error
+/// is printed, the input string for the code, the stage of compilation at which
+/// the error happened, a list of [error cells](SummaryCell) with the
+/// statement-specific errors and an optional separator between the cells.
 pub struct Summary<'l> {
     pub(super) filepath: &'l str,
     pub(super) input: &'l str,
@@ -92,6 +122,7 @@ pub struct Summary<'l> {
 }
 
 impl<'l> Summary<'l> {
+    /// Creates a new error summary.
     pub fn new(filepath: &'l str, input: &'l str, stage: SummaryStage) -> Self {
         assert!(input.len() > 0);
         Self {
@@ -103,10 +134,12 @@ impl<'l> Summary<'l> {
         }
     }
 
+    /// Sets a separator between the cells to the given character.
     pub fn set_sep(&mut self, sep: char) {
         self.sep = Some(sep);
     }
 
+    /// Adds a new error cell.
     pub fn add_cell(&mut self, cell: SummaryCell<'l>) {
         #[cfg(debug_assertions)]
         {
@@ -176,7 +209,8 @@ mod test {
                 let input = "abcdef";
                 let mut summary = Summary::new("", &input[1..], SummaryStage::Parser);
                 let mut cell = SummaryCell::new(&input[1..]);
-                let mut component = SummaryComponent::new(SummaryType::Error, 200, &input[1..], String::new());
+                let mut component =
+                    SummaryComponent::new(SummaryType::Error, 200, &input[1..], String::new());
                 component.set_declaration(&input[0..]);
                 cell.add_component(component);
                 summary.add_cell(cell);
