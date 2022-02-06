@@ -36,7 +36,7 @@ impl<'l> SummaryComponent<'l> {
         span: &'l str,
         message: String,
     ) -> Self {
-        assert!(span.len() > 0);
+        assert!(!span.is_empty());
         Self {
             summary_type,
             summary_code,
@@ -51,12 +51,15 @@ impl<'l> SummaryComponent<'l> {
     /// Sets a declaration of the item causing a problem to be the given span
     /// within the input code.
     pub fn set_declaration(&mut self, declaration: &'l str) {
-        assert!(declaration.len() > 0);
+        assert!(!declaration.is_empty());
         self.declaration = Some(declaration);
     }
 
     /// Sets a shorthand message for the component to be the given string.
     pub fn set_shorthand(&mut self, shorthand: String) {
+        if shorthand.contains('\n') {
+            panic!("Shorthand must be one-line only");
+        }
         self.shorthand = Some(shorthand);
     }
 
@@ -78,7 +81,7 @@ pub struct SummaryCell<'l> {
 impl<'l> SummaryCell<'l> {
     /// Creates a new error cell.
     pub fn new(span: &'l str) -> Self {
-        assert!(span.len() > 0);
+        assert!(!span.is_empty());
         SummaryCell {
             span,
             title: None,
@@ -124,7 +127,7 @@ pub struct Summary<'l> {
 impl<'l> Summary<'l> {
     /// Creates a new error summary.
     pub fn new(filepath: &'l str, input: &'l str, stage: SummaryStage) -> Self {
-        assert!(input.len() > 0);
+        assert!(!input.is_empty());
         Self {
             filepath,
             input,
@@ -164,7 +167,7 @@ mod test {
     fn catch_panic<F: FnOnce() + UnwindSafe>(f: F) -> String {
         let prev_hook = take_hook();
         set_hook(Box::new(|_info| {}));
-        let unwind = catch_unwind(|| f());
+        let unwind = catch_unwind(f);
         set_hook(prev_hook);
         unwind
             .err()

@@ -38,7 +38,7 @@ impl<'l> SpanLocator<'l> {
                     (
                         line_begin,
                         min(line_end + 1, input.len()),
-                        line_end + 1 <= input.len(),
+                        line_end < input.len(),
                     ) // Because lines() doesn't include newlines
                 })
                 .collect(),

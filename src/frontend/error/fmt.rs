@@ -21,7 +21,7 @@ impl SummaryType {
         }
     }
 
-    fn to_str(&self) -> &'static str {
+    fn get_str(&self) -> &'static str {
         match self {
             Self::Error => "error",
             Self::Warning => "warning",
@@ -36,18 +36,19 @@ impl<'l> SummaryComponent<'l> {
             format!("{} ", format!("{}.", index).bold()),
             format!(
                 "{}: ",
-                format!("{}[{}]", self.summary_type.to_str(), self.summary_code)
+                format!("{}[{}]", self.summary_type.get_str(), self.summary_code)
                     .color(self.summary_type.color())
                     .bold()
             ),
-            format!("{}[{}]: ", self.summary_type.to_str(), self.summary_code).len(),
+            format!("{}[{}]: ", self.summary_type.get_str(), self.summary_code).len(),
             self.message.clone(),
         )
     }
 
     fn fmt_shorthand(&self, index: usize) -> String {
-        if let Some(shorthand) = self.shorthand.as_ref() && shorthand.len() > 0 {
-            format!("[{}] {}", index, shorthand)
+        if let Some(shorthand) = self.shorthand.as_ref()
+            && !shorthand.trim_matches(&[' ', '\t', '\n'][..]).is_empty() {
+            format!("[{}] {}", index, shorthand.trim_matches(&[' ', '\t', '\n'][..]))
         } else {
             format!("[{}]", index)
         }
@@ -67,10 +68,7 @@ static DECLARED_COLOR: Color = Color::BrightBlue;
 static EXCLUDED_COLOR: Color = Color::BrightBlack;
 static TITLE_COLOR: Color = Color::Magenta;
 impl<'l> SummaryCell<'l> {
-    fn fmt_messages(
-        components: &Vec<&SummaryComponent<'l>>,
-        input_locator: &SpanLocator,
-    ) -> String {
+    fn fmt_messages(components: &[&SummaryComponent<'l>], input_locator: &SpanLocator) -> String {
         let (max_prefix, messages) = components
             .iter()
             .enumerate()
@@ -97,7 +95,7 @@ impl<'l> SummaryCell<'l> {
     }
 
     fn get_annotations(
-        components: &Vec<&SummaryComponent<'l>>,
+        components: &[&SummaryComponent<'l>],
     ) -> LinkedList<(&'l str, String, Color)> {
         components
             .iter()
@@ -141,7 +139,7 @@ impl<'l> SummaryCell<'l> {
         color: Option<Color>,
         underlines: LinkedList<(usize, usize, Color)>,
     ) -> String {
-        if underlines.len() == 0 {
+        if underlines.is_empty() {
             color.map_or(text.to_string(), |color| format!("{}", text.color(color)))
         } else {
             let mut underlined_text = String::new();
@@ -171,6 +169,7 @@ impl<'l> SummaryCell<'l> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn fmt_refs_line_underlines(
         line: &str,
         line_len: usize,
@@ -197,9 +196,8 @@ impl<'l> SummaryCell<'l> {
             let included_underlines = underlines
                 .iter()
                 .filter_map(|&(span_begin, span_end, color)| {
-                    if span_end <= unincluded_prefix {
-                        None
-                    } else if span_begin >= line.len() - unincluded_suffix {
+                    if span_end <= unincluded_prefix || span_begin >= line.len() - unincluded_suffix
+                    {
                         None
                     } else {
                         Some((
@@ -243,7 +241,7 @@ impl<'l> SummaryCell<'l> {
             );
             full_refs += "\n";
         } else {
-            full_refs += &line;
+            full_refs += line;
             full_refs += "\n";
             let mut underarrows = " ".to_string().repeat(line_len);
             for (span_begin, span_end, color) in underlines {
@@ -254,7 +252,7 @@ impl<'l> SummaryCell<'l> {
                     ),
                 );
             }
-            full_refs += &blank_num_prefix;
+            full_refs += blank_num_prefix;
             full_refs += &underarrows;
             full_refs += "\n";
         }
@@ -394,12 +392,12 @@ impl<'l> SummaryCell<'l> {
         // Adding arrow lines after the messages
         let message_suffixes = annotations
             .iter()
-            .map(|(_, _, message, message_len, _)| {
+            .map(|(span_begin, _, message, message_len, _)| {
                 let mut message_suffix = String::new();
                 let mut message_suffix_len = 0usize;
                 for (column, _, _, _, color) in &annotations {
-                    let column = line_index_to_column[&column];
-                    if column >= *message_len {
+                    let column = line_index_to_column[column];
+                    if column >= *message_len && column > *span_begin {
                         message_suffix += &format!(
                             "{}{}",
                             (message_suffix_len + message_len..column)
@@ -461,7 +459,7 @@ impl<'l> SummaryCell<'l> {
     }
 
     fn fmt_refs(
-        components: &Vec<&SummaryComponent<'l>>,
+        components: &[&SummaryComponent<'l>],
         span: &str,
         input_locator: &SpanLocator,
     ) -> String {
@@ -491,8 +489,8 @@ impl<'l> SummaryCell<'l> {
         }
 
         let mut annotations = Self::group_annotations(input_locator, annotations);
-        for (&line_num, _) in &selected_prefixes {
-            if input_locator.get_input_line(line_num).unwrap().len() > 0 {
+        for &line_num in selected_prefixes.keys() {
+            if !input_locator.get_input_line(line_num).unwrap().is_empty() {
                 annotations.try_insert(line_num, LinkedList::new());
             }
         }
@@ -534,9 +532,9 @@ impl<'l> SummaryCell<'l> {
             .collect()
     }
 
-    fn fmt_notes(components: &Vec<&SummaryComponent<'l>>, input_locator: &SpanLocator) -> String {
+    fn fmt_notes(components: &[&SummaryComponent<'l>], input_locator: &SpanLocator) -> String {
         components
-            .into_iter()
+            .iter()
             .enumerate()
             .filter_map(|(index, component)| Some(format!(" {}\n", component.fmt_note(index + 1)?)))
             .collect()
@@ -558,7 +556,7 @@ impl<'l> SummaryCell<'l> {
                 self.title
                     .as_ref()
                     .map(|title| " -> ".to_string() + &title[..])
-                    .unwrap_or(String::new())
+                    .unwrap_or_default()
             )
             .color(TITLE_COLOR)
             .bold()
@@ -573,76 +571,66 @@ static MAIN_HEADER_COLOR: Color = Color::Cyan;
 impl<'l> Display for Summary<'l> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut width = f.width().unwrap_or(DEFAULT_SUMMARY_WIDTH);
+        let preamble = format!(
+            "An error has occured during {}\n",
+            match self.stage {
+                SummaryStage::Parser => "parsing",
+                SummaryStage::Semantic => "semantic analysis",
+            }
+        );
+        write!(f, "{}", preamble.color(MAIN_HEADER_COLOR).bold().italic());
+
+        let cell_strings = self
+            .cells
+            .iter()
+            .map(|cell| cell.fmt(self.filepath, self.input))
+            .collect::<LinkedList<_>>();
+
+        let max_cell_width = cell_strings
+            .iter()
+            .map(|cell_string| {
+                cell_string
+                    .lines()
+                    .map(|line| {
+                        line.trim_end_matches(&[' ', '\n', '\t'][..])
+                            .chars()
+                            .map(|c| UnicodeWidthChar::width(c).unwrap_or(0))
+                            .sum::<usize>()
+                    })
+                    .max()
+                    .unwrap()
+            })
+            .max()
+            .unwrap_or(0);
+        let max_cell_width = max(max_cell_width, preamble.trim_end().len());
+
         write!(
             f,
             "{}",
-            format!(
-                "An error has occured during {}\n",
-                match self.stage {
-                    SummaryStage::Parser => "parsing",
-                    SummaryStage::Semantic => "semantic analysis",
-                }
-            )
-            .color(MAIN_HEADER_COLOR)
-            .bold()
-            .italic()
-        );
-        for (index, cell) in self.cells.iter().enumerate() {
-            if let Some(sep) = self.sep && index != 0 {
-                write!(
-                    f,
-                    "\n{}\n\n",
-                    (0..width).into_iter().map(|_| sep).collect::<String>()
-                )?;
-            }
-            f.write_str(&cell.fmt(self.filepath, self.input))?;
-        }
-        Ok(())
+            cell_strings
+                .into_iter()
+                .intersperse(if let Some(sep) = self.sep {
+                    format!("\n{}\n\n", sep.to_string().repeat(max_cell_width))
+                } else {
+                    "\n".to_string()
+                })
+                .collect::<String>()
+        )
     }
-}
-
-#[test]
-fn test() {
-    let input =
-        "😊😊😊 d = 3, a = 0;\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n😊😊😊 😊 = 0;\n\nint c = 0;";
-    let stat = &input[12..76];
-    let mut summary = Summary::new("file/path.rs", input, SummaryStage::Semantic);
-    summary.set_sep('-');
-
-    let mut cell = SummaryCell::new(stat);
-    cell.set_title("Example title".to_string());
-    for (i, &(b, e)) in [(8, 13), (36, 48), (49, 63)].iter().enumerate() {
-        let mut component = SummaryComponent::new(
-            if i % 2 == 0 {
-                SummaryType::Error
-            } else {
-                SummaryType::Warning
-            },
-            200,
-            &stat[b..e],
-            format!("{}{}", "This is a sample error message nr ", i),
-        );
-        // component.set_shorthand("ex. shorthand".to_string());
-        if i % 3 == 0 {
-            component.set_note(format!("{}{}", "This is a sample note nr ", i));
-        }
-        if i % 2 == 1 {
-            component.set_declaration(&input[4..15])
-        }
-        cell.add_component(component);
-    }
-    summary.add_cell(cell);
-
-    println!("{}", summary)
 }
 
 #[cfg(test)]
 mod test {
-    use super::{Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType};
+    use super::{
+        Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType, MAIN_HEADER_COLOR,
+        TITLE_COLOR,
+    };
 
-    use colored::control::SHOULD_COLORIZE;
+    use colored::{control::SHOULD_COLORIZE, Colorize};
     use indoc::indoc;
+    use std::panic::{catch_unwind, set_hook, take_hook, UnwindSafe};
 
+    #[allow(clippy::too_many_arguments)]
     fn singleton_summary(
         filepath: &str,
         input: &str,
@@ -679,13 +667,26 @@ mod test {
     fn assert_eq_multiline(source: String, target: String) {
         let source = source
             .lines()
-            .map(|line| line.trim_end().to_string() + "\n")
+            .map(|line| line.trim_end_matches(&[' ', '\n', '\t'][..]).to_string() + "\n")
             .collect::<String>();
         let target = target
             .lines()
-            .map(|line| line.trim_end().to_string() + "\n")
+            .map(|line| line.trim_end_matches(&[' ', '\n', '\t'][..]).to_string() + "\n")
             .collect::<String>();
         assert_eq!(source, target);
+    }
+
+    fn catch_panic<F: FnOnce() + UnwindSafe>(f: F) -> String {
+        let prev_hook = take_hook();
+        set_hook(Box::new(|_info| {}));
+        let unwind = catch_unwind(f);
+        set_hook(prev_hook);
+        unwind
+            .err()
+            .unwrap()
+            .downcast_ref::<&str>()
+            .unwrap()
+            .to_string()
     }
 
     #[test]
@@ -708,14 +709,14 @@ mod test {
                 None,
             ),
             indoc! {"
-            An error has occured during parsing
-            test/test.txt:1:5
-            1. error[200]: message
-             1 | 😊😊😊😊😊
-               |   ^^^^
-               |   |
-               |   V
-               | [1]
+                An error has occured during parsing
+                test/test.txt:1:5
+                1. error[200]: message
+                 1 | 😊😊😊😊😊
+                   |   ^^^^
+                   |   |
+                   |   V
+                   | [1]
             "}
             .to_string(),
         )
@@ -741,20 +742,20 @@ mod test {
                 None,
             ),
             indoc! {"
-            An error has occured during parsing
-            test/test.txt:1:2
-            1. error[200]: message
-             1 | ab
-               |  ^
-               |  |
-               |  V
-               | [1] first declared here
-             ...
-             4 | ef
-               | ^
-               | |
-               | V
-               | [1]
+                An error has occured during parsing
+                test/test.txt:1:2
+                1. error[200]: message
+                 1 | ab
+                   |  ^
+                   |  |
+                   |  V
+                   | [1] first declared here
+                 ...
+                 4 | ef
+                   | ^
+                   | |
+                   | V
+                   | [1]
             "}
             .to_string(),
         )
@@ -780,14 +781,14 @@ mod test {
                 None,
             ),
             indoc! {"
-            An error has occured during parsing
-            test/test.txt:1:1
-            1. error[200]: message
-             1 | abcdef
-               |    ^^
-               |    |
-               |    V
-               | [1]
+                An error has occured during parsing
+                test/test.txt:1:1
+                1. error[200]: message
+                 1 | abcdef
+                   |    ^^
+                   |    |
+                   |    V
+                   | [1]
             "}
             .to_string(),
         )
@@ -813,14 +814,14 @@ mod test {
                 None,
             ),
             indoc! {"
-            An error has occured during parsing
-            test/test.txt:1:1
-            1. error[200]: message
-             1 | abcdefgh
-               |     ^
-               |     |
-               |     |
-               | [1] <
+                An error has occured during parsing
+                test/test.txt:1:1
+                1. error[200]: message
+                 1 | abcdefgh
+                   |     ^
+                   |     |
+                   |     |
+                   | [1] <
             "}
             .to_string(),
         )
@@ -846,14 +847,14 @@ mod test {
                 None,
             ),
             indoc! {"
-            An error has occured during parsing
-            test/test.txt:1:1
-            1. error[200]: message
-             1 | abcdefgh
-               |      ^
-               |      |
-               |      |
-               | [1] </
+                An error has occured during parsing
+                test/test.txt:1:1
+                1. error[200]: message
+                 1 | abcdefgh
+                   |      ^
+                   |      |
+                   |      |
+                   | [1] </
             "}
             .to_string(),
         )
@@ -879,14 +880,14 @@ mod test {
                 None,
             ),
             indoc! {"
-            An error has occured during parsing
-            test/test.txt:1:1
-            1. error[200]: message
-             1 | abcdefgh
-               |       ^
-               |       |
-               |       |
-               | [1] <-/
+                An error has occured during parsing
+                test/test.txt:1:1
+                1. error[200]: message
+                 1 | abcdefgh
+                   |       ^
+                   |       |
+                   |       |
+                   | [1] <-/
             "}
             .to_string(),
         )
@@ -938,14 +939,47 @@ mod test {
                 None,
             ),
             indoc! {"
-            An error has occured during parsing
-            test/test.txt:1:1 -> title
-            1. error[200]: message
-             1 | abc
-               | ^^^
-               | |
-               | V
-               | [1]
+                An error has occured during parsing
+                test/test.txt:1:1 -> title
+                1. error[200]: message
+                 1 | abc
+                   | ^^^
+                   | |
+                   | V
+                   | [1]
+            "}
+            .to_string(),
+        )
+    }
+
+    #[test]
+    fn test_shorthand() {
+        let input = "abcdefg";
+        SHOULD_COLORIZE.set_override(false);
+        assert_eq_multiline(
+            singleton_summary(
+                "test/test.txt",
+                input,
+                SummaryStage::Parser,
+                input,
+                None,
+                SummaryType::Error,
+                200,
+                &input[4..],
+                "message",
+                "very long shorthand",
+                None,
+                None,
+            ),
+            indoc! {"
+                An error has occured during parsing
+                test/test.txt:1:1
+                1. error[200]: message
+                 1 | abcdefg
+                   |     ^^^
+                   |     |
+                   |     V
+                   | [1] very long shorthand
             "}
             .to_string(),
         )
@@ -971,15 +1005,64 @@ mod test {
                 Some("note"),
             ),
             indoc! {"
-            An error has occured during parsing
-            test/test.txt:1:1
-            1. error[200]: message
-             1 | abc
-               | ^^^
-               | |
-               | V
-               | [1]
-             [1] note: note
+                An error has occured during parsing
+                test/test.txt:1:1
+                1. error[200]: message
+                 1 | abc
+                   | ^^^
+                   | |
+                   | V
+                   | [1]
+                 [1] note: note
+            "}
+            .to_string(),
+        )
+    }
+
+    #[test]
+    fn test_spacing() {
+        let input = "abc";
+        SHOULD_COLORIZE.set_override(false);
+        let mut summary = Summary::new("test/test.txt", input, SummaryStage::Parser);
+        let mut cell = SummaryCell::new(input);
+        cell.add_component(SummaryComponent::new(
+            SummaryType::Error,
+            200,
+            &input[0..1],
+            String::new(),
+        ));
+        cell.add_component(SummaryComponent::new(
+            SummaryType::Error,
+            200,
+            &input[1..2],
+            String::new(),
+        ));
+        cell.add_component(SummaryComponent::new(
+            SummaryType::Error,
+            200,
+            &input[2..3],
+            String::new(),
+        ));
+        summary.add_cell(cell);
+        assert_eq_multiline(
+            format!("{}", summary),
+            indoc! {"
+                An error has occured during parsing
+                test/test.txt:1:1
+                1. error[200]:
+                2. error[200]:
+                3. error[200]:
+                 1 | a b c
+                   | ^ ^ ^
+                   | | | |
+                   | V | |
+                   | [1] |
+                   |   | |
+                   |   V |
+                   | [2] |
+                   |     |
+                   |     |
+                   | [3] <
             "}
             .to_string(),
         )
@@ -987,56 +1070,247 @@ mod test {
 
     #[test]
     fn test_main_message_alignment() {
-        todo!()
+        let input = "a b c";
+        SHOULD_COLORIZE.set_override(false);
+        let mut summary = Summary::new("test/test.txt", input, SummaryStage::Parser);
+        let mut cell = SummaryCell::new(input);
+        cell.add_component(SummaryComponent::new(
+            SummaryType::Error,
+            200,
+            &input[0..1],
+            String::new(),
+        ));
+        cell.add_component(SummaryComponent::new(
+            SummaryType::Warning,
+            200,
+            &input[2..3],
+            String::new(),
+        ));
+        cell.add_component(SummaryComponent::new(
+            SummaryType::Error,
+            1,
+            &input[4..5],
+            String::new(),
+        ));
+        summary.add_cell(cell);
+        assert_eq_multiline(
+            format!("{}", summary),
+            indoc! {"
+                An error has occured during parsing
+                test/test.txt:1:1
+                1.   error[200]: 
+                2. warning[200]: 
+                3.     error[1]: 
+                 1 | a b c
+                   | ^ ^ ^
+                   | | | |
+                   | V | |
+                   | [1] |
+                   |   | |
+                   |   V |
+                   | [2] |
+                   |     |
+                   |     |
+                   | [3] <
+            "}
+            .to_string(),
+        )
     }
 
     #[test]
     fn test_multicomponent() {
-        todo!()
+        let input = "a b\nc";
+        SHOULD_COLORIZE.set_override(false);
+        let mut summary = Summary::new("test/test.txt", input, SummaryStage::Parser);
+        let mut cell = SummaryCell::new(input);
+        cell.add_component(SummaryComponent::new(
+            SummaryType::Error,
+            200,
+            &input[0..1],
+            String::new(),
+        ));
+        cell.add_component(SummaryComponent::new(
+            SummaryType::Error,
+            200,
+            &input[2..3],
+            String::new(),
+        ));
+        cell.add_component(SummaryComponent::new(
+            SummaryType::Error,
+            200,
+            &input[4..5],
+            String::new(),
+        ));
+        summary.add_cell(cell);
+        assert_eq_multiline(
+            format!("{}", summary),
+            indoc! {"
+                An error has occured during parsing
+                test/test.txt:1:1
+                1. error[200]:
+                2. error[200]:
+                3. error[200]:
+                 1 | a b
+                   | ^ ^
+                   | | |
+                   | V |
+                   | [1]
+                   |   |
+                   |   V
+                   | [2]
+                   |
+                 2 | c
+                   | ^
+                   | |
+                   | V
+                   | [3]
+            "}
+            .to_string(),
+        )
     }
 
     #[test]
     fn test_multicell() {
-        todo!()
+        let input = "a b\nc";
+        SHOULD_COLORIZE.set_override(false);
+        let mut summary = Summary::new("test/test.txt", input, SummaryStage::Parser);
+        summary.set_sep('~');
+        for _ in 0..3 {
+            let mut cell = SummaryCell::new(input);
+            cell.add_component(SummaryComponent::new(
+                SummaryType::Error,
+                200,
+                &input[0..1],
+                String::new(),
+            ));
+            summary.add_cell(cell);
+        }
+        assert_eq_multiline(
+            format!("{}", summary),
+            indoc! {"
+                An error has occured during parsing
+                test/test.txt:1:1
+                1. error[200]:
+                 1 | a b
+                   | ^
+                   | |
+                   | V
+                   | [1]
+                
+                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+                test/test.txt:1:1
+                1. error[200]:
+                 1 | a b
+                   | ^
+                   | |
+                   | V
+                   | [1]
+                
+                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+                test/test.txt:1:1
+                1. error[200]:
+                 1 | a b
+                   | ^
+                   | |
+                   | V
+                   | [1]
+            "}
+            .to_string(),
+        )
     }
 
     #[test]
     fn test_doubleline_expr() {
-        todo!()
+        let input = "a b\nc d";
+        SHOULD_COLORIZE.set_override(false);
+        let mut summary = Summary::new("test/test.txt", input, SummaryStage::Parser);
+        let mut cell = SummaryCell::new(input);
+        cell.add_component(SummaryComponent::new(
+            SummaryType::Error,
+            200,
+            &input[2..5],
+            String::new(),
+        ));
+        summary.add_cell(cell);
+        assert_eq_multiline(
+            format!("{}", summary),
+            indoc! {"
+                An error has occured during parsing
+                test/test.txt:1:1
+                1. error[200]:
+                 1 | a b
+                   |   ^
+                   |   |
+                   |   V
+                   | [1]
+                   |
+                 2 | c d
+                   | ^
+            "}
+            .to_string(),
+        )
     }
 
     #[test]
     fn test_multiline_expr() {
-        todo!()
-    }
-
-    #[test]
-    fn test_excluded_code_1() {
-        todo!()
-    }
-
-    #[test]
-    fn test_excluded_code_2() {
-        todo!()
-    }
-
-    #[test]
-    fn test_excluded_code_3() {
-        todo!()
-    }
-
-    #[test]
-    fn test_excluded_code_4() {
-        todo!()
-    }
-
-    #[test]
-    fn test_excluded_code_5() {
-        todo!()
+        let input = "a b\ncd\ne f";
+        SHOULD_COLORIZE.set_override(false);
+        let mut summary = Summary::new("test/test.txt", input, SummaryStage::Parser);
+        let mut cell = SummaryCell::new(input);
+        cell.add_component(SummaryComponent::new(
+            SummaryType::Error,
+            200,
+            &input[2..8],
+            String::new(),
+        ));
+        summary.add_cell(cell);
+        assert_eq_multiline(
+            format!("{}", summary),
+            indoc! {"
+                An error has occured during parsing
+                test/test.txt:1:1
+                1. error[200]:
+                 1 | a b
+                   |   ^
+                   |   |
+                   |   V
+                   | [1]
+                   |
+                 2 | cd
+                   | ^^
+                   |
+                 3 | e f
+                   | ^
+            "}
+            .to_string(),
+        )
     }
 
     #[test]
     fn test_overlapping_spans() {
-        todo!()
+        assert_eq!(
+            catch_panic(|| {
+                let input = "abc";
+                let mut summary = Summary::new("test/test.txt", input, SummaryStage::Parser);
+                let mut cell = SummaryCell::new(input);
+                cell.add_component(SummaryComponent::new(
+                    SummaryType::Error,
+                    200,
+                    &input[..2],
+                    String::new(),
+                ));
+                cell.add_component(SummaryComponent::new(
+                    SummaryType::Error,
+                    200,
+                    &input[1..],
+                    String::new(),
+                ));
+                summary.add_cell(cell);
+                format!("{}", summary);
+            }),
+            "Overlapping spans in a summary cell"
+        );
     }
 }
