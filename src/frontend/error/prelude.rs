@@ -124,18 +124,64 @@ impl<'l> Summary<'l> {
 
 #[cfg(test)]
 mod test {
+    use super::{Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType};
+
+    use std::panic::{catch_unwind, set_hook, take_hook, UnwindSafe};
+
+    fn catch_panic<F: FnOnce() + UnwindSafe>(f: F) -> String {
+        let prev_hook = take_hook();
+        set_hook(Box::new(|_info| {}));
+        let unwind = catch_unwind(|| f());
+        set_hook(prev_hook);
+        unwind
+            .err()
+            .unwrap()
+            .downcast_ref::<String>()
+            .unwrap()
+            .clone()
+    }
     #[test]
     fn test_component_not_within_cell() {
-        todo!()
+        assert_eq!(
+            catch_panic(|| {
+                let input = "abcdef";
+                let mut cell = SummaryCell::new(&input[1..]);
+                cell.add_component(SummaryComponent::new(
+                    SummaryType::Error,
+                    200,
+                    &input[0..2],
+                    "message".to_string(),
+                ));
+            }),
+            "Component span not within the cell",
+        );
     }
 
     #[test]
     fn test_cell_not_within_input() {
-        todo!()
+        assert_eq!(
+            catch_panic(|| {
+                let input = "abcdef";
+                let mut summary = Summary::new("", &input[1..], SummaryStage::Parser);
+                summary.add_cell(SummaryCell::new(&input[0..2]));
+            }),
+            "Cell span not within the input"
+        )
     }
 
     #[test]
     fn test_declaraton_not_within_input() {
-        todo!()
+        assert_eq!(
+            catch_panic(|| {
+                let input = "abcdef";
+                let mut summary = Summary::new("", &input[1..], SummaryStage::Parser);
+                let mut cell = SummaryCell::new(&input[1..]);
+                let mut component = SummaryComponent::new(SummaryType::Error, 200, &input[1..], String::new());
+                component.set_declaration(&input[0..]);
+                cell.add_component(component);
+                summary.add_cell(cell);
+            }),
+            "Declaration not within the input"
+        )
     }
 }
