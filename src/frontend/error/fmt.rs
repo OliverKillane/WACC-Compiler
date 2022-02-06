@@ -46,7 +46,7 @@ impl<'l> SummaryComponent<'l> {
     }
 
     fn fmt_shorthand(&self, index: usize) -> String {
-        if let Some(shorthand) = self.shorthand.as_ref() {
+        if let Some(shorthand) = self.shorthand.as_ref() && shorthand.len() > 0 {
             format!("[{}] {}", index, shorthand)
         } else {
             format!("[{}]", index)
@@ -338,7 +338,7 @@ impl<'l> SummaryCell<'l> {
 
         // Calculating the mapping from span bounds to columns in the output text
         let mut column_cnt = 0;
-        let line_index_to_column = line
+        let mut line_index_to_column = line
             .char_indices()
             .map(|(index, c)| {
                 let curr_column_cnt = column_cnt;
@@ -346,6 +346,8 @@ impl<'l> SummaryCell<'l> {
                 (index, curr_column_cnt)
             })
             .collect::<HashMap<_, _>>();
+        line_index_to_column.insert(line.len(), column_cnt);
+        let line_index_to_column = line_index_to_column;
         let line_len = column_cnt;
 
         // Adding inter-annotation arrow lines
@@ -474,12 +476,8 @@ impl<'l> SummaryCell<'l> {
         let mut selected_prefixes = HashMap::<usize, _>::new();
         for &(span, _, color) in &annotations {
             let first_line = input_locator.get_line_num(&span[0..]).unwrap();
-            let (mut last_line, last_line_column) = input_locator
-                .get_coords(&span[span.len()..span.len()])
-                .unwrap();
-            if last_line_column == 0 {
-                last_line -= 1;
-            }
+            let last_char_index = span.char_indices().map(|(index, _)| index).last().unwrap();
+            let (mut last_line, _) = input_locator.get_coords(&span[last_char_index..]).unwrap();
             if first_line == last_line {
                 continue;
             }
@@ -645,13 +643,6 @@ mod test {
     use colored::control::SHOULD_COLORIZE;
     use indoc::indoc;
 
-    // 1. boundary conditions for arrows
-    // 2. boundary conditions for dimmed text -- declarations
-    // 3. unicode
-    // 4. multiline expressions - 2 lines & more
-    // 5. multidot between multi-line gaps
-    // 6. basic stuff - where an error has occured, title, error-warning alignment, note, matching numbers, multicell, multicomponent
-
     fn singleton_summary(
         filepath: &str,
         input: &str,
@@ -688,11 +679,11 @@ mod test {
     fn assert_eq_multiline(source: String, target: String) {
         let source = source
             .lines()
-            .map(|line| line.trim_end().to_string())
+            .map(|line| line.trim_end().to_string() + "\n")
             .collect::<String>();
         let target = target
             .lines()
-            .map(|line| line.trim_end().to_string())
+            .map(|line| line.trim_end().to_string() + "\n")
             .collect::<String>();
         assert_eq!(source, target);
     }
@@ -767,5 +758,285 @@ mod test {
             "}
             .to_string(),
         )
+    }
+
+    #[test]
+    fn test_arrow_layout_1() {
+        let input = "abcdef";
+        SHOULD_COLORIZE.set_override(false);
+        assert_eq_multiline(
+            singleton_summary(
+                "test/test.txt",
+                input,
+                SummaryStage::Parser,
+                &input[0..5],
+                None,
+                SummaryType::Error,
+                200,
+                &input[3..5],
+                "message",
+                "",
+                None,
+                None,
+            ),
+            indoc! {"
+            An error has occured during parsing
+            test/test.txt:1:1
+            1. error[200]: message
+             1 | abcdef
+               |    ^^
+               |    |
+               |    V
+               | [1]
+            "}
+            .to_string(),
+        )
+    }
+
+    #[test]
+    fn test_arrow_layout_2() {
+        let input = "abcdefgh";
+        SHOULD_COLORIZE.set_override(false);
+        assert_eq_multiline(
+            singleton_summary(
+                "test/test.txt",
+                input,
+                SummaryStage::Parser,
+                &input[0..7],
+                None,
+                SummaryType::Error,
+                200,
+                &input[4..5],
+                "message",
+                "",
+                None,
+                None,
+            ),
+            indoc! {"
+            An error has occured during parsing
+            test/test.txt:1:1
+            1. error[200]: message
+             1 | abcdefgh
+               |     ^
+               |     |
+               |     |
+               | [1] <
+            "}
+            .to_string(),
+        )
+    }
+
+    #[test]
+    fn test_arrow_layout_3() {
+        let input = "abcdefgh";
+        SHOULD_COLORIZE.set_override(false);
+        assert_eq_multiline(
+            singleton_summary(
+                "test/test.txt",
+                input,
+                SummaryStage::Parser,
+                &input[0..7],
+                None,
+                SummaryType::Error,
+                200,
+                &input[5..6],
+                "message",
+                "",
+                None,
+                None,
+            ),
+            indoc! {"
+            An error has occured during parsing
+            test/test.txt:1:1
+            1. error[200]: message
+             1 | abcdefgh
+               |      ^
+               |      |
+               |      |
+               | [1] </
+            "}
+            .to_string(),
+        )
+    }
+
+    #[test]
+    fn test_arrow_layout_4() {
+        let input = "abcdefgh";
+        SHOULD_COLORIZE.set_override(false);
+        assert_eq_multiline(
+            singleton_summary(
+                "test/test.txt",
+                input,
+                SummaryStage::Parser,
+                &input[0..7],
+                None,
+                SummaryType::Error,
+                200,
+                &input[6..7],
+                "message",
+                "",
+                None,
+                None,
+            ),
+            indoc! {"
+            An error has occured during parsing
+            test/test.txt:1:1
+            1. error[200]: message
+             1 | abcdefgh
+               |       ^
+               |       |
+               |       |
+               | [1] <-/
+            "}
+            .to_string(),
+        )
+    }
+
+    #[test]
+    fn test_stage() {
+        let input = "abcdefgh";
+        SHOULD_COLORIZE.set_override(false);
+        assert_eq_multiline(
+            format!(
+                "{}",
+                Summary::new("test/test.txt", input, SummaryStage::Parser)
+            ),
+            indoc! {"
+                An error has occured during parsing
+            "}
+            .to_string(),
+        );
+        assert_eq_multiline(
+            format!(
+                "{}",
+                Summary::new("test/test.txt", input, SummaryStage::Semantic)
+            ),
+            indoc! {"
+                An error has occured during semantic analysis
+            "}
+            .to_string(),
+        );
+    }
+
+    #[test]
+    fn test_title() {
+        let input = "abc";
+        SHOULD_COLORIZE.set_override(false);
+        assert_eq_multiline(
+            singleton_summary(
+                "test/test.txt",
+                input,
+                SummaryStage::Parser,
+                &input[0..3],
+                Some("title"),
+                SummaryType::Error,
+                200,
+                &input[0..3],
+                "message",
+                "",
+                None,
+                None,
+            ),
+            indoc! {"
+            An error has occured during parsing
+            test/test.txt:1:1 -> title
+            1. error[200]: message
+             1 | abc
+               | ^^^
+               | |
+               | V
+               | [1]
+            "}
+            .to_string(),
+        )
+    }
+
+    #[test]
+    fn test_note() {
+        let input = "abc";
+        SHOULD_COLORIZE.set_override(false);
+        assert_eq_multiline(
+            singleton_summary(
+                "test/test.txt",
+                input,
+                SummaryStage::Parser,
+                &input[0..3],
+                None,
+                SummaryType::Error,
+                200,
+                &input[0..3],
+                "message",
+                "",
+                None,
+                Some("note"),
+            ),
+            indoc! {"
+            An error has occured during parsing
+            test/test.txt:1:1
+            1. error[200]: message
+             1 | abc
+               | ^^^
+               | |
+               | V
+               | [1]
+             [1] note: note
+            "}
+            .to_string(),
+        )
+    }
+
+    #[test]
+    fn test_main_message_alignment() {
+        todo!()
+    }
+
+    #[test]
+    fn test_multicomponent() {
+        todo!()
+    }
+
+    #[test]
+    fn test_multicell() {
+        todo!()
+    }
+
+    #[test]
+    fn test_doubleline_expr() {
+        todo!()
+    }
+
+    #[test]
+    fn test_multiline_expr() {
+        todo!()
+    }
+
+    #[test]
+    fn test_excluded_code_1() {
+        todo!()
+    }
+
+    #[test]
+    fn test_excluded_code_2() {
+        todo!()
+    }
+
+    #[test]
+    fn test_excluded_code_3() {
+        todo!()
+    }
+
+    #[test]
+    fn test_excluded_code_4() {
+        todo!()
+    }
+
+    #[test]
+    fn test_excluded_code_5() {
+        todo!()
+    }
+
+    #[test]
+    fn test_overlapping_spans() {
+        todo!()
     }
 }

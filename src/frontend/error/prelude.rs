@@ -121,3 +121,21 @@ impl<'l> Summary<'l> {
         self.cells.push(cell);
     }
 }
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_component_not_within_cell() {
+        todo!()
+    }
+
+    #[test]
+    fn test_cell_not_within_input() {
+        todo!()
+    }
+
+    #[test]
+    fn test_declaraton_not_within_input() {
+        todo!()
+    }
+}
