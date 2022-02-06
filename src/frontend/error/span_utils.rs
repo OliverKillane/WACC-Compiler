@@ -1,5 +1,7 @@
 use std::{cmp::min, slice::SliceIndex};
 
+/// Returns the range of the indicies of the span within the input string, provided
+/// the span starts somewhere within the input string.
 pub(super) fn get_relative_range(input: &str, span: &str) -> Option<(usize, usize)> {
     let input_begin = input.as_ptr() as usize;
     let input_end = input_begin + input.len();
@@ -17,12 +19,15 @@ pub(super) fn get_relative_range(input: &str, span: &str) -> Option<(usize, usiz
     }
 }
 
+/// Span locator. Manages calculations regarding positioning of a span within
+/// the input string, as well as calculating the line at which the span starts.
 pub(super) struct SpanLocator<'l> {
     input: &'l str,
-    input_lines: Vec<(usize, usize)>,
+    input_lines: Vec<(usize, usize, bool)>,
 }
 
 impl<'l> SpanLocator<'l> {
+    /// Creates a new span locator for a given input.
     pub fn new(input: &'l str) -> Self {
         SpanLocator {
             input,
@@ -30,31 +35,42 @@ impl<'l> SpanLocator<'l> {
                 .lines()
                 .map(|line| {
                     let (line_begin, line_end) = get_relative_range(input, line).unwrap();
-                    (line_begin, min(line_end + 1, input.len())) // Because lines() doesn't include newlines
+                    (
+                        line_begin,
+                        min(line_end + 1, input.len()),
+                        line_end + 1 <= input.len(),
+                    ) // Because lines() doesn't include newlines
                 })
                 .collect(),
         }
     }
 
+    /// Calculates the range of the indicies of the span within the input string,
+    /// provided the span starts somewhere within the input string.
     pub fn get_range(&self, span: &str) -> Option<(usize, usize)> {
         get_relative_range(self.input, span)
     }
 
+    /// Calculates the line number at which the span starts, provided that it
+    /// starts somewhere within the input string.
     pub fn get_line_num(&self, span: &str) -> Option<usize> {
         let (input_pos, _) = self.get_range(span)?;
         let line_num = self
             .input_lines
-            .binary_search_by_key(&input_pos, |(line_start, _)| *line_start)
+            .binary_search_by_key(&input_pos, |(line_start, _, _)| *line_start)
             .unwrap_or_else(|idx| idx - 1);
         assert!(line_num < self.input_lines.len());
         Some(line_num)
     }
 
+    /// Returns a specific line in the input, provided such a line index exists
+    /// within the input.
     pub fn get_input_line(&self, line_num: usize) -> Option<&str> {
-        let (line_begin, line_end) = self.input_lines.get(line_num)?;
-        Some(&self.input[*line_begin..*line_end])
+        let (line_begin, line_end, ends_with_newline) = self.input_lines.get(line_num)?;
+        Some(&self.input[*line_begin..*line_end - *ends_with_newline as usize])
     }
 
+    /// Get the row and the column at which the span starts within the input string.
     pub fn get_coords(&self, span: &str) -> Option<(usize, usize)> {
         let line_num = self.get_line_num(span)?;
 
