@@ -1,3 +1,18 @@
+#[macro_use]
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref HASHSET: HashSet<&'static str> = {
+        let arr = [
+            "if", "then", "else", "fi", "fst", "snd", "int", "bool", "char", "string", "pair",
+            "newpair", "begin", "end", "is", "while", "do", "done", "exit", "return", "call",
+            "println", "print", "skip", "read", "free",
+        ];
+        HashSet::from_iter(arr)
+    };
+}
+
+use core::fmt;
 use nom::{
     branch::alt,
     bytes::complete::{escaped, escaped_transform, is_a, is_not, take_until, take_while},
@@ -20,8 +35,20 @@ use nom_supreme::{
     tag::complete::tag,
     ParserExt,
 };
+use std::{collections::HashSet, error::Error};
 
 use crate::frontend::ast;
+
+pub fn comments(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
+    recognize(pair(char('#'), alt((is_not("\n\r"), tag("")))))(input)
+}
+
+pub fn ws<'a, F: 'a, O>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, ErrorTree<&str>>
+where
+    F: FnMut(&'a str) -> IResult<&'a str, O, ErrorTree<&str>>,
+{
+    terminated(inner, many0(alt((comments, multispace1))))
+}
 
 pub enum Lexer {
     Fst,
@@ -130,13 +157,64 @@ impl Lexer {
     }
 }
 
-fn comments(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
-    recognize(pair(char('#'), alt((is_not("\n\r"), tag("")))))(input)
+#[derive(Debug, Clone)]
+struct KeywordIdentError;
+
+impl fmt::Display for KeywordIdentError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Expected identifier, found keyword")
+    }
+}
+impl std::error::Error for KeywordIdentError {}
+
+pub fn parse_ident(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
+    ws(map_res(
+        recognize(pair(
+            alt((alpha1, tag("_"))),
+            many0(alt((alphanumeric1, tag("_")))),
+        )),
+        |s| match HASHSET.get(s) {
+            None => Ok((s)),
+            _ => Err(KeywordIdentError),
+        },
+    ))(input)
 }
 
-fn ws<'a, F: 'a, O>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, ErrorTree<&str>>
-where
-    F: FnMut(&'a str) -> IResult<&'a str, O, ErrorTree<&str>>,
-{
-    terminated(inner, many0(alt((comments, multispace1))))
+pub fn parse_int(input: &str) -> IResult<&str, i32, ErrorTree<&str>> {
+    ws(map_res(
+        recognize(pair(
+            opt(alt((char('-'), char('+')))),
+            many1(one_of("0123456789")),
+        )),
+        &str::parse,
+    ))(input)
 }
+
+pub fn str_delimited<'a>(
+    del: &'static str,
+) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, ErrorTree<&str>> {
+    ws(delimited(
+        tag(del),
+        alt((
+            escaped(none_of("\\\'\""), '\\', one_of("'0nt\"b\\rf")),
+            tag(""),
+        )).cut(),
+        tag(del),
+    ))
+}
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     #[test]
+//     #[should_panic]
+//     fn parse_ident_catches_keyword() {
+//         let input = "hello";
+//         let output: Result<&str, ErrorTree<&str>> = final_parser(parse_ident)(input);
+//         match output {
+//             Err(wow) => println!("{}", wow),
+//             Ok(wow) => println!("{}", wow)
+//         }
+//         // println!("{:?}", parse_ident(input));
+//     }
+// }
