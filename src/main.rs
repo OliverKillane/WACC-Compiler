@@ -14,6 +14,9 @@
 //! - Panayiotis Gavriil
 //! - Oliver Killane
 
+#[macro_use]
+extern crate lazy_static;
+
 mod backend;
 mod frontend;
 mod intermediate;
