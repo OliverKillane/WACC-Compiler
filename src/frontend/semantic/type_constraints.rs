@@ -241,10 +241,11 @@ pub fn de_index(t: &Type, dim: usize) -> Option<Type> {
 }
 
 /// Given two concrete (non-generic) types, can the second be coerced into the
-/// first
+/// first.
 pub fn can_coerce(main_type: &Type, into_type: &Type) -> bool {
     match (main_type, into_type) {
         (Type::Any, _) | (_, Type::Any) => true,
+        (Type::String, Type::Array(box Type::Char, 1)) => true,
         (Type::Pair(box a1, box a2), Type::Pair(box b1, box b2)) => {
             can_coerce(a1, b1) && can_coerce(a2, b2)
         }
@@ -892,6 +893,13 @@ mod tests {
         assert!(can_coerce(&Type::Any, &Type::Bool));
         assert!(can_coerce(&Type::Any, &Type::Char));
         assert!(can_coerce(&Type::Char, &Type::Any));
+        assert!(can_coerce(&Type::String, &Type::Array(box Type::Char, 1)));
+    }
+
+    #[test]
+    fn can_coerce_does_not_match_incorrect_coercions() {
+        assert_eq!(can_coerce(&Type::Array(box Type::Char, 1), &Type::String), false);
+        assert_eq!(can_coerce(&Type::Array(box Type::Char, 2), &Type::Array(box Type::Char, 3)), false);
     }
 
     #[test]
