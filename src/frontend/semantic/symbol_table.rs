@@ -4,7 +4,8 @@
 //! - Local symbol table using scope to map strings to renamed identifiers
 //!   (used as a key into the global variable table)
 //!
-//!
+//! The final variable symbol table is output for each function, containing the
+//! renamed identifiers and the types.
 
 use super::{
     super::ast::{Function, Param, Type, WrapSpan},

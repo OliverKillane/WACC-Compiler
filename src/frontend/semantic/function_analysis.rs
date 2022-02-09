@@ -1,6 +1,15 @@
-//! Analysis of functions using the statement analysis
+//! Analysis of functions (parameters and declaration as well as contained
+//! block).
 //!
-//! Parameters have their own scope and are declared as errors separately
+//! Parameters have their own scope and are declared as errors separately.
+//!
+//! each function has its own flat symbol table created and checked through
+//! successive chained local symbol tables. Errors in the parameters and the
+//! function declaration is general are associated with the span of the
+//! function.
+//!
+//! All other errors are associated with spans of statements within the
+//! function.
 
 use super::{
     super::ast::{Function, Param, WrapSpan},

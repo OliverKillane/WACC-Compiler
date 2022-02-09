@@ -300,9 +300,16 @@ pub fn analyse_block<'a, 'b>(
     }
 }
 
-/// Given the type of the internal expressions to return, the assignment and
-/// symbol tables, determines if errors are present.
-
+/// Analyse the right hand side of a statement (e.g an expression, function
+/// call or array literal).
+///
+/// Renames the variables in this part of the ast, and updates the variable and
+/// local symbol tables.
+///
+/// On success returns an option of the renamed right hand side (variable renaming).
+///
+/// Adds any errors to the vector of semantic errors (representing the semantic
+/// errors in a single statement).
 fn analyse_rhs<'a, 'b>(
     expected: &Type,
     rhs: AssignRhs<'a, &'a str>,
@@ -448,6 +455,17 @@ fn analyse_rhs<'a, 'b>(
     }
 }
 
+/// Analyse the left hand side of a statement (e.g a variable assignment)
+///
+/// Renames the variables in this part of the ast, and updates the variable and
+/// local symbol tables.
+///
+/// On success returns an option of:
+/// - Type expected from any rhs assigning to it.
+/// - The renamed left hand side (variable renaming).
+///
+/// Adds any errors to the vector of semantic errors (representing the semantic
+/// errors in a single statement).
 fn analyse_lhs<'a, 'b>(
     lhs: AssignLhs<'a, &'a str>,
     var_symb: &mut VariableSymbolTable,

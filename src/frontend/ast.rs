@@ -7,90 +7,11 @@
 //! The AST is generic for variable identifiers, this allows for renaming to
 //! occur (as is required for our symbol table generation).
 //!
-//! Function identifiers are contained withing Strings, allowing them to live
-//! when the source code string is dropped and to be used in assembly
-//! generation.
+//! Function identifiers are contained withing strings, storing both the name
+//! and place in the source code.
 //!
-//! # Examples
-//! ## Empty code with skip statement
-//! WACC code:
-//! ```text
-//! begin  
-//!     int a = 9 * (3 + 7)
-//! end
-//! ```
-//! AST definition:
-//! ```
-//! Program(
-//!     vec![],
-//!     vec![
-//!         WrapSpan("int a = 9 * (3 + 7)", Stat::Def(
-//!             Type::Int,
-//!             "a",
-//!             AssignRhs::Expr(
-//!                 WrapSpan(
-//!                 "9 * (3 + 7)",
-//!                 Expr::BinOp(
-//!                     box WrapSpan("9", Expr::Int(9)),
-//!                     BinOp::Mul,
-//!                     box WrapSpan("(3 + 7)", Expr::BinOp(
-//!                         box (WrapSpan("3", Expr::Int(3)),
-//!                         BinOp::Add,
-//!                         box (WrapSpan("7", Expr::Int(7))
-//!                     ))
-//!                 ))
-//!             )
-//!         ))
-//!     ]
-//!     );
-//! ```
-//!
-//! ## Example of a function call
-//! WACC code:
-//! ```text
-//! begin
-//!     int function_name(int a) is
-//!         return a + 9
-//!     end
-//!
-//!     int variable = call function_name(6)
-//! end
-//! ```
-//! AST definition:
-//! ```
-//! Program(
-//!     vec![WrapSpan(
-//!         "function_name(int a)",
-//!         Function(
-//!             Type::Int,
-//!             "function_name",
-//!             vec![Param("int a", Type::Int, "a")],
-//!             vec![Stat(
-//!                 "return a + 9",
-//!                 StatCode::Return(Expr(
-//!                     "a + 9",
-//!                     ExprCode::BinOp(
-//!                         box (Expr("a", ExprCode::Var("a")),
-//!                         BinOp::Add,
-//!                         box (Expr("9", ExprCode::Int(9)),
-//!                     ),
-//!                 )),
-//!             )],
-//!         )
-//!     )],
-//!     vec![WrapSpan(
-//!         "int variable = call function_name(6)",
-//!         Stat::Def(
-//!             Type::Int,
-//!             "variable",
-//!             AssignRhs::Call(
-//!                 "function_name",
-//!                 vec![WrapSpan("6", Expr::Int(6))],
-//!             ),
-//!         ),
-//!     )],
-//! );
-//! ```
+//! WrapSpans are extensively used to associate parts of the AST with spans from
+//! the source code.
 
 /// A wrapper for AST nodes containing the span of the original code for which
 /// the wrapped structure represents.
@@ -231,19 +152,37 @@ pub enum BinOp {
 /// (4 - 3) + (9 * 7)
 /// ```
 /// ```
-/// WrapSpan("(4 - 3) + (9 * 7)", Expr::BinOp(
-///     box (WrapSpan("4 - 3", Expr=::BinOp(
-///         box (WrapSpan("4", Expr::Int(4)),
-///         BinOp::Sub,
-///         box (WrapSpan("3", Expr::Int(3))
-///     )),
-///     BinOp::Add,
-///     box WrapSpan("9 * 7", Expr::BinOp(
-///         box WrapSpan("9", Expr::Int(9)),
-///         BinOp::Mul,
-///         box WrapSpan("7", Expr::Int(7))
-///     )),
-/// ))
+/// WrapSpan(
+///     "chr ((1 + 1) + (3 * -2))",
+///     Expr::UnOp(
+///         UnOp::Chr,
+///         box WrapSpan(
+///             "(1 + 1) + (3 * -2)",
+///             Expr::BinOp(
+///                 box WrapSpan(
+///                     "1 + 1",
+///                     Expr::BinOp(
+///                         box WrapSpan("1", Expr::Int(1)),
+///                         BinOp::Mul,
+///                         box WrapSpan("1", Expr::Int(1)),
+///                     ),
+///                 ),
+///                 BinOp::Add,
+///                 box WrapSpan(
+///                     "3 * -2",
+///                     Expr::BinOp(
+///                         box WrapSpan("3", Expr::Int(3)),
+///                         BinOp::Mul,
+///                         box WrapSpan(
+///                             "-2",
+///                             Expr::UnOp(UnOp::Minus, box WrapSpan("2", Expr::Int(2))),
+///                         ),
+///                     ),
+///                 ),
+///             ),
+///         ),
+///     ),
+/// )
 /// ```  
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Expr<'a, IdRepr> {
@@ -602,16 +541,22 @@ pub struct Param<IdRepr>(pub Type, pub IdRepr);
 ///     Function(
 ///         Type::Int,
 ///         "sum",
-///         vec![WrapSpan("int a", Param(Type::Int, "a")),
-///         WrapSpan("int b", Param(Type::Int, "b")),],
 ///         vec![
-///             WrapSpan("return a + b", Stat::Return(WrapSpan("a + b", Expr::BinOp(
-///                 box WrapSpan("a", Expr::Var("a")),
-///                 BinOp::Add,
-///                 box (WrapSpan("b", Expr::Var("b")),
-///             ))))
-///         ]
-///     )
+///             WrapSpan("int a", Param(Type::Int, "a")),
+///             WrapSpan("int b", Param(Type::Int, "b")),
+///         ],
+///         vec![WrapSpan(
+///             "return a + b",
+///             Stat::Return(WrapSpan(
+///                 "a + b",
+///                 Expr::BinOp(
+///                     box WrapSpan("a", Expr::Var("a")),
+///                     BinOp::Add,
+///                     box WrapSpan("b", Expr::Var("b")),
+///                 ),
+///             )),
+///         )],
+///     ),
 /// )
 /// ```
 #[derive(Debug, PartialEq, Eq)]

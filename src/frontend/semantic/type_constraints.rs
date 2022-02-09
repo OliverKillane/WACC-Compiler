@@ -1,11 +1,7 @@
-//! The type constraint struct can be used to do type checking over operators,
-//! and allow type coercion. A list of constraining types are given, and types
-//! can be matched against the constraint.
+//! A module containing functions for checking type coercions are valid, as
+//! well as binary and unary operations.
 //!
-//! ```
-//! assert_eq!(TypeConstraint::new(Type::Int).inside(Type::char), false)
-//! assert_eq!(TypeConstraint::new(Type::Array(box Type::Any, 1)).inside(Type::array(box Type::char, 2)), true)
-//!```
+//! The module is intended
 
 use std::collections::HashMap;
 
@@ -53,6 +49,7 @@ lazy_static! {
         (BinOp::Newpair, Type::Pair(box Type::Generic(0), box Type::Generic(1)), Type::Generic(0), Type::Generic(1)),
     ];
 }
+
 /// Traverse through types until a match or not can be discerned. If generic is
 /// used, generic matches will result in new concrete types for the generic.
 ///
@@ -225,6 +222,12 @@ pub fn unop_match(unop: &UnOp, expr_type: &Type) -> Result<Type, (Vec<Type>, Vec
 /// Given a type returns:
 /// - The de-indexed type (dimension reduced by dim)
 /// - None signifies that the type could not be deindexed
+///
+/// e.g
+/// ```text
+/// int[][] a = [b,c,d];
+/// a[1][2] = 9; # De-Index by 2, and the types are still valid.
+/// ```
 pub fn de_index(t: &Type, dim: usize) -> Option<Type> {
     match t {
         Type::Array(box t_inner, n) => {

@@ -25,8 +25,10 @@ pub enum SemanticError<'a> {
     /// Invalid type for expression
     /// (span of expression, expected type, found type)
     ///
-    /// e.g a: int
-    /// a[0] <- invalid variable type
+    /// ```text
+    /// int a = 4;
+    /// int b = a[0] # invalid variable type for a, needs to be an Any[]
+    /// ```
     InvalidVariableType(&'a str, Type, Type),
 
     /// Invalid type for expression
