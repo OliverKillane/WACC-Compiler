@@ -1,20 +1,23 @@
+//! Contains formatting logic for colouring, highlighting messages and adding 
+//! arrows, taking into account unicode variable length encodings.
+
 use super::prelude::*;
 use super::span_utils::*;
 
 use colored::{control::SHOULD_COLORIZE, Color, Colorize};
 use nom::combinator::fail;
-use std::io::LineWriter;
-use std::iter::zip;
-use std::ops::Add;
 use std::{
     cmp::{max, min},
     collections::{HashMap, LinkedList},
     fmt::{Display, Write},
+    io::LineWriter,
+    iter::zip,
+    ops::Add,
 };
 use unicode_width::UnicodeWidthChar;
 
 impl SummaryType {
-    /// Produces a color for a summary type. Not implemented as Into not to
+    /// Produces a color for a summary type. Not implemented as Into as to not
     /// make the function public.
     fn color(&self) -> Color {
         match self {
@@ -589,6 +592,7 @@ impl<'l> SummaryCell<'l> {
 
 static DEFAULT_SUMMARY_WIDTH: usize = 80;
 static MAIN_HEADER_COLOR: Color = Color::Cyan;
+
 impl<'l> Display for Summary<'l> {
     /// Produces a string for the entire summary.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

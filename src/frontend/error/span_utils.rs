@@ -1,6 +1,9 @@
+//! Contains utility functions for determining the placement of spans within 
+//! the original source code string.
+
 use std::{cmp::min, slice::SliceIndex};
 
-/// Returns the range of the indicies of the span within the input string, provided
+/// Returns the range of the indices of the span within the input string, provided
 /// the span starts somewhere within the input string.
 pub(super) fn get_relative_range(input: &str, span: &str) -> Option<(usize, usize)> {
     let input_begin = input.as_ptr() as usize;
@@ -45,7 +48,7 @@ impl<'l> SpanLocator<'l> {
         }
     }
 
-    /// Calculates the range of the indicies of the span within the input string,
+    /// Calculates the range of the indices of the span within the input string,
     /// provided the span starts somewhere within the input string.
     pub fn get_range(&self, span: &str) -> Option<(usize, usize)> {
         get_relative_range(self.input, span)
