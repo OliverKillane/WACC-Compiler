@@ -1,4 +1,4 @@
-//! Contains formatting logic for colouring, highlighting messages and adding 
+//! Contains formatting logic for colouring, highlighting messages and adding
 //! arrows, taking into account unicode variable length encodings.
 
 use super::prelude::*;

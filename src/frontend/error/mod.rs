@@ -1,6 +1,6 @@
 //! Error display and formatting.
-//! 
-//! All errors thrown by the parser and semantic analyser are displayed in a 
+//!
+//! All errors thrown by the parser and semantic analyser are displayed in a
 //! consistent style highly reminiscent of Rust's own error messages.
 //! - Can display multiple errors as highlighted sections of a statement.
 //! - Can display arrows from errors to descriptions

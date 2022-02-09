@@ -1,10 +1,10 @@
-//! Provides the interface for the error system, including all functions 
+//! Provides the interface for the error system, including all functions
 //! required to build up summary components and summary cells.
-//! 
+//!
 //! Builder-like pattern use to construct error messages for printing.
 
-use std::collections::LinkedList;
 use super::span_utils::get_relative_range;
+use std::collections::LinkedList;
 
 /// Summary type for the [error cell component](SummaryComponent).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

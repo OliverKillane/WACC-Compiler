@@ -1,4 +1,4 @@
-//! Contains utility functions for determining the placement of spans within 
+//! Contains utility functions for determining the placement of spans within
 //! the original source code string.
 
 use std::{cmp::min, slice::SliceIndex};
