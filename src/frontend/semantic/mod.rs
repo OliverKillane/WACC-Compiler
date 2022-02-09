@@ -101,7 +101,7 @@ pub fn analyse_semantics<'a>(
     // analyse main code block
     let mut main_var_symb = VariableSymbolTable::new();
     let mut main_errors = Vec::with_capacity(0);
-    
+
     match analyse_block(
         main_block,
         &fun_symb,

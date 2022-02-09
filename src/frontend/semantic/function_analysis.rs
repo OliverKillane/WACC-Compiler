@@ -39,14 +39,13 @@ pub fn analyse_function<'a, 'b>(
         }
     }
 
-
     match analyse_block(
         block,
         fun_symb,
         &mut LocalSymbolTable::new_child(&local_symb),
         &mut var_symb,
         &Some(ret_type.clone()),
-        &mut errors
+        &mut errors,
     ) {
         Some((block_ast, terminated)) => {
             if !terminated {

@@ -898,8 +898,17 @@ mod tests {
 
     #[test]
     fn can_coerce_does_not_match_incorrect_coercions() {
-        assert_eq!(can_coerce(&Type::Array(box Type::Char, 1), &Type::String), false);
-        assert_eq!(can_coerce(&Type::Array(box Type::Char, 2), &Type::Array(box Type::Char, 3)), false);
+        assert_eq!(
+            can_coerce(&Type::Array(box Type::Char, 1), &Type::String),
+            false
+        );
+        assert_eq!(
+            can_coerce(
+                &Type::Array(box Type::Char, 2),
+                &Type::Array(box Type::Char, 3)
+            ),
+            false
+        );
     }
 
     #[test]
