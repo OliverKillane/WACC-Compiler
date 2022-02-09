@@ -243,6 +243,8 @@ fn parse_rhs(input: &str) -> IResult<&str, AssignRhs<&str>, ErrorTree<&str>> {
     );
     alt((
         map(call, |(id, es)| AssignRhs::Call(id, es)),
+        map(span(preceded(ws(tag("fst")), parse_expr)), |WrapSpan(s, e)| AssignRhs::Expr(WrapSpan(s, Expr::UnOp(UnOp::Fst, box e)))),
+        map(span(preceded(ws(tag("snd")), parse_expr)), |WrapSpan(s, e)| AssignRhs::Expr(WrapSpan(s, Expr::UnOp(UnOp::Snd, box e)))),
         map(parse_expr, AssignRhs::Expr),
         map(array_liter, AssignRhs::Array),
     ))(input)
@@ -379,8 +381,6 @@ fn parse_unary(op: &str) -> UnOp {
         "len" => UnOp::Len,
         "ord" => UnOp::Ord,
         "chr" => UnOp::Chr,
-        "fst" => UnOp::Fst,
-        "snd" => UnOp::Snd,
         _ => unreachable!(),
     }
 }
