@@ -130,6 +130,7 @@ fn type_match(
             }
         }
 
+        (Type::String, Type::Array(box Type::Char, 1)) => Ok(Type::String),
         // Primitive types must be equal
         (a, b) => {
             if a == b {
