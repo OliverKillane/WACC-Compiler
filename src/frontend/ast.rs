@@ -469,7 +469,7 @@ pub enum AssignRhs<'a, IdRepr> {
     /// ```text
     /// int[] int_arr = [2, 3 + 3, 4 * 7, 0] ;
     /// ```
-    Array(Vec<ExprSpan<'a, IdRepr>>),
+    Array(ArraySpan<'a, IdRepr>),
 
     /// Assign the return value of a function, with arguments.
     /// ```text
@@ -481,6 +481,8 @@ pub enum AssignRhs<'a, IdRepr> {
     /// ```
     Call(&'a str, Vec<ExprSpan<'a, IdRepr>>),
 }
+
+type ArraySpan<'a, IdRepr> = WrapSpan<'a, Vec<ExprSpan<'a, IdRepr>>>;
 
 /// Statements for assignment, control flow and definitions.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
