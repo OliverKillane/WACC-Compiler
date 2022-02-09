@@ -442,8 +442,6 @@ fn parse_unary(op: &str) -> UnOp {
         "len" => UnOp::Len,
         "ord" => UnOp::Ord,
         "chr" => UnOp::Chr,
-        "fst" => UnOp::Fst,
-        "snd" => UnOp::Snd,
         _ => unreachable!(),
     }
 }
