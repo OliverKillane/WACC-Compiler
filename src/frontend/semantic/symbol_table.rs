@@ -8,16 +8,18 @@
 //! renamed identifiers and the types.
 
 use super::{
-    super::ast::{Function, Param, Type, WrapSpan},
-    semantic_errors::SemanticError,
+    super::ast::{FunSpan, Function, Param, Type, WrapSpan},
+    semantic_errors::{SemanticError, StatementErrors},
 };
 
 use std::collections::HashMap;
 
+type FunctionType<'a> = (Type, Vec<(&'a str, Type)>);
+
 /// Function symbol table, holds the globally accessible functions identifier
 /// (string references) and the types and names of parameters
 #[derive(Debug, PartialEq, Eq)]
-pub struct FunctionSymbolTable<'a>(HashMap<&'a str, (Type, Vec<(&'a str, Type)>)>);
+pub struct FunctionSymbolTable<'a>(HashMap<&'a str, FunctionType<'a>>);
 
 impl<'a> FunctionSymbolTable<'a> {
     pub fn new() -> Self {
@@ -32,10 +34,7 @@ impl<'a> FunctionSymbolTable<'a> {
 
     /// Get the type of a given function by its identifier.
     pub fn get_fun(&self, ident: &str) -> Option<(Type, Vec<(&'a str, Type)>)> {
-        match self.0.get(ident) {
-            Some(fun_type) => Some(fun_type.clone()),
-            None => None,
-        }
+        self.0.get(ident).cloned()
     }
 }
 
@@ -75,16 +74,15 @@ impl VariableSymbolTable {
         ident: &'a str,
         local: &LocalSymbolTable<'a, 'b>,
     ) -> Option<(usize, Type)> {
-        match local.get_var(ident) {
-            Some((id, _)) => Some((
+        local.get_var(ident).map(|(id, _)| {
+            (
                 id,
                 self.0
                     .get(&id)
                     .expect("Failure: symbol in local table but not global.")
                     .clone(),
-            )),
-            None => None,
-        }
+            )
+        })
     }
 }
 
@@ -119,7 +117,7 @@ impl<'a, 'b> LocalSymbolTable<'a, 'b> {
     pub fn new_child(parent: &'b LocalSymbolTable<'a, 'b>) -> Self {
         LocalSymbolTable {
             current: HashMap::new(),
-            parent: Some(&parent),
+            parent: Some(parent),
         }
     }
 
@@ -138,7 +136,7 @@ impl<'a, 'b> LocalSymbolTable<'a, 'b> {
     /// Should only be called once it has been established the variable is not
     /// yet defined.
     pub fn add_var(&mut self, ident: &'a str, id: usize, span: &'a str) {
-        if let Some(_) = self.current.insert(ident, (id, span)) {
+        if self.current.insert(ident, (id, span)).is_some() {
             panic!("Repeat add of variable to local symbol table.")
         }
     }
@@ -175,8 +173,8 @@ pub fn get_fn_symbols<'a>(
     fn_defs: Vec<WrapSpan<'a, Function<'a, &'a str>>>,
 ) -> (
     FunctionSymbolTable,
-    Vec<WrapSpan<'a, Function<'a, &'a str>>>,
-    Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>,
+    Vec<FunSpan<'a, &'a str>>,
+    Vec<StatementErrors<'a>>,
 ) {
     let mut fun_symb = FunctionSymbolTable::new();
     let mut def_table: HashMap<&str, &str> = HashMap::new();

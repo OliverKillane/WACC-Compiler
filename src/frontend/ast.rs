@@ -567,11 +567,10 @@ pub struct Function<'a, IdRepr>(
     pub Vec<StatSpan<'a, IdRepr>>,
 );
 
+pub type FunSpan<'a, IdRepr> = WrapSpan<'a, Function<'a, IdRepr>>;
+
 /// Program is the root of the abstract syntax tree, containing all function
 /// definitions and the main program body, with all nested structures being
 /// associated with the original source code by [wrappers](WrapSpan).
 #[derive(Debug)]
-pub struct Program<'a, IdRepr>(
-    pub Vec<WrapSpan<'a, Function<'a, IdRepr>>>,
-    pub Vec<StatSpan<'a, IdRepr>>,
-);
+pub struct Program<'a, IdRepr>(pub Vec<FunSpan<'a, IdRepr>>, pub Vec<StatSpan<'a, IdRepr>>);

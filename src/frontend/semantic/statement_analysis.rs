@@ -203,29 +203,23 @@ pub fn analyse_block<'a, 'b>(
                         }
                     };
 
-                let if_block = match analyse_block(
+                let if_block = analyse_block(
                     if_block,
                     fun_symb,
                     &mut LocalSymbolTable::new_child(local_symb),
                     var_symb,
                     ret_type,
                     errors,
-                ) {
-                    Some((block_ast, block_terminated)) => Some((block_ast, block_terminated)),
-                    None => None,
-                };
+                );
 
-                let else_block = match analyse_block(
+                let else_block = analyse_block(
                     else_block,
                     fun_symb,
                     &mut LocalSymbolTable::new_child(local_symb),
                     var_symb,
                     ret_type,
                     errors,
-                ) {
-                    Some((block_ast, block_terminated)) => Some((block_ast, block_terminated)),
-                    None => None,
-                };
+                );
 
                 if let (
                     Some(cond_ast),
@@ -293,7 +287,7 @@ pub fn analyse_block<'a, 'b>(
 
     // Only if no errors have occurred in analysis (in this block or any other in
     // the same function), do we return a correct.
-    if errors.len() == 0 {
+    if errors.is_empty() {
         Some((correct, terminated))
     } else {
         None
@@ -437,7 +431,7 @@ fn analyse_rhs<'a, 'b>(
                         }
                     }
 
-                    if errors.len() == 0 {
+                    if errors.is_empty() {
                         Some(AssignRhs::Call(fun_name, correct))
                     } else {
                         None

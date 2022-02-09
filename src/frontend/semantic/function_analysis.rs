@@ -13,25 +13,25 @@
 
 use super::{
     super::ast::{Function, Param, WrapSpan},
-    semantic_errors::SemanticError,
+    semantic_errors::{SemanticError, StatementErrors},
     statement_analysis::analyse_block,
     symbol_table::{FunctionSymbolTable, LocalSymbolTable, VariableSymbolTable},
 };
+
+type FunctionErrors<'a> = (&'a str, Vec<StatementErrors<'a>>);
+type FunctionAnalysis<'a> = (WrapSpan<'a, Function<'a, usize>>, VariableSymbolTable);
 
 /// Determine if there are any semantic errors in a function:
 /// - If correct, return a renamed ast and update the variable symbol table
 /// - If incorrect return function  name and the statements with errors
 ///   attached.
-pub fn analyse_function<'a, 'b>(
+pub fn analyse_function<'a>(
     WrapSpan(def_span, Function(ret_type, name, parameters, block)): WrapSpan<
         'a,
         Function<'a, &'a str>,
     >,
     fun_symb: &FunctionSymbolTable<'a>,
-) -> Result<
-    (WrapSpan<'a, Function<'a, usize>>, VariableSymbolTable),
-    (&'a str, Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>),
-> {
+) -> Result<FunctionAnalysis<'a>, FunctionErrors<'a>> {
     let mut var_symb = VariableSymbolTable::new();
     let mut function_errors = Vec::with_capacity(0);
     let mut param_correct = Vec::with_capacity(0);
@@ -61,7 +61,7 @@ pub fn analyse_function<'a, 'b>(
                 function_errors.push(SemanticError::FunctionNoReturnOrExit(name))
             }
 
-            if function_errors.len() == 0 {
+            if function_errors.is_empty() {
                 Ok((
                     WrapSpan(def_span, Function(ret_type, name, param_correct, block_ast)),
                     var_symb,

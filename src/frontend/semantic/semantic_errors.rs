@@ -7,6 +7,8 @@
 
 use super::super::ast::{BinOp, Type, UnOp, WrapSpan};
 
+pub type StatementErrors<'a> = WrapSpan<'a, Vec<SemanticError<'a>>>;
+
 /// Contains all errors which can occur in expressions
 #[derive(Debug, PartialEq, Eq)]
 pub enum SemanticError<'a> {

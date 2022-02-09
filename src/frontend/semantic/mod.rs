@@ -48,12 +48,12 @@ use std::collections::HashMap;
 
 use self::{
     function_analysis::analyse_function,
-    semantic_errors::SemanticError,
+    semantic_errors::{SemanticError, StatementErrors},
     statement_analysis::analyse_block,
     symbol_table::{get_fn_symbols, LocalSymbolTable, VariableSymbolTable},
 };
 
-use super::ast::{Function, Program, StatSpan, WrapSpan};
+use super::ast::{FunSpan, Function, Program, StatSpan, WrapSpan};
 
 /// Analyses a program, either returning a flat variable and function symbol table
 /// and an ast, or a tuple of error (function defs, main body, function errors)
@@ -67,17 +67,19 @@ use super::ast::{Function, Program, StatSpan, WrapSpan};
 /// - Vector of semantic errors in function definitions
 /// - Vector of semantic errors in main program block
 /// - Vector of (function name, vector of semantic errors)
+#[allow(clippy::type_complexity)]
 pub fn analyse_semantics<'a>(
     Program(fn_defs, main_block): Program<'a, &'a str>,
 ) -> Result<
     (
-        (Vec<StatSpan<'a, usize>>, VariableSymbolTable),
-        HashMap<&'a str, (WrapSpan<'a, Function<'a, usize>>, VariableSymbolTable)>,
+        Vec<StatSpan<'a, usize>>,
+        VariableSymbolTable,
+        HashMap<&'a str, (FunSpan<'a, usize>, VariableSymbolTable)>,
     ),
     (
-        Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>,
-        Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>,
-        Vec<(&str, Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>)>,
+        Vec<StatementErrors<'a>>,
+        Vec<StatementErrors<'a>>,
+        Vec<(&str, Vec<StatementErrors<'a>>)>,
     ),
 > {
     // get function definitions
@@ -111,8 +113,8 @@ pub fn analyse_semantics<'a>(
         &mut main_errors,
     ) {
         Some((block_ast, _)) => {
-            if errors.len() == 0 && fun_def_errs.len() == 0 {
-                Ok(((block_ast, main_var_symb), correct))
+            if errors.is_empty() && fun_def_errs.is_empty() {
+                Ok((block_ast, main_var_symb, correct))
             } else {
                 Err((fun_def_errs, vec![], errors))
             }

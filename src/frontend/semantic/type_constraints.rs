@@ -3,7 +3,7 @@
 //!
 //! The module is intended
 
-use std::collections::HashMap;
+use std::{cmp::Ordering, collections::HashMap};
 
 use super::super::ast::{BinOp, GenericId, Type, UnOp};
 
@@ -95,7 +95,7 @@ fn type_match(
 
         // When matched with an any, any generics contained inside must be updated.
         (Type::Array(box a, _), Type::Any) => {
-            type_match(&a, &Type::Any, generics).expect("Any must match anything");
+            type_match(a, &Type::Any, generics).expect("Any must match anything");
             Ok(Type::Any)
         }
 
@@ -111,24 +111,24 @@ fn type_match(
                 (Ok(a1_conc), Ok(a2_conc)) => Ok(Type::Pair(box a1_conc, box a2_conc)),
             }
         }
-        (Type::Array(box a, dim_a), Type::Array(box b, dim_b)) => {
-            if dim_a == dim_b {
-                match type_match(a, b, generics) {
-                    Ok(a_conc) => Ok(Type::Array(box a_conc, *dim_b)),
-                    Err(t) => Err(Type::Array(box t, *dim_a)),
-                }
-            } else if dim_a > dim_b {
-                match type_match(&Type::Array(box a.clone(), dim_a - dim_b), b, generics) {
-                    Ok(a_conc) => Ok(Type::Array(box a_conc, *dim_b)),
-                    Err(t) => Err(Type::Array(box t, *dim_b)),
-                }
-            } else {
+        (Type::Array(box a, dim_a), Type::Array(box b, dim_b)) => match dim_a.cmp(dim_b) {
+            Ordering::Equal => match type_match(a, b, generics) {
+                Ok(a_conc) => Ok(Type::Array(box a_conc, *dim_b)),
+                Err(t) => Err(Type::Array(box t, *dim_a)),
+            },
+            Ordering::Less => {
                 match type_match(a, &Type::Array(box b.clone(), dim_b - dim_a), generics) {
                     Ok(a_conc) => Ok(Type::Array(box a_conc, *dim_a)),
                     Err(t) => Err(Type::Array(box t, *dim_a)),
                 }
             }
-        }
+            Ordering::Greater => {
+                match type_match(&Type::Array(box a.clone(), dim_a - dim_b), b, generics) {
+                    Ok(a_conc) => Ok(Type::Array(box a_conc, *dim_b)),
+                    Err(t) => Err(Type::Array(box t, *dim_b)),
+                }
+            }
+        },
 
         (Type::String, Type::Array(box Type::Char, 1)) => Ok(Type::String),
         // Primitive types must be equal
@@ -147,7 +147,7 @@ fn type_match(
 fn apply_generics(generic_type: &Type, generics: &HashMap<GenericId, Type>) -> Type {
     match generic_type {
         Type::Generic(n) => generics
-            .get(&n)
+            .get(n)
             .expect("Generic was added to the hashmap, and should still be there")
             .clone(),
         Type::Pair(box a, box b) => Type::Pair(
@@ -159,6 +159,8 @@ fn apply_generics(generic_type: &Type, generics: &HashMap<GenericId, Type>) -> T
     }
 }
 
+type PossibleTypes = Vec<(Type, Type)>;
+
 /// Match a binary operator and two input types.
 /// - On success, return the output type
 /// - On failure output the potential input types for the operator, and
@@ -167,7 +169,7 @@ pub fn binop_match(
     binop: &BinOp,
     left_type: &Type,
     right_type: &Type,
-) -> Result<Type, (Vec<(Type, Type)>, Vec<&'static BinOp>)> {
+) -> Result<Type, (PossibleTypes, Vec<&'static BinOp>)> {
     let mut generics = HashMap::with_capacity(0);
     let mut possible_types = Vec::new();
     let mut possible_binops = Vec::new();
@@ -182,14 +184,10 @@ pub fn binop_match(
                 (Ok(_), Ok(_)) => return Ok(apply_generics(output, &generics)),
                 _ => possible_types.push((left.clone(), right.clone())),
             };
-        } else {
-            match (
-                type_match(left, left_type, &mut generics),
-                type_match(right, right_type, &mut generics),
-            ) {
-                (Ok(_), Ok(_)) => possible_binops.push(op),
-                _ => (),
-            }
+        } else if type_match(left, left_type, &mut generics).is_ok()
+            && type_match(right, right_type, &mut generics).is_ok()
+        {
+            possible_binops.push(op)
         }
     }
     Err((possible_types, possible_binops))
@@ -210,11 +208,8 @@ pub fn unop_match(unop: &UnOp, expr_type: &Type) -> Result<Type, (Vec<Type>, Vec
                 Ok(_) => return Ok(apply_generics(out, &generics)),
                 Err(t) => possible_types.push(t),
             }
-        } else {
-            match type_match(input, expr_type, &mut generics) {
-                Ok(_) => possible_unops.push(op),
-                _ => (),
-            }
+        } else if type_match(input, expr_type, &mut generics).is_ok() {
+            possible_unops.push(op)
         }
     }
     Err((possible_types, possible_unops))
@@ -231,15 +226,11 @@ pub fn unop_match(unop: &UnOp, expr_type: &Type) -> Result<Type, (Vec<Type>, Vec
 /// ```
 pub fn de_index(t: &Type, dim: usize) -> Option<Type> {
     match t {
-        Type::Array(box t_inner, n) => {
-            if *n == dim {
-                Some(t_inner.clone())
-            } else if *n > dim {
-                Some(Type::Array(box t_inner.clone(), n - dim))
-            } else {
-                None
-            }
-        }
+        Type::Array(box t_inner, n) => match n.cmp(&dim) {
+            Ordering::Less => None,
+            Ordering::Equal => Some(t_inner.clone()),
+            Ordering::Greater => Some(Type::Array(box t_inner.clone(), n - dim)),
+        },
         _ => None,
     }
 }
@@ -253,15 +244,11 @@ pub fn can_coerce(main_type: &Type, into_type: &Type) -> bool {
         (Type::Pair(box a1, box a2), Type::Pair(box b1, box b2)) => {
             can_coerce(a1, b1) && can_coerce(a2, b2)
         }
-        (Type::Array(box a, dim_a), Type::Array(box b, dim_b)) => {
-            if dim_a == dim_b {
-                can_coerce(a, b)
-            } else if dim_a > dim_b {
-                can_coerce(&Type::Array(box a.clone(), dim_a - dim_b), b)
-            } else {
-                can_coerce(a, &Type::Array(box b.clone(), dim_b - dim_a))
-            }
-        }
+        (Type::Array(box a, dim_a), Type::Array(box b, dim_b)) => match dim_a.cmp(dim_b) {
+            Ordering::Less => can_coerce(a, &Type::Array(box b.clone(), dim_b - dim_a)),
+            Ordering::Equal => can_coerce(a, b),
+            Ordering::Greater => can_coerce(&Type::Array(box a.clone(), dim_a - dim_b), b),
+        },
         (a, b) => a == b,
     }
 }
