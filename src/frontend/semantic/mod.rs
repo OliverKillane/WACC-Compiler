@@ -98,22 +98,25 @@ pub fn analyse_semantics<'a>(
         }
     }
 
-    let mut main_var_symb = VariableSymbolTable::new();
     // analyse main code block
+    let mut main_var_symb = VariableSymbolTable::new();
+    let mut main_errors = Vec::with_capacity(0);
+    
     match analyse_block(
         main_block,
         &fun_symb,
         &mut LocalSymbolTable::new_root(),
         &mut main_var_symb,
         &None,
+        &mut main_errors,
     ) {
-        Ok((block_ast, _)) => {
+        Some((block_ast, _)) => {
             if errors.len() == 0 && fun_def_errs.len() == 0 {
                 Ok(((block_ast, main_var_symb), correct))
             } else {
                 Err((fun_def_errs, vec![], errors))
             }
         }
-        Err(main_errs) => Err((fun_def_errs, main_errs, errors)),
+        None => Err((fun_def_errs, main_errors, errors)),
     }
 }

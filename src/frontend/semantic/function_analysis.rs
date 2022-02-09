@@ -24,8 +24,9 @@ pub fn analyse_function<'a, 'b>(
     (&'a str, Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>),
 > {
     let mut var_symb = VariableSymbolTable::new();
-    let mut param_errors = Vec::new();
-    let mut param_correct = Vec::new();
+    let mut function_errors = Vec::with_capacity(0);
+    let mut param_correct = Vec::with_capacity(0);
+    let mut errors = Vec::with_capacity(0);
 
     // create a new local symbol table at the top of the scope
     let mut local_symb = LocalSymbolTable::new_root();
@@ -34,9 +35,10 @@ pub fn analyse_function<'a, 'b>(
     for WrapSpan(param_span, Param(param_type, param_name)) in parameters {
         match var_symb.def_var(param_name, &param_type, param_span, &mut local_symb) {
             Ok(rename) => param_correct.push(WrapSpan(param_span, Param(param_type, rename))),
-            Err(err) => param_errors.push(err),
+            Err(err) => function_errors.push(err),
         }
     }
+
 
     match analyse_block(
         block,
@@ -44,24 +46,25 @@ pub fn analyse_function<'a, 'b>(
         &mut LocalSymbolTable::new_child(&local_symb),
         &mut var_symb,
         &Some(ret_type.clone()),
+        &mut errors
     ) {
-        Ok((block_ast, terminated)) => {
+        Some((block_ast, terminated)) => {
             if !terminated {
-                param_errors.push(SemanticError::FunctionNoReturnOrExit(name))
+                function_errors.push(SemanticError::FunctionNoReturnOrExit(name))
             }
 
-            if param_errors.len() == 0 {
+            if function_errors.len() == 0 {
                 Ok((
                     WrapSpan(def_span, Function(ret_type, name, param_correct, block_ast)),
                     var_symb,
                 ))
             } else {
-                Err((name, vec![WrapSpan(def_span, param_errors)]))
+                Err((name, vec![WrapSpan(def_span, function_errors)]))
             }
         }
-        Err(mut errs) => {
-            errs.push(WrapSpan(def_span, param_errors));
-            Err((name, errs))
+        None => {
+            errors.push(WrapSpan(def_span, function_errors));
+            Err((name, errors))
         }
     }
 }

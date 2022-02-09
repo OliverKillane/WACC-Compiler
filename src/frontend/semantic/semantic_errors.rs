@@ -39,13 +39,12 @@ pub enum SemanticError<'a> {
 
     /// Invalid array literal (when an array literal is assigned to a non array
     /// type).
-    /// int a = [1,2,3,4]
-    InvalidArrayLiteral(Vec<&'a str>),
+    /// (span of literal, found types)
+    InvalidArrayLiteral(&'a str, Vec<Type>),
 
     /// A binary operator is applied incorrectly
-    /// (span of the left, span of right, possible input types, possible operators, found types, found operator)
+    /// (span of binary op, possible input types, possible operators, found types, found operator)
     InvalidBinOp(
-        &'a str,
         &'a str,
         Vec<(Type, Type)>,
         Vec<&'static BinOp>,
