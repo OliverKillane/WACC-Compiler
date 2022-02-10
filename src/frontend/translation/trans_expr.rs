@@ -8,7 +8,10 @@ use super::super::super::intermediate::Expr as IRExpr;
 use super::super::ast::{Expr, ExprSpan, UnOp, WrapSpan};
 
 /// usize -> &'a str
-pub fn translate_expr<'a>(WrapSpan(_, ast_expr): ExprSpan<'a, usize>, var_symb: &VariableSymbolTable) -> IRExpr {
+pub fn translate_expr<'a>(
+    WrapSpan(_, ast_expr): ExprSpan<'a, usize>,
+    var_symb: &VariableSymbolTable,
+) -> IRExpr {
     match ast_expr {
         // pair literal 'null' - maybe define null as PtrExpr in IR?
         Expr::Null => Ptr(PtrExpr::Null),
@@ -52,7 +55,11 @@ pub fn translate_expr<'a>(WrapSpan(_, ast_expr): ExprSpan<'a, usize>, var_symb: 
         },
 
         Expr::BinOp(box e1, o, box e2) => {
-            match (translate_expr(e1, var_symb), o, translate_expr(e2, var_symb)) {
+            match (
+                translate_expr(e1, var_symb),
+                o,
+                translate_expr(e2, var_symb),
+            ) {
                 (Num(n1), ast::BinOp::Add, Num(n2)) => {
                     Num(NumExpr::ArithOp(box n1, ArithOp::Add, box n2))
                 }
