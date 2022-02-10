@@ -4,6 +4,33 @@
 //! As a function not returning or exiting is a syntax error, we must separate
 //! the FunctionNoExitOrReturn semanticError from the others and report as a
 //! syntax error
+//!
+//! ## The errors reported are as follows:
+//! | Error Type                         | Summary Code | Description                                                                                                                               |
+//! |------------------------------------|--------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+//! | Undefined Variable Assigned To     | 201          | Variable was not defined, but a value was assigned to it                                                                                  |
+//! | Undefined Variable Used            | 202          | A variable was used in an expression or other statement                                                                                   |
+//! | Invalid Index Invalid              | 203          | Can only index arrays with integers, e.g `a[true]` throws this error                                                                      |
+//! | Invalid Variable Type              | 204          | The type of a varible used is not correct, for example in array indexing, e.g `int a = 8; a[7] = 9`                                       |
+//! | Invalid Type                       | 205          | The type of an expression is wrong or cannot be coerced to the expected, e.g `bool a = 3 + 3`                                             |
+//! | Invalid Call Type                  | 206          | An invalid type, but from a function call, e.g where `int fun(int a)` an error is thrown on `bool a = call fun(9)`                        |
+//! | Invalid Array Literal              | 207          | An array literal's elements are not the same type, e.g `[1,2,3,true]`                                                                     |
+//! | Invalid Binary Operation           | 208          | A binary operation is not well typed, e.g `true + 3` or `'c' \|\| 'a'`                                                                    |
+//! | Invalid Unary Operation            | 209          | A unary operation is not well typed, e.g `-true` or `ord 9`                                                                               |
+//! | Repeat Definition of Variable      | 210          | A variable definition is repeated in the same scope, e.g `int a = 3; bool a = true`                                                       |
+//! | Undefined Function                 | 211          | A call is made to an undefined function, e.g `int a = call undefined_fun(99)`                                                             |
+//! | Repeat Definition of Function      | 212          | A function name is used in two definitions, e.g `int fun1(int a) ... char fun1(bool b)`                                                   |
+//! | Function Parameter Length Mismatch | 213          | A function is provided an incorrect number of arguments, e.g `int fun1(int a) ... int a = call fun1(3,true)`                              |
+//! | Function Argument Type Invalid     | 214          | A function call has the correct number of arguments, but some of their types are wrong, e.g `int fun1(int a) ... int b = call fun1(true)` |
+//! | Invalid Function Return            | 215          | A function's return returns the wrong type, e.g `int fun1(int a) is ... return true end`                                                  |
+//! | Function No Return Or Exit         | 199          | A function has a control flow path that does not return or exit. This is a syntax error.                                                  |
+//! | Read Statement Mismatch            | 216          | The read statement is given an identifier/left assignment that is not a char or int, e.g `string a = "hey" ; read a`                      |
+//! | Free Statement Mismatch            | 217          | The free statement is given an identifier/left assignment that is not an array or pair, e.g `int a = 9 ; free a`                          |
+//! | Exit Statement Mismatch            | 218          | The exit statement is given a value that is not an integer, e.g `exit "hello"`                                                            |
+//! | Print Statement Mismatch           | 219          | A print statement is given the wrong type, currently all types can be printed, so this is here for future extension.                      |
+//! | Invalid If Condition               | 220          | The condition for an if statement is not a boolean, e.g `if (9 + 9) ...`                                                                  |
+//! | Invalid While Condition            | 221          | The condition for a while statement is not a boolean, e.g `while (9+9) ...`                                                               |
+//! | Return Statement Misplaced         | 222          | There is a return statement in the main program body, returns are only allowed in functions.                                              |
 
 use super::{
     super::{
@@ -49,7 +76,8 @@ pub fn convert_errors<'a>(
     (semantic_errs, syntax_errs)
 }
 
-/// 
+/// Generates an error cell for each statement in the vector of [statement errors](StatementErrors)
+/// and splits the syntax and semantic errors into different cells.
 fn create_cells<'a>(
     title: String,
     statements: Vec<StatementErrors<'a>>,
@@ -57,17 +85,16 @@ fn create_cells<'a>(
     syntax_errs: &mut Vec<SummaryCell<'a>>,
 ) {
     for WrapSpan(span, errs) in statements {
-        let (syn, sem): (Vec<SemanticError>, Vec<SemanticError>) =
-            errs.into_iter().partition(|err| {
-                matches!(err, SemanticError::FunctionNoReturnOrExit(_))
-            });
+        let (syn, sem): (Vec<SemanticError>, Vec<SemanticError>) = errs
+            .into_iter()
+            .partition(|err| matches!(err, SemanticError::FunctionNoReturnOrExit(_)));
 
         if !syn.is_empty() {
             let mut syntax_cell = SummaryCell::new(span);
             syntax_cell.set_title(title.clone());
 
             for err in syn {
-                syntax_cell.add_component(err.get_component());
+                syntax_cell.add_component(err.into());
             }
             syntax_errs.push(syntax_cell)
         }
@@ -77,15 +104,17 @@ fn create_cells<'a>(
             semantic_cell.set_title(title.clone());
 
             for err in sem {
-                semantic_cell.add_component(err.get_component());
+                semantic_cell.add_component(err.into());
             }
             semantic_errs.push(semantic_cell)
         }
     }
 }
 
-impl<'a> SemanticError<'a> {
-    fn get_component(self) -> SummaryComponent<'a> {
+#[allow(clippy::from_over_into)]
+impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
+    /// Convert semantic errors into summary components.
+    fn into(self) -> SummaryComponent<'a> {
         match self {
             SemanticError::UndefinedVariableAssignment(var_span) =>
                 SummaryComponent::new(
@@ -258,14 +287,14 @@ impl<'a> SemanticError<'a> {
             SemanticError::InvalidWhileCondition(cond_span, found) =>
                 SummaryComponent::new(
                     SummaryType::Error,
-                    220,
+                    221,
                     cond_span,
                     format!("While loop condition must be a {}, however {} was found.", Type::Bool, found)
                 ),
             SemanticError::ReturnStatementMisplaced(stat_span) =>
                 SummaryComponent::new(
                     SummaryType::Error,
-                    221,
+                    222,
                     stat_span,
                     String::from("Cannot have a return here!")
                 ),
@@ -274,6 +303,7 @@ impl<'a> SemanticError<'a> {
 }
 
 impl Display for BinOp {
+    /// Formatting for binary operators to display in the error summaries.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -299,6 +329,7 @@ impl Display for BinOp {
 }
 
 impl Display for UnOp {
+    /// Formatting for unary operators to display in the error summaries.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -317,6 +348,7 @@ impl Display for UnOp {
 }
 
 impl Display for Type {
+    /// Formatting for types to display in the error summaries.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Type::Int => write!(f, "int"),
@@ -333,6 +365,7 @@ impl Display for Type {
     }
 }
 
+/// Generates the alphabetical names for generics based of their identifier.
 fn generic_to_alpha(n: GenericId) -> String {
     let mut val = n;
     let mut result = String::new();

@@ -71,9 +71,8 @@ use super::{
 ///   variable symbol table
 ///
 /// On Failure Returns:
-/// - Vector of semantic errors in function definitions
-/// - Vector of semantic errors in main program block
-/// - Vector of (function name, vector of semantic errors)
+/// - Vector of semantic error summary cells
+/// - Vector of syntax error summary cells
 #[allow(clippy::type_complexity)]
 pub fn analyse_semantics<'a>(
     Program(fn_defs, main_block): Program<'a, &'a str>,
