@@ -282,7 +282,7 @@ fn parse_rhs(input: &str) -> IResult<&str, AssignRhs<&str>, ErrorTree<&str>> {
             |WrapSpan(s, e)| AssignRhs::Expr(WrapSpan(s, Expr::UnOp(UnOp::Snd, box e))),
         ),
         map(parse_expr, AssignRhs::Expr),
-        map(array_liter, AssignRhs::Array),
+        map(span(array_liter), AssignRhs::Array),
     ))(input)
 }
 
