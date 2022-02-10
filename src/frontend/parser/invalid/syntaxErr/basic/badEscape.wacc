@@ -1,0 +1,13 @@
+# program has unacceptable escape character
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+begin
+  char a = '\H'
+end

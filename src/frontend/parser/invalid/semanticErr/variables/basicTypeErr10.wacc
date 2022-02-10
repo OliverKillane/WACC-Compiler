@@ -1,0 +1,13 @@
+# type mismatch: string <- int
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  string s = 128
+end

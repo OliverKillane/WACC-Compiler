@@ -1,0 +1,15 @@
+# program performs boolean operations on arrays
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  int[] x = [1,2];
+  int[] y = [3,4];
+  println x > y
+end

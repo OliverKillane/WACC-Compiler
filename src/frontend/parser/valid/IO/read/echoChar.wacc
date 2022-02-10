@@ -1,0 +1,15 @@
+# echo the user's input char
+
+# Output:
+# enter a character to echo
+# #input#
+# #output#
+
+# Program:
+
+begin
+	char c = '\0' ;
+  println "enter a character to echo";
+	read c ;
+	println c 
+end

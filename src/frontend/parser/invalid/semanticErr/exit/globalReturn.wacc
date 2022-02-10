@@ -1,0 +1,14 @@
+# trying to return from the main program
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  return 42 ;
+  println "should not get here" 
+end

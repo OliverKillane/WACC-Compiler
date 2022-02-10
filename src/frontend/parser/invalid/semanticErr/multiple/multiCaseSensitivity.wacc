@@ -1,0 +1,20 @@
+# variable names are case sensitive in all possible ways
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  int number = 42 ;
+  println NUMBER ;
+
+  int INDEX = 0 ;
+  println index ;
+
+  int miXed = 3 ;
+  println MIxED
+end

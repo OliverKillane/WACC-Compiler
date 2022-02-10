@@ -1,0 +1,23 @@
+# trying to call a function in a general expression
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+begin 
+  int f (int x) is
+    return 0
+  end
+  println "init x" ;
+  int x = 2 ;
+  while x > f(x) do
+    println x ;
+    x = x - 1
+  done;
+  println "finshed I guess"
+end
+	

@@ -1,0 +1,17 @@
+# program has function before begin
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+int foo() is
+  return 42
+end
+
+begin
+  int x = call foo()
+end

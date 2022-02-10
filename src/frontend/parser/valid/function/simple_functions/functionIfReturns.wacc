@@ -1,0 +1,22 @@
+# a simple function with nested returns inside an if-statement after a return
+
+# Output:
+# go
+# 1
+
+begin
+    int f() is 
+        println "go";
+        return 1;
+        if true then
+            println "a";
+            return 2
+        else
+            println "b";
+            return 3
+        fi
+    end 
+
+    int ret = call f();
+    println ret
+end

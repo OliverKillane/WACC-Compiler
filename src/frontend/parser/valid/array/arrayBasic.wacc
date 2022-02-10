@@ -1,0 +1,11 @@
+# basic array declaration and assignment
+
+# Output:
+# #empty#
+
+# Program:
+
+begin
+  int[] a = [0]
+end
+

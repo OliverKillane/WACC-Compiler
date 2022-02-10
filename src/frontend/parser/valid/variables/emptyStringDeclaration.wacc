@@ -1,0 +1,10 @@
+# simple empty string variable declaration
+
+# Output:
+# #empty#
+
+# Program:
+
+begin
+  string s = ""
+end
