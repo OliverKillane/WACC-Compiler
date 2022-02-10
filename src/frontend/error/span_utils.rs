@@ -12,7 +12,7 @@ pub(super) fn get_relative_range(input: &str, span: &str) -> Option<(usize, usiz
     let span_begin = span.as_ptr() as usize;
     let span_end = span_begin + span.len();
 
-    if input_begin > span_begin || input_end <= span_begin {
+    if input_begin > span_begin || input_end < span_begin {
         None
     } else {
         Some((
