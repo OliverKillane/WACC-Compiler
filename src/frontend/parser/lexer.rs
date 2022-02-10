@@ -13,6 +13,8 @@ lazy_static! {
     };
 }
 
+const NO_WS_KEYWORDS: [Lexer; 4] = [Lexer::Int, Lexer::Bool, Lexer::Char, Lexer::String];
+
 use core::fmt;
 use nom::{
     branch::alt,
@@ -24,7 +26,7 @@ use nom::{
         },
         is_alphabetic, is_alphanumeric,
     },
-    combinator::{map, map_res, not, opt, recognize, value},
+    combinator::{map, map_res, not, opt, recognize, value, cond},
     error::{context, ParseError},
     multi::{many0, many1, separated_list0, separated_list1},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
@@ -51,6 +53,21 @@ where
     terminated(inner, many0(alt((comments, multispace1))))
 }
 
+// pub fn cond_two_parsers<'a, F1: 'a, F2: 'a, O>(first: bool, inner1: F1, inner2: F2) -> impl FnMut(&'a str) -> IResult<&'a str, O, ErrorTree<&str>>
+// where
+//     F1: FnMut(&'a str) -> IResult<&'a str, O, ErrorTree<&str>>,
+//     F2: FnMut(&'a str) -> IResult<&'a str, O, ErrorTree<&str>>,
+// {
+//     move |input| {
+//         if first {
+//             inner1(input)
+//         } else {
+//             inner2(input)
+//         }
+//     }
+// }
+
+#[derive(PartialEq)]
 pub enum Lexer {
     Fst,
     Snd,
@@ -108,8 +125,8 @@ pub enum Lexer {
 }
 
 impl Lexer {
-    pub fn parser<'a>(&self) -> impl FnMut(&'a str) -> IResult<&'a str, &str, ErrorTree<&str>> {
-        let parser = match self {
+    pub fn parser<'a>(self) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, ErrorTree<&'a str>> + 'a {
+        let parser = match &self {
             Self::Fst => tag("fst"),
             Self::Snd => tag("snd"),
             Self::Int => tag("int"),
@@ -166,7 +183,14 @@ impl Lexer {
             Self::Chr => tag("chr"),
         };
 
-        ws(parser)
+        move |input| {
+            if NO_WS_KEYWORDS.contains(&self) {
+                ws(terminated(parser.clone(), not(parse_ident)))(input)
+                // ws(parser.clone())(input)
+            } else {
+                ws(parser.clone())(input)
+            }
+        }
     }
 }
 

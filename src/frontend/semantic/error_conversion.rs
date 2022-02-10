@@ -31,11 +31,12 @@
 //! | Invalid If Condition               | 220          | The condition for an if statement is not a boolean, e.g `if (9 + 9) ...`                                                                  |
 //! | Invalid While Condition            | 221          | The condition for a while statement is not a boolean, e.g `while (9+9) ...`                                                               |
 //! | Return Statement Misplaced         | 222          | There is a return statement in the main program body, returns are only allowed in functions.                                              |
+//! | InvalidPairOp                      | 223          | Fst or Snd directly applied to null pair literal, e.g `fst null` `snd null`                                                               |
 
 use super::{
     super::{
         ast::{BinOp, GenericId, Type, UnOp, WrapSpan},
-        error::{SummaryCell, SummaryComponent, SummaryType},
+        error::{Summary, SummaryCell, SummaryComponent, SummaryType, SummaryStage},
     },
     semantic_errors::{self, SemanticError, StatementErrors},
 };
@@ -48,9 +49,10 @@ pub fn convert_errors<'a>(
     def_errs: Vec<StatementErrors<'a>>,
     main_errs: Vec<StatementErrors<'a>>,
     fun_errs: Vec<(&str, Vec<StatementErrors<'a>>)>,
-) -> (Vec<SummaryCell<'a>>, Vec<SummaryCell<'a>>) {
-    let mut semantic_errs = Vec::new();
-    let mut syntax_errs = Vec::new();
+    source_code: &'a str,
+) -> Vec<Summary<'a>> {
+    let mut semantic_errs = Summary::new(source_code, SummaryStage::Semantic);
+    let mut syntax_errs = Summary::new(source_code, SummaryStage::Parser);
 
     create_cells(
         String::from("In Function Declarations"),
@@ -73,7 +75,7 @@ pub fn convert_errors<'a>(
         )
     }
 
-    (semantic_errs, syntax_errs)
+    vec![semantic_errs, syntax_errs]
 }
 
 /// Generates an error cell for each statement in the vector of [statement errors](StatementErrors)
@@ -81,8 +83,8 @@ pub fn convert_errors<'a>(
 fn create_cells<'a>(
     title: String,
     statements: Vec<StatementErrors<'a>>,
-    semantic_errs: &mut Vec<SummaryCell<'a>>,
-    syntax_errs: &mut Vec<SummaryCell<'a>>,
+    semantic_errs: &mut Summary<'a>,
+    syntax_errs:&mut Summary<'a>,
 ) {
     for WrapSpan(span, errs) in statements {
         let (syn, sem): (Vec<SemanticError>, Vec<SemanticError>) = errs
@@ -96,7 +98,7 @@ fn create_cells<'a>(
             for err in syn {
                 syntax_cell.add_component(err.into());
             }
-            syntax_errs.push(syntax_cell)
+            syntax_errs.add_cell(syntax_cell);
         }
 
         if !sem.is_empty() {
@@ -106,7 +108,7 @@ fn create_cells<'a>(
             for err in sem {
                 semantic_cell.add_component(err.into());
             }
-            semantic_errs.push(semantic_cell)
+            semantic_errs.add_cell(semantic_cell);
         }
     }
 }
@@ -298,6 +300,12 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                     stat_span,
                     String::from("Cannot have a return here!")
                 ),
+            SemanticError::InvalidPairOp(null_span) => SummaryComponent::new(
+                SummaryType::Error,
+                223,
+                null_span,
+                String::from("Cannot use the fst or snd operators directly on a null, either create a new pair, or assign the null to a variable.")
+            )
         }
     }
 }

@@ -57,6 +57,9 @@ pub enum SemanticError<'a> {
         BinOp,
     ),
 
+    /// Invalid fst or snd application on a null
+    InvalidPairOp(&'a str),
+
     /// Invalid unary operator application
     /// (span of operation, possible types, possible unops, found type, found unop)
     InvalidUnOp(&'a str, Vec<Type>, Vec<&'static UnOp>, Type, UnOp),
