@@ -13,15 +13,16 @@ use nom::{
         },
         is_alphabetic, is_alphanumeric,
     },
-    combinator::{map, map_res, not, opt, recognize, success, value},
+    combinator::{cut, map, map_res, not, opt, recognize, success, value},
     error::{context, ParseError},
     multi::{many0, many1, separated_list0, separated_list1},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
-    IResult,
+    IResult, Parser,
 };
 use nom_supreme::{
     error::{BaseErrorKind, ErrorTree, Expectation, StackContext},
     final_parser::final_parser,
+    multi::collect_separated_terminated,
     tag::complete::tag,
     ParserExt,
 };
@@ -51,10 +52,9 @@ pub fn parse(input: &str) -> Result<Program<&str>, ErrorTree<&str>> {
 
 fn parse_program(input: &str) -> IResult<&str, Program<&str>, ErrorTree<&str>> {
     map(
-        delimited(
+        preceded(
             tuple((ws(success(())), Lexer::Begin.parser())),
-            tuple((many0(span(parse_func)), parse_stats)),
-            ws(Lexer::End.parser()),
+            tuple((many0(span(parse_func)), parse_stats(Lexer::End))),
         ),
         |(funcs, stats)| Program(funcs, stats),
     )(input)
@@ -65,35 +65,48 @@ fn parse_func(input: &str) -> IResult<&str, Function<&str>, ErrorTree<&str>> {
         tuple((
             parse_type,
             parse_ident,
-            delimited(
+            preceded(
                 Lexer::OpenParen.parser(),
-                separated_list0(Lexer::Comma.parser(), span(parse_param)),
-                Lexer::CloseParen.parser(),
+                alt((
+                    collect_separated_terminated(
+                        span(parse_param),
+                        Lexer::Comma.parser(),
+                        Lexer::CloseParen.parser(),
+                    ),
+                    map(Lexer::CloseParen.parser(), |_| Vec::new()),
+                )).cut(),
             ),
-            delimited(Lexer::Is.parser(), parse_stats, Lexer::End.parser()),
+            preceded(Lexer::Is.parser(), parse_stats(Lexer::End)),
         )),
         |(t, id, params, block)| Function(t, id, params, block),
     )(input)
 }
 
-fn parse_stats(input: &str) -> IResult<&str, Vec<WrapSpan<Stat<&str>>>, ErrorTree<&str>> {
-    separated_list1(Lexer::SemiColon.parser(), span(parse_stat))(input)
+fn parse_stats<'a>(
+    term: Lexer,
+) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<WrapSpan<Stat<&'a str>>>, ErrorTree<&str>> {
+    cut(collect_separated_terminated(
+        span(parse_stat).cut(),
+        Lexer::SemiColon.parser(),
+        term.parser(),
+    ))
 }
 
+// fn parse_stats(input: &str) -> IResult<&str, Vec<WrapSpan<Stat<&str>>>, ErrorTree<&str>> {
+//     cut(collect_separated_terminated(span(parse_stat).cut(), Lexer::SemiColon.parser(), Lexer::End.parser()))(input)
+// }
+
 fn parse_stat(input: &str) -> IResult<&str, Stat<&str>, ErrorTree<&str>> {
-    let parse_while = delimited(
+    let parse_while = preceded(
         Lexer::While.parser(),
-        separated_pair(parse_expr, Lexer::Do.parser(), parse_stats).cut(),
-        Lexer::Done.parser(),
+        separated_pair(parse_expr, Lexer::Do.parser(), parse_stats(Lexer::Done)).cut(),
     );
-    let parse_if = delimited(
+    let parse_if = preceded(
         Lexer::If.parser(),
         tuple((
-            separated_pair(parse_expr, Lexer::Then.parser(), parse_stats),
-            preceded(Lexer::Else.parser(), parse_stats),
-        ))
-        .cut(),
-        Lexer::Fi.parser(),
+            separated_pair(parse_expr, Lexer::Then.parser(), parse_stats(Lexer::Else)),
+            parse_stats(Lexer::Fi),
+        )).cut(),
     );
 
     context(
@@ -108,13 +121,6 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str>, ErrorTree<&str>> {
                 ),
                 |((t, id), rhs)| Stat::Def(t, id, rhs),
             ),
-            context(
-                "assign",
-                map(
-                    separated_pair(parse_lhs, Lexer::Assign.parser().cut(), parse_rhs),
-                    |(lhs, rhs)| Stat::Assign(lhs, rhs),
-                ),
-            ),
             preceded(Lexer::Read.parser(), map(parse_lhs.cut(), Stat::Read)),
             preceded(Lexer::Free.parser(), map(parse_expr.cut(), Stat::Free)),
             preceded(Lexer::Return.parser(), map(parse_expr.cut(), Stat::Return)),
@@ -127,17 +133,27 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str>, ErrorTree<&str>> {
             preceded(Lexer::Return.parser(), map(parse_expr.cut(), Stat::Return)),
             map(parse_if, |((e, st), sf)| Stat::If(e, st, sf)),
             map(parse_while, |(e, s)| Stat::While(e, s)),
-            delimited(
+            preceded(
                 Lexer::Begin.parser(),
-                map(parse_stats.cut(), Stat::Block),
-                Lexer::End.parser(),
+                map(parse_stats(Lexer::End).cut(), Stat::Block),
             ),
+            map(
+                separated_pair(parse_lhs, Lexer::Assign.parser().cut(), parse_rhs.cut()),
+                |(lhs, rhs)| Stat::Assign(lhs, rhs),
+            ),
+            // context(
+            //     "assign",
+            //     map(
+            //         separated_pair(parse_lhs, Lexer::Assign.parser(), parse_rhs.cut()),
+            //         |(lhs, rhs)| Stat::Assign(lhs, rhs),
+            //     ),
+            // ),
         )),
     )(input)
 }
 
 fn parse_param(input: &str) -> IResult<&str, Param<&str>, ErrorTree<&str>> {
-    map(tuple((parse_type, parse_ident)), |(t, ident)| {
+    map(tuple((parse_type, parse_ident.cut())), |(t, ident)| {
         Param(t, ident)
     })(input)
 }
@@ -221,27 +237,30 @@ fn parse_base_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
 
 fn parse_lhs(input: &str) -> IResult<&str, AssignLhs<&str>, ErrorTree<&str>> {
     alt((
-        map(parse_array_elem, |(id, exprs)| {
-            AssignLhs::ArrayElem(id, exprs)
-        }),
         map(preceded(Lexer::Fst.parser(), parse_expr.cut()), |pair| {
             AssignLhs::PairFst(pair)
         }),
         map(preceded(Lexer::Snd.parser(), parse_expr.cut()), |pair| {
             AssignLhs::PairSnd(pair)
         }),
-        map(parse_ident, AssignLhs::Var),
+        map(
+            pair(
+                parse_ident,
+                alt((map(parse_array_elem, Some), success(None))),
+            ),
+            |(id, arr)| match arr {
+                Some(arr) => AssignLhs::ArrayElem(id, arr),
+                None => AssignLhs::Var(id),
+            },
+        ),
     ))(input)
 }
 
-fn parse_array_elem(input: &str) -> TreeResult<(&str, Vec<WrapSpan<Expr<&str>>>)> {
-    tuple((
-        parse_ident,
-        many1(delimited(
-            Lexer::OpenBracket.parser(),
-            parse_expr,
-            Lexer::CloseBracket.parser(),
-        )),
+fn parse_array_elem(input: &str) -> IResult<&str, Vec<ExprSpan<&str>>, ErrorTree<&str>> {
+    many1(delimited(
+        Lexer::OpenBracket.parser(),
+        parse_expr,
+        Lexer::CloseBracket.parser(),
     ))(input)
 }
 
@@ -283,7 +302,7 @@ fn parse_expr(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&str
 fn fold_expr<'a>(
     expr: WrapSpan<'a, Expr<'a, &'a str>>,
     rem: Vec<(&'a str, WrapSpan<'a, Expr<'a, &'a str>>)>,
-    input: &'a str
+    input: &'a str,
 ) -> WrapSpan<'a, Expr<'a, &'a str>> {
     rem.into_iter()
         .rfold(expr, |acc, val| parse_bin_op(val, acc, input))
@@ -347,16 +366,46 @@ fn parse_expr_mult(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree
 }
 
 fn parse_literal_keywords(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&str>> {
-    let (input, s) = alt((Lexer::Bang.parser(), Lexer::Minus.parser(), parse_ident))(input)?;
-    match s {
-        "true" | "false" => Ok((input, WrapSpan(s, Expr::Bool(s.parse::<bool>().unwrap())))),
-        "null" => Ok((input, WrapSpan(s, Expr::Null))),
-        "!" | "-" | "len" | "ord" | "chr" => {
-            let (input, e) = parse_expr(input)?;
-            Ok((input, WrapSpan(s, Expr::UnOp(parse_unary(s), Box::new(e)))))
-        }
-        _ => Ok((input, WrapSpan(s, Expr::Var(s)))),
-    }
+    // let (input, s) = alt((Lexer::Bang.parser(), Lexer::Minus.parser(), parse_ident))(input)?;
+    // match s {
+    //     "true" | "false" => Ok((input, WrapSpan(s, Expr::Bool(s.parse::<bool>().unwrap())))),
+    //     "null" => Ok((input, WrapSpan(s, Expr::Null))),
+    //     "!" | "-" | "len" | "ord" | "chr" => {
+    //         let (input, e) = parse_expr(input)?;
+    //         Ok((input, WrapSpan(s, Expr::UnOp(parse_unary(s), Box::new(e)))))
+    //     }
+    //     _ => Ok((input, WrapSpan(s, Expr::Var(s)))),
+    // }
+    alt((
+        map(Lexer::True.parser(), |t| {
+            WrapSpan(t, Expr::Bool(t.parse::<bool>().unwrap()))
+        }),
+        map(Lexer::False.parser(), |t| {
+            WrapSpan(t, Expr::Bool(t.parse::<bool>().unwrap()))
+        }),
+        map(Lexer::Null.parser(), |t| WrapSpan(t, Expr::Null)),
+        // map(pair(alt((Lexer::Bang.parser(), Lexer::Minus.parser(),Lexer::Len.parser(),Lexer::Ord.parser(),Lexer::Chr.parser())), parse_expr), |(op, WrapSpan(_, _))| WrapSpan(op, Expr::UnOp()))
+        map(
+            span(preceded(Lexer::Bang.parser(), parse_expr)),
+            |WrapSpan(s1, e)| WrapSpan(s1, Expr::UnOp(UnOp::Neg, box e)),
+        ),
+        map(
+            span(preceded(Lexer::Minus.parser(), parse_expr)),
+            |WrapSpan(s1, e)| WrapSpan(s1, Expr::UnOp(UnOp::Minus, box e)),
+        ),
+        map(
+            span(preceded(Lexer::Len.parser(), parse_expr)),
+            |WrapSpan(s1, e)| WrapSpan(s1, Expr::UnOp(UnOp::Len, box e)),
+        ),
+        map(
+            span(preceded(Lexer::Ord.parser(), parse_expr)),
+            |WrapSpan(s1, e)| WrapSpan(s1, Expr::UnOp(UnOp::Ord, box e)),
+        ),
+        map(
+            span(preceded(Lexer::Chr.parser(), parse_expr)),
+            |WrapSpan(s1, e)| WrapSpan(s1, Expr::UnOp(UnOp::Chr, box e)),
+        ),
+    ))(input)
 }
 
 fn parse_expr_atom(input: &str) -> IResult<&str, Expr<&str>, ErrorTree<&str>> {
@@ -374,7 +423,14 @@ fn parse_expr_atom(input: &str) -> IResult<&str, Expr<&str>, ErrorTree<&str>> {
         }),
         map(parse_int, Expr::Int),
         map(str_delimited("\""), |s| Expr::String(s.to_string())),
-        map(parse_array_elem, |(id, e)| Expr::ArrayElem(id, e)),
+        // map(parse_array_elem, |(id, e)| Expr::ArrayElem(id, e)),
+        map(
+            pair(parse_ident, opt(parse_array_elem)),
+            |(id, arr)| match arr {
+                Some(arr) => Expr::ArrayElem(id, arr),
+                None => Expr::Var(id),
+            },
+        ),
         map(parse_literal_keywords, |WrapSpan(_, e)| e),
         map(
             delimited(
@@ -401,12 +457,14 @@ fn parse_unary(op: &str) -> UnOp {
 fn parse_bin_op<'a>(
     tup: (&'a str, WrapSpan<'a, Expr<'a, &'a str>>),
     expr1: WrapSpan<'a, Expr<'a, &'a str>>,
-    input: &'a str
+    input: &'a str,
 ) -> WrapSpan<'a, Expr<'a, &'a str>> {
     let (op, expr2) = tup;
 
     let min = expr1.0.as_ptr().min(expr2.0.as_ptr()) as usize - input.as_ptr() as usize;
-    let max = (expr2.0.as_ptr() as usize + expr2.0.len()).min(expr1.0.as_ptr() as usize + expr1.0.len()) - input.as_ptr() as usize;
+    let max = (expr2.0.as_ptr() as usize + expr2.0.len())
+        .min(expr1.0.as_ptr() as usize + expr1.0.len())
+        - input.as_ptr() as usize;
     let s = &input[min..max];
 
     WrapSpan(
@@ -433,4 +491,3 @@ fn parse_bin_op<'a>(
         ),
     )
 }
-
