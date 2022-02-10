@@ -49,8 +49,12 @@ where
     }
 }
 
-pub fn parse(input: &str) -> Result<Program<&str>, ErrorTree<&str>> {
-    final_parser(parse_program)(input)
+pub fn parse(input: &str) -> Result<Program<&str>, Summary> {
+    let semantic_info = final_parser(parse_program)(input);
+    match semantic_info {
+        Ok(ast) => Ok(ast),
+        Err(err) => Err(convert_error_tree(input, err))
+    }
 }
 
 fn parse_program(input: &str) -> IResult<&str, Program<&str>, ErrorTree<&str>> {
@@ -506,48 +510,12 @@ pub fn collect_errors<'a>(
 }
 
 pub fn convert_error_tree<'a>(
-    path: &'a str,
     input: &'a str,
     err: ErrorTree<&'a str>,
 ) -> Summary<'a> {
-    // let summary_cell = Vec::new();
-
     let mut h = HashMap::new();
-    let err = parse(include_str!(
-        "parser/invalid/syntaxErr/function/thisIsNotC.wacc"
-    ))
-    .unwrap_err();
     collect_errors(err, &mut h, vec![]);
 
-    let mut summary = Summary::new(input, SummaryStage::Parser);
-    for (k, v) in h {
-        let mut summary_cell = SummaryCell::new(&k[..1]);
-        summary_cell.add_component(SummaryComponent::new(
-            SummaryType::Error,
-            100,
-            &k[..1],
-            "Wow this is a bad error here".to_string(),
-        ));
-        summary.add_cell(summary_cell);
-    }
-    println!("{}", summary);
-    summary
-    // *.add_cell(summary_cell)
-}
-
-// enum HashTree<'a> {
-//     Node(StackContext, Vec<(&'a str, BaseErrorKind)>, Box<HashTree>)
-// }
-
-pub fn m1() {
-    let mut h = HashMap::new();
-    let input = include_str!("parser/invalid/syntaxErr/basic/skpErr.wacc");
-    let err = parse(input).unwrap_err();
-    println!("{}", err);
-    println!("{:?}", err);
-    collect_errors(err, &mut h, vec![]);
-
-    println!("{:?}", h);
 
     let mut summary = Summary::new(input, SummaryStage::Parser);
     for (k, v) in h {
@@ -584,5 +552,5 @@ pub fn m1() {
         );
         summary.add_cell(summary_cell);
     }
-    println!("{}", summary);
+    summary
 }
