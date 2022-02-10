@@ -1,0 +1,16 @@
+# call free on a non-pair type 
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  int x = 5;
+  println x;
+  free 9 ; 
+  println x
+end

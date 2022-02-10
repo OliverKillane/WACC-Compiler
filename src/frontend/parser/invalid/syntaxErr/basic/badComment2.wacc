@@ -1,0 +1,15 @@
+# program has missing in-line comment declaration
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+begin
+  int x = 10 ; can I put in-line comments after the ';'?
+  x = 20 ; #yes, but only if you remember to use the '#' charcter!
+  exit x
+end

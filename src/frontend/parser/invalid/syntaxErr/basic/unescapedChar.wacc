@@ -1,0 +1,13 @@
+# unescaped double quote
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+begin
+  char a = '"'
+end

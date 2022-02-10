@@ -1,0 +1,22 @@
+# Uses C-style pointers. This is WACC, not C.
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+begin
+  int f(int *x) is 
+    *x = *x + 1;
+    return 0
+  end
+
+  int *x = malloc(4);
+  x[0] = 77;
+  int f = call f(x);
+  println *(x);
+  free x
+end

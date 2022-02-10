@@ -1,0 +1,14 @@
+# variable declaration missing variable name
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+
+# Program:
+
+begin
+  int = 42
+end

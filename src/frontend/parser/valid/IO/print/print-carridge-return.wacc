@@ -1,0 +1,10 @@
+# simple print statement off a string with a carridge-return character
+
+# Output:
+#  World!
+
+# Program:
+
+begin
+  print "Hello \r World!\n"
+end

@@ -1,0 +1,26 @@
+# function body missing a guaranteed return (the loop might not be entered)
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+begin
+  int f(int n) is
+    int i = 0;
+    while i < n do
+      i = i + 1;
+      if i >= n 
+      then 
+        return i 
+      else
+        skip
+      fi
+    done
+  end
+  int x = call f(10) ;
+  println x 
+end

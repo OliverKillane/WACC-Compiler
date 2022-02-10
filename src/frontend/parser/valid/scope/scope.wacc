@@ -1,0 +1,19 @@
+# simple scoping test
+
+# Output:
+# #empty#
+
+# Program:
+
+begin
+  begin
+    begin
+      begin
+        begin
+          skip
+        end
+      end
+    end
+  end
+end
+

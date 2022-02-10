@@ -1,0 +1,15 @@
+# multiple type mismatches: int <- bool, bool <- char, char <- int
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  int i = true ;
+  bool b = 'a' ;
+  char c = 10
+end

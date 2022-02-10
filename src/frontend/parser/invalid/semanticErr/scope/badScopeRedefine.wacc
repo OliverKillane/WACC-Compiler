@@ -1,0 +1,19 @@
+# variable scoping test that uses a redefined variable incorrectly
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  int x = 12 ;
+  begin
+    bool x = true ;
+    x = 5
+  end ;
+  exit x 
+end
+

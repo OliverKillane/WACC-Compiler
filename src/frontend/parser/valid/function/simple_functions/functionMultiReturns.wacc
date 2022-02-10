@@ -1,0 +1,19 @@
+# a simple function with multiple returns, importantly one at the end.
+
+# Output:
+# 1
+
+# Program:
+
+begin
+  int returnInWhile() is
+    while true do
+      return 1 ;
+      println "How on Earth did we get here?"
+    done ;
+    return 2
+  end
+
+  int x = call returnInWhile() ;
+  println x
+end

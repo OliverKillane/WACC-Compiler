@@ -1,0 +1,18 @@
+# function parameter misuse
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+	int f(int x) is
+    bool b = x && true ;
+		return 0
+	end
+  int x = call f(0) 
+end
+	

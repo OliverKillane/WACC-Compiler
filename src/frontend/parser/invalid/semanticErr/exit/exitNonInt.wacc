@@ -1,0 +1,14 @@
+# exit with non-int - this should be an invalid program! 
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  char x = 'f' ;
+  exit x
+end

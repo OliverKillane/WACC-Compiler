@@ -1,0 +1,17 @@
+# multiplying a negative integer
+
+# Output:
+# -20000
+# #runtime_error#
+
+# Exit:
+# 255
+
+# Program:
+
+begin
+  int x = -20000 ;
+  println x ;
+  x = x*100000000; #err here? 
+  println x 
+end

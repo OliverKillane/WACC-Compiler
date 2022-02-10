@@ -1,0 +1,17 @@
+# negative overflow
+
+# Output:
+# -2000000000
+# #runtime_error#
+
+# Exit:
+# 255
+
+# Program:
+
+begin
+  int x = -2000000000 ;
+  println x ;
+  x = x - 2000000000; #err here? 
+  println x 
+end
