@@ -4,7 +4,7 @@ mod error;
 mod parser;
 mod semantic;
 
-pub use parser::{parse, collect_errors};
+pub use parser::{collect_errors, m1, parse};
 
 pub fn analyse(source_code: &str) -> Result<(), ()> {
     todo!()

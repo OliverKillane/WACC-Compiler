@@ -25,8 +25,9 @@ use nom_supreme::{
     error::{BaseErrorKind, ErrorTree, Expectation, StackContext},
     final_parser::final_parser,
     multi::collect_separated_terminated,
+    parser_ext::Context,
     tag::complete::tag,
-    ParserExt, parser_ext::Context,
+    ParserExt,
 };
 
 use self::lexer::{parse_int, str_delimited};
@@ -116,8 +117,8 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str>, ErrorTree<&str>> {
             map(
                 separated_pair(
                     tuple((parse_type, parse_ident.cut())),
-                    Lexer::Assign.parser(),
-                    parse_rhs,
+                    Lexer::Assign.parser().cut(),
+                    parse_rhs.cut(),
                 ),
                 |((t, id), rhs)| Stat::Def(t, id, rhs),
             ),
@@ -137,10 +138,10 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str>, ErrorTree<&str>> {
                 Lexer::Begin.parser(),
                 map(parse_stats(Lexer::End).cut(), Stat::Block),
             ),
-            map(
+            context("Assign Statement", map(
                 separated_pair(parse_lhs, Lexer::Assign.parser().cut(), parse_rhs.cut()),
                 |(lhs, rhs)| Stat::Assign(lhs, rhs),
-            ),
+            )),
         )),
     )(input)
 }
@@ -273,19 +274,22 @@ fn parse_rhs(input: &str) -> IResult<&str, AssignRhs<&str>, ErrorTree<&str>> {
         separated_list0(Lexer::Comma.parser(), parse_expr).cut(),
         Lexer::CloseBracket.parser(),
     );
-    alt((
-        map(call, |(id, es)| AssignRhs::Call(id, es)),
-        map(
-            span(preceded(Lexer::Fst.parser(), parse_expr.cut())),
-            |WrapSpan(s, e)| AssignRhs::Expr(WrapSpan(s, Expr::UnOp(UnOp::Fst, box e))),
-        ),
-        map(
-            span(preceded(Lexer::Snd.parser(), parse_expr.cut())),
-            |WrapSpan(s, e)| AssignRhs::Expr(WrapSpan(s, Expr::UnOp(UnOp::Snd, box e))),
-        ),
-        map(parse_expr, AssignRhs::Expr),
-        map(span(array_liter), AssignRhs::Array),
-    ))(input)
+    context(
+        "Assign RHS",
+        alt((
+            map(call, |(id, es)| AssignRhs::Call(id, es)),
+            map(
+                span(preceded(Lexer::Fst.parser(), parse_expr.cut())),
+                |WrapSpan(s, e)| AssignRhs::Expr(WrapSpan(s, Expr::UnOp(UnOp::Fst, box e))),
+            ),
+            map(
+                span(preceded(Lexer::Snd.parser(), parse_expr.cut())),
+                |WrapSpan(s, e)| AssignRhs::Expr(WrapSpan(s, Expr::UnOp(UnOp::Snd, box e))),
+            ),
+            map(parse_expr, AssignRhs::Expr),
+            map(span(array_liter), AssignRhs::Array),
+        )),
+    )(input)
 }
 
 fn parse_expr(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&str>> {
@@ -473,39 +477,112 @@ fn parse_bin_op<'a>(
     )
 }
 
-
-
 use crate::frontend::error::*;
 
-pub fn collect_errors<'a>(err: ErrorTree<&'a str>, locations: &mut HashMap<&'a str, (Vec<StackContext>, Vec<BaseErrorKind>)>) {
+pub fn collect_errors<'a>(
+    err: ErrorTree<&'a str>,
+    locations: &mut HashMap<&'a str, (Vec<StackContext>, Vec<BaseErrorKind>)>,
+    mut past_contexts: Vec<StackContext>,
+) {
     match err {
-        ErrorTree::Base { location, kind } => { 
-            locations.entry(location).or_insert((vec![], vec![])).1.push(kind);
-        },
+        ErrorTree::Base { location, kind } => {
+            let loc = locations.entry(location).or_insert((vec![], vec![]));
+            loc.1.push(kind);
+            loc.0 = past_contexts;
+        }
         ErrorTree::Stack { contexts, box base } => {
             for (location, context) in contexts {
-                locations.entry(location).or_insert((vec![], vec![])).0.push(context);
+                past_contexts.push(context);
             }
-            collect_errors(base, locations);
+
+            collect_errors(base, locations, past_contexts.clone());
         }
         ErrorTree::Alt(siblings) => {
             for err_tree in siblings {
-                collect_errors(err_tree, locations);
+                collect_errors(err_tree, locations, past_contexts.clone());
             }
         }
     };
 }
 
-pub fn convert_error_tree<'a>(path: &'a str, input: &'a str, err: ErrorTree<&'a str>) -> Summary<'a> {
+pub fn convert_error_tree<'a>(
+    path: &'a str,
+    input: &'a str,
+    err: ErrorTree<&'a str>,
+) -> Summary<'a> {
     // let summary_cell = Vec::new();
 
     let mut h = HashMap::new();
-    let err = parse(include_str!("parser/invalid/syntaxErr/function/thisIsNotC.wacc")).unwrap_err();
-    collect_errors(err, &mut h);
+    let err = parse(include_str!(
+        "parser/invalid/syntaxErr/function/thisIsNotC.wacc"
+    ))
+    .unwrap_err();
+    collect_errors(err, &mut h, vec![]);
 
-    let summary_cell =  ;
-    
-    let mut s = Summary::new(path, input, SummaryStage::Parser);
-    s.add_cell(summary_cell);
-    s
+    let mut summary = Summary::new(input, SummaryStage::Parser);
+    for (k, v) in h {
+        let mut summary_cell = SummaryCell::new(&k[..1]);
+        summary_cell.add_component(SummaryComponent::new(
+            SummaryType::Error,
+            100,
+            &k[..1],
+            "Wow this is a bad error here".to_string(),
+        ));
+        summary.add_cell(summary_cell);
+    }
+    println!("{}", summary);
+    summary
+    // *.add_cell(summary_cell)
+}
+
+// enum HashTree<'a> {
+//     Node(StackContext, Vec<(&'a str, BaseErrorKind)>, Box<HashTree>)
+// }
+
+pub fn m1() {
+    let mut h = HashMap::new();
+    let input = include_str!("parser/invalid/syntaxErr/basic/skpErr.wacc");
+    let err = parse(input).unwrap_err();
+    println!("{}", err);
+    println!("{:?}", err);
+    collect_errors(err, &mut h, vec![]);
+
+    println!("{:?}", h);
+
+    let mut summary = Summary::new(input, SummaryStage::Parser);
+    for (k, v) in h {
+        let k2 = match k {
+            "" => &input[input.len() - 2..],
+            _ => &k[..1],
+        };
+        let mut summary_cell = SummaryCell::new(&k2);
+        let contexts: String =
+            v.0.into_iter()
+                .map(|v| match v {
+                    StackContext::Context(s) => format!("{}", s),
+                    StackContext::Kind(nek) => format!("{:?}", nek),
+                })
+                .last()
+                .unwrap_or("missing context".to_string());
+        let expected: Vec<String> =
+            v.1.into_iter()
+                .map(|v| match v {
+                    BaseErrorKind::Expected(e) => format!("{}", e),
+                    BaseErrorKind::Kind(e) => format!("{:?}", e),
+                    BaseErrorKind::External(e) => format!("{}", e),
+                })
+                .collect();
+
+        summary_cell.add_component(
+            SummaryComponent::new(
+                SummaryType::Error,
+                100,
+                &k2,
+                format!("Expected {}", contexts),
+            )
+            .set_note(format!("Try one of: {}", expected.join(", "))),
+        );
+        summary.add_cell(summary_cell);
+    }
+    println!("{}", summary);
 }
