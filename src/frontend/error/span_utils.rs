@@ -1,7 +1,7 @@
 //! Contains utility functions for determining the placement of spans within
 //! the original source code string.
 
-use std::{cmp::min, slice::SliceIndex};
+use std::{cmp::min, collections::HashMap, slice::SliceIndex};
 
 /// Returns the range of the indices of the span within the input string, provided
 /// the span starts somewhere within the input string.
@@ -27,6 +27,7 @@ pub(super) fn get_relative_range(input: &str, span: &str) -> Option<(usize, usiz
 pub(super) struct SpanLocator<'l> {
     input: &'l str,
     input_lines: Vec<(usize, usize, bool)>,
+    input_lines_characters_map: Vec<HashMap<usize, usize>>,
 }
 
 impl<'l> SpanLocator<'l> {
@@ -43,6 +44,19 @@ impl<'l> SpanLocator<'l> {
                         min(line_end + 1, input.len()),
                         line_end < input.len(),
                     ) // Because lines() doesn't include newlines
+                })
+                .collect(),
+            input_lines_characters_map: input
+                .lines()
+                .map(|line| {
+                    let mut characters_map = HashMap::new();
+                    let mut characters_count = 0;
+                    for (column, (char_index, _)) in line.char_indices().enumerate() {
+                        characters_map.insert(char_index, column);
+                        characters_count += 1;
+                    }
+                    characters_map.insert(line.len(), characters_count);
+                    characters_map
                 })
                 .collect(),
         }
@@ -77,13 +91,12 @@ impl<'l> SpanLocator<'l> {
     pub fn get_coords(&self, span: &str) -> Option<(usize, usize)> {
         let line_num = self.get_line_num(span)?;
 
-        let (line_pos, _) = SpanLocator {
-            input: &self.input[self.input_lines[line_num].0..self.input_lines[line_num].1],
-            input_lines: Vec::new(),
-        }
-        .get_range(span)
-        .unwrap();
-        Some((line_num, line_pos))
+        let (line_pos, _) =
+            get_relative_range(self.get_input_line(line_num).unwrap(), span).unwrap();
+        Some((
+            line_num,
+            self.input_lines_characters_map[line_num][&line_pos],
+        ))
     }
 }
 
