@@ -508,7 +508,12 @@ impl<'l> SummaryCell<'l> {
         let mut selected_prefixes = HashMap::<usize, _>::new();
         for &(span, _, color) in &annotations {
             let first_line = input_locator.get_line_num(&span[0..]).unwrap();
-            let last_char_index = span.char_indices().map(|(index, _)| index).last().unwrap();
+            let last_char_index =
+                if let Some(last_char_index) = span.char_indices().map(|(index, _)| index).last() {
+                    last_char_index
+                } else {
+                    continue;
+                };
             let (mut last_line, _) = input_locator.get_coords(&span[last_char_index..]).unwrap();
             if first_line == last_line {
                 continue;
@@ -663,12 +668,6 @@ impl<'l> Summary<'l> {
     }
 }
 
-#[test]
-fn test_f() {
-    let input = "abc";
-    println!("{:?}", get_relative_range(input, &input[1..1]))
-}
-
 #[cfg(test)]
 mod test {
     use super::{
@@ -775,6 +774,39 @@ mod test {
                    |   ^^^^
                    |   |
                    |   V
+                   | [1]
+            "}
+            .to_string(),
+        )
+    }
+
+    #[test]
+    fn test_end_span() {
+        let input = "abc";
+        SHOULD_COLORIZE.set_override(false);
+        assert_eq_multiline(
+            singleton_summary(
+                None,
+                input,
+                SummaryStage::Parser,
+                input,
+                None,
+                SummaryType::Error,
+                200,
+                &input[3..3],
+                "message",
+                "",
+                None,
+                None,
+            ),
+            indoc! {"
+                An error has occured during parsing
+                1:1
+                1. error[200]: message
+                 1 | abc
+                   |    ^
+                   |    |
+                   |    V
                    | [1]
             "}
             .to_string(),
