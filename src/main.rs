@@ -18,6 +18,7 @@
 extern crate lazy_static;
 
 mod backend;
+mod emulator;
 mod frontend;
 mod intermediate;
 

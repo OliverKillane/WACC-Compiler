@@ -10,7 +10,7 @@ pub type BlockId = usize;
 pub type DataRef = u64;
 
 /// A common container for all types of expressions.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     /// A [number expression](NumExpr)
     Num(NumExpr),
@@ -21,7 +21,7 @@ pub enum Expr {
 }
 
 /// Types of arithmetic operations on [numeric expressions](NumExpr).
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ArithOp {
     /// Addition (+).
     Add,
@@ -36,7 +36,7 @@ pub enum ArithOp {
 }
 
 /// Size of the [numeric expression](NumExpr).
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum NumSize {
     /// Signifies a 4-byte expression, for example an int
     DWord,
@@ -48,7 +48,7 @@ pub enum NumSize {
 
 /// A numeric expression. Can represent for example
 /// character or integer expressions.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum NumExpr {
     /// Size of the given type in the memory. The type of this expression is
     /// always a DWord.
@@ -79,7 +79,7 @@ pub enum NumExpr {
 }
 
 /// Types of boolean operations on [boolean expressions](BoolExpr).
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum BoolOp {
     /// Conjunction (&&).
     And,
@@ -90,7 +90,7 @@ pub enum BoolOp {
 }
 
 /// A boolean expression.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BoolExpr {
     /// A boolean constant. Can be either true or false.
     Const(bool),
@@ -118,7 +118,7 @@ pub enum BoolExpr {
 }
 
 /// A pointer manipulation expressiion.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PtrExpr {
     /// A null-pointer expression. Dereferencing it will cause a segmentation fault.
     Null,
@@ -152,7 +152,7 @@ pub enum PtrExpr {
 }
 
 /// An execution statement.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Stat {
     /// Assigns the value of an expression to a variable. The variable must have
     /// a matching type in the symbol table attached to each
@@ -191,7 +191,7 @@ pub enum Stat {
 }
 
 /// An action to be performed after a block of statements is executed.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BlockEnding {
     /// Represents a conditional jump. The boolean expressions in the vector are
     /// evaluated consecutively. If a boolean expression is true, then the
@@ -209,14 +209,14 @@ pub enum BlockEnding {
 
 /// A block of statements. Contains the blocks that have conditional jumps to it. The
 /// list of statements must not be empty.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Block(pub Vec<BlockId>, pub Vec<Stat>, pub BlockEnding);
 /// A graph of blocks. The index of the block in the block graph signifies the
 /// [block id](BlockId) of that block.
 pub type BlockGraph = Vec<Block>;
 
 /// Type of an expression.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Type {
     /// A numeric expression type, with the given expression size.
     Num(NumSize),
@@ -230,7 +230,7 @@ pub enum Type {
 /// for the arguments, the table of types for local variables used and the
 /// [block graph](BlockGraph) for its body. The execution starts off from the
 /// first block in the block graph.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Function(
     pub Type,
     pub Vec<(Type, VarRepr)>,
@@ -243,7 +243,7 @@ pub struct Function(
 /// map of structs in the data section for the whole program. The execution starts
 /// off from the first block in the block graph. The expressions in the data
 /// section structs may not use any variable references.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Program(
     pub HashMap<String, Function>,
     pub HashMap<VarRepr, Type>,
