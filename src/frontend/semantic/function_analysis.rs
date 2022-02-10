@@ -18,7 +18,12 @@ use super::{
     symbol_table::{FunctionSymbolTable, LocalSymbolTable, VariableSymbolTable},
 };
 
+/// An error result from a function analysis, containing the function name, and
+/// the statement errors contained.
 type FunctionErrors<'a> = (&'a str, Vec<StatementErrors<'a>>);
+
+/// A correct result from a function analysis, containing the function, as well
+/// as the flat symbol table associated with it.
 type FunctionAnalysis<'a> = (WrapSpan<'a, Function<'a, usize>>, VariableSymbolTable);
 
 /// Determine if there are any semantic errors in a function:

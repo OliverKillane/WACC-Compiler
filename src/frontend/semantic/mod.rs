@@ -37,6 +37,7 @@
 //! Expressions are also push forwards, and propagate back many errors through
 //! the expression tree traversal.
 
+mod error_conversion;
 mod expression_analysis;
 mod function_analysis;
 pub mod semantic_errors;
@@ -46,14 +47,20 @@ mod type_constraints;
 
 use std::collections::HashMap;
 
+use nom::error::convert_error;
+
 use self::{
+    error_conversion::convert_errors,
     function_analysis::analyse_function,
     semantic_errors::{SemanticError, StatementErrors},
     statement_analysis::analyse_block,
     symbol_table::{get_fn_symbols, LocalSymbolTable, VariableSymbolTable},
 };
 
-use super::ast::{FunSpan, Function, Program, StatSpan, WrapSpan};
+use super::{
+    ast::{FunSpan, Function, Program, StatSpan, WrapSpan},
+    error::SummaryCell,
+};
 
 /// Analyses a program, either returning a flat variable and function symbol table
 /// and an ast, or a tuple of error (function defs, main body, function errors)
@@ -64,9 +71,8 @@ use super::ast::{FunSpan, Function, Program, StatSpan, WrapSpan};
 ///   variable symbol table
 ///
 /// On Failure Returns:
-/// - Vector of semantic errors in function definitions
-/// - Vector of semantic errors in main program block
-/// - Vector of (function name, vector of semantic errors)
+/// - Vector of semantic error summary cells
+/// - Vector of syntax error summary cells
 #[allow(clippy::type_complexity)]
 pub fn analyse_semantics<'a>(
     Program(fn_defs, main_block): Program<'a, &'a str>,
@@ -76,11 +82,7 @@ pub fn analyse_semantics<'a>(
         VariableSymbolTable,
         HashMap<&'a str, (FunSpan<'a, usize>, VariableSymbolTable)>,
     ),
-    (
-        Vec<StatementErrors<'a>>,
-        Vec<StatementErrors<'a>>,
-        Vec<(&str, Vec<StatementErrors<'a>>)>,
-    ),
+    (Vec<SummaryCell<'a>>, Vec<SummaryCell<'a>>),
 > {
     // get function definitions
     let (fun_symb, filtered_fn_defs, fun_def_errs) = get_fn_symbols(fn_defs);
@@ -116,9 +118,9 @@ pub fn analyse_semantics<'a>(
             if errors.is_empty() && fun_def_errs.is_empty() {
                 Ok((block_ast, main_var_symb, correct))
             } else {
-                Err((fun_def_errs, vec![], errors))
+                Err(convert_errors(fun_def_errs, vec![], errors))
             }
         }
-        None => Err((fun_def_errs, main_errors, errors)),
+        None => Err(convert_errors(fun_def_errs, main_errors, errors)),
     }
 }
