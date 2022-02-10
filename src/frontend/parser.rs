@@ -530,7 +530,7 @@ pub fn convert_error_tree<'a>(input: &'a str, err: ErrorTree<&'a str>) -> Summar
                     StackContext::Kind(nek) => format!("{:?}", nek),
                 })
                 .last()
-                .unwrap_or("missing context".to_string());
+                .unwrap_or_else(|| String::from("missing context"));
         let expected: Vec<String> =
             v.1.into_iter()
                 .map(|v| match v {
