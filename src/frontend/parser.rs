@@ -95,6 +95,10 @@ fn parse_stats<'a>(
     ))
 }
 
+// fn parse_stats(input: &str) -> IResult<&str, Vec<WrapSpan<Stat<&str>>>, ErrorTree<&str>> {
+//     cut(collect_separated_terminated(span(parse_stat).cut(), Lexer::SemiColon.parser(), Lexer::End.parser()))(input)
+// }
+
 fn parse_stat(input: &str) -> IResult<&str, Stat<&str>, ErrorTree<&str>> {
     let parse_while = preceded(
         Lexer::While.parser(),
