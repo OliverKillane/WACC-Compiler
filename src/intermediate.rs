@@ -230,7 +230,8 @@ pub struct Function(
 /// An entire program. Contains the definitions of functions, the table of types
 /// for local variables used, the [block graph](BlockGraph) for its body and the
 /// map of structs in the data section for the whole program. The execution starts
-/// off from the first block in the block graph.
+/// off from the first block in the block graph. The expressions in the data
+/// section structs may not use any variable references.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Program(
     pub HashMap<String, Function>,
