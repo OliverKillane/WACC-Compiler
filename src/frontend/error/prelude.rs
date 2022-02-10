@@ -56,7 +56,6 @@ impl<'l> SummaryComponent<'l> {
         span: &'l str,
         message: String,
     ) -> Self {
-        assert!(!span.is_empty());
         Self {
             summary_type,
             summary_code,

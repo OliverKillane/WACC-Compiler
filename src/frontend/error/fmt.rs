@@ -342,12 +342,24 @@ impl<'l> SummaryCell<'l> {
             .into_iter()
             .map(|(span, message, color)| {
                 let message_len = message.chars().count();
-                let (span_begin, span_end) = get_relative_range(line, span).unwrap();
+                let (span_begin, mut span_end) = get_relative_range(line, span).unwrap();
+                if span_begin == span_end {
+                    span_end += 1;
+                }
                 (span_begin, span_end, message, message_len, color)
             })
             .collect::<Vec<_>>();
-
         let mut line = line.to_string();
+
+        // Taking care of the spans that point to the end of the line
+        for &(span_begin, _, _, _, _) in &annotations {
+            if span_begin == line.len() {
+                line += " ";
+                break;
+            }
+        }
+
+        // Spreading the neighbouring spans out so that there are spaces between them
         Self::fmt_refs_line_spread_out(
             &mut line,
             &mut unincluded_prefix,
@@ -496,7 +508,12 @@ impl<'l> SummaryCell<'l> {
         let mut selected_prefixes = HashMap::<usize, _>::new();
         for &(span, _, color) in &annotations {
             let first_line = input_locator.get_line_num(&span[0..]).unwrap();
-            let last_char_index = span.char_indices().map(|(index, _)| index).last().unwrap();
+            let last_char_index =
+                if let Some(last_char_index) = span.char_indices().map(|(index, _)| index).last() {
+                    last_char_index
+                } else {
+                    continue;
+                };
             let (mut last_line, _) = input_locator.get_coords(&span[last_char_index..]).unwrap();
             if first_line == last_line {
                 continue;
@@ -757,6 +774,39 @@ mod test {
                    |   ^^^^
                    |   |
                    |   V
+                   | [1]
+            "}
+            .to_string(),
+        )
+    }
+
+    #[test]
+    fn test_end_span() {
+        let input = "abc";
+        SHOULD_COLORIZE.set_override(false);
+        assert_eq_multiline(
+            singleton_summary(
+                None,
+                input,
+                SummaryStage::Parser,
+                input,
+                None,
+                SummaryType::Error,
+                200,
+                &input[3..3],
+                "message",
+                "",
+                None,
+                None,
+            ),
+            indoc! {"
+                An error has occured during parsing
+                1:1
+                1. error[200]: message
+                 1 | abc
+                   |    ^
+                   |    |
+                   |    V
                    | [1]
             "}
             .to_string(),
