@@ -489,7 +489,7 @@ impl<'l> SummaryCell<'l> {
             .into_iter()
             .collect::<Vec<_>>();
         if annotations.is_empty() {
-            return String::new();
+            return String::default();
         }
         annotations.sort_by_key(|&(span, _, _)| input_locator.get_range(span).unwrap().0);
 
@@ -564,7 +564,7 @@ impl<'l> SummaryCell<'l> {
     }
 
     /// Formats a single error cell.
-    fn fmt(&self, filepath: &str, input: &str) -> String {
+    fn fmt(&self, filepath: Option<&str>, input: &str) -> String {
         let input_locator = SpanLocator::new(input);
         let mut components = self.components.iter().collect::<Vec<_>>();
         components.sort_by_key(|component| input_locator.get_range(component.span));
@@ -573,8 +573,8 @@ impl<'l> SummaryCell<'l> {
         format!(
             "{}",
             format!(
-                "{}:{}:{}{}\n",
-                filepath,
+                "{}{}:{}{}\n",
+                filepath.map_or(String::default(), |s| format!("{}:", s)),
                 span_line + 1,
                 span_column + 1,
                 self.title
@@ -609,7 +609,7 @@ impl<'l> Display for Summary<'l> {
         let cell_strings = self
             .cells
             .iter()
-            .map(|cell| cell.fmt(self.filepath, self.input))
+            .map(|cell| cell.fmt(self.filepath.as_ref().map(|s| &s[..]), self.input))
             .collect::<LinkedList<_>>();
 
         let max_cell_width = cell_strings
@@ -664,7 +664,7 @@ mod test {
 
     #[allow(clippy::too_many_arguments)]
     fn singleton_summary(
-        filepath: &str,
+        filepath: Option<&str>,
         input: &str,
         stage: SummaryStage,
         stat: &str,
@@ -677,19 +677,22 @@ mod test {
         declaration: Option<&str>,
         note: Option<&str>,
     ) -> String {
-        let mut summary = Summary::new(filepath, input, stage);
+        let mut summary = Summary::new(input, stage);
+        if let Some(filepath) = filepath {
+            summary.set_filepath(filepath.to_string());
+        }
         let mut cell = SummaryCell::new(stat);
         if let Some(title) = title {
             cell.set_title(title.to_string());
         }
         let mut component =
-            SummaryComponent::new(component_type, component_code, expr, message.to_string());
-        component.set_shorthand(shorthand.to_string());
+            SummaryComponent::new(component_type, component_code, expr, message.to_string())
+                .set_shorthand(shorthand.to_string());
         if let Some(declaration) = declaration {
-            component.set_declaration(declaration);
+            component = component.set_declaration(declaration);
         }
         if let Some(note) = note {
-            component.set_note(note.to_string());
+            component = component.set_note(note.to_string());
         }
         cell.add_component(component);
         summary.add_cell(cell);
@@ -723,14 +726,8 @@ mod test {
 
     #[test]
     fn test_code() {
-        assert_eq!(
-            Summary::new("test/test.txt", "abc", SummaryStage::Parser).code(),
-            100
-        );
-        assert_eq!(
-            Summary::new("test/test.txt", "abc", SummaryStage::Semantic).code(),
-            200
-        );
+        assert_eq!(Summary::new("abc", SummaryStage::Parser).code(), 100);
+        assert_eq!(Summary::new("abc", SummaryStage::Semantic).code(), 200);
     }
 
     #[test]
@@ -739,7 +736,7 @@ mod test {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "test/test.txt",
+                None,
                 input,
                 SummaryStage::Parser,
                 &input[4..16],
@@ -754,7 +751,7 @@ mod test {
             ),
             indoc! {"
                 An error has occured during parsing
-                test/test.txt:1:5
+                1:5
                 1. error[200]: message
                  1 | 😊😊😊😊😊
                    |   ^^^^
@@ -772,7 +769,7 @@ mod test {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "test/test.txt",
+                None,
                 input,
                 SummaryStage::Parser,
                 &input[1..8],
@@ -787,7 +784,7 @@ mod test {
             ),
             indoc! {"
                 An error has occured during parsing
-                test/test.txt:1:2
+                1:2
                 1. error[200]: message
                  1 | ab
                    |  ^
@@ -811,7 +808,7 @@ mod test {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "test/test.txt",
+                None,
                 input,
                 SummaryStage::Parser,
                 &input[0..5],
@@ -826,7 +823,7 @@ mod test {
             ),
             indoc! {"
                 An error has occured during parsing
-                test/test.txt:1:1
+                1:1
                 1. error[200]: message
                  1 | abcdef
                    |    ^^
@@ -844,7 +841,7 @@ mod test {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "test/test.txt",
+                None,
                 input,
                 SummaryStage::Parser,
                 &input[0..7],
@@ -859,7 +856,7 @@ mod test {
             ),
             indoc! {"
                 An error has occured during parsing
-                test/test.txt:1:1
+                1:1
                 1. error[200]: message
                  1 | abcdefgh
                    |     ^
@@ -877,7 +874,7 @@ mod test {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "test/test.txt",
+                None,
                 input,
                 SummaryStage::Parser,
                 &input[0..7],
@@ -892,7 +889,7 @@ mod test {
             ),
             indoc! {"
                 An error has occured during parsing
-                test/test.txt:1:1
+                1:1
                 1. error[200]: message
                  1 | abcdefgh
                    |      ^
@@ -910,7 +907,7 @@ mod test {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "test/test.txt",
+                None,
                 input,
                 SummaryStage::Parser,
                 &input[0..7],
@@ -925,7 +922,7 @@ mod test {
             ),
             indoc! {"
                 An error has occured during parsing
-                test/test.txt:1:1
+                1:1
                 1. error[200]: message
                  1 | abcdefgh
                    |       ^
@@ -938,24 +935,51 @@ mod test {
     }
 
     #[test]
+    fn test_filename() {
+        let input = "abc";
+        SHOULD_COLORIZE.set_override(false);
+        assert_eq_multiline(
+            singleton_summary(
+                Some("test/test.wacc"),
+                input,
+                SummaryStage::Parser,
+                &input[0..3],
+                None,
+                SummaryType::Error,
+                200,
+                &input[0..3],
+                "message",
+                "",
+                None,
+                None,
+            ),
+            indoc! {"
+                An error has occured during parsing
+                test/test.wacc:1:1
+                1. error[200]: message
+                 1 | abc
+                   | ^^^
+                   | |
+                   | V
+                   | [1]
+            "}
+            .to_string(),
+        )
+    }
+
+    #[test]
     fn test_stage() {
         let input = "abcdefgh";
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
-            format!(
-                "{}",
-                Summary::new("test/test.txt", input, SummaryStage::Parser)
-            ),
+            format!("{}", Summary::new(input, SummaryStage::Parser)),
             indoc! {"
                 An error has occured during parsing
             "}
             .to_string(),
         );
         assert_eq_multiline(
-            format!(
-                "{}",
-                Summary::new("test/test.txt", input, SummaryStage::Semantic)
-            ),
+            format!("{}", Summary::new(input, SummaryStage::Semantic)),
             indoc! {"
                 An error has occured during semantic analysis
             "}
@@ -969,7 +993,7 @@ mod test {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "test/test.txt",
+                None,
                 input,
                 SummaryStage::Parser,
                 &input[0..3],
@@ -984,7 +1008,7 @@ mod test {
             ),
             indoc! {"
                 An error has occured during parsing
-                test/test.txt:1:1 -> title
+                1:1 -> title
                 1. error[200]: message
                  1 | abc
                    | ^^^
@@ -1002,7 +1026,7 @@ mod test {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "test/test.txt",
+                None,
                 input,
                 SummaryStage::Parser,
                 input,
@@ -1017,7 +1041,7 @@ mod test {
             ),
             indoc! {"
                 An error has occured during parsing
-                test/test.txt:1:1
+                1:1
                 1. error[200]: message
                  1 | abcdefg
                    |     ^^^
@@ -1035,7 +1059,7 @@ mod test {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "test/test.txt",
+                None,
                 input,
                 SummaryStage::Parser,
                 &input[0..3],
@@ -1050,7 +1074,7 @@ mod test {
             ),
             indoc! {"
                 An error has occured during parsing
-                test/test.txt:1:1
+                1:1
                 1. error[200]: message
                  1 | abc
                    | ^^^
@@ -1067,32 +1091,32 @@ mod test {
     fn test_spacing() {
         let input = "abc";
         SHOULD_COLORIZE.set_override(false);
-        let mut summary = Summary::new("test/test.txt", input, SummaryStage::Parser);
+        let mut summary = Summary::new(input, SummaryStage::Parser);
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
             200,
             &input[0..1],
-            String::new(),
+            String::default(),
         ));
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
             200,
             &input[1..2],
-            String::new(),
+            String::default(),
         ));
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
             200,
             &input[2..3],
-            String::new(),
+            String::default(),
         ));
         summary.add_cell(cell);
         assert_eq_multiline(
             format!("{}", summary),
             indoc! {"
                 An error has occured during parsing
-                test/test.txt:1:1
+                1:1
                 1. error[200]:
                 2. error[200]:
                 3. error[200]:
@@ -1116,7 +1140,7 @@ mod test {
     fn test_main_message_alignment() {
         let input = "a b c";
         SHOULD_COLORIZE.set_override(false);
-        let mut summary = Summary::new("test/test.txt", input, SummaryStage::Parser);
+        let mut summary = Summary::new(input, SummaryStage::Parser);
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
@@ -1141,7 +1165,7 @@ mod test {
             format!("{}", summary),
             indoc! {"
                 An error has occured during parsing
-                test/test.txt:1:1
+                1:1
                 1.   error[200]: 
                 2. warning[200]: 
                 3.     error[1]: 
@@ -1165,7 +1189,7 @@ mod test {
     fn test_multicomponent() {
         let input = "a b\nc";
         SHOULD_COLORIZE.set_override(false);
-        let mut summary = Summary::new("test/test.txt", input, SummaryStage::Parser);
+        let mut summary = Summary::new(input, SummaryStage::Parser);
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
@@ -1190,7 +1214,7 @@ mod test {
             format!("{}", summary),
             indoc! {"
                 An error has occured during parsing
-                test/test.txt:1:1
+                1:1
                 1. error[200]:
                 2. error[200]:
                 3. error[200]:
@@ -1217,7 +1241,7 @@ mod test {
     fn test_multicell() {
         let input = "a b\nc";
         SHOULD_COLORIZE.set_override(false);
-        let mut summary = Summary::new("test/test.txt", input, SummaryStage::Parser);
+        let mut summary = Summary::new(input, SummaryStage::Parser);
         summary.set_sep('~');
         for _ in 0..3 {
             let mut cell = SummaryCell::new(input);
@@ -1233,7 +1257,7 @@ mod test {
             format!("{}", summary),
             indoc! {"
                 An error has occured during parsing
-                test/test.txt:1:1
+                1:1
                 1. error[200]:
                  1 | a b
                    | ^
@@ -1241,7 +1265,7 @@ mod test {
                    | V
                    | [1]
                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                test/test.txt:1:1
+                1:1
                 1. error[200]:
                  1 | a b
                    | ^
@@ -1249,7 +1273,7 @@ mod test {
                    | V
                    | [1]
                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                test/test.txt:1:1
+                1:1
                 1. error[200]:
                  1 | a b
                    | ^
@@ -1265,7 +1289,7 @@ mod test {
     fn test_doubleline_expr() {
         let input = "a b\nc d";
         SHOULD_COLORIZE.set_override(false);
-        let mut summary = Summary::new("test/test.txt", input, SummaryStage::Parser);
+        let mut summary = Summary::new(input, SummaryStage::Parser);
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
@@ -1278,7 +1302,7 @@ mod test {
             format!("{}", summary),
             indoc! {"
                 An error has occured during parsing
-                test/test.txt:1:1
+                1:1
                 1. error[200]:
                  1 | a b
                    |   ^
@@ -1297,7 +1321,7 @@ mod test {
     fn test_multiline_expr() {
         let input = "a b\ncd\ne f";
         SHOULD_COLORIZE.set_override(false);
-        let mut summary = Summary::new("test/test.txt", input, SummaryStage::Parser);
+        let mut summary = Summary::new(input, SummaryStage::Parser);
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
@@ -1310,7 +1334,7 @@ mod test {
             format!("{}", summary),
             indoc! {"
                 An error has occured during parsing
-                test/test.txt:1:1
+                1:1
                 1. error[200]:
                  1 | a b
                    |   ^
@@ -1333,7 +1357,7 @@ mod test {
         assert_eq!(
             catch_panic(|| {
                 let input = "abc";
-                let mut summary = Summary::new("test/test.txt", input, SummaryStage::Parser);
+                let mut summary = Summary::new(input, SummaryStage::Parser);
                 let mut cell = SummaryCell::new(input);
                 cell.add_component(SummaryComponent::new(
                     SummaryType::Error,
