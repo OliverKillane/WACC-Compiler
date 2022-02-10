@@ -686,13 +686,13 @@ mod test {
             cell.set_title(title.to_string());
         }
         let mut component =
-            SummaryComponent::new(component_type, component_code, expr, message.to_string());
-        component.set_shorthand(shorthand.to_string());
+            SummaryComponent::new(component_type, component_code, expr, message.to_string())
+                .set_shorthand(shorthand.to_string());
         if let Some(declaration) = declaration {
-            component.set_declaration(declaration);
+            component = component.set_declaration(declaration);
         }
         if let Some(note) = note {
-            component.set_note(note.to_string());
+            component = component.set_note(note.to_string());
         }
         cell.add_component(component);
         summary.add_cell(cell);
