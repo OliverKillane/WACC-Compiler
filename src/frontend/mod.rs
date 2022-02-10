@@ -3,6 +3,7 @@ mod error;
 mod parser;
 mod semantic;
 mod tests;
+mod translation;
 
 pub use error::Summary;
 use parser::parse;
