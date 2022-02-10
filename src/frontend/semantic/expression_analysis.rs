@@ -1,8 +1,6 @@
-//! Expression analysis
+//! Analyse WACC expressions, renaming variable uses.
 //!
-//! Analyses WACC expressions
-//!
-//! Analyse expressions expressions, performing variable reference renaming and
+//! Analyse expressions, performing variable reference renaming and
 //! determining the type of the expression for use in further analysis
 //! (e.g statements).
 //!
@@ -59,8 +57,8 @@ pub fn analyse_expression<'a, 'b>(
             for index_expr in indexes.into_iter() {
                 match analyse_expression(index_expr, local_symb, var_symb, errors) {
                     Some((Type::Int, new_index_expr)) => correct_indexes.push(new_index_expr),
-                    Some((_, WrapSpan(index_span, _))) => {
-                        errors.push(SemanticError::InvalidIndex(index_span))
+                    Some((index_type, WrapSpan(index_span, _))) => {
+                        errors.push(SemanticError::InvalidIndex(index_span, index_type))
                     }
                     None => any_errors = true,
                 }
@@ -218,7 +216,7 @@ mod tests {
         match analyse_expression(expr2, &local_symb, &var_symb, &mut expr2_errors) {
             None => {
                 assert!(expr2_errors.contains(&SemanticError::UndefinedVariableUse("x")));
-                assert!(expr2_errors.contains(&SemanticError::InvalidIndex("'c'")));
+                assert!(expr2_errors.contains(&SemanticError::InvalidIndex("'c'", Type::Char)));
             }
             _ => assert!(false),
         }

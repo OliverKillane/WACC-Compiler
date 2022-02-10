@@ -421,6 +421,7 @@ pub enum AssignRhs<'a, IdRepr> {
     Call(&'a str, Vec<ExprSpan<'a, IdRepr>>),
 }
 
+/// Alias for WrapSpans around array literals.
 type ArraySpan<'a, IdRepr> = WrapSpan<'a, Vec<ExprSpan<'a, IdRepr>>>;
 
 /// Statements for assignment, control flow and definitions.
@@ -567,6 +568,7 @@ pub struct Function<'a, IdRepr>(
     pub Vec<StatSpan<'a, IdRepr>>,
 );
 
+/// Alias for WrapSpans around functions.
 pub type FunSpan<'a, IdRepr> = WrapSpan<'a, Function<'a, IdRepr>>;
 
 /// Program is the root of the abstract syntax tree, containing all function
