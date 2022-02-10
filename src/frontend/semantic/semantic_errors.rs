@@ -7,6 +7,7 @@
 
 use super::super::ast::{BinOp, Type, UnOp, WrapSpan};
 
+/// A collection of semantic errors associated with the span of a statement.
 pub type StatementErrors<'a> = WrapSpan<'a, Vec<SemanticError<'a>>>;
 
 /// Contains all errors which can occur in expressions
@@ -117,5 +118,3 @@ pub enum SemanticError<'a> {
     /// (The entire return statement)
     ReturnStatementMisplaced(&'a str),
 }
-
-pub type SemanticErrorSummary<'a> = Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>;

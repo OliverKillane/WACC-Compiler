@@ -44,6 +44,7 @@ impl<'a> FunctionSymbolTable<'a> {
 pub struct VariableSymbolTable(HashMap<usize, Type>);
 
 impl VariableSymbolTable {
+    /// Create a new flat variable symbol table
     pub fn new() -> Self {
         Self(HashMap::new())
     }
@@ -85,6 +86,7 @@ impl VariableSymbolTable {
         })
     }
 
+    /// Get the type of a variable from its renamed identifier.
     pub fn get_type_from_id(&self, id: usize) -> Option<&Type> {
         self.0.get(&id)
     }
@@ -215,7 +217,7 @@ pub fn get_fn_symbols<'a>(
 
 #[cfg(test)]
 mod tests {
-    use super::{super::semantic_errors::SemanticErrorSummary, *};
+    use super::*;
 
     #[test]
     fn local_symb_can_add_and_find_vars_in_current_scope() {
@@ -668,11 +670,9 @@ mod tests {
             ),
         ];
 
-        let errors_expected: SemanticErrorSummary = vec![];
-
         assert_eq!(fn_symb_expected, fn_symb);
         assert_eq!(valid_fns_expected, valid_fns);
-        assert_eq!(errors_expected, errors);
+        assert!(errors.is_empty());
     }
 
     #[test]
@@ -746,7 +746,7 @@ mod tests {
             ),
         ];
 
-        let errors_expected: SemanticErrorSummary = vec![WrapSpan(
+        let errors_expected = vec![WrapSpan(
             "bool fun1(bool x, bool y)",
             vec![SemanticError::RepeatDefinitionFunction(
                 "fun1",
@@ -847,10 +847,8 @@ mod tests {
             ),
         ];
 
-        let errors_expected: SemanticErrorSummary = vec![];
-
         assert_eq!(fn_symb_expected, fn_symb);
         assert_eq!(valid_fns_expected, valid_fns);
-        assert_eq!(errors_expected, errors);
+        assert!(errors.is_empty());
     }
 }

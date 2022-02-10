@@ -159,7 +159,8 @@ fn apply_generics(generic_type: &Type, generics: &HashMap<GenericId, Type>) -> T
     }
 }
 
-type PossibleTypes = Vec<(Type, Type)>;
+/// A vector of possible (left, right) input types for a binary operator.
+type BinOpPossibleTypes = Vec<(Type, Type)>;
 
 /// Match a binary operator and two input types.
 /// - On success, return the output type
@@ -169,7 +170,7 @@ pub fn binop_match(
     binop: &BinOp,
     left_type: &Type,
     right_type: &Type,
-) -> Result<Type, (PossibleTypes, Vec<&'static BinOp>)> {
+) -> Result<Type, (BinOpPossibleTypes, Vec<&'static BinOp>)> {
     let mut generics = HashMap::with_capacity(0);
     let mut possible_types = Vec::new();
     let mut possible_binops = Vec::new();
