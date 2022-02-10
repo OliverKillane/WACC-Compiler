@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 mod lexer;
+use std::collections::HashMap;
+
 use lexer::{parse_ident, ws, Lexer};
 
 use crate::frontend::ast::*;
@@ -24,7 +26,7 @@ use nom_supreme::{
     final_parser::final_parser,
     multi::collect_separated_terminated,
     tag::complete::tag,
-    ParserExt,
+    ParserExt, parser_ext::Context,
 };
 
 use self::lexer::{parse_int, str_delimited};
@@ -469,4 +471,41 @@ fn parse_bin_op<'a>(
             box expr2,
         ),
     )
+}
+
+
+
+use crate::frontend::error::*;
+
+pub fn collect_errors<'a>(err: ErrorTree<&'a str>, locations: &mut HashMap<&'a str, (Vec<StackContext>, Vec<BaseErrorKind>)>) {
+    match err {
+        ErrorTree::Base { location, kind } => { 
+            locations.entry(location).or_insert((vec![], vec![])).1.push(kind);
+        },
+        ErrorTree::Stack { contexts, box base } => {
+            for (location, context) in contexts {
+                locations.entry(location).or_insert((vec![], vec![])).0.push(context);
+            }
+            collect_errors(base, locations);
+        }
+        ErrorTree::Alt(siblings) => {
+            for err_tree in siblings {
+                collect_errors(err_tree, locations);
+            }
+        }
+    };
+}
+
+pub fn convert_error_tree<'a>(path: &'a str, input: &'a str, err: ErrorTree<&'a str>) -> Summary<'a> {
+    // let summary_cell = Vec::new();
+
+    let mut h = HashMap::new();
+    let err = parse(include_str!("parser/invalid/syntaxErr/function/thisIsNotC.wacc")).unwrap_err();
+    collect_errors(err, &mut h);
+
+    let summary_cell =  ;
+    
+    let mut s = Summary::new(path, input, SummaryStage::Parser);
+    s.add_cell(summary_cell);
+    s
 }
