@@ -185,7 +185,7 @@ pub fn parse_ident(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
         recognize(pair(
             alt((alpha1, tag("_"))),
             many0(alt((alphanumeric1, tag("_")))),
-        )),
+        )).context("identifier"),
         |s| match HASHSET.get(s) {
             None => Ok(s),
             _ => Err(KeywordIdentError),
