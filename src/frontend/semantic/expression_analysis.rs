@@ -1,8 +1,6 @@
-//! Expression analysis
+//! Analyse WACC expressions, renaming variable uses.
 //!
-//! Analyses WACC expressions
-//!
-//! Analyse expressions expressions, performing variable reference renaming and
+//! Analyse expressions, performing variable reference renaming and
 //! determining the type of the expression for use in further analysis
 //! (e.g statements).
 //!
