@@ -6,6 +6,9 @@ pub type VarRepr = u32;
 /// The id of a block in a [block graph](BlockGraph).
 pub type BlockId = usize;
 
+/// A reference to a piece of data in the data section.
+pub type DataRef = u64;
+
 /// A common container for all types of expressions.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Expr {
@@ -112,16 +115,20 @@ pub enum BoolExpr {
 /// A pointer manipulation expressiion.
 #[derive(Debug, PartialEq, Eq)]
 pub enum PtrExpr {
+    /// A null-pointer expression. Dereferencing it will cause a segmentation fault.
+    Null,
+    /// A reference to a piece of data in the data section. Can be used to for
+    /// example store strings. The data reference must exist in the main map
+    /// of the data section structs.
+    DataRef(DataRef),
     /// A reference to a variable. The variable must have a pointer type in
     /// the symbol table attached to each [function](Function) or to [program](Program).
     Var(VarRepr),
     /// Dereference of a pointer under a given pointer.
     Deref(Box<PtrExpr>),
-
     /// An offset of a pointer. Can be used for example to index an array or
     /// get an element out of a pair.
     Offset(Box<PtrExpr>, Box<NumExpr>),
-
     /// Allocates a container on a heap with given items inside it. An array
     /// for example can be represented as the first element being a dword with
     /// the size of the array, and the rest of the expressions being the items
@@ -221,11 +228,14 @@ pub struct Function(
 );
 
 /// An entire program. Contains the definitions of functions, the table of types
-/// for local variables used and the [block graph](BlockGraph) for its body.
-/// The execution starts off from the first block in the block graph.
+/// for local variables used, the [block graph](BlockGraph) for its body and the
+/// map of structs in the data section for the whole program. The execution starts
+/// off from the first block in the block graph. The expressions in the data
+/// section structs may not use any variable references.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Program(
     pub HashMap<String, Function>,
     pub HashMap<VarRepr, Type>,
     pub BlockGraph,
+    pub HashMap<DataRef, Vec<Expr>>,
 );
