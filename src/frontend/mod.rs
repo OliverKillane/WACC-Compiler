@@ -6,6 +6,10 @@ mod semantic;
 
 pub use parser::{collect_errors, parse};
 
-pub fn analyse(source_code: &str) -> Result<(), ()> {
-    todo!()
+use self::error::Summary;
+
+pub fn analyse<'a>(source_code: &'a str) -> Result<(), Summary<'a>> {
+    let program = parse(source_code)?;
+
+    Ok(())
 }
