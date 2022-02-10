@@ -74,7 +74,8 @@ fn parse_func(input: &str) -> IResult<&str, Function<&str>, ErrorTree<&str>> {
                         Lexer::CloseParen.parser(),
                     ),
                     map(Lexer::CloseParen.parser(), |_| Vec::new()),
-                )).cut(),
+                ))
+                .cut(),
             ),
             preceded(Lexer::Is.parser(), parse_stats(Lexer::End)),
         )),
@@ -92,10 +93,6 @@ fn parse_stats<'a>(
     ))
 }
 
-// fn parse_stats(input: &str) -> IResult<&str, Vec<WrapSpan<Stat<&str>>>, ErrorTree<&str>> {
-//     cut(collect_separated_terminated(span(parse_stat).cut(), Lexer::SemiColon.parser(), Lexer::End.parser()))(input)
-// }
-
 fn parse_stat(input: &str) -> IResult<&str, Stat<&str>, ErrorTree<&str>> {
     let parse_while = preceded(
         Lexer::While.parser(),
@@ -106,7 +103,8 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str>, ErrorTree<&str>> {
         tuple((
             separated_pair(parse_expr, Lexer::Then.parser(), parse_stats(Lexer::Else)),
             parse_stats(Lexer::Fi),
-        )).cut(),
+        ))
+        .cut(),
     );
 
     context(
@@ -141,13 +139,6 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str>, ErrorTree<&str>> {
                 separated_pair(parse_lhs, Lexer::Assign.parser().cut(), parse_rhs.cut()),
                 |(lhs, rhs)| Stat::Assign(lhs, rhs),
             ),
-            // context(
-            //     "assign",
-            //     map(
-            //         separated_pair(parse_lhs, Lexer::Assign.parser(), parse_rhs.cut()),
-            //         |(lhs, rhs)| Stat::Assign(lhs, rhs),
-            //     ),
-            // ),
         )),
     )(input)
 }
@@ -366,16 +357,6 @@ fn parse_expr_mult(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree
 }
 
 fn parse_literal_keywords(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&str>> {
-    // let (input, s) = alt((Lexer::Bang.parser(), Lexer::Minus.parser(), parse_ident))(input)?;
-    // match s {
-    //     "true" | "false" => Ok((input, WrapSpan(s, Expr::Bool(s.parse::<bool>().unwrap())))),
-    //     "null" => Ok((input, WrapSpan(s, Expr::Null))),
-    //     "!" | "-" | "len" | "ord" | "chr" => {
-    //         let (input, e) = parse_expr(input)?;
-    //         Ok((input, WrapSpan(s, Expr::UnOp(parse_unary(s), Box::new(e)))))
-    //     }
-    //     _ => Ok((input, WrapSpan(s, Expr::Var(s)))),
-    // }
     alt((
         map(Lexer::True.parser(), |t| {
             WrapSpan(t, Expr::Bool(t.parse::<bool>().unwrap()))
@@ -384,25 +365,24 @@ fn parse_literal_keywords(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, Er
             WrapSpan(t, Expr::Bool(t.parse::<bool>().unwrap()))
         }),
         map(Lexer::Null.parser(), |t| WrapSpan(t, Expr::Null)),
-        // map(pair(alt((Lexer::Bang.parser(), Lexer::Minus.parser(),Lexer::Len.parser(),Lexer::Ord.parser(),Lexer::Chr.parser())), parse_expr), |(op, WrapSpan(_, _))| WrapSpan(op, Expr::UnOp()))
         map(
-            span(preceded(Lexer::Bang.parser(), parse_expr)),
+            span(preceded(Lexer::Bang.parser(), parse_expr.cut())),
             |WrapSpan(s1, e)| WrapSpan(s1, Expr::UnOp(UnOp::Neg, box e)),
         ),
         map(
-            span(preceded(Lexer::Minus.parser(), parse_expr)),
+            span(preceded(Lexer::Minus.parser(), parse_expr.cut())),
             |WrapSpan(s1, e)| WrapSpan(s1, Expr::UnOp(UnOp::Minus, box e)),
         ),
         map(
-            span(preceded(Lexer::Len.parser(), parse_expr)),
+            span(preceded(Lexer::Len.parser(), parse_expr.cut())),
             |WrapSpan(s1, e)| WrapSpan(s1, Expr::UnOp(UnOp::Len, box e)),
         ),
         map(
-            span(preceded(Lexer::Ord.parser(), parse_expr)),
+            span(preceded(Lexer::Ord.parser(), parse_expr.cut())),
             |WrapSpan(s1, e)| WrapSpan(s1, Expr::UnOp(UnOp::Ord, box e)),
         ),
         map(
-            span(preceded(Lexer::Chr.parser(), parse_expr)),
+            span(preceded(Lexer::Chr.parser(), parse_expr.cut())),
             |WrapSpan(s1, e)| WrapSpan(s1, Expr::UnOp(UnOp::Chr, box e)),
         ),
     ))(input)
@@ -423,7 +403,6 @@ fn parse_expr_atom(input: &str) -> IResult<&str, Expr<&str>, ErrorTree<&str>> {
         }),
         map(parse_int, Expr::Int),
         map(str_delimited("\""), |s| Expr::String(s.to_string())),
-        // map(parse_array_elem, |(id, e)| Expr::ArrayElem(id, e)),
         map(
             pair(parse_ident, opt(parse_array_elem)),
             |(id, arr)| match arr {

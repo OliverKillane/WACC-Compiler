@@ -187,7 +187,7 @@ pub fn parse_ident(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
             many0(alt((alphanumeric1, tag("_")))),
         )),
         |s| match HASHSET.get(s) {
-            None => Ok((s)),
+            None => Ok(s),
             _ => Err(KeywordIdentError),
         },
     ))(input)
@@ -195,10 +195,7 @@ pub fn parse_ident(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
 
 pub fn parse_int(input: &str) -> IResult<&str, i32, ErrorTree<&str>> {
     ws(map_res(
-        recognize(pair(
-            opt(alt((char('-'), char('+')))),
-            digit1,
-        )),
+        recognize(pair(opt(alt((char('-'), char('+')))), digit1)),
         &str::parse,
     ))(input)
 }
