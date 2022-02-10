@@ -1,0 +1,40 @@
+# simple sequential counting
+
+# Output:
+# Can you count to 10?
+# 1
+# 2
+# 3
+# 4
+# 5
+# 6
+# 7
+# 8
+# 9
+# 10
+
+# Program:
+
+begin
+  int i = 1 ;
+  println "Can you count to 10?" ;
+  println i ;
+  i = i + 1 ;
+  println i ;
+  i = i + 1 ;
+  println i ;
+  i = i + 1 ;
+  println i ;
+  i = i + 1 ;
+  println i ;
+  i = i + 1 ;
+  println i ;
+  i = i + 1 ;
+  println i ;
+  i = i + 1 ;
+  println i ;
+  i = i + 1 ;
+  println i ;
+  i = i + 1 ;
+  println i 
+end

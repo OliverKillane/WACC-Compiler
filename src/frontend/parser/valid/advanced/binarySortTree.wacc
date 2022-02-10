@@ -1,0 +1,83 @@
+# The program reads n (number of integers), then n integers. After each input, 
+# it insert the integer into a binary search tree. At the end, it prints out 
+# the content in the binary search tree so that we have a sorted list of 
+# integer.
+# 
+# We represent a node in the binary search tree using two pair elements. The 
+# first element has a type <int, pair>, the int is the integer stored in the 
+# node, the pair is the pointer to the second pair element. The second pair 
+# element has a type <pair, pair> which is the pointer to the two children 
+# nodes in the binary search tree.
+
+begin
+
+  # Create a new node of a binary search tree having the given integer value 
+  # and points to the two given pairs.
+  pair(int, pair) createNewNode(int value, pair(int, pair) left, pair(int, pair) right) is
+    pair(pair, pair) p = newpair(left, right) ;
+    pair(int, pair) q = newpair(value, p) ;
+    return q
+  end
+
+  # Given a root of a binary search tree and an integer to insert, the function 
+  # inserts the integer into the tree and returns the new root of the tree.
+  pair(int, pair) insert(pair(int, pair) root, int n) is
+    if root == null then
+      root = call createNewNode(n, null, null)
+    else
+      pair(pair, pair) p = snd root ;
+      int current = fst root ;
+      pair(int, pair) q = null ;
+      if n < current then
+      	q = fst p ;
+        fst p = call insert(q, n)
+      else 
+      	q = snd p ;
+        snd p = call insert(q, n)
+      fi 
+    fi ;
+    return root
+  end
+
+  # Print the integers in the binary search tree in the increasing order.
+  int printTree(pair(int, pair) root) is
+    if root == null then
+      return 0 
+    else
+      pair(pair, pair) body = snd root ;
+      pair(int, pair) p = fst body ;
+      int temp = call printTree(p) ;
+      temp = fst root ; 
+      print temp ;
+      print ' ' ;
+      p = snd body ;
+      temp = call printTree(p) ;
+      return 0
+    fi
+  end
+
+  # The main function
+  int n = 0 ;
+  print "Please enter the number of integers to insert: " ;
+  read n ;
+  print "There are " ;
+  print n ;
+  println " integers." ;
+  int i = 0 ;
+  pair(int, pair) root = null ;
+  while i < n do
+    int x = 0 ;
+    print "Please enter the number at position " ; 
+    print i + 1 ;
+    print " : " ;
+    read x ;
+    root = call insert(root, x) ;
+    i = i + 1
+  done ;
+  print "Here are the numbers sorted: " ;
+  i = call printTree(root) ;
+  println ""
+end
+
+
+

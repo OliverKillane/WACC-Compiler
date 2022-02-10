@@ -1,0 +1,16 @@
+# Use a integer as a loop condition. Enter the loop once only, then exit the loop.
+
+# Output:
+# Change n
+# Should print "Change n" once before.
+
+# Program:
+
+begin
+	int n = 0 ;
+	while n != 1 do
+		n = 1 ;
+		println "Change n"
+	done ;
+	println "Should print \"Change n\" once before."
+end

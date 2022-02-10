@@ -1,0 +1,11 @@
+# begin token typo
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+bgn skip end

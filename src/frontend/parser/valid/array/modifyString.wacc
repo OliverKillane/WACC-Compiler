@@ -1,0 +1,17 @@
+# create and modify string as array of characters
+
+# Output:
+# hello world!
+# Hello world!
+# Hi!
+
+# Program:
+
+begin
+  char[] str = ['h','e','l','l','o',' ','w','o','r','l','d','!'] ;
+  println str ;
+  str[0] = 'H' ;
+  println str ;
+  str = ['H','i','!'] ;
+  println str
+end
