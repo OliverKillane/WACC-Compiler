@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#[allow(dead_code)]
 use crate::frontend::ast::*;
 use nom::{
     branch::alt,
@@ -19,16 +19,16 @@ fn ws<'a, F: 'a, O, E: ParseError<&'a str>>(
     inner: F,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
 where
-    F: FnMut(&'a str) -> IResult<&'a str, O, E>,
+    F: Fn(&'a str) -> IResult<&'a str, O, E>,
 {
     terminated(inner, multispace0)
 }
 
 fn span<'a, F: 'a, O, E: ParseError<&'a str>>(
-    mut inner: F,
+    inner: F,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, WrapSpan<'a, O>, E>
 where
-    F: FnMut(&'a str) -> IResult<&'a str, O, E>,
+    F: Fn(&'a str) -> IResult<&'a str, O, E>,
 {
     move |input| {
         let (rest, ret) = inner(input)?;
@@ -36,18 +36,18 @@ where
     }
 }
 
-pub fn parse(input: &str) -> IResult<&str, Program<&str, &str>> {
+pub fn parse(input: &str) -> IResult<&str, Program<&str>> {
     parse_program(input)
 }
 
-fn parse_program(input: &str) -> IResult<&str, Program<&str, &str>> {
+fn parse_program(input: &str) -> IResult<&str, Program<&str>> {
     map(
         tuple((many0(span(parse_func)), parse_stats)),
         |(funcs, stats)| Program(funcs, stats),
     )(input)
 }
 
-fn parse_func(input: &str) -> IResult<&str, Function<&str, &str>> {
+fn parse_func(input: &str) -> IResult<&str, Function<&str>> {
     map(
         tuple((
             parse_type,
@@ -59,15 +59,15 @@ fn parse_func(input: &str) -> IResult<&str, Function<&str, &str>> {
             ),
             delimited(tag("is"), parse_stats, tag("end")),
         )),
-        |(t, id, params, block)| Function(t, id, params, block),
+        |(t, id, params, block)| Function(t, id.to_string(), params, block),
     )(input)
 }
 
-fn parse_stats(input: &str) -> IResult<&str, Vec<WrapSpan<Stat<&str, &str>>>> {
+fn parse_stats(input: &str) -> IResult<&str, Vec<WrapSpan<Stat<&str>>>> {
     separated_list1(char(';'), span(parse_stat))(input)
 }
 
-fn parse_stat(input: &str) -> IResult<&str, Stat<&str, &str>> {
+fn parse_stat(input: &str) -> IResult<&str, Stat<&str>> {
     let parse_while = delimited(
         tag("while"),
         separated_pair(parse_expr, tag("do"), parse_stats),
@@ -109,10 +109,10 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str, &str>> {
 }
 
 fn parse_ident(input: &str) -> IResult<&str, &str> {
-    ws(recognize(pair(
+    recognize(pair(
         alt((alpha1, tag("_"))),
         many0(alt((alphanumeric1, tag("_")))),
-    )))(input)
+    ))(input)
 }
 
 fn parse_param(input: &str) -> IResult<&str, Param<&str>> {
@@ -155,7 +155,7 @@ fn parse_pair_type(input: &str) -> IResult<&str, Type> {
 
 fn parse_pair_elem_type(input: &str) -> IResult<&str, Type> {
     alt((
-        value(Type::Pair(box Type::Any, box Type::Any), tag("pair")),
+        value(Type::GenericPair, tag("pair")),
         map(tuple((parse_pair_type, parse_array_desc1)), |(t, n)| {
             Type::Array(box t, n)
         }),
@@ -170,12 +170,12 @@ fn parse_pair_elem_type(input: &str) -> IResult<&str, Type> {
 }
 
 fn parse_base_type(input: &str) -> IResult<&str, Type> {
-    ws(alt((
+    alt((
         value(Type::Int, tag("int")),
         value(Type::Bool, tag("bool")),
         value(Type::Char, tag("char")),
         value(Type::String, tag("string")),
-    )))(input)
+    ))(input)
 }
 
 fn parse_lhs(input: &str) -> IResult<&str, AssignLhs<&str>> {
@@ -184,12 +184,8 @@ fn parse_lhs(input: &str) -> IResult<&str, AssignLhs<&str>> {
         map(parse_array_elem, |(id, exprs)| {
             AssignLhs::ArrayElem(id, exprs)
         }),
-        map(preceded(tag("fst"), parse_expr), |pair| {
-            AssignLhs::PairFst(pair)
-        }),
-        map(preceded(tag("snd"), parse_expr), |pair| {
-            AssignLhs::PairSnd(pair)
-        }),
+        map(preceded(tag("fst"), parse_expr), |pair| AssignLhs::PairFst(pair)),
+        map(preceded(tag("snd"), parse_expr), |pair| AssignLhs::PairSnd(pair)),
     ))(input)
 }
 
@@ -200,7 +196,8 @@ fn parse_array_elem(input: &str) -> IResult<&str, (&str, Vec<WrapSpan<Expr<&str>
     ))(input)
 }
 
-fn parse_rhs(input: &str) -> IResult<&str, AssignRhs<&str, &str>> {
+
+fn parse_rhs(input: &str) -> IResult<&str, AssignRhs<&str>> {
     let new_pair = delimited(
         tuple((tag("newpair"), char('('))),
         separated_pair(parse_expr, char(','), parse_expr),
@@ -220,13 +217,9 @@ fn parse_rhs(input: &str) -> IResult<&str, AssignRhs<&str, &str>> {
         map(parse_expr, |e| AssignRhs::Expr(e)),
         map(array_liter, |arr| AssignRhs::Array(arr)),
         map(new_pair, |(e1, e2)| AssignRhs::NewPair(e1, e2)),
-        map(preceded(tag("fst"), parse_expr), |pair| {
-            AssignRhs::PairFst(pair)
-        }),
-        map(preceded(tag("snd"), parse_expr), |pair| {
-            AssignRhs::PairSnd(pair)
-        }),
-        map(call, |(id, es)| AssignRhs::Call(id, es)),
+        map(preceded(tag("fst"), parse_expr), |pair| AssignRhs::PairFst(pair)),
+        map(preceded(tag("snd"), parse_expr), |pair| AssignRhs::PairSnd(pair)),
+        map(call, |(id, es)| AssignRhs::Call(id.to_string(), es)),
     ))(input)
 }
 
@@ -277,27 +270,18 @@ fn parse_expr_plus(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>> {
 
 fn parse_expr_mult(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>> {
     let (input, sub_exp) = span(parse_expr_atom)(input)?;
-    let (input, exprs) = many0(tuple((
-        alt((tag("*"), tag("/"), tag("%"))),
-        span(parse_expr_atom),
-    )))(input)?;
+    let (input, exprs) = many0(tuple((alt((tag("*"), tag("/"), tag("%"))), span(parse_expr_atom))))(input)?;
     Ok((input, fold_expr(sub_exp, exprs)))
 }
 
 fn parse_literal_keywords(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>> {
     let (input, WrapSpan(span, s)) = span(parse_ident)(input)?;
     match s {
-        "true" | "false" => Ok((
-            input,
-            WrapSpan(span, Expr::Bool(s.parse::<bool>().unwrap())),
-        )),
+        "true" | "false" => Ok((input, WrapSpan(span, Expr::Bool(s.parse::<bool>().unwrap())))),
         "null" => Ok((input, WrapSpan(span, Expr::Null))),
         "!" | "-" | "len" | "ord" | "chr" => {
             let (input, e) = parse_expr(input)?;
-            Ok((
-                input,
-                WrapSpan(span, Expr::UnOp(parse_unary(&s), Box::new(e))),
-            ))
+            Ok((input, WrapSpan(span, Expr::UnOp(parse_unary(&s), Box::new(e)))))
         }
         _ => Ok((input, WrapSpan(span, Expr::Var(s)))),
     }
@@ -365,74 +349,4 @@ fn parse_bin_op<'a>(
             box expr2,
         ),
     )
-}
-
-#[cfg(test)]
-mod tests {
-
-    use super::*;
-    // use crate::frontend::ast::*;
-
-    #[test]
-    fn unary() {
-        let input = "!";
-        assert_eq!(parse_unary(input), UnOp::Neg);
-
-        let input = "-";
-        assert_eq!(parse_unary(input), UnOp::Minus);
-
-        let input = "len";
-        assert_eq!(parse_unary(input), UnOp::Len);
-
-        let input = "ord";
-        assert_eq!(parse_unary(input), UnOp::Ord);
-
-        let input = "chr";
-        assert_eq!(parse_unary(input), UnOp::Chr);
-    }
-
-    #[test]
-    fn ident() {
-        let input = "_hello_there12345sdf   ";
-        assert_eq!(parse_ident(input), Ok(("", "_hello_there12345sdf")));
-    }
-
-    #[test]
-    #[should_panic]
-    fn wrong_ident() {
-        let input = "123hello_";
-        parse_ident(input).unwrap();
-    }
-
-    #[test]
-    fn base_type() {
-        let input = "int   ";
-        assert_eq!(parse_base_type(input), Ok(("", Type::Int)));
-
-        let input = "bool";
-        assert_eq!(parse_base_type(input), Ok(("", Type::Bool)));
-
-        let input = "char   ";
-        assert_eq!(parse_base_type(input), Ok(("", Type::Char)));
-
-        let input = "string   ";
-        assert_eq!(parse_base_type(input), Ok(("", Type::String)));
-    }
-
-    #[test]
-    fn program() {
-        let input = "begin
-        skip
-        end";
-        // assert_eq!(parse_program(input), Ok(("", Program(vec![], vec![WrapSpan("skip", Stat::Skip)]))));
-
-        let input = "bool";
-        assert_eq!(parse_base_type(input), Ok(("", Type::Bool)));
-
-        let input = "char   ";
-        assert_eq!(parse_base_type(input), Ok(("", Type::Char)));
-
-        let input = "string   ";
-        assert_eq!(parse_base_type(input), Ok(("", Type::String)));
-    }
 }
