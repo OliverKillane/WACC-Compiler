@@ -6,7 +6,8 @@ lazy_static! {
         let arr = [
             "if", "then", "else", "fi", "fst", "snd", "int", "bool", "char", "string", "pair",
             "newpair", "begin", "end", "is", "while", "do", "done", "exit", "return", "call",
-            "println", "print", "skip", "read", "free",
+            "println", "print", "skip", "read", "free", "chr", "ord", "len", "null", "false",
+            "true",
         ];
         HashSet::from_iter(arr)
     };
@@ -98,6 +99,12 @@ pub enum Lexer {
     Else,
     Newpair,
     Bang,
+    True,
+    False,
+    Null,
+    Len,
+    Ord,
+    Chr,
 }
 
 impl Lexer {
@@ -151,6 +158,12 @@ impl Lexer {
             Self::Return => tag("return"),
             Self::Newpair => tag("newpair"),
             Self::Bang => tag("!"),
+            Self::True => tag("true"),
+            Self::False => tag("false"),
+            Self::Null => tag("null"),
+            Self::Len => tag("len"),
+            Self::Ord => tag("ord"),
+            Self::Chr => tag("chr"),
         };
 
         ws(parser)
@@ -184,7 +197,7 @@ pub fn parse_int(input: &str) -> IResult<&str, i32, ErrorTree<&str>> {
     ws(map_res(
         recognize(pair(
             opt(alt((char('-'), char('+')))),
-            many1(one_of("0123456789")),
+            digit1,
         )),
         &str::parse,
     ))(input)
@@ -196,10 +209,11 @@ pub fn str_delimited<'a>(
     ws(delimited(
         tag(del),
         alt((
-            escaped(none_of("\\\'\""), '\\', one_of("'0nt\"b\\rf")),
+            escaped(none_of("\\\'\""), '\\', one_of("'0nt\"b\\rf").cut()),
             tag(""),
-        )).cut(),
-        tag(del),
+        ))
+        .cut(),
+        tag(del).cut(),
     ))
 }
 
