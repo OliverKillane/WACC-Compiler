@@ -47,6 +47,11 @@ pub enum NumSize {
 /// character or integer expressions.
 #[derive(Debug, PartialEq, Eq)]
 pub enum NumExpr {
+    /// Size of the given type in the memory. The type of this expression is
+    /// always a DWord.
+    SizeOf(Type),
+    /// Size of a wide allocation field.
+    SizeOfWideAlloc,
     /// A number constant. The value must fit within the given expression size.
     Const(NumSize, i32),
     /// A reference to a variable. The variable must have a numeric type in
@@ -125,8 +130,14 @@ pub enum PtrExpr {
     /// Allocates a container on a heap with given items inside it. An array
     /// for example can be represented as the first element being a dword with
     /// the size of the array, and the rest of the expressions being the items
-    /// in that array.
+    /// in that array. The width of the allocation is the sum of the sizes
+    /// of all of the expressions
     Malloc(Vec<Expr>),
+    /// Allocates a container on a heap with given items inside it. A pair for
+    /// example can be represented as an allocation of exactly 2 expressions.
+    /// The width of the allocation is the number of the fields in the
+    /// allocation times the size of a single wide malloc field.
+    WideMalloc(Vec<Expr>),
     /// A call to a [function](Function). The function must have a pointer output type.
     /// The number and types of the argument expressions must match the ones of
     /// the function parameters.
