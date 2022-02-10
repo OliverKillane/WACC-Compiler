@@ -121,7 +121,7 @@ pub enum SummaryStage {
 /// the error happened, a list of [error cells](SummaryCell) with the
 /// statement-specific errors and an optional separator between the cells.
 pub struct Summary<'l> {
-    pub(super) filepath: &'l str,
+    pub(super) filepath: Option<String>,
     pub(super) input: &'l str,
     pub(super) stage: SummaryStage,
     pub(super) cells: Vec<SummaryCell<'l>>,
@@ -130,15 +130,20 @@ pub struct Summary<'l> {
 
 impl<'l> Summary<'l> {
     /// Creates a new error summary.
-    pub fn new(filepath: &'l str, input: &'l str, stage: SummaryStage) -> Self {
+    pub fn new(input: &'l str, stage: SummaryStage) -> Self {
         assert!(!input.is_empty());
         Self {
-            filepath,
+            filepath: None,
             input,
             stage,
             cells: Vec::new(),
             sep: None,
         }
+    }
+
+    /// Sets the file path to the origin file of the input
+    pub fn set_filepath(&mut self, filepath: String) {
+        self.filepath = Some(filepath);
     }
 
     /// Sets a separator between the cells to the given character.
@@ -202,7 +207,7 @@ mod test {
         assert_eq!(
             catch_panic(|| {
                 let input = "abcdef";
-                let mut summary = Summary::new("", &input[1..], SummaryStage::Parser);
+                let mut summary = Summary::new(&input[1..], SummaryStage::Parser);
                 summary.add_cell(SummaryCell::new(&input[0..2]));
             }),
             "Cell span not within the input"
@@ -214,7 +219,7 @@ mod test {
         assert_eq!(
             catch_panic(|| {
                 let input = "abcdef";
-                let mut summary = Summary::new("", &input[1..], SummaryStage::Parser);
+                let mut summary = Summary::new(&input[1..], SummaryStage::Parser);
                 let mut cell = SummaryCell::new(&input[1..]);
                 let mut component =
                     SummaryComponent::new(SummaryType::Error, 200, &input[1..], String::new());
