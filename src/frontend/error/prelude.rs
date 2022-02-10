@@ -54,22 +54,25 @@ impl<'l> SummaryComponent<'l> {
 
     /// Sets a declaration of the item causing a problem to be the given span
     /// within the input code.
-    pub fn set_declaration(&mut self, declaration: &'l str) {
+    pub fn set_declaration(mut self, declaration: &'l str) -> Self {
         assert!(!declaration.is_empty());
         self.declaration = Some(declaration);
+        self
     }
 
     /// Sets a shorthand message for the component to be the given string.
-    pub fn set_shorthand(&mut self, shorthand: String) {
+    pub fn set_shorthand(mut self, shorthand: String) -> Self {
         if shorthand.contains('\n') {
             panic!("Shorthand must be one-line only");
         }
         self.shorthand = Some(shorthand);
+        self
     }
 
     /// Sets a "note" message to be the given string.
-    pub fn set_note(&mut self, note: String) {
+    pub fn set_note(mut self, note: String) -> Self {
         self.note = Some(note);
+        self
     }
 }
 
@@ -94,15 +97,17 @@ impl<'l> SummaryCell<'l> {
     }
 
     /// Sets a new title for the error cell.
-    pub fn set_title(&mut self, title: String) {
+    pub fn set_title(&mut self, title: String) -> &mut Self {
         self.title = Some(title);
+        self
     }
 
     /// Adds a new [expression with error](SummaryComponent) to the error cell.
-    pub fn add_component(&mut self, component: SummaryComponent<'l>) {
+    pub fn add_component(&mut self, component: SummaryComponent<'l>) -> &mut Self {
         #[cfg(debug_assertions)]
         get_relative_range(self.span, component.span).expect("Component span not within the cell");
         self.components.push_back(component);
+        self
     }
 }
 
@@ -121,7 +126,7 @@ pub enum SummaryStage {
 /// the error happened, a list of [error cells](SummaryCell) with the
 /// statement-specific errors and an optional separator between the cells.
 pub struct Summary<'l> {
-    pub(super) filepath: &'l str,
+    pub(super) filepath: Option<String>,
     pub(super) input: &'l str,
     pub(super) stage: SummaryStage,
     pub(super) cells: Vec<SummaryCell<'l>>,
@@ -130,10 +135,10 @@ pub struct Summary<'l> {
 
 impl<'l> Summary<'l> {
     /// Creates a new error summary.
-    pub fn new(filepath: &'l str, input: &'l str, stage: SummaryStage) -> Self {
+    pub fn new(input: &'l str, stage: SummaryStage) -> Self {
         assert!(!input.is_empty());
         Self {
-            filepath,
+            filepath: None,
             input,
             stage,
             cells: Vec::new(),
@@ -141,13 +146,20 @@ impl<'l> Summary<'l> {
         }
     }
 
+    /// Sets the file path to the origin file of the input
+    pub fn set_filepath(&mut self, filepath: String) -> &mut Self {
+        self.filepath = Some(filepath);
+        self
+    }
+
     /// Sets a separator between the cells to the given character.
-    pub fn set_sep(&mut self, sep: char) {
+    pub fn set_sep(&mut self, sep: char) -> &mut Self {
         self.sep = Some(sep);
+        self
     }
 
     /// Adds a new error cell.
-    pub fn add_cell(&mut self, cell: SummaryCell<'l>) {
+    pub fn add_cell(&mut self, cell: SummaryCell<'l>) -> &mut Self {
         #[cfg(debug_assertions)]
         {
             get_relative_range(self.input, cell.span).expect("Cell span not within the input");
@@ -159,6 +171,7 @@ impl<'l> Summary<'l> {
             }
         }
         self.cells.push(cell);
+        self
     }
 }
 
@@ -202,7 +215,7 @@ mod test {
         assert_eq!(
             catch_panic(|| {
                 let input = "abcdef";
-                let mut summary = Summary::new("", &input[1..], SummaryStage::Parser);
+                let mut summary = Summary::new(&input[1..], SummaryStage::Parser);
                 summary.add_cell(SummaryCell::new(&input[0..2]));
             }),
             "Cell span not within the input"
@@ -214,12 +227,12 @@ mod test {
         assert_eq!(
             catch_panic(|| {
                 let input = "abcdef";
-                let mut summary = Summary::new("", &input[1..], SummaryStage::Parser);
+                let mut summary = Summary::new(&input[1..], SummaryStage::Parser);
                 let mut cell = SummaryCell::new(&input[1..]);
-                let mut component =
-                    SummaryComponent::new(SummaryType::Error, 200, &input[1..], String::new());
-                component.set_declaration(&input[0..]);
-                cell.add_component(component);
+                cell.add_component(
+                    SummaryComponent::new(SummaryType::Error, 200, &input[1..], String::new())
+                        .set_declaration(&input[0..]),
+                );
                 summary.add_cell(cell);
             }),
             "Declaration not within the input"
