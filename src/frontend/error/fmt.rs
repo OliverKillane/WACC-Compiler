@@ -342,12 +342,24 @@ impl<'l> SummaryCell<'l> {
             .into_iter()
             .map(|(span, message, color)| {
                 let message_len = message.chars().count();
-                let (span_begin, span_end) = get_relative_range(line, span).unwrap();
+                let (span_begin, mut span_end) = get_relative_range(line, span).unwrap();
+                if span_begin == span_end {
+                    span_end += 1;
+                }
                 (span_begin, span_end, message, message_len, color)
             })
             .collect::<Vec<_>>();
-
         let mut line = line.to_string();
+
+        // Taking care of the spans that point to the end of the line
+        for &(span_begin, _, _, _, _) in &annotations {
+            if span_begin == line.len() {
+                line += " ";
+                break;
+            }
+        }
+
+        // Spreading the neighbouring spans out so that there are spaces between them
         Self::fmt_refs_line_spread_out(
             &mut line,
             &mut unincluded_prefix,
@@ -649,6 +661,12 @@ impl<'l> Summary<'l> {
     fn code(&self) -> u32 {
         self.stage as u32
     }
+}
+
+#[test]
+fn test_f() {
+    let input = "abc";
+    println!("{:?}", get_relative_range(input, &input[1..1]))
 }
 
 #[cfg(test)]
