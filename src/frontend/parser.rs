@@ -53,7 +53,7 @@ pub fn parse(input: &str) -> Result<Program<&str>, Summary> {
     let semantic_info = final_parser(parse_program)(input);
     match semantic_info {
         Ok(ast) => Ok(ast),
-        Err(err) => Err(convert_error_tree(input, err))
+        Err(err) => Err(convert_error_tree(input, err)),
     }
 }
 
@@ -142,10 +142,13 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str>, ErrorTree<&str>> {
                 Lexer::Begin.parser(),
                 map(parse_stats(Lexer::End).cut(), Stat::Block),
             ),
-            context("Assign Statement", map(
-                separated_pair(parse_lhs, Lexer::Assign.parser().cut(), parse_rhs.cut()),
-                |(lhs, rhs)| Stat::Assign(lhs, rhs),
-            )),
+            context(
+                "Assign Statement",
+                map(
+                    separated_pair(parse_lhs, Lexer::Assign.parser().cut(), parse_rhs.cut()),
+                    |(lhs, rhs)| Stat::Assign(lhs, rhs),
+                ),
+            ),
         )),
     )(input)
 }
@@ -509,13 +512,9 @@ pub fn collect_errors<'a>(
     };
 }
 
-pub fn convert_error_tree<'a>(
-    input: &'a str,
-    err: ErrorTree<&'a str>,
-) -> Summary<'a> {
+pub fn convert_error_tree<'a>(input: &'a str, err: ErrorTree<&'a str>) -> Summary<'a> {
     let mut h = HashMap::new();
     collect_errors(err, &mut h, vec![]);
-
 
     let mut summary = Summary::new(input, SummaryStage::Parser);
     for (k, v) in h {
@@ -523,11 +522,11 @@ pub fn convert_error_tree<'a>(
             "" => &input[input.len() - 2..],
             _ => &k[..1],
         };
-        let mut summary_cell = SummaryCell::new(&k2);
+        let mut summary_cell = SummaryCell::new(k2);
         let contexts: String =
             v.0.into_iter()
                 .map(|v| match v {
-                    StackContext::Context(s) => format!("{}", s),
+                    StackContext::Context(s) => s.to_string(),
                     StackContext::Kind(nek) => format!("{:?}", nek),
                 })
                 .last()
@@ -545,7 +544,7 @@ pub fn convert_error_tree<'a>(
             SummaryComponent::new(
                 SummaryType::Error,
                 100,
-                &k2,
+                k2,
                 format!("Expected {}", contexts),
             )
             .set_note(format!("Try one of: {}", expected.join(", "))),
