@@ -23,12 +23,28 @@ pub enum SummaryType {
 /// presentation, an optional shorthand message that will be displayed within
 /// the code presentation and an optional "note" message.
 pub struct SummaryComponent<'l> {
+    /// Component type. Shows up next to the main error message. Determines the
+    /// color of the component.
     pub(super) summary_type: SummaryType,
+    /// Component code. Used for differentiation of different component types.
+    /// Shows up in square brackets next to the summary type.
     pub(super) summary_code: u32,
+    /// Component span. Determines the part that is underlined in a summary cell.
+    /// Must be within the bounds of the input of the whole summary. Must not
+    /// overlap with other spans within the cell. Must not overlap with other
+    /// declarations within the [cell](SummaryCell).
     pub(super) span: &'l str,
+    /// Component declaration. Displays an optional message "First declared here"
+    /// within the [cell](SummaryCell), colored on a different color.
     pub(super) declaration: Option<&'l str>,
+    /// Main component message. Shows up above the code presentation.
     pub(super) message: String,
+    /// Shordhand message. Shows up optionally under the arrow leading from the
+    /// underlined span. If not provided, only the component number will be
+    /// shown.
     pub(super) shorthand: Option<String>,
+    /// Note message. Shows up optionally below the code presentation. Used to
+    /// inform the user of some important things to remember.
     pub(super) note: Option<String>,
 }
 
@@ -80,13 +96,19 @@ impl<'l> SummaryComponent<'l> {
 /// [expressions with errors](SummaryComponent), an optional title for the
 /// error in the error cell and the expression components.
 pub struct SummaryCell<'l> {
+    /// The span of the entire cell. The parts of the line in the code presentation
+    /// that are not the span will be dimmed out. Determines the location of the
+    /// cell displayed at the top of it.
     pub(super) span: &'l str,
+    /// The title of the cell. Displays an optional message next to the location
+    /// of the cell.
     pub(super) title: Option<String>,
+    /// List of all cell [components](SummaryComponent).
     pub(super) components: LinkedList<SummaryComponent<'l>>,
 }
 
 impl<'l> SummaryCell<'l> {
-    /// Creates a new error cell.
+    /// Creates a new error cell. Sets the span to the provided span.
     pub fn new(span: &'l str) -> Self {
         assert!(!span.is_empty());
         SummaryCell {
@@ -126,15 +148,22 @@ pub enum SummaryStage {
 /// the error happened, a list of [error cells](SummaryCell) with the
 /// statement-specific errors and an optional separator between the cells.
 pub struct Summary<'l> {
+    /// Input filepath. Optionally displayed before the input cell location.
     pub(super) filepath: Option<String>,
+    /// The text of the entire code.
     pub(super) input: &'l str,
+    /// Summary stage. Displayed at the top of the summary. Determines the code
+    /// of the summary.
     pub(super) stage: SummaryStage,
+    /// A list of all [summary cells](SummaryCell).
     pub(super) cells: Vec<SummaryCell<'l>>,
+    /// An optional separator between the summary cells.
     pub(super) sep: Option<char>,
 }
 
 impl<'l> Summary<'l> {
-    /// Creates a new error summary.
+    /// Creates a new error summary. Sets the input and stage of the summary to
+    /// the values provided.
     pub fn new(input: &'l str, stage: SummaryStage) -> Self {
         assert!(!input.is_empty());
         Self {
@@ -146,7 +175,7 @@ impl<'l> Summary<'l> {
         }
     }
 
-    /// Sets the file path to the origin file of the input
+    /// Sets the file path to the origin file of the input.
     pub fn set_filepath(&mut self, filepath: String) -> &mut Self {
         self.filepath = Some(filepath);
         self
