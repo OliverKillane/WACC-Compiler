@@ -115,6 +115,8 @@ pub enum BoolExpr {
 /// A pointer manipulation expressiion.
 #[derive(Debug, PartialEq, Eq)]
 pub enum PtrExpr {
+    /// A null-pointer expression. Dereferencing it will cause a segmentation fault.
+    Null,
     /// A reference to a piece of data in the data section. Can be used to for
     /// example store strings. The data reference must exist in the main map
     /// of the data section structs.
