@@ -89,8 +89,13 @@ pub enum SemanticError<'a> {
     InvalidFunctionReturn(&'a str, Type, Type),
 
     /// Function has a control flow that does not end in return or exit.
-    /// (The function's name)
+    /// (The statement which should have been a return)
     FunctionNoReturnOrExit(&'a str),
+
+    /// A function is ended with a while statement, so cannot determine if it 
+    /// ends.
+    /// (the entire while statement - not including body)
+    FunctionLastStatIsWhile(&'a str),
 
     /// Read statement invalid (wrong type)
     /// (variable/lvalue identifier, type found)

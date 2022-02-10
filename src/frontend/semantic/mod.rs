@@ -108,9 +108,10 @@ pub fn analyse_semantics<'a>(
         &mut LocalSymbolTable::new_root(),
         &mut main_var_symb,
         &None,
+        false,
         &mut main_errors,
     ) {
-        Some((block_ast, _)) => {
+        Some(block_ast) => {
             if errors.is_empty() && fun_def_errs.is_empty() {
                 Ok((block_ast, main_var_symb, correct))
             } else {

@@ -59,13 +59,10 @@ pub fn analyse_function<'a>(
         &mut LocalSymbolTable::new_child(&local_symb),
         &mut var_symb,
         &Some(ret_type.clone()),
+        true,
         &mut errors,
     ) {
-        Some((block_ast, terminated)) => {
-            if !terminated {
-                function_errors.push(SemanticError::FunctionNoReturnOrExit(name))
-            }
-
+        Some(block_ast) => {
             if function_errors.is_empty() {
                 Ok((
                     WrapSpan(def_span, Function(ret_type, name, param_correct, block_ast)),

@@ -32,6 +32,7 @@
 //! | Invalid While Condition            | 221          | The condition for a while statement is not a boolean, e.g `while (9+9) ...`                                                               |
 //! | Return Statement Misplaced         | 222          | There is a return statement in the main program body, returns are only allowed in functions.                                              |
 //! | InvalidPairOp                      | 223          | Fst or Snd directly applied to null pair literal, e.g `fst null` `snd null`                                                               |
+//! | Function Last Is While             | 198          | The last statement in a function is a while loop, which may not return (undecidable)                                                      |
 
 use super::{
     super::{
@@ -89,7 +90,7 @@ fn create_cells<'a>(
     for WrapSpan(span, errs) in statements {
         let (syn, sem): (Vec<SemanticError>, Vec<SemanticError>) = errs
             .into_iter()
-            .partition(|err| matches!(err, SemanticError::FunctionNoReturnOrExit(_)));
+            .partition(|err| matches!(err, SemanticError::FunctionNoReturnOrExit(_)) || matches!(err, SemanticError::FunctionLastStatIsWhile(_)));
 
         if !syn.is_empty() {
             let mut syntax_cell = SummaryCell::new(span);
@@ -244,12 +245,12 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                     expr_span,
                     format!("Incorrect type returned, should have been {} but found {}.", expected, found)
                 ),
-            SemanticError::FunctionNoReturnOrExit(fun_name) =>
+            SemanticError::FunctionNoReturnOrExit(ending_stat_span) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     199,
-                    fun_name,
-                    format!("Function {} can potentially end without returning or exiting.", fun_name)
+                    ending_stat_span,
+                    String::from("The last statement on any path through a function must be a return or exit.")
                 ),
             SemanticError::ReadStatementMismatch(read_ident, found) =>
                 SummaryComponent::new(
@@ -305,7 +306,13 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                 223,
                 null_span,
                 String::from("Cannot use the fst or snd operators directly on a null, either create a new pair, or assign the null to a variable.")
-            )
+            ),
+            SemanticError::FunctionLastStatIsWhile(while_span) => 
+                SummaryComponent::new(
+                    SummaryType::Error, 
+                    198, 
+                    while_span, 
+                    String::from("A while loop cannot be the last statement on a path through the function, all functions must return or exit, and this cannot be determined for while loops even if they contain a return or exit"))
         }
     }
 }
