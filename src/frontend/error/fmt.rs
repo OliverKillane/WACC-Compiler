@@ -768,7 +768,7 @@ mod test {
             ),
             indoc! {"
                 An error has occured during parsing
-                1:5
+                1:2
                 1. error[200]: message
                  1 | 😊😊😊😊😊
                    |   ^^^^
