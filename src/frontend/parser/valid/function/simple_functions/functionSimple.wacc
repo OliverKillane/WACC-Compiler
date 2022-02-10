@@ -1,0 +1,14 @@
+# a simple function definition and call
+
+# Output:
+# 0
+
+# Program:
+
+begin
+  int f() is
+    return 0 
+  end
+  int x = call f() ;
+  println x 
+end

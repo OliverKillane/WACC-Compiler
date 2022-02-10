@@ -174,7 +174,7 @@ impl<'l> Summary<'l> {
         }
     }
 
-    /// Sets the file path to the origin file of the input.
+    /// Sets the file path to the origin file of the input
     pub fn set_filepath(&mut self, filepath: String) -> &mut Self {
         self.filepath = Some(filepath);
         self

@@ -1,0 +1,10 @@
+# simple println statement
+
+# Output:
+# Hello World!
+
+# Program:
+
+begin
+  println "Hello World!"
+end

@@ -1,0 +1,23 @@
+# attempted function definition after body begun
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+begin
+  int f() is
+    return 0 
+  end 
+  int x = call f();
+  println x ;
+  int g() is
+    return 1
+  end
+  int y = call g();
+  println y
+end
+	

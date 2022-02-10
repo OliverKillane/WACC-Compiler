@@ -1,0 +1,20 @@
+# variable scoping test that redefines a variable within an if-statement
+
+# Output:
+# true
+# 12
+
+# Program:
+
+begin
+  int x = 12 ;
+  if x == 12 then
+    bool x = true ;
+    println x
+  else
+    char x = 'a';
+    println x
+  fi ;
+  println x 
+end
+

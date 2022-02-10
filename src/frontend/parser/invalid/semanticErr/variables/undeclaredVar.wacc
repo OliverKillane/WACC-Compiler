@@ -1,0 +1,13 @@
+# assignment to undeclared variable
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  x = 10
+end

@@ -1,0 +1,14 @@
+# bad integer assignments - multiple syntax errors
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+begin
+  int x = 22 0 ;
+  int y = 1A4
+end

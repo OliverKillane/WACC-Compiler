@@ -1,0 +1,19 @@
+# function call with too few arguments
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+	int f(int a, int b) is
+		return 0 
+	end
+	int x = call f(1);
+	println x
+end
+
+	

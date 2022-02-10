@@ -1,0 +1,30 @@
+# test that the passed parameter can be updated and used
+# and that y remains the same
+
+# Output:
+# y is 1
+# x is 1
+# x is now 5
+# y is still 1
+
+# Program:
+
+begin
+
+  int f(int x) is
+    print "x is ";
+    println x;
+    x = 5;
+    print "x is now ";
+    println x;
+    return x
+  end
+
+  int y = 1;
+  print "y is ";
+  println y;
+  int x = call f(y);
+  print "y is still ";
+  println y
+end
+

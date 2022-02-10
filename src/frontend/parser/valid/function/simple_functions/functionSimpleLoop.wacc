@@ -1,0 +1,18 @@
+# define and call a function with a simple loop
+
+# Output:
+# 10
+
+# Program:
+
+begin
+  int f(int n) is
+    int i = 0;
+    while i < n do
+      i = i + 1
+    done;
+    return i 
+  end
+  int x = call f(10) ;
+  println x 
+end

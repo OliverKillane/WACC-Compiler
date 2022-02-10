@@ -1,0 +1,13 @@
+# type mismatch: string <- char
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  string s = 'h'
+end

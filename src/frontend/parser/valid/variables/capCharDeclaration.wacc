@@ -1,0 +1,10 @@
+# simple capital character variable declaration
+
+# Output:
+# #empty#
+
+# Program:
+
+begin
+  char c = 'M'
+end

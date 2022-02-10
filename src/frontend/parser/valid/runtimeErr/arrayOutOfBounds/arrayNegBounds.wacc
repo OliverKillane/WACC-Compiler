@@ -1,0 +1,15 @@
+# attempt out of bounds array access (this ought to seg fault or similar)
+
+# Output:
+# #runtime_error#
+
+# Exit:
+# 255
+
+# Program:
+
+begin
+	int[] a = [43, 2, 18, 1] ;
+  int[] b = [1, 2, 3] ;	
+  println a[-2]
+end
