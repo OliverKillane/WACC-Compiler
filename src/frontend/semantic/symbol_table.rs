@@ -12,7 +12,7 @@ use super::{
     semantic_errors::{SemanticError, StatementErrors},
 };
 
-use std::collections::HashMap;
+use std::{collections::HashMap, slice::SliceIndex};
 
 type FunctionType<'a> = (Type, Vec<(&'a str, Type)>);
 
@@ -83,6 +83,10 @@ impl VariableSymbolTable {
                     .clone(),
             )
         })
+    }
+
+    pub fn get_type_from_id(&self, id: usize) -> Option<&Type> {
+        self.0.get(&id)
     }
 }
 

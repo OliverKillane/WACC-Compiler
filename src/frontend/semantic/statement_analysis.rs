@@ -81,7 +81,7 @@ pub fn analyse_block<'a, 'b>(
                 let mut stat_errors = Vec::with_capacity(0);
                 match analyse_lhs(lhs, var_symb, local_symb, &mut stat_errors) {
                     Some((lhs_type, lhs_ast)) => {
-                        if can_coerce(&Type::Int, &lhs_type) || can_coerce(&Type::Int, &lhs_type) {
+                        if can_coerce(&Type::Int, &lhs_type) || can_coerce(&Type::Char, &lhs_type) {
                             correct.push(WrapSpan(span, Stat::Read(lhs_ast)))
                         } else {
                             errors.push(WrapSpan(
@@ -140,7 +140,7 @@ pub fn analyse_block<'a, 'b>(
                         }
                         None => errors.push(WrapSpan(
                             span,
-                            vec![SemanticError::ReturnStatementMisplaced],
+                            vec![SemanticError::ReturnStatementMisplaced(span)],
                         )),
                     },
                     None => errors.push(WrapSpan(span, stat_errors)),
@@ -177,6 +177,7 @@ pub fn analyse_block<'a, 'b>(
                 let mut stat_errors = Vec::with_capacity(0);
                 match analyse_expression(expr, local_symb, var_symb, &mut stat_errors) {
                     Some((_, expr_renamed)) => {
+                        // any type can be printed, so no coercion check
                         correct.push(WrapSpan(span, Stat::PrintLn(expr_renamed)))
                     }
                     None => errors.push(WrapSpan(span, stat_errors)),
@@ -488,7 +489,7 @@ fn analyse_lhs<'a, 'b>(
                     if can_coerce(&Type::Int, &expr_type) {
                         correct.push(WrapSpan(expr_span, expr_ast));
                     } else {
-                        errors.push(SemanticError::InvalidIndex(expr_span))
+                        errors.push(SemanticError::InvalidIndex(expr_span, expr_type))
                     }
                 }
             }

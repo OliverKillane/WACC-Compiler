@@ -22,7 +22,7 @@ pub enum SemanticError<'a> {
 
     /// Invalid Index (A non-integer was used as an index)
     /// (span of indexing expression)
-    InvalidIndex(&'a str),
+    InvalidIndex(&'a str, Type),
 
     /// Invalid type for expression
     /// (span of expression, expected type, found type)
@@ -85,7 +85,7 @@ pub enum SemanticError<'a> {
     InvalidFunctionReturn(&'a str, Type, Type),
 
     /// Function has a control flow that does not end in return or exit.
-    /// (Function name)
+    /// (The function's name)
     FunctionNoReturnOrExit(&'a str),
 
     /// Read statement invalid (wrong type)
@@ -103,7 +103,7 @@ pub enum SemanticError<'a> {
     /// Print/Println Statement invalid (wrong type).
     /// Currently all types can be printed, this is here for extensibility.
     /// (span of print/println statement, type found)
-    PrintStatementMisMatch(&'a str, Type, Type),
+    PrintStatementMisMatch(&'a str, Type),
 
     /// If statement must take a bool
     /// (span of expression, type found)
@@ -114,7 +114,8 @@ pub enum SemanticError<'a> {
     InvalidWhileCondition(&'a str, Type),
 
     /// Return statement outside of a function Only occurs in the main block.
-    ReturnStatementMisplaced,
+    /// (The entire return statement)
+    ReturnStatementMisplaced(&'a str),
 }
 
 pub type SemanticErrorSummary<'a> = Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>;
