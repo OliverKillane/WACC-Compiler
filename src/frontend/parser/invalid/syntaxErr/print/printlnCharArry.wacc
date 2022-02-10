@@ -1,0 +1,13 @@
+# You cannot directly print a char[] in WACC
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+begin
+  println ['H','e','l','l','o',' ','W','o','r','l','d','!']
+end

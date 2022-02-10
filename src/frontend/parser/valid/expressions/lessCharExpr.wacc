@@ -1,0 +1,15 @@
+# evaluating less-than on characters
+
+# Output:
+# true
+# false
+
+# Program:
+
+begin
+  char a = 'a' ;
+  char e = 'e' ;
+  char c = 'c' ;
+  println a < e ;
+  println e < c
+end

@@ -1,0 +1,15 @@
+# attempt to read into a boolan variable
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  bool b = true ;
+  read b ; 
+  println b 
+end

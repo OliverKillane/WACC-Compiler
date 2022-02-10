@@ -1,0 +1,14 @@
+# call fst on a null pair literal 
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  int i = snd null;
+  println i
+end

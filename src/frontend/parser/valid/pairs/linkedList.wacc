@@ -1,0 +1,27 @@
+# create and print a linked list using pairs
+
+# Output:
+# list = {1, 2, 4, 11}
+
+# Program:
+
+begin
+  pair(int, pair) p = newpair(11, null) ;
+    pair(int, pair) q = newpair(4, p) ;
+    pair(int, pair) r = newpair(2, q) ;
+    pair(int, pair) s = newpair(1, r) ;
+    print "list = {" ;
+    pair(int, pair) x = s ;
+    pair(int, pair) y = snd x ;
+    int f = 0;
+    while y != null do
+      f = fst x ;
+      print f ;
+      print ", " ;
+      x = y ;
+      y = snd x
+    done ;
+    f = fst x ;
+    print f ;
+    println "}"
+end

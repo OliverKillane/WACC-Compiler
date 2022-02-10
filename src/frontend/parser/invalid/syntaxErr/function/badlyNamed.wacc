@@ -1,0 +1,17 @@
+# function return type and name are conflated
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+begin
+  intf() is
+    return 42
+  end
+
+  int x = call f()
+end

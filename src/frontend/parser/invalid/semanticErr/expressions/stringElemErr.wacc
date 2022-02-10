@@ -1,0 +1,16 @@
+# element access is not permitted for strings
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  string str = "hello world!" ;
+  println str ;
+  str[0] = 'H' ;
+  println str
+end

@@ -1,0 +1,15 @@
+# done typo
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+begin
+  while false do
+    skip
+  dono
+end

@@ -1,0 +1,15 @@
+# read into pair type
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  pair(int, int) p = newpair(1,2);
+  read p
+end
+

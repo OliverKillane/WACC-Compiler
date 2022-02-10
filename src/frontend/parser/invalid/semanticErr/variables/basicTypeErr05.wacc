@@ -1,0 +1,13 @@
+# type mismatch: bool <- char
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  bool b = 't'
+end

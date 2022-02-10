@@ -1,0 +1,15 @@
+# false typo
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  while fals do
+    skip
+  done
+end

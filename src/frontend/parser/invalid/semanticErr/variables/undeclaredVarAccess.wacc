@@ -1,0 +1,14 @@
+# access attempt on undeclared variable
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  int x = 10 ;
+  x = x + y
+end

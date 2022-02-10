@@ -1,0 +1,13 @@
+# tries to exit using a character
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  exit 'a'
+end
