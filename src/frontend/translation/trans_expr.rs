@@ -1,7 +1,5 @@
 //! Expression translator for AST to IR
 
-use core::num;
-
 use crate::frontend::ast;
 use crate::frontend::semantic::symbol_table::VariableSymbolTable;
 use crate::intermediate::{ArithOp, BoolExpr, BoolOp, Expr::*, NumExpr, NumSize::*, PtrExpr, Type};
