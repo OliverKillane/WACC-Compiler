@@ -59,7 +59,7 @@ use self::{
 
 use super::{
     ast::{FunSpan, Function, Program, StatSpan, WrapSpan},
-    error::{SummaryCell, Summary},
+    error::{Summary, SummaryCell},
 };
 
 /// Analyses a program, either returning a flat variable and function symbol table
@@ -75,7 +75,8 @@ use super::{
 /// - Vector of syntax error summary cells
 #[allow(clippy::type_complexity)]
 pub fn analyse_semantics<'a>(
-    Program(fn_defs, main_block): Program<'a, &'a str>, source_code: &'a str
+    Program(fn_defs, main_block): Program<'a, &'a str>,
+    source_code: &'a str,
 ) -> Result<
     (
         Vec<StatSpan<'a, usize>>,
@@ -93,7 +94,9 @@ pub fn analyse_semantics<'a>(
     // traverse and analyse functions
     for WrapSpan(fun_name, fun) in filtered_fn_defs {
         match analyse_function(WrapSpan(fun_name, fun), &fun_symb) {
-            Ok(res) => {correct.insert(fun_name, res);},
+            Ok(res) => {
+                correct.insert(fun_name, res);
+            }
             Err(fun_err) => errors.push(fun_err),
         }
     }
@@ -118,6 +121,11 @@ pub fn analyse_semantics<'a>(
                 Err(convert_errors(fun_def_errs, vec![], errors, source_code))
             }
         }
-        None => Err(convert_errors(fun_def_errs, main_errors, errors, source_code)),
+        None => Err(convert_errors(
+            fun_def_errs,
+            main_errors,
+            errors,
+            source_code,
+        )),
     }
 }

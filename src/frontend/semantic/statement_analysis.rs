@@ -33,43 +33,91 @@ pub fn analyse_block<'a, 'b>(
 ) -> Option<Vec<WrapSpan<'a, Stat<'a, usize>>>> {
     let mut any_errors = false;
     let mut correct: Vec<StatSpan<'a, usize>> = Vec::new();
-    
+
     let mut stat_iter = stats.into_iter().peekable();
     while let Some(stat) = stat_iter.next() {
         if stat_iter.peek().is_none() && must_ret {
             let WrapSpan(span, inner_stat) = stat;
             match inner_stat {
                 Stat::While(cond, while_inner) => {
-                    errors.push(WrapSpan(span, vec![SemanticError::FunctionLastStatIsWhile(span)]));
-                    analyse_statement(WrapSpan(span, Stat::While(cond, while_inner)), fun_symb, local_symb, var_symb, ret_type, true, errors);
+                    errors.push(WrapSpan(
+                        span,
+                        vec![SemanticError::FunctionLastStatIsWhile(span)],
+                    ));
+                    analyse_statement(
+                        WrapSpan(span, Stat::While(cond, while_inner)),
+                        fun_symb,
+                        local_symb,
+                        var_symb,
+                        ret_type,
+                        true,
+                        errors,
+                    );
                     any_errors = true;
                 }
                 Stat::If(cond, if_block, else_block) => {
-                    match analyse_statement(WrapSpan(span, Stat::If(cond, if_block, else_block)), fun_symb, local_symb, var_symb, ret_type, true, errors) {
+                    match analyse_statement(
+                        WrapSpan(span, Stat::If(cond, if_block, else_block)),
+                        fun_symb,
+                        local_symb,
+                        var_symb,
+                        ret_type,
+                        true,
+                        errors,
+                    ) {
                         Some(if_renamed) => correct.push(if_renamed),
                         None => any_errors = true,
                     }
                 }
                 Stat::Exit(inner) => {
-                    match analyse_statement(WrapSpan(span, Stat::Exit(inner)), fun_symb, local_symb, var_symb, ret_type, true, errors) {
+                    match analyse_statement(
+                        WrapSpan(span, Stat::Exit(inner)),
+                        fun_symb,
+                        local_symb,
+                        var_symb,
+                        ret_type,
+                        true,
+                        errors,
+                    ) {
                         Some(exit_renamed) => correct.push(exit_renamed),
                         None => any_errors = true,
                     }
                 }
                 Stat::Return(inner) => {
-                    match analyse_statement(WrapSpan(span, Stat::Return(inner)), fun_symb, local_symb, var_symb, ret_type, true, errors) {
+                    match analyse_statement(
+                        WrapSpan(span, Stat::Return(inner)),
+                        fun_symb,
+                        local_symb,
+                        var_symb,
+                        ret_type,
+                        true,
+                        errors,
+                    ) {
                         Some(exit_renamed) => correct.push(exit_renamed),
                         None => any_errors = true,
                     }
                 }
                 other => {
-                    analyse_statement(WrapSpan(span, other), fun_symb, local_symb, var_symb, ret_type, true, errors);
-                    errors.push(WrapSpan(span, vec![SemanticError::FunctionNoReturnOrExit(span)]));
+                    analyse_statement(
+                        WrapSpan(span, other),
+                        fun_symb,
+                        local_symb,
+                        var_symb,
+                        ret_type,
+                        true,
+                        errors,
+                    );
+                    errors.push(WrapSpan(
+                        span,
+                        vec![SemanticError::FunctionNoReturnOrExit(span)],
+                    ));
                     any_errors = true
                 }
             }
         } else {
-            match analyse_statement(stat, fun_symb, local_symb, var_symb, ret_type, false, errors) {
+            match analyse_statement(
+                stat, fun_symb, local_symb, var_symb, ret_type, false, errors,
+            ) {
                 Some(renamed_ast) => correct.push(renamed_ast),
                 None => any_errors = true,
             }
@@ -83,18 +131,17 @@ pub fn analyse_block<'a, 'b>(
     }
 }
 
-/// Analyse a statement, resulting in either the errors for a statement or a 
+/// Analyse a statement, resulting in either the errors for a statement or a
 /// correct renamed ast.
 fn analyse_statement<'a, 'b>(
-    WrapSpan(span, stat): StatSpan<'a, &'a str>, 
+    WrapSpan(span, stat): StatSpan<'a, &'a str>,
     fun_symb: &FunctionSymbolTable<'a>,
     local_symb: &mut LocalSymbolTable<'a, 'b>,
     var_symb: &mut VariableSymbolTable,
     ret_type: &Option<Type>,
     must_ret: bool,
-    errors: &mut Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>
+    errors: &mut Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>,
 ) -> Option<StatSpan<'a, usize>> {
-
     let mut add_error = |err| {
         errors.push(err);
         None
@@ -114,7 +161,9 @@ fn analyse_statement<'a, 'b>(
                         var_symb,
                         &mut rhs_errors,
                     ) {
-                        Some(renamed_rhs) => Some(WrapSpan(span, Stat::Def(var_type, rename, renamed_rhs))),
+                        Some(renamed_rhs) => {
+                            Some(WrapSpan(span, Stat::Def(var_type, rename, renamed_rhs)))
+                        }
                         None => add_error(WrapSpan(span, rhs_errors)),
                     }
                 }
@@ -133,9 +182,7 @@ fn analyse_statement<'a, 'b>(
                         var_symb,
                         &mut stat_errors,
                     ) {
-                        Some(rhs_ast) => {
-                            Some(WrapSpan(span, Stat::Assign(lhs_ast, rhs_ast)))
-                        }
+                        Some(rhs_ast) => Some(WrapSpan(span, Stat::Assign(lhs_ast, rhs_ast))),
                         None => add_error(WrapSpan(span, stat_errors)),
                     }
                 }
@@ -187,10 +234,7 @@ fn analyse_statement<'a, 'b>(
                 Some((expr_type, WrapSpan(expr_span, expr_ast))) => match &ret_type {
                     Some(return_type) => {
                         if can_coerce(return_type, &expr_type) {
-                            Some(WrapSpan(
-                                span,
-                                Stat::Return(WrapSpan(expr_span, expr_ast)),
-                            ))
+                            Some(WrapSpan(span, Stat::Return(WrapSpan(expr_span, expr_ast))))
                         } else {
                             add_error(WrapSpan(
                                 span,
@@ -248,24 +292,24 @@ fn analyse_statement<'a, 'b>(
         }
         Stat::If(cond, if_block, else_block) => {
             let mut stat_errors = Vec::with_capacity(0);
-            let cond_valid =
-                match analyse_expression(cond, local_symb, var_symb, &mut stat_errors) {
-                    Some((cond_type, WrapSpan(cond_span, cond_ast))) => {
-                        if can_coerce(&Type::Bool, &cond_type) {
-                            Some(WrapSpan(cond_span, cond_ast))
-                        } else {
-                            errors.push(WrapSpan(
-                                span,
-                                vec![SemanticError::InvalidIfCondition(cond_span, cond_type)],
-                            ));
-                            None
-                        }
-                    }
-                    None => {
-                        errors.push(WrapSpan(span, stat_errors));
+            let cond_valid = match analyse_expression(cond, local_symb, var_symb, &mut stat_errors)
+            {
+                Some((cond_type, WrapSpan(cond_span, cond_ast))) => {
+                    if can_coerce(&Type::Bool, &cond_type) {
+                        Some(WrapSpan(cond_span, cond_ast))
+                    } else {
+                        errors.push(WrapSpan(
+                            span,
+                            vec![SemanticError::InvalidIfCondition(cond_span, cond_type)],
+                        ));
                         None
                     }
-                };
+                }
+                None => {
+                    errors.push(WrapSpan(span, stat_errors));
+                    None
+                }
+            };
 
             let if_block = analyse_block(
                 if_block,
@@ -287,11 +331,8 @@ fn analyse_statement<'a, 'b>(
                 errors,
             );
 
-            if let (
-                Some(cond_ast),
-                Some(if_block_ast),
-                Some(else_block_ast),
-            ) = (cond_valid, if_block, else_block)
+            if let (Some(cond_ast), Some(if_block_ast), Some(else_block_ast)) =
+                (cond_valid, if_block, else_block)
             {
                 Some(WrapSpan(
                     span,
@@ -311,16 +352,14 @@ fn analyse_statement<'a, 'b>(
                         } else {
                             errors.push(WrapSpan(
                                 span,
-                                vec![SemanticError::InvalidWhileCondition(
-                                    cond_span, cond_type,
-                                )],
+                                vec![SemanticError::InvalidWhileCondition(cond_span, cond_type)],
                             ));
                             None
                         }
                     }
                     None => None,
                 };
-
+                
             if let (Some(cond), Some(block_ast)) = (
                 condition_valid,
                 analyse_block(
@@ -339,7 +378,7 @@ fn analyse_statement<'a, 'b>(
             }
         }
         Stat::Block(block) => {
-            if let Some(block_ast) = analyse_block(
+            analyse_block(
                 block,
                 fun_symb,
                 &mut LocalSymbolTable::new_child(local_symb),
@@ -347,16 +386,10 @@ fn analyse_statement<'a, 'b>(
                 ret_type,
                 must_ret,
                 errors,
-            ) {
-                Some(WrapSpan(span, Stat::Block(block_ast)))
-            } else {
-                None
-            }
+            ).map(|block_ast| WrapSpan(span, Stat::Block(block_ast)))
         }
     }
 }
-
-
 
 /// Analyse the right hand side of a statement (e.g an expression, function
 /// call or array literal).

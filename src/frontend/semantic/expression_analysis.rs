@@ -7,7 +7,7 @@
 //! Extensively pushes forwards with finding errors, potentially from every
 //! leaf node of an expression tree.
 use super::{
-    super::ast::{Expr, Type, WrapSpan, UnOp},
+    super::ast::{Expr, Type, UnOp, WrapSpan},
     semantic_errors::SemanticError,
     symbol_table::{LocalSymbolTable, VariableSymbolTable},
     type_constraints::{binop_match, de_index, unop_match},

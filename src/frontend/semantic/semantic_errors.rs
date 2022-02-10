@@ -92,7 +92,7 @@ pub enum SemanticError<'a> {
     /// (The statement which should have been a return)
     FunctionNoReturnOrExit(&'a str),
 
-    /// A function is ended with a while statement, so cannot determine if it 
+    /// A function is ended with a while statement, so cannot determine if it
     /// ends.
     /// (the entire while statement - not including body)
     FunctionLastStatIsWhile(&'a str),

@@ -37,7 +37,7 @@
 use super::{
     super::{
         ast::{BinOp, GenericId, Type, UnOp, WrapSpan},
-        error::{Summary, SummaryCell, SummaryComponent, SummaryType, SummaryStage},
+        error::{Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType},
     },
     semantic_errors::{self, SemanticError, StatementErrors},
 };
@@ -85,12 +85,14 @@ fn create_cells<'a>(
     title: String,
     statements: Vec<StatementErrors<'a>>,
     semantic_errs: &mut Summary<'a>,
-    syntax_errs:&mut Summary<'a>,
+    syntax_errs: &mut Summary<'a>,
 ) {
     for WrapSpan(span, errs) in statements {
-        let (syn, sem): (Vec<SemanticError>, Vec<SemanticError>) = errs
-            .into_iter()
-            .partition(|err| matches!(err, SemanticError::FunctionNoReturnOrExit(_)) || matches!(err, SemanticError::FunctionLastStatIsWhile(_)));
+        let (syn, sem): (Vec<SemanticError>, Vec<SemanticError>) =
+            errs.into_iter().partition(|err| {
+                matches!(err, SemanticError::FunctionNoReturnOrExit(_))
+                    || matches!(err, SemanticError::FunctionLastStatIsWhile(_))
+            });
 
         if !syn.is_empty() {
             let mut syntax_cell = SummaryCell::new(span);
@@ -307,11 +309,11 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                 null_span,
                 String::from("Cannot use the fst or snd operators directly on a null, either create a new pair, or assign the null to a variable.")
             ),
-            SemanticError::FunctionLastStatIsWhile(while_span) => 
+            SemanticError::FunctionLastStatIsWhile(while_span) =>
                 SummaryComponent::new(
-                    SummaryType::Error, 
-                    198, 
-                    while_span, 
+                    SummaryType::Error,
+                    198,
+                    while_span,
                     String::from("A while loop cannot be the last statement on a path through the function, all functions must return or exit, and this cannot be determined for while loops even if they contain a return or exit"))
         }
     }

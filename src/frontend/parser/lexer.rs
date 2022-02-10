@@ -26,7 +26,7 @@ use nom::{
         },
         is_alphabetic, is_alphanumeric,
     },
-    combinator::{map, map_res, not, opt, recognize, value, cond},
+    combinator::{cond, map, map_res, not, opt, recognize, value},
     error::{context, ParseError},
     multi::{many0, many1, separated_list0, separated_list1},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
@@ -125,7 +125,9 @@ pub enum Lexer {
 }
 
 impl Lexer {
-    pub fn parser<'a>(self) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, ErrorTree<&'a str>> + 'a {
+    pub fn parser<'a>(
+        self,
+    ) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, ErrorTree<&'a str>> + 'a {
         let parser = match &self {
             Self::Fst => tag("fst"),
             Self::Snd => tag("snd"),

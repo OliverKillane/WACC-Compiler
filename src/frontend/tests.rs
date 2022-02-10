@@ -616,7 +616,8 @@ fn printInputTriangle() {
 
 #[test]
 fn functionConditionalReturn() {
-    let input = include_str!("parser/valid/function/nested_functions/functionConditionalReturn.wacc");
+    let input =
+        include_str!("parser/valid/function/nested_functions/functionConditionalReturn.wacc");
     let res = analyse(input);
     if let Err(v) = &res {
         for e in v {
@@ -652,7 +653,8 @@ fn mutualRecursion() {
 
 #[test]
 fn fixedPointRealArithmetic() {
-    let input = include_str!("parser/valid/function/nested_functions/fixedPointRealArithmetic.wacc");
+    let input =
+        include_str!("parser/valid/function/nested_functions/fixedPointRealArithmetic.wacc");
     let res = analyse(input);
     if let Err(v) = &res {
         for e in v {
@@ -3814,4 +3816,3 @@ fn freeNonPair() {
     };
     assert!(res.is_ok());
 }
-
