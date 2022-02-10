@@ -512,7 +512,7 @@ pub fn convert_error_tree<'a>(path: &'a str, input: &'a str, err: ErrorTree<&'a 
     s
 }
 
-fn parse_str(input: &str) -> IResult<&str, &str, ErrorTree<&str>>  {
+fn parse_str(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
     let esc = escaped(none_of("\\\"\'"), '\\', one_of("'0nt\"b\\rf"));
     let esc_or_empty = alt((esc, tag("")));
     delimited(tag("\""), esc_or_empty, tag("\""))(input)
