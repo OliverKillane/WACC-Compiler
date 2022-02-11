@@ -590,9 +590,17 @@ impl<'l> SummaryCell<'l> {
     fn fmt(&self, filepath: Option<&str>, input: &str) -> String {
         let input_locator = SpanLocator::new(input);
         let mut components = self.components.iter().collect::<Vec<_>>();
+
+        // sort components by their location
         components.sort_by_key(|component| input_locator.get_range(component.span));
 
-        let (span_line, span_column) = input_locator.get_coords(self.span).unwrap();
+        // if there are no components, or there is a component with no span, use
+        // the statement span, otherwise use the minimum coordinate
+        let (span_line, span_column) = match components.get(0) {
+            Some(comp) => input_locator.get_coords(comp.span).unwrap(),
+            _ => input_locator.get_coords(self.span).unwrap(),
+        };
+
         format!(
             "{}",
             format!(
@@ -812,7 +820,7 @@ mod test {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:1
+                1:4
                 1. error[200]: message
                  1 | abc
                    |    ^
@@ -845,7 +853,7 @@ mod test {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:2
+                4:1
                 1. error[200]: message
                  1 | ab
                    |  ^
@@ -884,7 +892,7 @@ mod test {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:1
+                1:4
                 1. error[200]: message
                  1 | abcdef
                    |    ^^
@@ -917,7 +925,7 @@ mod test {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:1
+                1:5
                 1. error[200]: message
                  1 | abcdefgh
                    |     ^
@@ -950,7 +958,7 @@ mod test {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:1
+                1:6
                 1. error[200]: message
                  1 | abcdefgh
                    |      ^
@@ -983,7 +991,7 @@ mod test {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:1
+                1:7
                 1. error[200]: message
                  1 | abcdefgh
                    |       ^
@@ -1102,7 +1110,7 @@ mod test {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:1
+                1:5
                 1. error[200]: message
                  1 | abcdefg
                    |     ^^^
@@ -1364,7 +1372,7 @@ mod test {
             format!("{}", summary),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:1
+                1:3
                 1. error[200]:
                  1 | a b
                    |   ^
@@ -1396,7 +1404,7 @@ mod test {
             format!("{}", summary),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:1
+                1:3
                 1. error[200]:
                  1 | a b
                    |   ^
