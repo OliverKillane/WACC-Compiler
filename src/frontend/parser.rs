@@ -1,4 +1,8 @@
-#![allow(dead_code)]
+//! Parser for WACC language grammar.
+//!
+//! [parse](parse) is the entry point. On success, will return [Program](Program)
+//! and will return a [Summary](Summary) on failure.
+
 mod lexer;
 use std::collections::HashMap;
 
@@ -35,8 +39,12 @@ use self::lexer::{parse_int, str_delimited};
 #[cfg(test)]
 mod tests;
 
-type TreeResult<'a, T> = IResult<&'a str, T, ErrorTree<&'a str>>;
-
+/// Wraps the result of the parser in a [WrapSpan]
+///
+/// Mimics the builder pattern's span in order to move building the span
+/// outside of parsing the AST node itself.
+///
+/// * `inner` - Parser whose Result is wrapped in a [WrapSpan].
 fn span<'a, F: 'a, O, E: ParseError<&'a str>>(
     mut inner: F,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, WrapSpan<'a, O>, E>
@@ -45,10 +53,16 @@ where
 {
     move |input| {
         let (rest, ret) = inner(input)?;
-        Ok((rest, WrapSpan(&input[..input.len() - rest.len()], ret)))
+        Ok((
+            rest,
+            WrapSpan(input[..input.len() - rest.len()].trim_end(), ret),
+        ))
     }
 }
 
+/// Parses the input string into a [Program]. If the input string contains
+/// syntax errors, a [Vec<Summary>](Vec<Summary>) is produced instead to be used by the
+/// error handler.
 pub fn parse(input: &str) -> Result<Program<&str>, Vec<Summary>> {
     let semantic_info = final_parser(parse_program)(input);
     match semantic_info {
@@ -57,6 +71,30 @@ pub fn parse(input: &str) -> Result<Program<&str>, Vec<Summary>> {
     }
 }
 
+/// Parses an input string into a [Program].
+///
+/// Some examples of valid programs:
+/// ```text
+/// begin
+///     skip
+/// end
+/// ```
+///
+/// ```text
+/// begin
+///     int add(int a, int b) is
+///         return a + b
+///     end
+///     int ret = call add(5, 10);
+///     println ret
+/// end
+/// ```
+///
+/// Example of invalid program:
+/// ```text
+/// begin
+/// end
+/// ```
 fn parse_program(input: &str) -> IResult<&str, Program<&str>, ErrorTree<&str>> {
     map(
         delimited(
@@ -74,6 +112,9 @@ fn parse_program(input: &str) -> IResult<&str, Program<&str>, ErrorTree<&str>> {
     )(input)
 }
 
+/// Parses an input string into a [Function].
+///
+/// Cuts after parsing "(", so that error handling is well-formatted.
 fn parse_func(input: &str) -> IResult<&str, Function<&str>, ErrorTree<&str>> {
     map(
         tuple((
@@ -98,6 +139,14 @@ fn parse_func(input: &str) -> IResult<&str, Function<&str>, ErrorTree<&str>> {
     )(input)
 }
 
+/// Combinator that takes in a terminating [Lexer] and returns a parser for
+/// parsing statement blocks.
+///
+/// We make a new combinator as parsing statements with different terminating
+/// tokens comes up a lot. This allows the process to be streamlined.
+///
+/// Cuts immediately, and after parsing the first [Stat], so that error
+/// handling is well-formatted.
 fn parse_stats<'a>(
     term: Lexer,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<WrapSpan<Stat<&'a str>>>, ErrorTree<&str>> {
@@ -111,6 +160,15 @@ fn parse_stats<'a>(
     ))
 }
 
+/// Parser for building a [Stat].
+///
+/// Two sub-parsers are built up first for brevity: parse_while and parse_if.
+/// These are large parsers so it benefits us to break up the code, but would
+/// not be worth moving them into new parsers as they are only used here and
+/// can be surely inlined by the compiler.
+///
+/// Cuts in appropriate places, so that error
+/// handling is well-formatted.
 fn parse_stat(input: &str) -> IResult<&str, Stat<&str>, ErrorTree<&str>> {
     let parse_while = preceded(
         Lexer::While.parser(),
@@ -165,12 +223,19 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str>, ErrorTree<&str>> {
     )(input)
 }
 
+/// Parses a parameter for function definitions and returns a [Stat]. Cuts
+/// after the type is parsed so that error messaging is well-formed.
 fn parse_param(input: &str) -> IResult<&str, Param<&str>, ErrorTree<&str>> {
     map(tuple((parse_type, parse_ident.cut())), |(t, ident)| {
         Param(t, ident)
     })(input)
 }
 
+/// First of two array descriptor parsers used in parsing types.
+///
+/// This allows for 0 or more sets of
+/// "[" "]" to be parsed. Returns [usize] of the number of pairs of well-formed array
+/// descriptors, as only this is needed when parsing types.
 fn parse_array_desc0(input: &str) -> IResult<&str, usize, ErrorTree<&str>> {
     map(
         many0(pair(
@@ -181,6 +246,12 @@ fn parse_array_desc0(input: &str) -> IResult<&str, usize, ErrorTree<&str>> {
     )(input)
 }
 
+/// Second of two array descriptor parsers used in parsing types.
+///  
+/// This allows for 1 or more sets of
+/// "[" "]" to be parsed. Returns [usize] of the number of pairs of well-formed array
+/// descriptors, as only this is needed when parsing types.
+/// This parser was specifically designed for parsing multi-level pair-types.
 fn parse_array_desc1(input: &str) -> IResult<&str, usize, ErrorTree<&str>> {
     map(
         many1(pair(
@@ -191,6 +262,8 @@ fn parse_array_desc1(input: &str) -> IResult<&str, usize, ErrorTree<&str>> {
     )(input)
 }
 
+/// Parser for the [Type] AST Node. Can parse well-formed base types, array
+/// types and pair types.
 fn parse_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     map(
         pair(alt((parse_base_type, parse_pair_type)), parse_array_desc0),
@@ -201,6 +274,8 @@ fn parse_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     )(input)
 }
 
+/// Parser for the [Type] AST Node. Handles the case when a pair type needs
+/// to be parsed.
 fn parse_pair_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     map(
         preceded(
@@ -219,6 +294,10 @@ fn parse_pair_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     )(input)
 }
 
+/// Parser for the [Type] AST Node. Handles the case where you want to parse
+/// the sub-type of a [Type::Pair]. This was complicated as the spec allows
+/// for pair types to be pair-elem types, but only in the case that it's also
+/// an array.
 fn parse_pair_elem_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     alt((
         value(
@@ -239,6 +318,7 @@ fn parse_pair_elem_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     ))(input)
 }
 
+/// Parser for the [Type] AST node.
 fn parse_base_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     ws(alt((
         value(Type::Int, Lexer::Int.parser()),
@@ -248,6 +328,7 @@ fn parse_base_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     )))(input)
 }
 
+/// Parser for the left-hand side of an assign expression.
 fn parse_lhs(input: &str) -> IResult<&str, AssignLhs<&str>, ErrorTree<&str>> {
     alt((
         map(preceded(Lexer::Fst.parser(), parse_expr.cut()), |pair| {
@@ -269,6 +350,7 @@ fn parse_lhs(input: &str) -> IResult<&str, AssignLhs<&str>, ErrorTree<&str>> {
     ))(input)
 }
 
+/// Parser for an array element.
 fn parse_array_elem(input: &str) -> IResult<&str, Vec<ExprSpan<&str>>, ErrorTree<&str>> {
     many1(delimited(
         Lexer::OpenBracket.parser(),
@@ -277,6 +359,7 @@ fn parse_array_elem(input: &str) -> IResult<&str, Vec<ExprSpan<&str>>, ErrorTree
     ))(input)
 }
 
+/// Parser for the right-hand side of an assign expression.
 fn parse_rhs(input: &str) -> IResult<&str, AssignRhs<&str>, ErrorTree<&str>> {
     let call = context(
         "Argument List",
@@ -319,10 +402,14 @@ fn parse_rhs(input: &str) -> IResult<&str, AssignRhs<&str>, ErrorTree<&str>> {
     )(input)
 }
 
+/// Entry-point parser for building a [Expr]. Precedence and associativity of
+/// operators is handled in this parser.
 fn parse_expr(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&str>> {
     context("Expression", parse_expr_or)(input)
 }
 
+/// Performs a right-fold on an expression to build up an expression tree from
+/// a vector of nodes. Right-folding allows for left-associative operators.
 fn fold_expr<'a>(
     expr: WrapSpan<'a, Expr<'a, &'a str>>,
     rem: Vec<(&'a str, WrapSpan<'a, Expr<'a, &'a str>>)>,
@@ -332,6 +419,7 @@ fn fold_expr<'a>(
         .rfold(expr, |acc, val| parse_bin_op(val, acc, input))
 }
 
+/// Parser for a `expr1 || expr2` expression.
 fn parse_expr_or(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&str>> {
     let (rest, sub_exp) = parse_expr_and(input)?;
     let (rest, exprs) = many0(tuple((
@@ -341,6 +429,7 @@ fn parse_expr_or(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&
     Ok((rest, fold_expr(sub_exp, exprs, input)))
 }
 
+/// Parser for a `expr1 && expr2` expression.
 fn parse_expr_and(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&str>> {
     let (rest, sub_exp) = parse_expr_eq(input)?;
     let (rest, exprs) = many0(tuple((
@@ -350,6 +439,7 @@ fn parse_expr_and(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<
     Ok((rest, fold_expr(sub_exp, exprs, input)))
 }
 
+/// Parser for a `expr1 == expr2` expression.
 fn parse_expr_eq(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&str>> {
     let (rest, sub_exp) = parse_expr_cmp(input)?;
     let (rest, exprs) = many0(tuple((
@@ -359,6 +449,7 @@ fn parse_expr_eq(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&
     Ok((rest, fold_expr(sub_exp, exprs, input)))
 }
 
+/// Parser for a `expr1 (>= | > | <= | <) expr2` expression.
 fn parse_expr_cmp(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&str>> {
     let (rest, sub_exp) = parse_expr_plus(input)?;
     let (rest, exprs) = many0(tuple((
@@ -373,6 +464,7 @@ fn parse_expr_cmp(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<
     Ok((rest, fold_expr(sub_exp, exprs, input)))
 }
 
+/// Parser for a `expr1 (+ | -) expr2` expression.
 fn parse_expr_plus(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&str>> {
     let (rest, sub_exp) = parse_expr_mult(input)?;
     let (rest, exprs) = many0(tuple((
@@ -382,6 +474,7 @@ fn parse_expr_plus(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree
     Ok((rest, fold_expr(sub_exp, exprs, input)))
 }
 
+/// Parser for a `expr1 (* | / | %) expr2` expression.
 fn parse_expr_mult(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&str>> {
     let (rest, sub_exp) = span(parse_expr_atom)(input)?;
     let (rest, exprs) = many0(tuple((
@@ -395,6 +488,7 @@ fn parse_expr_mult(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree
     Ok((rest, fold_expr(sub_exp, exprs, input)))
 }
 
+/// Parser for unary expressions and bool/pair literals.
 fn parse_literal_keywords(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&str>> {
     alt((
         map(Lexer::True.parser(), |t| {
@@ -427,6 +521,8 @@ fn parse_literal_keywords(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, Er
     ))(input)
 }
 
+/// Parser for atomic expressions such as newpair, integers, string/character
+/// literals, unary expressions and '('expr')'.
 fn parse_expr_atom(input: &str) -> IResult<&str, Expr<&str>, ErrorTree<&str>> {
     let new_pair = delimited(
         pair(Lexer::Newpair.parser(), Lexer::OpenParen.parser().cut()),
@@ -462,6 +558,7 @@ fn parse_expr_atom(input: &str) -> IResult<&str, Expr<&str>, ErrorTree<&str>> {
     ))(input)
 }
 
+/// Matches a [str] unary operator and returns [UnOp]
 fn parse_unary(op: &str) -> UnOp {
     match op {
         "!" => UnOp::Neg,
@@ -473,6 +570,9 @@ fn parse_unary(op: &str) -> UnOp {
     }
 }
 
+/// Matches the binary operator string and combines the two input [Expr]s
+/// into a [Expr::BinOp]. Also calculates the associatity-agnsostic span for the
+/// resulting [Expr], allowing for nice error translation
 fn parse_bin_op<'a>(
     tup: (&'a str, WrapSpan<'a, Expr<'a, &'a str>>),
     expr1: WrapSpan<'a, Expr<'a, &'a str>>,
@@ -513,6 +613,7 @@ fn parse_bin_op<'a>(
 
 use crate::frontend::error::*;
 
+/// Takes the error tree and groups them by the start of their spans.
 pub fn collect_errors<'a>(
     err: ErrorTree<&'a str>,
     locations: &mut HashMap<&'a str, (Vec<StackContext>, Vec<BaseErrorKind>)>,
@@ -539,17 +640,15 @@ pub fn collect_errors<'a>(
     };
 }
 
+/// Converts the [ErrorTree] into a [Summary] which allows for nice user-facing
+/// error printing.
 pub fn convert_error_tree<'a>(input: &'a str, err: ErrorTree<&'a str>) -> Summary<'a> {
     let mut h = HashMap::new();
     collect_errors(err, &mut h, vec![]);
 
     let mut summary = Summary::new(input, SummaryStage::Parser);
     for (k, v) in h {
-        let k2 = match k {
-            "" => &input[input.len() - 2..],
-            _ => &k[..1],
-        };
-        let mut summary_cell = SummaryCell::new(k2);
+        let mut summary_cell = SummaryCell::new(input);
         let contexts: String =
             v.0.into_iter()
                 .map(|v| match v {
@@ -571,7 +670,7 @@ pub fn convert_error_tree<'a>(input: &'a str, err: ErrorTree<&'a str>) -> Summar
             SummaryComponent::new(
                 SummaryType::Error,
                 100,
-                k2,
+                &k[..1],
                 format!("Expected {}", contexts),
             )
             .set_note(format!("Try: {}", expected.join(", "))),
