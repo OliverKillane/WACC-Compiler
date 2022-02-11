@@ -23,13 +23,25 @@ pub fn translate_expr<'a>(
         Expr::Char(c) => Num(NumExpr::Const(Byte, c as i32)),
 
         // Use ptr to the vec that represents the String?
+        // character array
+        // vec([size]), [items]..[items])
         Expr::String(s) => {
             todo!()
         }
 
-        Expr::Var(v) => {
-            // Variable Symbol Table
-            todo!()
+        Expr::Var(v) => match var_symb.get_type_from_id(v) {
+            Some(t) => match t {
+                // ast::Type::Int => Num(NumExpr::Var(v)),
+                ast::Type::Bool => todo!(),
+                ast::Type::Char => todo!(),
+                ast::Type::String => todo!(),
+                ast::Type::Any => todo!(),
+                ast::Type::Generic(_) => todo!(),
+                ast::Type::Pair(_, _) => todo!(),
+                ast::Type::Array(_, _) => todo!(),
+                _ => todo!()
+            },
+            None => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!"),
         }
 
         Expr::ArrayElem(_, _) => {
@@ -45,13 +57,16 @@ pub fn translate_expr<'a>(
             )),
             (UnOp::Chr, Num(n)) => Num(NumExpr::Cast(Byte, box n)),
             (UnOp::Ord, Num(n)) => Num(NumExpr::Cast(DWord, box n)),
-            _ => panic!("Shouldn't reach this!"),
+            _ => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!"),
         },
+        // NumExpr::Deref(NumSize::DWord, PtrExpr::Var(var))
+        // someexpr::Deref(PtrExpr::Offset(PtrExpr::Var(pair), NumExpr::SizeOf(first_field_type)))
         Expr::UnOp(o, box v) => match o {
+            // deref ptr 
             UnOp::Len => todo!(),
             UnOp::Fst => todo!(),
             UnOp::Snd => todo!(),
-            _ => panic!("Shouldn't reach this!"),
+            _ => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!"),
         },
 
         Expr::BinOp(box e1, o, box e2) => {
@@ -112,10 +127,10 @@ pub fn translate_expr<'a>(
                 (e1, ast::BinOp::Newpair, e2) => {
                     todo!()
                 }
-                _ => panic!("Shouldn't reach this!"),
+                _ => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!"),
             }
         }
-        _ => panic!("Shouldn't reach this!"),
+        _ => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!"),
     }
 }
 
