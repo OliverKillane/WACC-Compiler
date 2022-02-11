@@ -40,10 +40,10 @@ use self::lexer::{parse_int, str_delimited};
 mod tests;
 
 /// Wraps the result of the parser in a [WrapSpan]
-/// 
+///
 /// Mimics the builder pattern's span in order to move building the span
 /// outside of parsing the AST node itself.
-/// 
+///
 /// * `inner` - Parser whose Result is wrapped in a [WrapSpan].
 fn span<'a, F: 'a, O, E: ParseError<&'a str>>(
     mut inner: F,
@@ -53,13 +53,16 @@ where
 {
     move |input| {
         let (rest, ret) = inner(input)?;
-        Ok((rest, WrapSpan(&input[..input.len() - rest.len()].trim_end(), ret)))
+        Ok((
+            rest,
+            WrapSpan(input[..input.len() - rest.len()].trim_end(), ret),
+        ))
     }
 }
 
 /// Parses the input string into a [Program]. If the input string contains
-/// syntax errors, a [Vec<Summary>](Vec<Summary>) is produced instead to be used by the 
-/// error handler. 
+/// syntax errors, a [Vec<Summary>](Vec<Summary>) is produced instead to be used by the
+/// error handler.
 pub fn parse(input: &str) -> Result<Program<&str>, Vec<Summary>> {
     let semantic_info = final_parser(parse_program)(input);
     match semantic_info {
@@ -69,24 +72,24 @@ pub fn parse(input: &str) -> Result<Program<&str>, Vec<Summary>> {
 }
 
 /// Parses an input string into a [Program].
-/// 
+///
 /// Some examples of valid programs:
 /// ```text
 /// begin
 ///     skip
 /// end
 /// ```
-/// 
+///
 /// ```text
 /// begin
-///     int add(int a, int b) is 
+///     int add(int a, int b) is
 ///         return a + b
 ///     end
 ///     int ret = call add(5, 10);
 ///     println ret
 /// end
 /// ```
-/// 
+///
 /// Example of invalid program:
 /// ```text
 /// begin
@@ -110,7 +113,7 @@ fn parse_program(input: &str) -> IResult<&str, Program<&str>, ErrorTree<&str>> {
 }
 
 /// Parses an input string into a [Function].
-/// 
+///
 /// Cuts after parsing "(", so that error handling is well-formatted.
 fn parse_func(input: &str) -> IResult<&str, Function<&str>, ErrorTree<&str>> {
     map(
@@ -138,11 +141,11 @@ fn parse_func(input: &str) -> IResult<&str, Function<&str>, ErrorTree<&str>> {
 
 /// Combinator that takes in a terminating [Lexer] and returns a parser for
 /// parsing statement blocks.
-/// 
+///
 /// We make a new combinator as parsing statements with different terminating
 /// tokens comes up a lot. This allows the process to be streamlined.
-/// 
-/// Cuts immediately, and after parsing the first [Stat], so that error 
+///
+/// Cuts immediately, and after parsing the first [Stat], so that error
 /// handling is well-formatted.
 fn parse_stats<'a>(
     term: Lexer,
@@ -158,13 +161,13 @@ fn parse_stats<'a>(
 }
 
 /// Parser for building a [Stat].
-/// 
+///
 /// Two sub-parsers are built up first for brevity: parse_while and parse_if.
 /// These are large parsers so it benefits us to break up the code, but would
 /// not be worth moving them into new parsers as they are only used here and
 /// can be surely inlined by the compiler.
-/// 
-/// Cuts in appropriate places, so that error 
+///
+/// Cuts in appropriate places, so that error
 /// handling is well-formatted.
 fn parse_stat(input: &str) -> IResult<&str, Stat<&str>, ErrorTree<&str>> {
     let parse_while = preceded(
@@ -228,8 +231,8 @@ fn parse_param(input: &str) -> IResult<&str, Param<&str>, ErrorTree<&str>> {
     })(input)
 }
 
-/// First of two array descriptor parsers used in parsing types. 
-/// 
+/// First of two array descriptor parsers used in parsing types.
+///
 /// This allows for 0 or more sets of
 /// "[" "]" to be parsed. Returns [usize] of the number of pairs of well-formed array
 /// descriptors, as only this is needed when parsing types.
@@ -259,7 +262,7 @@ fn parse_array_desc1(input: &str) -> IResult<&str, usize, ErrorTree<&str>> {
     )(input)
 }
 
-/// Parser for the [Type] AST Node. Can parse well-formed base types, array 
+/// Parser for the [Type] AST Node. Can parse well-formed base types, array
 /// types and pair types.
 fn parse_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     map(
@@ -272,7 +275,7 @@ fn parse_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
 }
 
 /// Parser for the [Type] AST Node. Handles the case when a pair type needs
-/// to be parsed. 
+/// to be parsed.
 fn parse_pair_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     map(
         preceded(
@@ -315,7 +318,7 @@ fn parse_pair_elem_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     ))(input)
 }
 
-/// Parser for the [Type] AST node. 
+/// Parser for the [Type] AST node.
 fn parse_base_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     ws(alt((
         value(Type::Int, Lexer::Int.parser()),
@@ -404,7 +407,6 @@ fn parse_rhs(input: &str) -> IResult<&str, AssignRhs<&str>, ErrorTree<&str>> {
 fn parse_expr(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&str>> {
     context("Expression", parse_expr_or)(input)
 }
-
 
 /// Performs a right-fold on an expression to build up an expression tree from
 /// a vector of nodes. Right-folding allows for left-associative operators.
@@ -637,7 +639,7 @@ pub fn collect_errors<'a>(
         }
     };
 }
- 
+
 /// Converts the [ErrorTree] into a [Summary] which allows for nice user-facing
 /// error printing.
 pub fn convert_error_tree<'a>(input: &'a str, err: ErrorTree<&'a str>) -> Summary<'a> {
@@ -646,7 +648,7 @@ pub fn convert_error_tree<'a>(input: &'a str, err: ErrorTree<&'a str>) -> Summar
 
     let mut summary = Summary::new(input, SummaryStage::Parser);
     for (k, v) in h {
-        let mut summary_cell = SummaryCell::new(&input);
+        let mut summary_cell = SummaryCell::new(input);
         let contexts: String =
             v.0.into_iter()
                 .map(|v| match v {

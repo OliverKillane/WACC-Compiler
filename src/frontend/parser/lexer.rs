@@ -1,7 +1,7 @@
 //! Lexes individual string tokens and handles whitespace.
 //!
 //! ## Errors
-//! Two new errors are introduced: [KeywordIdentError](KeywordIdentError) and 
+//! Two new errors are introduced: [KeywordIdentError](KeywordIdentError) and
 //! [OutOfBoundsInt](OutOfBoundsInt).
 
 #![deny(clippy::missing_docs_in_private_items)]
@@ -48,7 +48,7 @@ use std::{collections::HashSet, error::Error};
 
 use crate::frontend::ast;
 
-/// Parser for WACC comments. Returns the parsed comment on success. 
+/// Parser for WACC comments. Returns the parsed comment on success.
 pub fn comments(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
     recognize(pair(char('#'), alt((is_not("\n\r"), tag("")))))(input)
 }
@@ -175,7 +175,6 @@ pub enum Lexer {
 }
 
 impl Lexer {
-
     /// Returns parser for desired parser. Returned parser returns the desired token, with no
     /// trailing whitespace, and a result with an [ErrorTree](ErrorTree) if parsing the token fails.
     /// Whitespace is always consumed, but is not in the matched token.
@@ -281,7 +280,6 @@ impl fmt::Display for OutOfBoundsInt {
 }
 impl std::error::Error for OutOfBoundsInt {}
 
-
 /// Parses an identifier. On success, a [&str](str) is produced. Else,
 /// an [ErrorTree](ErrorTree) is produced with the context of the error to be
 /// converted into a syntax error later.
@@ -318,7 +316,7 @@ pub fn parse_int(input: &str) -> IResult<&str, i32, ErrorTree<&str>> {
 /// ```text
 /// '\n'
 /// ```
-/// To prevent duplication of the parser, this combinator takes in the 
+/// To prevent duplication of the parser, this combinator takes in the
 /// delimiters, and produces a parser that can parse escaped string and char
 /// literals. Fails if escaped character is illegal.
 pub fn str_delimited<'a>(
