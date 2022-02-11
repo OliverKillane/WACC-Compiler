@@ -86,8 +86,7 @@ fn parse_func(input: &str) -> IResult<&str, Function<&str>, ErrorTree<&str>> {
                         span(parse_param),
                         Lexer::Comma.parser(),
                         Lexer::CloseParen.parser(),
-                    )
-                    ,
+                    ),
                     map(Lexer::CloseParen.parser(), |_| Vec::new()),
                 ))
                 .cut()
