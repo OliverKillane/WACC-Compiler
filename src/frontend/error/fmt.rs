@@ -621,11 +621,11 @@ impl<'l> Display for Summary<'l> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut width = f.width().unwrap_or(DEFAULT_SUMMARY_WIDTH);
         let preamble = format!(
-            "{} occured during {}:\n",
+            "{} been found during {}\n",
             if self.cells.len() > 1 {
-                "Some errors have"
+                format!("{} erroneous statements have", self.cells.len())
             } else {
-                "An error"
+                String::from("An erroneous statement has")
             },
             match self.stage {
                 SummaryStage::Parser => "parsing",
@@ -778,7 +778,7 @@ mod test {
                 None,
             ),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
                 1:2
                 1. error[200]: message
                  1 | 😊😊😊😊😊
@@ -811,7 +811,7 @@ mod test {
                 None,
             ),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
                 1:1
                 1. error[200]: message
                  1 | abc
@@ -844,7 +844,7 @@ mod test {
                 None,
             ),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
                 1:2
                 1. error[200]: message
                  1 | ab
@@ -883,7 +883,7 @@ mod test {
                 None,
             ),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
                 1:1
                 1. error[200]: message
                  1 | abcdef
@@ -916,7 +916,7 @@ mod test {
                 None,
             ),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
                 1:1
                 1. error[200]: message
                  1 | abcdefgh
@@ -949,7 +949,7 @@ mod test {
                 None,
             ),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
                 1:1
                 1. error[200]: message
                  1 | abcdefgh
@@ -982,7 +982,7 @@ mod test {
                 None,
             ),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
                 1:1
                 1. error[200]: message
                  1 | abcdefgh
@@ -1015,7 +1015,7 @@ mod test {
                 None,
             ),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
                 test/test.wacc:1:1
                 1. error[200]: message
                  1 | abc
@@ -1035,14 +1035,14 @@ mod test {
         assert_eq_multiline(
             format!("{}", Summary::new(input, SummaryStage::Parser)),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
             "}
             .to_string(),
         );
         assert_eq_multiline(
             format!("{}", Summary::new(input, SummaryStage::Semantic)),
             indoc! {"
-                An error has occured during semantic analysis
+                An erroneous statement has been found during semantic analysis
             "}
             .to_string(),
         );
@@ -1068,7 +1068,7 @@ mod test {
                 None,
             ),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
                 1:1 -> title
                 1. error[200]: message
                  1 | abc
@@ -1101,7 +1101,7 @@ mod test {
                 None,
             ),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
                 1:1
                 1. error[200]: message
                  1 | abcdefg
@@ -1134,7 +1134,7 @@ mod test {
                 Some("note"),
             ),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
                 1:1
                 1. error[200]: message
                  1 | abc
@@ -1176,7 +1176,7 @@ mod test {
         assert_eq_multiline(
             format!("{}", summary),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
                 1:1
                 1. error[200]:
                 2. error[200]:
@@ -1225,7 +1225,7 @@ mod test {
         assert_eq_multiline(
             format!("{}", summary),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
                 1:1
                 1.   error[200]: 
                 2. warning[200]: 
@@ -1274,7 +1274,7 @@ mod test {
         assert_eq_multiline(
             format!("{}", summary),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
                 1:1
                 1. error[200]:
                 2. error[200]:
@@ -1314,10 +1314,11 @@ mod test {
             ));
             summary.add_cell(cell);
         }
+
         assert_eq_multiline(
             format!("{}", summary),
             indoc! {"
-                An error has occured during parsing
+                3 erroneous statements have been found during parsing
                 1:1
                 1. error[200]:
                  1 | a b
@@ -1325,7 +1326,7 @@ mod test {
                    | |
                    | V
                    | [1]
-                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 1:1
                 1. error[200]:
                  1 | a b
@@ -1333,7 +1334,7 @@ mod test {
                    | |
                    | V
                    | [1]
-                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 1:1
                 1. error[200]:
                  1 | a b
@@ -1362,7 +1363,7 @@ mod test {
         assert_eq_multiline(
             format!("{}", summary),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
                 1:1
                 1. error[200]:
                  1 | a b
@@ -1394,7 +1395,7 @@ mod test {
         assert_eq_multiline(
             format!("{}", summary),
             indoc! {"
-                An error has occured during parsing
+                An erroneous statement has been found during parsing
                 1:1
                 1. error[200]:
                  1 | a b
