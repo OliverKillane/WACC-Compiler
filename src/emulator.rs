@@ -65,7 +65,7 @@ fn eval_ptrexpr(
             if let Var::Ptr(ptr) = deref_memory(ptr_expr, functions, state)? {
                 *ptr
             } else {
-                return Err(ExitStatus::Fault(format!("Allocation type fault")));
+                return Err(ExitStatus::Fault("Allocation type fault".to_string()));
             }
         }
         PtrExpr::Offset(ptr_expr, num_expr) => {
@@ -143,7 +143,7 @@ fn eval_boolexpr(
             if let Var::Bool(bool) = deref_memory(ptr_expr, functions, state)? {
                 *bool
             } else {
-                return Err(ExitStatus::Fault(format!("Allocation type fault")));
+                return Err(ExitStatus::Fault("Allocation type fault".to_string()));
             }
         }
         BoolExpr::TestZero(num_expr) => {
@@ -208,7 +208,7 @@ fn eval_numexpr(
                 (Var::DWord(ref num), NumSize::DWord) => (*num, NumSize::DWord),
                 (Var::Word(ref num), NumSize::Word) => (*num as i32, NumSize::Word),
                 (Var::Byte(ref num), NumSize::Byte) => (*num as i32, NumSize::Byte),
-                _ => return Err(ExitStatus::Fault(format!("Allocation type fault"))),
+                _ => return Err(ExitStatus::Fault("Allocation type fault".to_string())),
             }
         }
         NumExpr::ArithOp(box num_expr1, op, box num_expr2) => {
@@ -302,13 +302,13 @@ fn deref_memory<'l>(
     state
         .memory
         .get_mut(&mem_location)
-        .ok_or(ExitStatus::Fault("Segmentation fault".to_string()))
+        .ok_or_else(|| ExitStatus::Fault("Segmentation fault".to_string()))
 }
 
 /// Returns a reference to a given variable.
 fn get_var<'l>(var: &VarRepr, vars: &'l mut HashMap<VarRepr, Var>) -> &'l mut Var {
     vars.get_mut(var)
-        .expect(&format!("Variable {} not found", var))
+        .unwrap_or_else(|| panic!("Variable {} not found", var))
 }
 
 /// Runs a single statement. Returns either nothing or an exit status.
@@ -394,7 +394,7 @@ fn run_statement(
                 if let Some(Var::Byte(c)) = state.memory.get(&addr) {
                     state.stdout.push(*c as u8 as char)
                 } else {
-                    return Err(ExitStatus::Fault(format!("Allocation type fault")));
+                    return Err(ExitStatus::Fault("Allocation type fault".to_string()));
                 }
             }
         }
@@ -447,13 +447,13 @@ fn run_graph(
 /// Runs a single function. Returns either a value or an exit status.
 fn run_function(
     name: &str,
-    args: &Vec<Var>,
+    args: &[Var],
     functions: &HashMap<String, Function>,
     state: &mut ProgramState,
 ) -> Result<Var, ExitStatus> {
     let Function(ret_type, arg_vars, local_vars, graph) = functions
         .get(name)
-        .expect(&format!("Function with name \"{}\" not found", name));
+        .unwrap_or_else(|| panic!("Function with name \"{}\" not found", name));
     if args.len() != arg_vars.len() {
         panic!("Function arguments length mismatch");
     }
