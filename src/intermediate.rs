@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 /// The representation of an identifier of a variable.
-pub type VarRepr = u32;
+pub type VarRepr = usize;
 
 /// The id of a block in a [block graph](BlockGraph).
 pub type BlockId = usize;
