@@ -549,19 +549,25 @@ impl<'l> SummaryCell<'l> {
                     " ...\n".to_string()
                 }
             });
+        let (span_begin, span_end) = input_locator.get_range(span).unwrap();
         annotations
             .into_iter()
             .map(|(line_num, annotations)| {
                 let line = input_locator.get_input_line(line_num).unwrap();
-                let (span_begin, span_end) = input_locator.get_range(span).unwrap();
                 let (line_begin, line_end) = input_locator.get_range(line).unwrap();
                 Self::fmt_refs_line(
                     line,
                     *selected_prefixes
                         .get(&line_num)
                         .unwrap_or(&(0, Color::White)),
-                    max(span_begin as isize - line_begin as isize, 0) as usize,
-                    max(line_end as isize - span_end as isize, 0) as usize,
+                    min(
+                        max(span_begin as isize - line_begin as isize, 0) as usize,
+                        line.len(),
+                    ),
+                    min(
+                        max(line_end as isize - span_end as isize, 0) as usize,
+                        line.len(),
+                    ),
                     line_num,
                     line_num_width,
                     annotations,
