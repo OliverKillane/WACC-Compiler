@@ -30,14 +30,14 @@ use std::{cmp::min, fs::read_to_string, path::PathBuf, process};
 #[derive(Parser, Debug)]
 #[clap(author = "Jordan Hall, Bartłomiej Cieślar, Panayiotis Gavriil and Oliver Killane", about = "WACC compiler" , long_about = Some("A wacc compiler written is rust targeting 32 bit ARM systems"), version = "0.5.1")]
 struct Args {
-    #[clap(parse(from_os_str), value_name = "FILE")]
+    #[clap(parse(from_os_str), value_name = "INPUT FILE")]
     filepath: PathBuf,
 
     #[clap(
         short,
         long,
         parse(from_os_str),
-        value_name = "FILE",
+        value_name = "OUTPUT FILE",
         help = "The name of the output file"
     )]
     outputpath: Option<PathBuf>,
@@ -52,13 +52,15 @@ const FILE_FAILURE: i32 = 1;
 /// - Halts and reports failures through returning exit codes.
 fn main() {
     let args = Args::parse();
+    let filepath = args.filepath.as_path().display().to_string();
 
     match read_to_string(args.filepath) {
         Ok(source_code) => match analyse(&source_code) {
             Ok(_ir) => process::exit(COMPILE_SUCCESS),
             Err(errs) => {
                 let mut exit_code = i32::MAX;
-                for err in errs {
+                for mut err in errs {
+                    err.set_filepath(filepath.clone());
                     exit_code = min(exit_code, err.get_code());
                     println!("{}", err)
                 }
