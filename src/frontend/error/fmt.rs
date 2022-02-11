@@ -621,7 +621,13 @@ impl<'l> Display for Summary<'l> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut width = f.width().unwrap_or(DEFAULT_SUMMARY_WIDTH);
         let preamble = format!(
-            "An error has occured during {}\n",
+            "{} occured during {}:\n",
+                if self.cells.len() > 1 {
+                    "Some errors have"
+                } else {
+                    "An error"
+                }
+            ,
             match self.stage {
                 SummaryStage::Parser => "parsing",
                 SummaryStage::Semantic => "semantic analysis",

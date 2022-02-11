@@ -53,6 +53,10 @@ pub fn analyse_function<'a>(
         }
     }
 
+    if !function_errors.is_empty() {
+        errors.push(WrapSpan(def_span, function_errors))
+    }
+
     match analyse_block(
         block,
         fun_symb,
@@ -63,17 +67,16 @@ pub fn analyse_function<'a>(
         &mut errors,
     ) {
         Some(block_ast) => {
-            if function_errors.is_empty() {
+            if errors.is_empty() {
                 Ok((
                     WrapSpan(def_span, Function(ret_type, name, param_correct, block_ast)),
                     var_symb,
                 ))
             } else {
-                Err((name, vec![WrapSpan(def_span, function_errors)]))
+                Err((name, errors))
             }
         }
         None => {
-            errors.push(WrapSpan(def_span, function_errors));
             Err((name, errors))
         }
     }

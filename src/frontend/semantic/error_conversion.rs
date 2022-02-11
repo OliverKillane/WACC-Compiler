@@ -76,13 +76,15 @@ pub fn convert_errors<'a>(
         )
     }
 
+    // syntax errors rare, generally expected to have a single semantics summary
     let mut summaries = Vec::with_capacity(1);
-    if !semantic_errors.is_empty() {
-        summaries.push(semantic_errors)
-    }
 
     if !syntax_errors.is_empty() {
         summaries.push(syntax_errors)
+    }
+
+    if !semantic_errors.is_empty() {
+        summaries.push(semantic_errors)
     }
 
     summaries
@@ -99,8 +101,8 @@ fn create_cells<'a>(
     for WrapSpan(span, errs) in statements {
         let (syn, sem): (Vec<SemanticError>, Vec<SemanticError>) =
             errs.into_iter().partition(|err| {
-                matches!(err, SemanticError::FunctionNoReturnOrExit(_))
-                    || matches!(err, SemanticError::FunctionLastStatIsWhile(_))
+                matches!(err, SemanticError::FunctionNoReturnOrExit(_,_))
+                    || matches!(err, SemanticError::FunctionLastStatIsWhile(_,_))
             });
 
         if !syn.is_empty() {
@@ -136,56 +138,57 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                     201,
                     var_span,
                     format!("Assignment to undefined variable {}.", var_span)
-                ),
+                ).set_shorthand(format!("To amend, declare the variable {}.", var_span)),
             SemanticError::UndefinedVariableUse(var_span) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     202,
                     var_span,
                     format!("Use of undeclared variable {}.", var_span)
-                ),
+                ).set_shorthand(String::from("Either declare the variable elsewhere, use another declared variable, or change the expression.")),
             SemanticError::InvalidIndex(index_span, index_type) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     203,
                     index_span,
-                    format!("Incorrect type of index, only {} can be used to index, but here an expression of type {} was used.", Type::Int, index_type)
-                ),
+                    format!("Incorrect type of index, an expression of type {} was used.", index_type)
+                ).set_shorthand(format!("To amend, change the expression to be of type {}", Type::Int))
+                .set_note(format!("Only expressions of type {} can be used as indices", Type::Int)),
             SemanticError::InvalidVariableType(var_span, expected, found) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     204,
                     var_span,
                     format!("Incorrect type for variable, expected a {} but found {}", expected, found)
-                ),
+                ).set_shorthand(format!("Either change the type of the variable, change the expression, or declare a new variable of type {} to use.", expected)),
             SemanticError::InvalidType(expr_span, expected, found) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     205,
                     expr_span,
                     format!("Wrong type! Expected {} but found {}", expected, found)
-                ),
+                ).set_shorthand(String::from("The type of the expression must match the type it is being assigned to.")),
             SemanticError::InvalidCallType(call_span, expected, found) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     206,
                     call_span,
                     format!("Wrong type returned from call! Expected {} but found {}", expected, found)
-                ),
+                ).set_shorthand(format!("Either make the call be to a function returning {}, or change the type it is assigned to to an {}.", expected, expected)),
             SemanticError::InvalidArrayLiteral(lit_span, types) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     207,
                     lit_span,
                     format!("Invalid array literal, all must be the same type, but found an array with types: [{}]", types.into_iter().map(|t| format!("{}", t)).collect::<Vec<_>>().join(","))
-                ),
+                ).set_shorthand(String::from("All the elements in the array need to coerce to a common type T, such that the array is T[].")),
             SemanticError::InvalidBinOp(binop_span, possible_types, possible_ops, (found_left, found_right), found_op) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     208,
                     binop_span,
                     format!("Invalid application of operator {} on {} and {}.", found_left, found_right, found_op)
-                ).set_note(format!("{} {}",
+                ).set_shorthand(format!("{} {}",
                         if possible_types.is_empty() {
                             format!("There are no possible input types for the operator {}.", found_op)
                         } else {
@@ -205,7 +208,7 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                     209,
                     op_span,
                     format!("Invalid application of {} on {}.", found_op, found_type)
-                ).set_note(format!("{} {}",
+                ).set_shorthand(format!("{} {}",
                         if possible_types.is_empty() {
                             format!("There are no possible input types for {}.", found_op) // there will *always* be an input type, this is there in the event that we remove an operator from the unops table, but leave in the ast.
                         } else {
@@ -223,21 +226,24 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                     210,
                     var_span,
                     format!("Repeat definition of variable {}.", var_span)
-                ).set_declaration(orig_def_span),
+                ).set_declaration(orig_def_span)
+                .set_shorthand(format!("To amend use a different name to {} in this definition", var_span))
+                .set_note(String::from("A variable can only be declared once in a scope-level.")),
             SemanticError::UndefinedFunction(fun_span) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     211,
                     fun_span,
                     format!("Use of undefined function {}.", fun_span)
-                ),
+                ).set_shorthand(format!("To amend, declare a new function {}.", fun_span)),
             SemanticError::RepeatDefinitionFunction(fun_span, orig_def_span) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     212,
                     fun_span,
                     format!("Repeat definition of function {}.", fun_span)
-                ),
+                ).set_shorthand(format!("To amend change the function name to something other than {}.", fun_span))
+                .set_note(String::from("A function can only be defined once, to amend use a different identifier.")),
             SemanticError::FunctionParametersLengthMismatch(fun_span, expected, found) =>
                 SummaryComponent::new(
                     SummaryType::Error,
@@ -251,35 +257,35 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                     214,
                     arg_span,
                     format!("Function argument for parameter {} is of type {} but should have been {}.", param_name, found, expected)
-                ),
+                ).set_shorthand(format!("To amend, change the expression for parameter {} to one of type {}.", param_name, expected)),
             SemanticError::InvalidFunctionReturn(expr_span, expected, found) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     215,
                     expr_span,
                     format!("Incorrect type returned, should have been {} but found {}.", expected, found)
-                ),
-            SemanticError::FunctionNoReturnOrExit(ending_stat_span) =>
+                ).set_shorthand(format!("To amend, change the expression to one of type {}.",expected)),
+            SemanticError::FunctionNoReturnOrExit(ending_stat_span, ret_type) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     199,
                     ending_stat_span,
                     String::from("The last statement on any path through a function must be a return or exit.")
-                ),
+                ).set_shorthand(format!("To amend add a either an exit, or a return statement returning an expression of type {} after this statement.", ret_type)),
             SemanticError::ReadStatementMismatch(read_ident, found) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     216,
                     read_ident,
                     format!("Wrong type of identifier used in read statement, found {} but should have been an {} or {}.", found, Type::Int, Type::Char)
-                ),
+                ).set_shorthand(format!("Can only read an {} or {}", Type::Int, Type::Char)),
             SemanticError::FreeStatementMismatch(expr_span, found) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     217,
                     expr_span,
                     format!("Cannot free {}, needs to be a pointer types such as an {} or {}", found, Type::Pair(box Type::Any, box Type::Any), Type::Array(box Type::Any, 1))
-                ),
+                ).set_note(String::from("Arrays and pairs are the only dynamically allocated structures, so they are the only types that can be freed.")),
             SemanticError::ExitStatementMismatch(expr_span, found) =>
                 SummaryComponent::new(
                     SummaryType::Error,
@@ -307,7 +313,7 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                     221,
                     cond_span,
                     format!("While loop condition must be a {}, however {} was found.", Type::Bool, found)
-                ),
+                ).set_shorthand(format!("To amend, change the condition to be of type {}.", Type::Bool)),
             SemanticError::ReturnStatementMisplaced(stat_span) =>
                 SummaryComponent::new(
                     SummaryType::Error,
@@ -320,16 +326,17 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                 223,
                 null_span,
                 String::from("Cannot use the fst or snd operators directly on a null.")
-            ).set_note(
+            ).set_shorthand(
                 String::from("Either create a new pair, or assign the null to a variable.")
-            ),
-            SemanticError::FunctionLastStatIsWhile(while_span) =>
+            ).set_note(String::from("In WACC semantic type checking is required for applications of fst and snd directly on nulls, however if the null is first assigned to a variable, this will pass.")),
+            SemanticError::FunctionLastStatIsWhile(while_span, ret_type) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     198,
                     while_span,
                     String::from("A while loop cannot be the last statement on a path through the function")
-                ).set_note(String::from("All functions must return or exit, and this cannot be determined for while loops even if they contain a return or exit."))
+                ).set_shorthand(format!("Add an exit or return statement of type {} after the end of this while loop.", ret_type))
+                .set_note(String::from("Its is not possible for the compiler to determine if a while loop is run even once, or forever, for all possible conditions, so cannot infer if a return statement may not be required."))
         }
     }
 }

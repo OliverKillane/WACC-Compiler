@@ -42,7 +42,7 @@ pub fn analyse_block<'a, 'b>(
                 Stat::While(cond, while_inner) => {
                     errors.push(WrapSpan(
                         span,
-                        vec![SemanticError::FunctionLastStatIsWhile(span)],
+                        vec![SemanticError::FunctionLastStatIsWhile(span, ret_type.clone().expect("If it must return, it must be a function."))],
                     ));
                     analyse_statement(
                         WrapSpan(span, Stat::While(cond, while_inner)),
@@ -109,7 +109,7 @@ pub fn analyse_block<'a, 'b>(
                     );
                     errors.push(WrapSpan(
                         span,
-                        vec![SemanticError::FunctionNoReturnOrExit(span)],
+                        vec![SemanticError::FunctionNoReturnOrExit(span, ret_type.clone().expect("If it must return, it must be a function."))],
                     ));
                     any_errors = true
                 }
@@ -350,7 +350,6 @@ fn analyse_statement<'a, 'b>(
                         if can_coerce(&Type::Bool, &cond_type) {
                             Some(WrapSpan(cond_span, cond_ast))
                         } else {
-                            println!("adding error");
                             errors.push(WrapSpan(
                                 span,
                                 vec![SemanticError::InvalidWhileCondition(cond_span, cond_type)],
@@ -376,10 +375,8 @@ fn analyse_statement<'a, 'b>(
                     errors,
                 ),
             ) {
-                println!("Condition is valid {}", span);
                 Some(WrapSpan(span, Stat::While(cond, block_ast)))
             } else {
-                println!("Condition is invalid");
                 None
             }
         }
