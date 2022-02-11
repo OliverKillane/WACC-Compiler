@@ -560,8 +560,14 @@ impl<'l> SummaryCell<'l> {
                     *selected_prefixes
                         .get(&line_num)
                         .unwrap_or(&(0, Color::White)),
-                    max(span_begin as isize - line_begin as isize, 0) as usize,
-                    max(line_end as isize - span_end as isize, 0) as usize,
+                    min(
+                        max(span_begin as isize - line_begin as isize, 0) as usize,
+                        line.len(),
+                    ),
+                    min(
+                        max(line_end as isize - span_end as isize, 0) as usize,
+                        line.len(),
+                    ),
                     line_num,
                     line_num_width,
                     annotations,
