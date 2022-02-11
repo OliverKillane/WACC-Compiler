@@ -44,7 +44,8 @@ struct Args {
 }
 
 /// Exit code for a file open failure.
-const FILEFAILURE: i32 = 1;
+const COMPILE_SUCCESS: i32 = 0;
+const FILE_FAILURE: i32 = 1;
 
 /// Compiler main entry.
 /// - Processes command line arguments controlling compiler behaviour.
@@ -54,7 +55,7 @@ fn main() {
 
     match read_to_string(args.filepath) {
         Ok(source_code) => match analyse(&source_code) {
-            Ok(_ir) => todo!("Implement the IR and "),
+            Ok(_ir) => process::exit(COMPILE_SUCCESS),
             Err(errs) => {
                 let mut exit_code = i32::MAX;
                 for err in errs {
@@ -70,7 +71,7 @@ fn main() {
                 "Error: Could not open file ".red().underline(),
                 err
             );
-            process::exit(FILEFAILURE);
+            process::exit(FILE_FAILURE);
         }
     }
 }
