@@ -350,6 +350,7 @@ fn analyse_statement<'a, 'b>(
                         if can_coerce(&Type::Bool, &cond_type) {
                             Some(WrapSpan(cond_span, cond_ast))
                         } else {
+                            println!("adding error");
                             errors.push(WrapSpan(
                                 span,
                                 vec![SemanticError::InvalidWhileCondition(cond_span, cond_type)],
@@ -357,7 +358,10 @@ fn analyse_statement<'a, 'b>(
                             None
                         }
                     }
-                    None => None,
+                    None => {
+                        errors.push(WrapSpan(span, stat_errors));
+                        None
+                    },
                 };
                 
             if let (Some(cond), Some(block_ast)) = (
@@ -372,8 +376,10 @@ fn analyse_statement<'a, 'b>(
                     errors,
                 ),
             ) {
+                println!("Condition is valid {}", span);
                 Some(WrapSpan(span, Stat::While(cond, block_ast)))
             } else {
+                println!("Condition is invalid");
                 None
             }
         }
