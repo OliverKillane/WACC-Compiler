@@ -49,11 +49,11 @@ where
     }
 }
 
-pub fn parse(input: &str) -> Result<Program<&str>, Summary> {
+pub fn parse(input: &str) -> Result<Program<&str>, Vec<Summary>> {
     let semantic_info = final_parser(parse_program)(input);
     match semantic_info {
         Ok(ast) => Ok(ast),
-        Err(err) => Err(convert_error_tree(input, err)),
+        Err(err) => Err(vec![convert_error_tree(input, err)]),
     }
 }
 

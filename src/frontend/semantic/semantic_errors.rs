@@ -57,6 +57,9 @@ pub enum SemanticError<'a> {
         BinOp,
     ),
 
+    /// Invalid fst or snd application on a null
+    InvalidPairOp(&'a str),
+
     /// Invalid unary operator application
     /// (span of operation, possible types, possible unops, found type, found unop)
     InvalidUnOp(&'a str, Vec<Type>, Vec<&'static UnOp>, Type, UnOp),
@@ -86,8 +89,13 @@ pub enum SemanticError<'a> {
     InvalidFunctionReturn(&'a str, Type, Type),
 
     /// Function has a control flow that does not end in return or exit.
-    /// (The function's name)
-    FunctionNoReturnOrExit(&'a str),
+    /// (The statement which should have been a return, type to return)
+    FunctionNoReturnOrExit(&'a str, Type),
+
+    /// A function is ended with a while statement, so cannot determine if it
+    /// ends.
+    /// (the entire while statement - not including body, type to return)
+    FunctionLastStatIsWhile(&'a str, Type),
 
     /// Read statement invalid (wrong type)
     /// (variable/lvalue identifier, type found)

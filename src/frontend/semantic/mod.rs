@@ -59,7 +59,7 @@ use self::{
 
 use super::{
     ast::{FunSpan, Function, Program, StatSpan, WrapSpan},
-    error::SummaryCell,
+    error::{Summary, SummaryCell},
 };
 
 /// Analyses a program, either returning a flat variable and function symbol table
@@ -76,13 +76,14 @@ use super::{
 #[allow(clippy::type_complexity)]
 pub fn analyse_semantics<'a>(
     Program(fn_defs, main_block): Program<'a, &'a str>,
+    source_code: &'a str,
 ) -> Result<
     (
         Vec<StatSpan<'a, usize>>,
         VariableSymbolTable,
         HashMap<&'a str, (FunSpan<'a, usize>, VariableSymbolTable)>,
     ),
-    (Vec<SummaryCell<'a>>, Vec<SummaryCell<'a>>),
+    Vec<Summary<'a>>,
 > {
     // get function definitions
     let (fun_symb, filtered_fn_defs, fun_def_errs) = get_fn_symbols(fn_defs);
@@ -94,9 +95,7 @@ pub fn analyse_semantics<'a>(
     for WrapSpan(fun_name, fun) in filtered_fn_defs {
         match analyse_function(WrapSpan(fun_name, fun), &fun_symb) {
             Ok(res) => {
-                correct
-                    .insert(fun_name, res)
-                    .expect("no duplicated in filtered function definitions");
+                correct.insert(fun_name, res);
             }
             Err(fun_err) => errors.push(fun_err),
         }
@@ -112,15 +111,21 @@ pub fn analyse_semantics<'a>(
         &mut LocalSymbolTable::new_root(),
         &mut main_var_symb,
         &None,
+        false,
         &mut main_errors,
     ) {
-        Some((block_ast, _)) => {
+        Some(block_ast) => {
             if errors.is_empty() && fun_def_errs.is_empty() {
                 Ok((block_ast, main_var_symb, correct))
             } else {
-                Err(convert_errors(fun_def_errs, vec![], errors))
+                Err(convert_errors(fun_def_errs, vec![], errors, source_code))
             }
         }
-        None => Err(convert_errors(fun_def_errs, main_errors, errors)),
+        None => Err(convert_errors(
+            fun_def_errs,
+            main_errors,
+            errors,
+            source_code,
+        )),
     }
 }

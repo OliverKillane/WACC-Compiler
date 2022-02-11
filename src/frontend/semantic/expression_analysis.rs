@@ -7,7 +7,7 @@
 //! Extensively pushes forwards with finding errors, potentially from every
 //! leaf node of an expression tree.
 use super::{
-    super::ast::{Expr, Type, WrapSpan},
+    super::ast::{Expr, Type, UnOp, WrapSpan},
     semantic_errors::SemanticError,
     symbol_table::{LocalSymbolTable, VariableSymbolTable},
     type_constraints::{binop_match, de_index, unop_match},
@@ -88,6 +88,13 @@ pub fn analyse_expression<'a, 'b>(
             } else {
                 None
             }
+        }
+
+        // Capturing the `snd null` or `fst null` semantic error (personally I
+        // think this makes little sense, but alas the spec).
+        Expr::UnOp(UnOp::Snd | UnOp::Fst, box WrapSpan(null_span, Expr::Null)) => {
+            errors.push(SemanticError::InvalidPairOp(null_span));
+            None
         }
 
         // Unary operator checking, using the unop_matching functionality from

@@ -12,7 +12,7 @@ path = "src/main.rs"
 [dependencies]
 nom = "7.1.0"
 nom-supreme = "0.6.0"
-clap = "3.0.5"
+clap = { version = "3.0.14", features = ["derive"] }
 lazy_static = "1.4.0"
 colored = "2.0.0"
 unicode-width = "0.1.9"
