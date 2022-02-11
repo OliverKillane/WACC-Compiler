@@ -76,8 +76,6 @@ pub fn analyse_function<'a>(
                 Err((name, errors))
             }
         }
-        None => {
-            Err((name, errors))
-        }
+        None => Err((name, errors)),
     }
 }

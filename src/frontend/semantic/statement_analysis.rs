@@ -42,7 +42,12 @@ pub fn analyse_block<'a, 'b>(
                 Stat::While(cond, while_inner) => {
                     errors.push(WrapSpan(
                         span,
-                        vec![SemanticError::FunctionLastStatIsWhile(span, ret_type.clone().expect("If it must return, it must be a function."))],
+                        vec![SemanticError::FunctionLastStatIsWhile(
+                            span,
+                            ret_type
+                                .clone()
+                                .expect("If it must return, it must be a function."),
+                        )],
                     ));
                     analyse_statement(
                         WrapSpan(span, Stat::While(cond, while_inner)),
@@ -109,7 +114,12 @@ pub fn analyse_block<'a, 'b>(
                     );
                     errors.push(WrapSpan(
                         span,
-                        vec![SemanticError::FunctionNoReturnOrExit(span, ret_type.clone().expect("If it must return, it must be a function."))],
+                        vec![SemanticError::FunctionNoReturnOrExit(
+                            span,
+                            ret_type
+                                .clone()
+                                .expect("If it must return, it must be a function."),
+                        )],
                     ));
                     any_errors = true
                 }

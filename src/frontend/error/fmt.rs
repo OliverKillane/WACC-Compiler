@@ -622,12 +622,11 @@ impl<'l> Display for Summary<'l> {
         let mut width = f.width().unwrap_or(DEFAULT_SUMMARY_WIDTH);
         let preamble = format!(
             "{} occured during {}:\n",
-                if self.cells.len() > 1 {
-                    "Some errors have"
-                } else {
-                    "An error"
-                }
-            ,
+            if self.cells.len() > 1 {
+                "Some errors have"
+            } else {
+                "An error"
+            },
             match self.stage {
                 SummaryStage::Parser => "parsing",
                 SummaryStage::Semantic => "semantic analysis",

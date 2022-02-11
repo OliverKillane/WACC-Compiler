@@ -101,8 +101,8 @@ fn create_cells<'a>(
     for WrapSpan(span, errs) in statements {
         let (syn, sem): (Vec<SemanticError>, Vec<SemanticError>) =
             errs.into_iter().partition(|err| {
-                matches!(err, SemanticError::FunctionNoReturnOrExit(_,_))
-                    || matches!(err, SemanticError::FunctionLastStatIsWhile(_,_))
+                matches!(err, SemanticError::FunctionNoReturnOrExit(_, _))
+                    || matches!(err, SemanticError::FunctionLastStatIsWhile(_, _))
             });
 
         if !syn.is_empty() {
