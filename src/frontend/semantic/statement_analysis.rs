@@ -361,9 +361,9 @@ fn analyse_statement<'a, 'b>(
                     None => {
                         errors.push(WrapSpan(span, stat_errors));
                         None
-                    },
+                    }
                 };
-                
+
             if let (Some(cond), Some(block_ast)) = (
                 condition_valid,
                 analyse_block(
@@ -383,17 +383,16 @@ fn analyse_statement<'a, 'b>(
                 None
             }
         }
-        Stat::Block(block) => {
-            analyse_block(
-                block,
-                fun_symb,
-                &mut LocalSymbolTable::new_child(local_symb),
-                var_symb,
-                ret_type,
-                must_ret,
-                errors,
-            ).map(|block_ast| WrapSpan(span, Stat::Block(block_ast)))
-        }
+        Stat::Block(block) => analyse_block(
+            block,
+            fun_symb,
+            &mut LocalSymbolTable::new_child(local_symb),
+            var_symb,
+            ret_type,
+            must_ret,
+            errors,
+        )
+        .map(|block_ast| WrapSpan(span, Stat::Block(block_ast))),
     }
 }
 

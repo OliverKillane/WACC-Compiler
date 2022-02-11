@@ -52,31 +52,40 @@ pub fn convert_errors<'a>(
     fun_errs: Vec<(&str, Vec<StatementErrors<'a>>)>,
     source_code: &'a str,
 ) -> Vec<Summary<'a>> {
-    let mut semantic_errs = Summary::new(source_code, SummaryStage::Semantic);
-    let mut syntax_errs = Summary::new(source_code, SummaryStage::Parser);
+    let mut semantic_errors = Summary::new(source_code, SummaryStage::Semantic);
+    let mut syntax_errors = Summary::new(source_code, SummaryStage::Parser);
 
     create_cells(
         String::from("In Function Declarations"),
         def_errs,
-        &mut semantic_errs,
-        &mut syntax_errs,
+        &mut semantic_errors,
+        &mut syntax_errors,
     );
     create_cells(
         String::from("In Main Program Body"),
         main_errs,
-        &mut semantic_errs,
-        &mut syntax_errs,
+        &mut semantic_errors,
+        &mut syntax_errors,
     );
     for (fun_name, errs) in fun_errs {
         create_cells(
             format!("In Function {}", fun_name),
             errs,
-            &mut semantic_errs,
-            &mut syntax_errs,
+            &mut semantic_errors,
+            &mut syntax_errors,
         )
     }
 
-    vec![semantic_errs, syntax_errs]
+    let mut summaries = Vec::with_capacity(1);
+    if !semantic_errors.is_empty() {
+        summaries.push(semantic_errors)
+    }
+
+    if !syntax_errors.is_empty() {
+        summaries.push(syntax_errors)
+    }
+
+    summaries
 }
 
 /// Generates an error cell for each statement in the vector of [statement errors](StatementErrors)
@@ -175,7 +184,8 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                     SummaryType::Error,
                     208,
                     binop_span,
-                    format!("Invalid application of operator {} on {} and {}. {} {}", found_left, found_right, found_op,
+                    format!("Invalid application of operator {} on {} and {}.", found_left, found_right, found_op)
+                ).set_note(format!("{} {}",
                         if possible_types.is_empty() {
                             format!("There are no possible input types for the operator {}.", found_op)
                         } else {
@@ -187,13 +197,15 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                             format!("Possible operators for {} and {} are {}.", found_left, found_right, possible_ops.into_iter().map(|op| format!("{}", op)).collect::<Vec<_>>().join(",") )
                         }
                     )
-                ),
+                )
+                ,
             SemanticError::InvalidUnOp(op_span, possible_types, possible_ops, found_type, found_op) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     209,
                     op_span,
-                    format!("Invalid application of {} on {}. {} {}", found_op, found_type,
+                    format!("Invalid application of {} on {}.", found_op, found_type)
+                ).set_note(format!("{} {}",
                         if possible_types.is_empty() {
                             format!("There are no possible input types for {}.", found_op) // there will *always* be an input type, this is there in the event that we remove an operator from the unops table, but leave in the ast.
                         } else {
@@ -307,14 +319,17 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                 SummaryType::Error,
                 223,
                 null_span,
-                String::from("Cannot use the fst or snd operators directly on a null, either create a new pair, or assign the null to a variable.")
+                String::from("Cannot use the fst or snd operators directly on a null.")
+            ).set_note(
+                String::from("Either create a new pair, or assign the null to a variable.")
             ),
             SemanticError::FunctionLastStatIsWhile(while_span) =>
                 SummaryComponent::new(
                     SummaryType::Error,
                     198,
                     while_span,
-                    String::from("A while loop cannot be the last statement on a path through the function, all functions must return or exit, and this cannot be determined for while loops even if they contain a return or exit"))
+                    String::from("A while loop cannot be the last statement on a path through the function")
+                ).set_note(String::from("All functions must return or exit, and this cannot be determined for while loops even if they contain a return or exit."))
         }
     }
 }

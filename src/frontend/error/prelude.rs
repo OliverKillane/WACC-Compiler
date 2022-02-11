@@ -22,6 +22,7 @@ pub enum SummaryType {
 /// item causing the problem, a full error message displayed above the code
 /// presentation, an optional shorthand message that will be displayed within
 /// the code presentation and an optional "note" message.
+#[derive(Debug)]
 pub struct SummaryComponent<'l> {
     /// Component type. Shows up next to the main error message. Determines the
     /// color of the component.
@@ -94,6 +95,7 @@ impl<'l> SummaryComponent<'l> {
 /// An error cell. Contains the span of the statement containing all the
 /// [expressions with errors](SummaryComponent), an optional title for the
 /// error in the error cell and the expression components.
+#[derive(Debug)]
 pub struct SummaryCell<'l> {
     /// The span of the entire cell. The parts of the line in the code presentation
     /// that are not the span will be dimmed out. Determines the location of the
@@ -146,6 +148,7 @@ pub enum SummaryStage {
 /// is printed, the input string for the code, the stage of compilation at which
 /// the error happened, a list of [error cells](SummaryCell) with the
 /// statement-specific errors and an optional separator between the cells.
+#[derive(Debug)]
 pub struct Summary<'l> {
     /// Input filepath. Optionally displayed before the input cell location.
     pub(super) filepath: Option<String>,
@@ -200,6 +203,14 @@ impl<'l> Summary<'l> {
         }
         self.cells.push(cell);
         self
+    }
+
+    pub fn get_code(&self) -> i32 {
+        self.stage as i32
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.cells.is_empty()
     }
 }
 
