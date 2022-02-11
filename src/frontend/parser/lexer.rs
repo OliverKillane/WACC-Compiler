@@ -13,8 +13,6 @@ lazy_static! {
     };
 }
 
-const NO_WS_KEYWORDS: [Lexer; 4] = [Lexer::Int, Lexer::Bool, Lexer::Char, Lexer::String];
-
 use core::fmt;
 use nom::{
     branch::alt,
@@ -30,7 +28,7 @@ use nom::{
     error::{context, ParseError},
     multi::{many0, many1, separated_list0, separated_list1},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
-    IResult,
+    IResult, Parser,
 };
 use nom_supreme::{
     error::{BaseErrorKind, ErrorTree, Expectation, StackContext},
@@ -48,7 +46,7 @@ pub fn comments(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
 
 pub fn ws<'a, F: 'a, O>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, ErrorTree<&str>>
 where
-    F: FnMut(&'a str) -> IResult<&'a str, O, ErrorTree<&str>>,
+    F: Parser<&'a str, O, ErrorTree<&'a str>>,
 {
     terminated(inner, many0(alt((comments, multispace1))))
 }
@@ -128,70 +126,66 @@ impl Lexer {
     pub fn parser<'a>(
         self,
     ) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, ErrorTree<&'a str>> + 'a {
-        let parser = match &self {
-            Self::Fst => tag("fst"),
-            Self::Snd => tag("snd"),
-            Self::Int => tag("int"),
-            Self::Bool => tag("bool"),
-            Self::Char => tag("char"),
-            Self::Int => tag("int"),
-            Self::String => tag("string"),
-            Self::Begin => tag("begin"),
-            Self::End => tag("end"),
-            Self::Plus => tag("+"),
-            Self::Minus => tag("-"),
-            Self::Mult => tag("*"),
-            Self::Div => tag("/"),
-            Self::Mod => tag("%"),
-            Self::And => tag("&&"),
-            Self::Or => tag("||"),
-            Self::Gt => tag(">"),
-            Self::Gte => tag(">="),
-            Self::Lt => tag("<"),
-            Self::Lte => tag("<="),
-            Self::Eq => tag("=="),
-            Self::Ne => tag("!="),
-            Self::Pair => tag("pair"),
-            Self::OpenBracket => tag("["),
-            Self::CloseBracket => tag("]"),
-            Self::OpenParen => tag("("),
-            Self::CloseParen => tag(")"),
-            Self::Comma => tag(","),
-            Self::If => tag("if"),
-            Self::Then => tag("then"),
-            Self::Else => tag("else"),
-            Self::Fi => tag("fi"),
-            Self::SemiColon => tag(";"),
-            Self::Is => tag("is"),
-            Self::While => tag("while"),
-            Self::Do => tag("do"),
-            Self::Done => tag("done"),
-            Self::Assign => tag("="),
-            Self::Call => tag("call"),
-            Self::Exit => tag("exit"),
-            Self::Println => tag("println"),
-            Self::Print => tag("print"),
-            Self::Skip => tag("skip"),
-            Self::Read => tag("read"),
-            Self::Free => tag("free"),
-            Self::Return => tag("return"),
-            Self::Newpair => tag("newpair"),
-            Self::Bang => tag("!"),
-            Self::True => tag("true"),
-            Self::False => tag("false"),
-            Self::Null => tag("null"),
-            Self::Len => tag("len"),
-            Self::Ord => tag("ord"),
-            Self::Chr => tag("chr"),
+        let literal = match &self {
+            Self::Fst => "fst",
+            Self::Snd => "snd",
+            Self::Int => "int",
+            Self::Bool => "bool",
+            Self::Char => "char",
+            Self::Int => "int",
+            Self::String => "string",
+            Self::Begin => "begin",
+            Self::End => "end",
+            Self::Plus => "+",
+            Self::Minus => "-",
+            Self::Mult => "*",
+            Self::Div => "/",
+            Self::Mod => "%",
+            Self::And => "&&",
+            Self::Or => "||",
+            Self::Gt => ">",
+            Self::Gte => ">=",
+            Self::Lt => "<",
+            Self::Lte => "<=",
+            Self::Eq => "==",
+            Self::Ne => "!=",
+            Self::Pair => "pair",
+            Self::OpenBracket => "[",
+            Self::CloseBracket => "]",
+            Self::OpenParen => "(",
+            Self::CloseParen => ")",
+            Self::Comma => ",",
+            Self::If => "if",
+            Self::Then => "then",
+            Self::Else => "else",
+            Self::Fi => "fi",
+            Self::SemiColon => ";",
+            Self::Is => "is",
+            Self::While => "while",
+            Self::Do => "do",
+            Self::Done => "done",
+            Self::Assign => "=",
+            Self::Call => "call",
+            Self::Exit => "exit",
+            Self::Println => "println",
+            Self::Print => "print",
+            Self::Skip => "skip",
+            Self::Read => "read",
+            Self::Free => "free",
+            Self::Return => "return",
+            Self::Newpair => "newpair",
+            Self::Bang => "!",
+            Self::True => "true",
+            Self::False => "false",
+            Self::Null => "null",
+            Self::Len => "len",
+            Self::Ord => "ord",
+            Self::Chr => "chr",
         };
 
-        move |input| {
-            if NO_WS_KEYWORDS.contains(&self) {
-                ws(terminated(parser.clone(), not(parse_ident)))(input)
-                // ws(parser.clone())(input)
-            } else {
-                ws(parser.clone())(input)
-            }
+        move |input| match HASHSET.get(literal) {
+            None => ws(tag(literal))(input),
+            Some(_) => ws(terminated(tag(literal), not(parse_ident)))(input),
         }
     }
 }
@@ -205,6 +199,16 @@ impl fmt::Display for KeywordIdentError {
     }
 }
 impl std::error::Error for KeywordIdentError {}
+
+#[derive(Debug, Clone)]
+struct OutOfBoundsInt;
+
+impl fmt::Display for OutOfBoundsInt {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "a 32-bit integer")
+    }
+}
+impl std::error::Error for OutOfBoundsInt {}
 
 pub fn parse_ident(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
     ws(map_res(
@@ -221,10 +225,12 @@ pub fn parse_ident(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
 }
 
 pub fn parse_int(input: &str) -> IResult<&str, i32, ErrorTree<&str>> {
-    ws(map_res(
-        recognize(pair(opt(alt((char('-'), char('+')))), digit1)),
-        &str::parse,
-    ))(input)
+    ws(recognize(pair(opt(alt((char('-'), char('+')))), digit1))
+        .map_res_cut(|s: &str| match s.parse() {
+            Err(_) => Err(OutOfBoundsInt),
+            Ok(i) => Ok(i),
+        })
+        .context("Integer"))(input)
 }
 
 pub fn str_delimited<'a>(
