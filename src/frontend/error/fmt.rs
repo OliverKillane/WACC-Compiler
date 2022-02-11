@@ -549,11 +549,11 @@ impl<'l> SummaryCell<'l> {
                     " ...\n".to_string()
                 }
             });
+        let (span_begin, span_end) = input_locator.get_range(span).unwrap();
         annotations
             .into_iter()
             .map(|(line_num, annotations)| {
                 let line = input_locator.get_input_line(line_num).unwrap();
-                let (span_begin, span_end) = input_locator.get_range(span).unwrap();
                 let (line_begin, line_end) = input_locator.get_range(line).unwrap();
                 Self::fmt_refs_line(
                     line,
