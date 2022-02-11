@@ -13,6 +13,33 @@
 //! - Bartłomiej Cieślar
 //! - Panayiotis Gavriil
 //! - Oliver Killane
+//!
+//! ## Command Line interface
+//! provides basic options for taking input file, setting output and help menus.
+//!
+//! for example `./compile --help`:
+//! ```text
+//! wacc_33 0.5.1
+//! Jordan Hall, Bartłomiej Cieślar, Panayiotis Gavriil and Oliver Killane
+//! A wacc compiler written is rust targeting 32 bit ARM systems
+//!
+//! USAGE:
+//!     compile [OPTIONS] <INPUT FILE>
+//!
+//! ARGS:
+//!     <INPUT FILE>
+//!
+//!
+//! OPTIONS:
+//!     -h, --help
+//!             Print help information
+//!
+//!     -o, --outputpath <OUTPUT FILE>
+//!             The name of the output file
+//!
+//!     -V, --version
+//!             Print version information
+//! ```
 
 #[macro_use]
 extern crate lazy_static;
