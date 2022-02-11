@@ -15,7 +15,7 @@ use nom::{
         },
         is_alphabetic, is_alphanumeric,
     },
-    combinator::{cut, map, map_res, not, opt, recognize, success, value},
+    combinator::{cut, eof, map, map_res, not, opt, recognize, success, value},
     error::{context, ParseError},
     multi::{many0, many1, separated_list0, separated_list1},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
@@ -59,9 +59,16 @@ pub fn parse(input: &str) -> Result<Program<&str>, Vec<Summary>> {
 
 fn parse_program(input: &str) -> IResult<&str, Program<&str>, ErrorTree<&str>> {
     map(
-        preceded(
-            tuple((ws(success(())), Lexer::Begin.parser())),
-            tuple((many0(span(parse_func)), parse_stats(Lexer::End))),
+        delimited(
+            tuple((
+                ws(success(())),
+                Lexer::Begin.parser().context("Start of Program"),
+            )),
+            tuple((
+                many0(span(parse_func)),
+                parse_stats(Lexer::End).context("End of Program"),
+            )),
+            eof.context("End of File"),
         ),
         |(funcs, stats)| Program(funcs, stats),
     )(input)
@@ -79,10 +86,12 @@ fn parse_func(input: &str) -> IResult<&str, Function<&str>, ErrorTree<&str>> {
                         span(parse_param),
                         Lexer::Comma.parser(),
                         Lexer::CloseParen.parser(),
-                    ),
+                    )
+                    ,
                     map(Lexer::CloseParen.parser(), |_| Vec::new()),
                 ))
-                .cut(),
+                .cut()
+                .context("Argument List"),
             ),
             preceded(Lexer::Is.parser(), parse_stats(Lexer::End)),
         )),
@@ -93,10 +102,13 @@ fn parse_func(input: &str) -> IResult<&str, Function<&str>, ErrorTree<&str>> {
 fn parse_stats<'a>(
     term: Lexer,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<WrapSpan<Stat<&'a str>>>, ErrorTree<&str>> {
-    cut(collect_separated_terminated(
-        span(parse_stat).cut(),
-        Lexer::SemiColon.parser(),
-        term.parser(),
+    cut(context(
+        "Statement/Block Terminator",
+        collect_separated_terminated(
+            span(parse_stat).cut(),
+            Lexer::SemiColon.parser(),
+            term.parser(),
+        ),
     ))
 }
 
@@ -111,11 +123,12 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str>, ErrorTree<&str>> {
             separated_pair(parse_expr, Lexer::Then.parser(), parse_stats(Lexer::Else)),
             parse_stats(Lexer::Fi),
         ))
-        .cut(),
+        .cut()
+        .context("If Statement"),
     );
 
     context(
-        "statement",
+        "Statement",
         alt((
             value(Stat::Skip, Lexer::Skip.parser()),
             map(
@@ -266,20 +279,28 @@ fn parse_array_elem(input: &str) -> IResult<&str, Vec<ExprSpan<&str>>, ErrorTree
 }
 
 fn parse_rhs(input: &str) -> IResult<&str, AssignRhs<&str>, ErrorTree<&str>> {
-    let call = delimited(
-        Lexer::Call.parser(),
-        separated_pair(
-            parse_ident,
-            Lexer::OpenParen.parser(),
-            separated_list0(Lexer::Comma.parser(), parse_expr),
-        )
-        .cut(),
-        Lexer::CloseParen.parser(),
+    let call = context(
+        "Argument List",
+        delimited(
+            Lexer::Call.parser(),
+            separated_pair(
+                parse_ident,
+                Lexer::OpenParen.parser(),
+                separated_list0(Lexer::Comma.parser(), parse_expr).cut(),
+            )
+            .cut(),
+            Lexer::CloseParen.parser(),
+        ),
     );
-    let array_liter = delimited(
-        Lexer::OpenBracket.parser(),
-        separated_list0(Lexer::Comma.parser(), parse_expr).cut(),
-        Lexer::CloseBracket.parser(),
+    let array_liter = context(
+        "Array Literal",
+        delimited(
+            Lexer::OpenBracket.parser(),
+            separated_list0(Lexer::Comma.parser(), parse_expr)
+                .cut()
+                .context("Array Literal"),
+            Lexer::CloseBracket.parser(),
+        ),
     );
     context(
         "Assign RHS",
@@ -300,7 +321,7 @@ fn parse_rhs(input: &str) -> IResult<&str, AssignRhs<&str>, ErrorTree<&str>> {
 }
 
 fn parse_expr(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&str>> {
-    parse_expr_or(input)
+    context("Expression", parse_expr_or)(input)
 }
 
 fn fold_expr<'a>(
@@ -314,13 +335,19 @@ fn fold_expr<'a>(
 
 fn parse_expr_or(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&str>> {
     let (rest, sub_exp) = parse_expr_and(input)?;
-    let (rest, exprs) = many0(tuple((Lexer::Or.parser(), parse_expr_and)))(rest)?;
+    let (rest, exprs) = many0(tuple((
+        Lexer::Or.parser(),
+        parse_expr_and.cut().context("Expression"),
+    )))(rest)?;
     Ok((rest, fold_expr(sub_exp, exprs, input)))
 }
 
 fn parse_expr_and(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&str>> {
     let (rest, sub_exp) = parse_expr_eq(input)?;
-    let (rest, exprs) = many0(tuple((Lexer::And.parser(), parse_expr_eq)))(rest)?;
+    let (rest, exprs) = many0(tuple((
+        Lexer::And.parser(),
+        parse_expr_eq.cut().context("Expression"),
+    )))(rest)?;
     Ok((rest, fold_expr(sub_exp, exprs, input)))
 }
 
@@ -328,7 +355,7 @@ fn parse_expr_eq(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<&
     let (rest, sub_exp) = parse_expr_cmp(input)?;
     let (rest, exprs) = many0(tuple((
         alt((Lexer::Eq.parser(), Lexer::Ne.parser())),
-        parse_expr_cmp,
+        parse_expr_cmp.cut().context("Expression"),
     )))(rest)?;
     Ok((rest, fold_expr(sub_exp, exprs, input)))
 }
@@ -342,7 +369,7 @@ fn parse_expr_cmp(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree<
             Lexer::Gt.parser(),
             Lexer::Lt.parser(),
         )),
-        parse_expr_plus,
+        parse_expr_plus.cut().context("Summand Expression"),
     )))(rest)?;
     Ok((rest, fold_expr(sub_exp, exprs, input)))
 }
@@ -351,7 +378,7 @@ fn parse_expr_plus(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree
     let (rest, sub_exp) = parse_expr_mult(input)?;
     let (rest, exprs) = many0(tuple((
         alt((Lexer::Plus.parser(), Lexer::Minus.parser())),
-        parse_expr_mult,
+        parse_expr_mult.cut().context("Term Expression"),
     )))(rest)?;
     Ok((rest, fold_expr(sub_exp, exprs, input)))
 }
@@ -364,7 +391,7 @@ fn parse_expr_mult(input: &str) -> IResult<&str, WrapSpan<Expr<&str>>, ErrorTree
             Lexer::Div.parser(),
             Lexer::Mod.parser(),
         )),
-        span(parse_expr_atom),
+        span(parse_expr_atom).cut().context("Atom Expression"),
     )))(rest)?;
     Ok((rest, fold_expr(sub_exp, exprs, input)))
 }
@@ -413,9 +440,10 @@ fn parse_expr_atom(input: &str) -> IResult<&str, Expr<&str>, ErrorTree<&str>> {
         }),
         map(str_delimited("\'"), |s| {
             Expr::Char(s.chars().next().unwrap_or_default())
-        }),
+        })
+        .context("Char Literal"),
         map(parse_int, Expr::Int),
-        map(str_delimited("\""), |s| Expr::String(s.to_string())),
+        map(str_delimited("\""), |s| Expr::String(s.to_string())).context("String Literal"),
         map(
             pair(parse_ident, opt(parse_array_elem)),
             |(id, arr)| match arr {
@@ -427,8 +455,8 @@ fn parse_expr_atom(input: &str) -> IResult<&str, Expr<&str>, ErrorTree<&str>> {
         map(
             delimited(
                 Lexer::OpenParen.parser(),
-                parse_expr,
-                Lexer::CloseParen.parser(),
+                parse_expr.cut(),
+                Lexer::CloseParen.parser().cut(),
             ),
             |e| e.1,
         ),
@@ -529,7 +557,7 @@ pub fn convert_error_tree<'a>(input: &'a str, err: ErrorTree<&'a str>) -> Summar
                     StackContext::Context(s) => s.to_string(),
                     StackContext::Kind(nek) => format!("{:?}", nek),
                 })
-                .last()
+                .next()
                 .unwrap_or_else(|| String::from("missing context"));
         let expected: Vec<String> =
             v.1.into_iter()
@@ -547,7 +575,7 @@ pub fn convert_error_tree<'a>(input: &'a str, err: ErrorTree<&'a str>) -> Summar
                 k2,
                 format!("Expected {}", contexts),
             )
-            .set_note(format!("Try one of: {}", expected.join(", "))),
+            .set_note(format!("Try: {}", expected.join(", "))),
         );
         summary.add_cell(summary_cell);
     }
