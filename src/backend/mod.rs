@@ -1,3 +1,5 @@
+#![allow(unused_variables)]
+
 mod assembly_gen;
 mod graph_coloring;
 mod ssa;
@@ -5,7 +7,10 @@ mod ssa_opt;
 mod three_code;
 
 use crate::intermediate::Program;
-use std::fmt::Display;
+use graph_coloring::GeneralAssembly;
+use ssa::SSA;
+use ssa_opt::optimize_ssa;
+use three_code::ThreeCode;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum PropagationOpt {
@@ -25,39 +30,6 @@ struct Options {
     strength_reduction: bool,
     loop_unrolling: bool,
     common_expressions: bool,
-}
-
-struct ThreeCode;
-struct SSA;
-struct GeneralAssembly;
-
-impl Into<ThreeCode> for (&Program, &Options) {
-    fn into(self) -> ThreeCode {
-        let (program, options) = self;
-        todo!()
-    }
-}
-
-impl Into<SSA> for ThreeCode {
-    fn into(self) -> SSA {
-        todo!()
-    }
-}
-
-fn optimize_ssa(ssa: SSA, options: &Options) -> SSA {
-    todo!()
-}
-
-impl Into<GeneralAssembly> for SSA {
-    fn into(self) -> GeneralAssembly {
-        todo!()
-    }
-}
-
-impl Display for GeneralAssembly {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
-    }
 }
 
 /// Compiles the given program into an arm32 assembly
