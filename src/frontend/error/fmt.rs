@@ -696,7 +696,6 @@ mod test {
 
     use colored::{control::SHOULD_COLORIZE, Colorize};
     use indoc::indoc;
-    use std::panic::{catch_unwind, set_hook, take_hook, UnwindSafe};
 
     #[allow(clippy::too_many_arguments)]
     fn singleton_summary(
@@ -745,19 +744,6 @@ mod test {
             .map(|line| line.trim_end_matches(&[' ', '\n', '\t'][..]).to_string() + "\n")
             .collect::<String>();
         assert_eq!(source, target);
-    }
-
-    fn catch_panic<F: FnOnce() + UnwindSafe>(f: F) -> String {
-        let prev_hook = take_hook();
-        set_hook(Box::new(|_info| {}));
-        let unwind = catch_unwind(f);
-        set_hook(prev_hook);
-        unwind
-            .err()
-            .unwrap()
-            .downcast_ref::<&str>()
-            .unwrap()
-            .to_string()
     }
 
     #[test]
@@ -1423,28 +1409,24 @@ mod test {
     }
 
     #[test]
+    #[should_panic(expected = "Overlapping spans in a summary cell")]
     fn test_overlapping_spans() {
-        assert_eq!(
-            catch_panic(|| {
-                let input = "abc";
-                let mut summary = Summary::new(input, SummaryStage::Parser);
-                let mut cell = SummaryCell::new(input);
-                cell.add_component(SummaryComponent::new(
-                    SummaryType::Error,
-                    200,
-                    &input[..2],
-                    String::new(),
-                ));
-                cell.add_component(SummaryComponent::new(
-                    SummaryType::Error,
-                    200,
-                    &input[1..],
-                    String::new(),
-                ));
-                summary.add_cell(cell);
-                format!("{}", summary);
-            }),
-            "Overlapping spans in a summary cell"
-        );
+        let input = "abc";
+        let mut summary = Summary::new(input, SummaryStage::Parser);
+        let mut cell = SummaryCell::new(input);
+        cell.add_component(SummaryComponent::new(
+            SummaryType::Error,
+            200,
+            &input[..2],
+            String::new(),
+        ));
+        cell.add_component(SummaryComponent::new(
+            SummaryType::Error,
+            200,
+            &input[1..],
+            String::new(),
+        ));
+        summary.add_cell(cell);
+        format!("{}", summary);
     }
 }

@@ -218,63 +218,37 @@ impl<'l> Summary<'l> {
 mod test {
     use super::{Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType};
 
-    use std::panic::{catch_unwind, set_hook, take_hook, UnwindSafe};
-
-    fn catch_panic<F: FnOnce() + UnwindSafe>(f: F) -> String {
-        let prev_hook = take_hook();
-        set_hook(Box::new(|_info| {}));
-        let unwind = catch_unwind(f);
-        set_hook(prev_hook);
-        unwind
-            .err()
-            .unwrap()
-            .downcast_ref::<String>()
-            .unwrap()
-            .clone()
-    }
     #[test]
+    #[should_panic(expected = "Component span not within the cell")]
     fn test_component_not_within_cell() {
-        assert_eq!(
-            catch_panic(|| {
-                let input = "abcdef";
-                let mut cell = SummaryCell::new(&input[1..]);
-                cell.add_component(SummaryComponent::new(
-                    SummaryType::Error,
-                    200,
-                    &input[0..2],
-                    "message".to_string(),
-                ));
-            }),
-            "Component span not within the cell",
-        );
+        let input = "abcdef";
+        let mut cell = SummaryCell::new(&input[1..]);
+        cell.add_component(SummaryComponent::new(
+            SummaryType::Error,
+            200,
+            &input[0..2],
+            "message".to_string(),
+        ));
     }
 
     #[test]
+    #[should_panic(expected = "Cell span not within the input")]
     fn test_cell_not_within_input() {
-        assert_eq!(
-            catch_panic(|| {
-                let input = "abcdef";
-                let mut summary = Summary::new(&input[1..], SummaryStage::Parser);
-                summary.add_cell(SummaryCell::new(&input[0..2]));
-            }),
-            "Cell span not within the input"
-        )
+        let input = "abcdef";
+        let mut summary = Summary::new(&input[1..], SummaryStage::Parser);
+        summary.add_cell(SummaryCell::new(&input[0..2]));
     }
 
     #[test]
+    #[should_panic(expected = "Declaration not within the input")]
     fn test_declaraton_not_within_input() {
-        assert_eq!(
-            catch_panic(|| {
-                let input = "abcdef";
-                let mut summary = Summary::new(&input[1..], SummaryStage::Parser);
-                let mut cell = SummaryCell::new(&input[1..]);
-                cell.add_component(
-                    SummaryComponent::new(SummaryType::Error, 200, &input[1..], String::new())
-                        .set_declaration(&input[0..]),
-                );
-                summary.add_cell(cell);
-            }),
-            "Declaration not within the input"
-        )
+        let input = "abcdef";
+        let mut summary = Summary::new(&input[1..], SummaryStage::Parser);
+        let mut cell = SummaryCell::new(&input[1..]);
+        cell.add_component(
+            SummaryComponent::new(SummaryType::Error, 200, &input[1..], String::new())
+                .set_declaration(&input[0..]),
+        );
+        summary.add_cell(cell);
     }
 }
