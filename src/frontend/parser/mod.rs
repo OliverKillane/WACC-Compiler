@@ -416,7 +416,7 @@ fn fold_expr<'a>(
     input: &'a str,
 ) -> WrapSpan<'a, Expr<'a, &'a str>> {
     rem.into_iter()
-        .rfold(expr, |acc, val| parse_bin_op(val, acc, input))
+        .fold(expr, |acc, val| parse_bin_op(val, acc, input))
 }
 
 /// Parser for a `expr1 || expr2` expression.
@@ -582,7 +582,7 @@ fn parse_bin_op<'a>(
 
     let min = expr1.0.as_ptr().min(expr2.0.as_ptr()) as usize - input.as_ptr() as usize;
     let max = (expr2.0.as_ptr() as usize + expr2.0.len())
-        .min(expr1.0.as_ptr() as usize + expr1.0.len())
+        .max(expr1.0.as_ptr() as usize + expr1.0.len())
         - input.as_ptr() as usize;
     let s = &input[min..max];
 
@@ -648,6 +648,11 @@ pub fn convert_error_tree<'a>(input: &'a str, err: ErrorTree<&'a str>) -> Summar
 
     let mut summary = Summary::new(input, SummaryStage::Parser);
     for (k, v) in h {
+        let k = match k {
+            "" => &input[input.len() - 2..],
+            _ => &k[..1],
+        };
+
         let mut summary_cell = SummaryCell::new(input);
         let contexts: String =
             v.0.into_iter()
@@ -667,15 +672,54 @@ pub fn convert_error_tree<'a>(input: &'a str, err: ErrorTree<&'a str>) -> Summar
                 .collect();
 
         summary_cell.add_component(
-            SummaryComponent::new(
-                SummaryType::Error,
-                100,
-                &k[..1],
-                format!("Expected {}", contexts),
-            )
-            .set_note(format!("Try: {}", expected.join(", "))),
+            SummaryComponent::new(SummaryType::Error, 100, k, format!("Expected {}", contexts))
+                .set_note(format!("Try: {}", expected.join(", "))),
         );
         summary.add_cell(summary_cell);
     }
     summary
+}
+
+#[cfg(test)]
+mod unit_tests {
+    use super::*;
+
+    #[test]
+    fn expr_folds_correctly() {
+        let expr = fold_expr(
+            WrapSpan("", Expr::Int(0)),
+            vec![
+                ("-", WrapSpan("", Expr::Int(1))),
+                ("+", WrapSpan("", Expr::Int(2))),
+                ("-", WrapSpan("", Expr::Int(3))),
+            ],
+            "",
+        );
+
+        assert_eq!(
+            expr,
+            WrapSpan(
+                "",
+                Expr::BinOp(
+                    box WrapSpan(
+                        "",
+                        Expr::BinOp(
+                            box WrapSpan(
+                                "",
+                                Expr::BinOp(
+                                    box WrapSpan("", Expr::Int(0)),
+                                    BinOp::Sub,
+                                    box WrapSpan("", Expr::Int(1)),
+                                )
+                            ),
+                            BinOp::Add,
+                            box WrapSpan("", Expr::Int(2)),
+                        )
+                    ),
+                    BinOp::Sub,
+                    box WrapSpan("", Expr::Int(3)),
+                )
+            )
+        );
+    }
 }
