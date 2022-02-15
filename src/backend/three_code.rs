@@ -3,9 +3,8 @@ use crate::intermediate::*;
 
 pub(super) struct ThreeCode;
 
-impl Into<ThreeCode> for (&Program, &Options) {
-    fn into(self) -> ThreeCode {
-        let (program, options) = self;
+impl From<(&Program, &Options)> for ThreeCode {
+    fn from((program, options): (&Program, &Options)) -> ThreeCode {
         todo!()
     }
 }

@@ -1,9 +1,9 @@
-use super::ssa::SSA;
+use super::ssa::StaticSingleAssignment;
 
 pub(super) struct GeneralAssembly;
 
-impl Into<GeneralAssembly> for SSA {
-    fn into(self) -> GeneralAssembly {
+impl From<StaticSingleAssignment> for GeneralAssembly {
+    fn from(ssa: StaticSingleAssignment) -> GeneralAssembly {
         todo!()
     }
 }

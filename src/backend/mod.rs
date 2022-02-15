@@ -8,7 +8,7 @@ mod three_code;
 
 use crate::intermediate::Program;
 use graph_coloring::GeneralAssembly;
-use ssa::SSA;
+use ssa::StaticSingleAssignment;
 use ssa_opt::optimize_ssa;
 use three_code::ThreeCode;
 
@@ -34,9 +34,9 @@ struct Options {
 
 /// Compiles the given program into an arm32 assembly
 fn compile(program: &Program, options: Options) -> String {
-    let three_code: ThreeCode = (program, &options).into();
-    let ssa: SSA = three_code.into();
+    let three_code = ThreeCode::from((program, &options));
+    let ssa = StaticSingleAssignment::from(three_code);
     let ssa = optimize_ssa(ssa, &options);
-    let general_assembly: GeneralAssembly = ssa.into();
+    let general_assembly = GeneralAssembly::from(ssa);
     format!("{}", general_assembly)
 }

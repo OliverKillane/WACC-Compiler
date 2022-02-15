@@ -1,9 +1,9 @@
 use super::three_code::ThreeCode;
 
-pub(super) struct SSA;
+pub(super) struct StaticSingleAssignment;
 
-impl Into<SSA> for ThreeCode {
-    fn into(self) -> SSA {
+impl From<ThreeCode> for StaticSingleAssignment {
+    fn from(three_code: ThreeCode) -> StaticSingleAssignment {
         todo!()
     }
 }

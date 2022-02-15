@@ -1,5 +1,5 @@
-use super::{ssa::SSA, Options};
+use super::{ssa::StaticSingleAssignment, Options};
 
-pub(super) fn optimize_ssa(ssa: SSA, options: &Options) -> SSA {
+pub(super) fn optimize_ssa(ssa: StaticSingleAssignment, options: &Options) -> StaticSingleAssignment {
     todo!()
 }
