@@ -64,14 +64,21 @@ impl<'l> SpanLocator<'l> {
 
     /// Calculates the range of the indices of the span within the input string,
     /// provided the span starts somewhere within the input string.
-    pub fn get_range(&self, span: &str) -> Option<(usize, usize)> {
+    pub fn get_optional_range(&self, span: &str) -> Option<(usize, usize)> {
         get_relative_range(self.input, span)
+    }
+
+    /// Calculates the range of indices of the span within the input string.
+    /// Panics if the span is not within the input string
+    pub fn get_range(&self, span: &str) -> (usize, usize) {
+        self.get_optional_range(span)
+            .expect("Span not within the input string")
     }
 
     /// Calculates the line number at which the span starts, provided that it
     /// starts somewhere within the input string.
-    pub fn get_line_num(&self, span: &str) -> Option<usize> {
-        let (input_pos, _) = self.get_range(span)?;
+    pub fn get_optional_line_num(&self, span: &str) -> Option<usize> {
+        let (input_pos, _) = self.get_optional_range(span)?;
         let line_num = self
             .input_lines
             .binary_search_by_key(&input_pos, |(line_start, _, _)| *line_start)
@@ -80,23 +87,44 @@ impl<'l> SpanLocator<'l> {
         Some(line_num)
     }
 
+    /// Calculates the line number at which the span starts. Panics if the span
+    /// is not within any line.
+    pub fn get_line_num(&self, span: &str) -> usize {
+        self.get_optional_line_num(span)
+            .expect("Span does not correspond to any line in the input string")
+    }
+
     /// Returns a specific line in the input, provided such a line index exists
     /// within the input.
-    pub fn get_input_line(&self, line_num: usize) -> Option<&str> {
+    pub fn get_optional_input_line(&self, line_num: usize) -> Option<&str> {
         let (line_begin, line_end, ends_with_newline) = self.input_lines.get(line_num)?;
         Some(&self.input[*line_begin..*line_end - *ends_with_newline as usize])
     }
 
-    /// Get the row and the column at which the span starts within the input string.
-    pub fn get_coords(&self, span: &str) -> Option<(usize, usize)> {
-        let line_num = self.get_line_num(span)?;
+    /// Returns a specific line in the input. Panics if the line number is out
+    /// of bounds
+    pub fn get_input_line(&self, line_num: usize) -> &str {
+        self.get_optional_input_line(line_num)
+            .expect("Line number out of bounds")
+    }
 
-        let (line_pos, _) =
-            get_relative_range(self.get_input_line(line_num).unwrap(), span).unwrap();
+    /// Gets the row and the column at which the span starts within the input string,
+    /// provided the span is within the input string.
+    pub fn get_optional_coords(&self, span: &str) -> Option<(usize, usize)> {
+        let line_num = self.get_optional_line_num(span)?;
+
+        let (line_pos, _) = get_relative_range(self.get_input_line(line_num), span).unwrap();
         Some((
             line_num,
             self.input_lines_characters_map[line_num][&line_pos],
         ))
+    }
+
+    /// Gets the row and the column at which the span starts within the input string.
+    /// Panics if the span is not within the input string.
+    pub fn get_coords(&self, span: &str) -> (usize, usize) {
+        self.get_optional_coords(span)
+            .expect("Span not within the input string")
     }
 }
 
@@ -123,9 +151,9 @@ mod test {
         let a = &s[0..5];
         let b = &s[8..15];
         let locator = SpanLocator::new(s);
-        assert_eq!(locator.get_range(a).unwrap(), (0, 5));
-        assert_eq!(locator.get_range(b).unwrap(), (8, 15));
-        assert_eq!(locator.get_range("other"), None);
+        assert_eq!(locator.get_optional_range(a), Some((0, 5)));
+        assert_eq!(locator.get_optional_range(b), Some((8, 15)));
+        assert_eq!(locator.get_optional_range("other"), None);
     }
 
     #[test]
@@ -134,9 +162,9 @@ mod test {
         let a = &s[0..1];
         let b = &s[4..7];
         let locator = SpanLocator::new(s);
-        assert_eq!(locator.get_line_num(a).unwrap(), 0);
-        assert_eq!(locator.get_line_num(b).unwrap(), 2);
-        assert_eq!(locator.get_line_num("other"), None);
+        assert_eq!(locator.get_optional_line_num(a), Some(0));
+        assert_eq!(locator.get_optional_line_num(b), Some(2));
+        assert_eq!(locator.get_optional_line_num("other"), None);
     }
 
     #[test]
@@ -146,18 +174,14 @@ mod test {
         let b = &s[4..7];
         let locator = SpanLocator::new(s);
         assert_eq!(
-            locator
-                .get_input_line(locator.get_line_num(a).unwrap())
-                .unwrap(),
-            "1"
+            locator.get_optional_input_line(locator.get_line_num(a)),
+            Some("1")
         );
         assert_eq!(
-            locator
-                .get_input_line(locator.get_line_num(b).unwrap())
-                .unwrap(),
-            "345"
+            locator.get_optional_input_line(locator.get_line_num(b)),
+            Some("345")
         );
-        assert_eq!(locator.get_input_line(4), None);
+        assert_eq!(locator.get_optional_input_line(4), None);
     }
 
     #[test]
@@ -166,8 +190,8 @@ mod test {
         let a = &s[0..1];
         let b = &s[5..7];
         let locator = SpanLocator::new(s);
-        assert_eq!(locator.get_coords(a).unwrap(), (0, 0));
-        assert_eq!(locator.get_coords(b).unwrap(), (2, 1));
-        assert_eq!(locator.get_coords("other"), None);
+        assert_eq!(locator.get_optional_coords(a), Some((0, 0)));
+        assert_eq!(locator.get_optional_coords(b), Some((2, 1)));
+        assert_eq!(locator.get_optional_coords("other"), None);
     }
 }

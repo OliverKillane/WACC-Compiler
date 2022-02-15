@@ -144,7 +144,7 @@ impl<'l> SummaryCell<'l> {
     ) -> HashMap<usize, LinkedList<(&'l str, String, Color)>> {
         let mut line_nums = HashMap::new();
         for annotation @ (span, _, _) in annotations {
-            let line_num = input_locator.get_line_num(span).unwrap();
+            let line_num = input_locator.get_line_num(span);
             line_nums.try_insert(line_num, LinkedList::new());
             line_nums.get_mut(&line_num).unwrap().push_back(annotation);
         }
@@ -503,33 +503,32 @@ impl<'l> SummaryCell<'l> {
         if annotations.is_empty() {
             return String::default();
         }
-        annotations.sort_by_key(|&(span, _, _)| input_locator.get_range(span).unwrap().0);
+        annotations.sort_by_key(|&(span, _, _)| input_locator.get_range(span).0);
 
         let mut selected_prefixes = HashMap::<usize, _>::new();
         for &(span, _, color) in &annotations {
-            let first_line = input_locator.get_line_num(&span[0..]).unwrap();
+            let first_line = input_locator.get_line_num(&span[0..]);
             let last_char_index =
                 if let Some(last_char_index) = span.char_indices().map(|(index, _)| index).last() {
                     last_char_index
                 } else {
                     continue;
                 };
-            let (mut last_line, _) = input_locator.get_coords(&span[last_char_index..]).unwrap();
+            let (mut last_line, _) = input_locator.get_coords(&span[last_char_index..]);
             if first_line == last_line {
                 continue;
             }
-            let (_, span_end) = input_locator.get_range(span).unwrap();
+            let (_, span_end) = input_locator.get_range(span);
             for line in first_line + 1..=last_line {
-                let (line_begin, line_end) = input_locator
-                    .get_range(input_locator.get_input_line(line).unwrap())
-                    .unwrap();
+                let (line_begin, line_end) =
+                    input_locator.get_range(input_locator.get_input_line(line));
                 selected_prefixes.insert(line, (min(line_end, span_end) - line_begin, color));
             }
         }
 
         let mut annotations = Self::group_annotations(input_locator, annotations);
         for &line_num in selected_prefixes.keys() {
-            if !input_locator.get_input_line(line_num).unwrap().is_empty() {
+            if !input_locator.get_input_line(line_num).is_empty() {
                 annotations.try_insert(line_num, LinkedList::new());
             }
         }
@@ -549,12 +548,12 @@ impl<'l> SummaryCell<'l> {
                     " ...\n".to_string()
                 }
             });
-        let (span_begin, span_end) = input_locator.get_range(span).unwrap();
+        let (span_begin, span_end) = input_locator.get_range(span);
         annotations
             .into_iter()
             .map(|(line_num, annotations)| {
-                let line = input_locator.get_input_line(line_num).unwrap();
-                let (line_begin, line_end) = input_locator.get_range(line).unwrap();
+                let line = input_locator.get_input_line(line_num);
+                let (line_begin, line_end) = input_locator.get_range(line);
                 Self::fmt_refs_line(
                     line,
                     *selected_prefixes
@@ -597,8 +596,8 @@ impl<'l> SummaryCell<'l> {
         // if there are no components, or there is a component with no span, use
         // the statement span, otherwise use the minimum coordinate
         let (span_line, span_column) = match components.get(0) {
-            Some(comp) => input_locator.get_coords(comp.span).unwrap(),
-            _ => input_locator.get_coords(self.span).unwrap(),
+            Some(comp) => input_locator.get_coords(comp.span),
+            _ => input_locator.get_coords(self.span),
         };
 
         format!(
