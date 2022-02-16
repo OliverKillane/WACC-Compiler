@@ -60,7 +60,7 @@ pub fn analyse_block<'a, 'b>(
                     );
                     any_errors = true;
                 }
-                Stat::If(_, _, _) | Stat::Exit(_) | Stat::Return(_) => {
+                Stat::If(_, _, _) | Stat::Exit(_) | Stat::Return(_) | Stat::Block(_) => {
                     match analyse_statement(
                         WrapSpan(span, inner_stat),
                         fun_symb,
