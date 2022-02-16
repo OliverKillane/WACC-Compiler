@@ -5,14 +5,11 @@ use super::prelude::*;
 use super::span_utils::*;
 
 use colored::{control::SHOULD_COLORIZE, Color, Colorize};
-use nom::combinator::fail;
 use std::{
     cmp::{max, min},
     collections::{HashMap, LinkedList},
-    fmt::{Display, Write},
-    io::LineWriter,
+    fmt::Display,
     iter::zip,
-    ops::Add,
 };
 use unicode_width::UnicodeWidthChar;
 
@@ -82,7 +79,7 @@ static EXCLUDED_COLOR: Color = Color::BrightBlack;
 static TITLE_COLOR: Color = Color::Magenta;
 impl<'l> SummaryCell<'l> {
     /// Formats the full messages section of a single error cell.
-    fn fmt_messages(components: &[&SummaryComponent<'l>], input_locator: &SpanLocator) -> String {
+    fn fmt_messages(components: &[&SummaryComponent<'l>]) -> String {
         let (max_prefix, messages) = components
             .iter()
             .enumerate()
@@ -142,11 +139,14 @@ impl<'l> SummaryCell<'l> {
         input_locator: &SpanLocator,
         annotations: Vec<(&'l str, String, Color)>,
     ) -> HashMap<usize, LinkedList<(&'l str, String, Color)>> {
-        let mut line_nums = HashMap::new();
+        let mut line_nums: HashMap<usize, LinkedList<(&str, String, Color)>> = HashMap::new();
         for annotation @ (span, _, _) in annotations {
             let line_num = input_locator.get_line_num(span);
-            line_nums.try_insert(line_num, LinkedList::new());
-            line_nums.get_mut(&line_num).unwrap().push_back(annotation);
+            if let Some(annotations) = line_nums.get_mut(&line_num) {
+                annotations.push_back(annotation);
+            } else {
+                line_nums.insert(line_num, LinkedList::new());
+            }
         }
         line_nums
     }
@@ -263,7 +263,7 @@ impl<'l> SummaryCell<'l> {
             full_refs += line;
             full_refs += "\n";
             let mut underarrows = " ".to_string().repeat(line_len);
-            for (span_begin, span_end, color) in underlines {
+            for (span_begin, span_end, _) in underlines {
                 underarrows.replace_range(
                     line_index_to_column[&span_begin]..line_index_to_column[&span_end],
                     &"^".to_string().repeat(
@@ -384,7 +384,7 @@ impl<'l> SummaryCell<'l> {
         // Adding inter-annotation arrow lines
         let arrow_lines = annotations.iter().rev().fold(
             LinkedList::<(String, String)>::new(),
-            |mut rows, (column, _, message, message_len, color)| {
+            |mut rows, (column, _, _, message_len, color)| {
                 let column = line_index_to_column[column];
                 let mut line_top = if let Some((row, _)) = rows.front() {
                     row.clone()
@@ -408,7 +408,7 @@ impl<'l> SummaryCell<'l> {
         );
 
         // Adding left arrows inside messages' lines
-        for (span_begin, _, message, message_len, color) in &mut annotations {
+        for (span_begin, _, message, message_len, _) in &mut annotations {
             if *message_len < line_index_to_column[span_begin] {
                 *message += " <";
                 *message_len += 2;
@@ -425,7 +425,7 @@ impl<'l> SummaryCell<'l> {
         // Adding arrow lines after the messages
         let message_suffixes = annotations
             .iter()
-            .map(|(span_begin, _, message, message_len, _)| {
+            .map(|(span_begin, _, _, message_len, _)| {
                 let mut message_suffix = String::new();
                 let mut message_suffix_len = 0usize;
                 for (column, _, _, _, color) in &annotations {
@@ -492,6 +492,7 @@ impl<'l> SummaryCell<'l> {
     }
 
     /// Formats the code presentation section of the error cell.
+    #[allow(unused_must_use)]
     fn fmt_refs(
         components: &[&SummaryComponent<'l>],
         span: &str,
@@ -514,7 +515,7 @@ impl<'l> SummaryCell<'l> {
                 } else {
                     continue;
                 };
-            let (mut last_line, _) = input_locator.get_coords(&span[last_char_index..]);
+            let (last_line, _) = input_locator.get_coords(&span[last_char_index..]);
             if first_line == last_line {
                 continue;
             }
@@ -577,7 +578,7 @@ impl<'l> SummaryCell<'l> {
     }
 
     /// Formats the notes section of the error cell.
-    fn fmt_notes(components: &[&SummaryComponent<'l>], input_locator: &SpanLocator) -> String {
+    fn fmt_notes(components: &[&SummaryComponent<'l>]) -> String {
         components
             .iter()
             .enumerate()
@@ -614,19 +615,17 @@ impl<'l> SummaryCell<'l> {
             )
             .color(TITLE_COLOR)
             .bold()
-        ) + &Self::fmt_messages(&components, &input_locator)
+        ) + &Self::fmt_messages(&components)
             + &Self::fmt_refs(&components, self.span, &input_locator)
-            + &Self::fmt_notes(&components, &input_locator)
+            + &Self::fmt_notes(&components)
     }
 }
 
-static DEFAULT_SUMMARY_WIDTH: usize = 80;
 static MAIN_HEADER_COLOR: Color = Color::Cyan;
 
 impl<'l> Display for Summary<'l> {
     /// Produces a string for the entire summary.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut width = f.width().unwrap_or(DEFAULT_SUMMARY_WIDTH);
         let preamble = format!(
             "{} been found during {}\n",
             if self.cells.len() > 1 {
@@ -639,7 +638,7 @@ impl<'l> Display for Summary<'l> {
                 SummaryStage::Semantic => "semantic analysis",
             }
         );
-        write!(f, "{}", preamble.color(MAIN_HEADER_COLOR).bold().italic());
+        write!(f, "{}", preamble.color(MAIN_HEADER_COLOR).bold().italic())?;
 
         let cell_strings = self
             .cells
@@ -688,12 +687,9 @@ impl<'l> Summary<'l> {
 
 #[cfg(test)]
 mod test {
-    use super::{
-        Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType, MAIN_HEADER_COLOR,
-        TITLE_COLOR,
-    };
+    use super::{Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType};
 
-    use colored::{control::SHOULD_COLORIZE, Colorize};
+    use colored::control::SHOULD_COLORIZE;
     use indoc::indoc;
 
     #[allow(clippy::too_many_arguments)]

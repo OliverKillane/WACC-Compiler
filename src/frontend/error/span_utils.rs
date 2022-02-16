@@ -1,7 +1,7 @@
 //! Contains utility functions for determining the placement of spans within
 //! the original source code string.
 
-use std::{cmp::min, collections::HashMap, slice::SliceIndex};
+use std::{cmp::min, collections::HashMap};
 
 /// Returns the range of the indices of the span within the input string, provided
 /// the span starts somewhere within the input string.
