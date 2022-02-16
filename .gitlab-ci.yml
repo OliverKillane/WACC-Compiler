@@ -41,10 +41,15 @@ build-docs:
   stage: doc
   script:
     - cargo doc
+    - mkdir public
+    - mv target/doc public
   artifacts:
-    paths: 
-      - target/doc
+    paths:
+      - public
     expire_in: 1 week
-    
-  
 
+pages:
+  stage: doc
+  artifacts:
+    paths:
+      - public
