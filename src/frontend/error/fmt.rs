@@ -5,14 +5,11 @@ use super::prelude::*;
 use super::span_utils::*;
 
 use colored::{control::SHOULD_COLORIZE, Color, Colorize};
-use nom::combinator::fail;
 use std::{
     cmp::{max, min},
     collections::{HashMap, LinkedList},
-    fmt::{Display, Write},
-    io::LineWriter,
+    fmt::Display,
     iter::zip,
-    ops::Add,
 };
 use unicode_width::UnicodeWidthChar;
 
@@ -82,7 +79,7 @@ static EXCLUDED_COLOR: Color = Color::BrightBlack;
 static TITLE_COLOR: Color = Color::Magenta;
 impl<'l> SummaryCell<'l> {
     /// Formats the full messages section of a single error cell.
-    fn fmt_messages(components: &[&SummaryComponent<'l>], input_locator: &SpanLocator) -> String {
+    fn fmt_messages(components: &[&SummaryComponent<'l>]) -> String {
         let (max_prefix, messages) = components
             .iter()
             .enumerate()
@@ -142,11 +139,14 @@ impl<'l> SummaryCell<'l> {
         input_locator: &SpanLocator,
         annotations: Vec<(&'l str, String, Color)>,
     ) -> HashMap<usize, LinkedList<(&'l str, String, Color)>> {
-        let mut line_nums = HashMap::new();
+        let mut line_nums: HashMap<usize, LinkedList<(&str, String, Color)>> = HashMap::new();
         for annotation @ (span, _, _) in annotations {
-            let line_num = input_locator.get_line_num(span).unwrap();
-            line_nums.try_insert(line_num, LinkedList::new());
-            line_nums.get_mut(&line_num).unwrap().push_back(annotation);
+            let line_num = input_locator.get_line_num(span);
+            if let Some(anns) = line_nums.get_mut(&line_num) {
+                anns.push_back(annotation)
+            } else {
+                line_nums.insert(line_num, LinkedList::from([annotation]));
+            }
         }
         line_nums
     }
@@ -263,7 +263,7 @@ impl<'l> SummaryCell<'l> {
             full_refs += line;
             full_refs += "\n";
             let mut underarrows = " ".to_string().repeat(line_len);
-            for (span_begin, span_end, color) in underlines {
+            for (span_begin, span_end, _) in underlines {
                 underarrows.replace_range(
                     line_index_to_column[&span_begin]..line_index_to_column[&span_end],
                     &"^".to_string().repeat(
@@ -359,7 +359,7 @@ impl<'l> SummaryCell<'l> {
             }
         }
 
-        // Spreading the neighbouring spans out so that there are spaces between them
+        // Spreading the neighboring spans out so that there are spaces between them
         Self::fmt_refs_line_spread_out(
             &mut line,
             &mut unincluded_prefix,
@@ -384,7 +384,7 @@ impl<'l> SummaryCell<'l> {
         // Adding inter-annotation arrow lines
         let arrow_lines = annotations.iter().rev().fold(
             LinkedList::<(String, String)>::new(),
-            |mut rows, (column, _, message, message_len, color)| {
+            |mut rows, (column, _, _, message_len, color)| {
                 let column = line_index_to_column[column];
                 let mut line_top = if let Some((row, _)) = rows.front() {
                     row.clone()
@@ -408,7 +408,7 @@ impl<'l> SummaryCell<'l> {
         );
 
         // Adding left arrows inside messages' lines
-        for (span_begin, _, message, message_len, color) in &mut annotations {
+        for (span_begin, _, message, message_len, _) in &mut annotations {
             if *message_len < line_index_to_column[span_begin] {
                 *message += " <";
                 *message_len += 2;
@@ -425,7 +425,7 @@ impl<'l> SummaryCell<'l> {
         // Adding arrow lines after the messages
         let message_suffixes = annotations
             .iter()
-            .map(|(span_begin, _, message, message_len, _)| {
+            .map(|(span_begin, _, _, message_len, _)| {
                 let mut message_suffix = String::new();
                 let mut message_suffix_len = 0usize;
                 for (column, _, _, _, color) in &annotations {
@@ -492,6 +492,7 @@ impl<'l> SummaryCell<'l> {
     }
 
     /// Formats the code presentation section of the error cell.
+    #[allow(unused_must_use)]
     fn fmt_refs(
         components: &[&SummaryComponent<'l>],
         span: &str,
@@ -503,33 +504,32 @@ impl<'l> SummaryCell<'l> {
         if annotations.is_empty() {
             return String::default();
         }
-        annotations.sort_by_key(|&(span, _, _)| input_locator.get_range(span).unwrap().0);
+        annotations.sort_by_key(|&(span, _, _)| input_locator.get_range(span).0);
 
         let mut selected_prefixes = HashMap::<usize, _>::new();
         for &(span, _, color) in &annotations {
-            let first_line = input_locator.get_line_num(&span[0..]).unwrap();
+            let first_line = input_locator.get_line_num(&span[0..]);
             let last_char_index =
                 if let Some(last_char_index) = span.char_indices().map(|(index, _)| index).last() {
                     last_char_index
                 } else {
                     continue;
                 };
-            let (mut last_line, _) = input_locator.get_coords(&span[last_char_index..]).unwrap();
+            let (last_line, _) = input_locator.get_coords(&span[last_char_index..]);
             if first_line == last_line {
                 continue;
             }
-            let (_, span_end) = input_locator.get_range(span).unwrap();
+            let (_, span_end) = input_locator.get_range(span);
             for line in first_line + 1..=last_line {
-                let (line_begin, line_end) = input_locator
-                    .get_range(input_locator.get_input_line(line).unwrap())
-                    .unwrap();
+                let (line_begin, line_end) =
+                    input_locator.get_range(input_locator.get_input_line(line));
                 selected_prefixes.insert(line, (min(line_end, span_end) - line_begin, color));
             }
         }
 
         let mut annotations = Self::group_annotations(input_locator, annotations);
         for &line_num in selected_prefixes.keys() {
-            if !input_locator.get_input_line(line_num).unwrap().is_empty() {
+            if !input_locator.get_input_line(line_num).is_empty() {
                 annotations.try_insert(line_num, LinkedList::new());
             }
         }
@@ -549,12 +549,12 @@ impl<'l> SummaryCell<'l> {
                     " ...\n".to_string()
                 }
             });
-        let (span_begin, span_end) = input_locator.get_range(span).unwrap();
+        let (span_begin, span_end) = input_locator.get_range(span);
         annotations
             .into_iter()
             .map(|(line_num, annotations)| {
-                let line = input_locator.get_input_line(line_num).unwrap();
-                let (line_begin, line_end) = input_locator.get_range(line).unwrap();
+                let line = input_locator.get_input_line(line_num);
+                let (line_begin, line_end) = input_locator.get_range(line);
                 Self::fmt_refs_line(
                     line,
                     *selected_prefixes
@@ -578,7 +578,7 @@ impl<'l> SummaryCell<'l> {
     }
 
     /// Formats the notes section of the error cell.
-    fn fmt_notes(components: &[&SummaryComponent<'l>], input_locator: &SpanLocator) -> String {
+    fn fmt_notes(components: &[&SummaryComponent<'l>]) -> String {
         components
             .iter()
             .enumerate()
@@ -596,10 +596,11 @@ impl<'l> SummaryCell<'l> {
 
         // if there are no components, or there is a component with no span, use
         // the statement span, otherwise use the minimum coordinate
-        let (span_line, span_column) = match components.get(0) {
-            Some(comp) => input_locator.get_coords(comp.span).unwrap(),
-            _ => input_locator.get_coords(self.span).unwrap(),
-        };
+        let (span_line, span_column) = input_locator.get_coords(
+            components
+                .first()
+                .map_or_else(|| self.span, |comp| comp.span),
+        );
 
         format!(
             "{}",
@@ -615,19 +616,17 @@ impl<'l> SummaryCell<'l> {
             )
             .color(TITLE_COLOR)
             .bold()
-        ) + &Self::fmt_messages(&components, &input_locator)
+        ) + &Self::fmt_messages(&components)
             + &Self::fmt_refs(&components, self.span, &input_locator)
-            + &Self::fmt_notes(&components, &input_locator)
+            + &Self::fmt_notes(&components)
     }
 }
 
-static DEFAULT_SUMMARY_WIDTH: usize = 80;
 static MAIN_HEADER_COLOR: Color = Color::Cyan;
 
 impl<'l> Display for Summary<'l> {
     /// Produces a string for the entire summary.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut width = f.width().unwrap_or(DEFAULT_SUMMARY_WIDTH);
         let preamble = format!(
             "{} been found during {}\n",
             if self.cells.len() > 1 {
@@ -640,12 +639,12 @@ impl<'l> Display for Summary<'l> {
                 SummaryStage::Semantic => "semantic analysis",
             }
         );
-        write!(f, "{}", preamble.color(MAIN_HEADER_COLOR).bold().italic());
+        write!(f, "{}", preamble.color(MAIN_HEADER_COLOR).bold().italic())?;
 
         let cell_strings = self
             .cells
             .iter()
-            .map(|cell| cell.fmt(self.filepath.as_ref().map(|s| &s[..]), self.input))
+            .map(|cell| cell.fmt(self.filepath.as_deref(), self.input))
             .collect::<LinkedList<_>>();
 
         let max_cell_width = cell_strings
@@ -689,14 +688,10 @@ impl<'l> Summary<'l> {
 
 #[cfg(test)]
 mod test {
-    use super::{
-        Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType, MAIN_HEADER_COLOR,
-        TITLE_COLOR,
-    };
+    use super::{Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType};
 
-    use colored::{control::SHOULD_COLORIZE, Colorize};
+    use colored::control::SHOULD_COLORIZE;
     use indoc::indoc;
-    use std::panic::{catch_unwind, set_hook, take_hook, UnwindSafe};
 
     #[allow(clippy::too_many_arguments)]
     fn singleton_summary(
@@ -745,19 +740,6 @@ mod test {
             .map(|line| line.trim_end_matches(&[' ', '\n', '\t'][..]).to_string() + "\n")
             .collect::<String>();
         assert_eq!(source, target);
-    }
-
-    fn catch_panic<F: FnOnce() + UnwindSafe>(f: F) -> String {
-        let prev_hook = take_hook();
-        set_hook(Box::new(|_info| {}));
-        let unwind = catch_unwind(f);
-        set_hook(prev_hook);
-        unwind
-            .err()
-            .unwrap()
-            .downcast_ref::<&str>()
-            .unwrap()
-            .to_string()
     }
 
     #[test]
@@ -1423,28 +1405,24 @@ mod test {
     }
 
     #[test]
+    #[should_panic(expected = "Overlapping spans in a summary cell")]
     fn test_overlapping_spans() {
-        assert_eq!(
-            catch_panic(|| {
-                let input = "abc";
-                let mut summary = Summary::new(input, SummaryStage::Parser);
-                let mut cell = SummaryCell::new(input);
-                cell.add_component(SummaryComponent::new(
-                    SummaryType::Error,
-                    200,
-                    &input[..2],
-                    String::new(),
-                ));
-                cell.add_component(SummaryComponent::new(
-                    SummaryType::Error,
-                    200,
-                    &input[1..],
-                    String::new(),
-                ));
-                summary.add_cell(cell);
-                format!("{}", summary);
-            }),
-            "Overlapping spans in a summary cell"
-        );
+        let input = "abc";
+        let mut summary = Summary::new(input, SummaryStage::Parser);
+        let mut cell = SummaryCell::new(input);
+        cell.add_component(SummaryComponent::new(
+            SummaryType::Error,
+            200,
+            &input[..2],
+            String::new(),
+        ));
+        cell.add_component(SummaryComponent::new(
+            SummaryType::Error,
+            200,
+            &input[1..],
+            String::new(),
+        ));
+        summary.add_cell(cell);
+        format!("{}", summary);
     }
 }
