@@ -20,19 +20,13 @@ use core::fmt;
 use nom::{
     branch::alt,
     bytes::complete::{escaped, is_not},
-    character::complete::{
-        alpha1, alphanumeric1, char, digit1, multispace1, none_of, one_of
-    },
+    character::complete::{alpha1, alphanumeric1, char, digit1, multispace1, none_of, one_of},
     combinator::{map_res, not, opt, recognize},
     multi::many0,
     sequence::{delimited, pair, terminated},
     IResult, Parser,
 };
-use nom_supreme::{
-    error::ErrorTree,
-    tag::complete::tag,
-    ParserExt,
-};
+use nom_supreme::{error::ErrorTree, tag::complete::tag, ParserExt};
 use std::collections::HashSet;
 
 /// Parser for WACC comments. Returns the parsed comment on success.

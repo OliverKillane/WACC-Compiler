@@ -17,7 +17,7 @@ use nom::{
     combinator::{cut, eof, map, opt, success, value},
     error::{context, ParseError},
     multi::{many0, many1, separated_list0},
-    sequence::{delimited, pair, preceded, tuple, separated_pair},
+    sequence::{delimited, pair, preceded, separated_pair, tuple},
     IResult,
 };
 use nom_supreme::{
