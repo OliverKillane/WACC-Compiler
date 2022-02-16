@@ -8,10 +8,10 @@
 image: rustlang/rust:nightly
 
 stages:
+  - doc
   - build
   - test
   - lint
-  - doc
 
 build:
   stage: build
@@ -37,19 +37,12 @@ linter:
     - echo "Clippy checking codebase..."
     - cargo clippy -- -D warnings
 
-build-docs:
+pages:
   stage: doc
   script:
     - cargo doc
     - mkdir public
     - mv target/doc public
-  artifacts:
-    paths:
-      - public
-    expire_in: 1 week
-
-pages:
-  stage: doc
   artifacts:
     paths:
       - public
