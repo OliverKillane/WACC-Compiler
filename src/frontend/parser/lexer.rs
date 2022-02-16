@@ -4,11 +4,6 @@
 //! Two new errors are introduced: [KeywordIdentError](KeywordIdentError) and
 //! [OutOfBoundsInt](OutOfBoundsInt).
 
-#![deny(clippy::missing_docs_in_private_items)]
-
-#[macro_use]
-use lazy_static::lazy_static;
-
 lazy_static! {
     static ref KEYWORD_HASHSET: HashSet<&'static str> = {
         let arr = [
@@ -24,29 +19,21 @@ lazy_static! {
 use core::fmt;
 use nom::{
     branch::alt,
-    bytes::complete::{escaped, escaped_transform, is_a, is_not, take_until, take_while},
-    character::{
-        complete::{
-            alpha1, alphanumeric1, anychar, char, digit1, multispace0, multispace1, none_of,
-            not_line_ending, one_of, space0,
-        },
-        is_alphabetic, is_alphanumeric,
+    bytes::complete::{escaped, is_not},
+    character::complete::{
+        alpha1, alphanumeric1, char, digit1, multispace1, none_of, one_of
     },
-    combinator::{cond, map, map_res, not, opt, recognize, value},
-    error::{context, ParseError},
-    multi::{many0, many1, separated_list0, separated_list1},
-    sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
+    combinator::{map_res, not, opt, recognize},
+    multi::many0,
+    sequence::{delimited, pair, terminated},
     IResult, Parser,
 };
 use nom_supreme::{
-    error::{BaseErrorKind, ErrorTree, Expectation, StackContext},
-    final_parser::final_parser,
+    error::ErrorTree,
     tag::complete::tag,
     ParserExt,
 };
-use std::{collections::HashSet, error::Error};
-
-use crate::frontend::ast;
+use std::collections::HashSet;
 
 /// Parser for WACC comments. Returns the parsed comment on success.
 pub fn comments(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
@@ -61,7 +48,6 @@ where
     terminated(inner, many0(alt((comments, multispace1))))
 }
 
-#[allow(clippy::missing_docs_in_private_items)]
 /// All possible tokens to be lexed. Allows for a compile-time guarantee that we
 /// lex every possible token.
 #[derive(PartialEq)]
@@ -196,7 +182,6 @@ impl Lexer {
             Self::Int => "int",
             Self::Bool => "bool",
             Self::Char => "char",
-            Self::Int => "int",
             Self::String => "string",
             Self::Begin => "begin",
             Self::End => "end",
@@ -332,19 +317,3 @@ pub fn str_delimited<'a>(
         tag(del).cut(),
     ))
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     #[test]
-//     #[should_panic]
-//     fn parse_ident_catches_keyword() {
-//         let input = "hello";
-//         let output: Result<&str, ErrorTree<&str>> = final_parser(parse_ident)(input);
-//         match output {
-//             Err(wow) => println!("{}", wow),
-//             Ok(wow) => println!("{}", wow)
-//         }
-//         // println!("{:?}", parse_ident(input));
-//     }
-// }
