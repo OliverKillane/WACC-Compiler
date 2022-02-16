@@ -4,7 +4,7 @@
 use super::{
     super::ast::{AssignLhs, AssignRhs, Expr, Stat, StatSpan, Type, WrapSpan},
     expression_analysis::analyse_expression,
-    semantic_errors::{SemanticError, StatementErrors},
+    semantic_errors::SemanticError,
     symbol_table::{FunctionSymbolTable, LocalSymbolTable, VariableSymbolTable},
     type_constraints::{can_coerce, de_index},
 };
@@ -39,7 +39,7 @@ pub fn analyse_block<'a, 'b>(
         if stat_iter.peek().is_none() && must_ret {
             let WrapSpan(span, inner_stat) = stat;
             match inner_stat {
-                Stat::While(cond, while_inner) => {
+                Stat::While(_, _) => {
                     errors.push(WrapSpan(
                         span,
                         vec![SemanticError::FunctionLastStatIsWhile(
@@ -50,7 +50,7 @@ pub fn analyse_block<'a, 'b>(
                         )],
                     ));
                     analyse_statement(
-                        WrapSpan(span, Stat::While(cond, while_inner)),
+                        WrapSpan(span, inner_stat),
                         fun_symb,
                         local_symb,
                         var_symb,
@@ -60,9 +60,9 @@ pub fn analyse_block<'a, 'b>(
                     );
                     any_errors = true;
                 }
-                Stat::If(cond, if_block, else_block) => {
+                Stat::If(_, _, _) | Stat::Exit(_) | Stat::Return(_) => {
                     match analyse_statement(
-                        WrapSpan(span, Stat::If(cond, if_block, else_block)),
+                        WrapSpan(span, inner_stat),
                         fun_symb,
                         local_symb,
                         var_symb,
@@ -70,35 +70,7 @@ pub fn analyse_block<'a, 'b>(
                         true,
                         errors,
                     ) {
-                        Some(if_renamed) => correct.push(if_renamed),
-                        None => any_errors = true,
-                    }
-                }
-                Stat::Exit(inner) => {
-                    match analyse_statement(
-                        WrapSpan(span, Stat::Exit(inner)),
-                        fun_symb,
-                        local_symb,
-                        var_symb,
-                        ret_type,
-                        true,
-                        errors,
-                    ) {
-                        Some(exit_renamed) => correct.push(exit_renamed),
-                        None => any_errors = true,
-                    }
-                }
-                Stat::Return(inner) => {
-                    match analyse_statement(
-                        WrapSpan(span, Stat::Return(inner)),
-                        fun_symb,
-                        local_symb,
-                        var_symb,
-                        ret_type,
-                        true,
-                        errors,
-                    ) {
-                        Some(exit_renamed) => correct.push(exit_renamed),
+                        Some(renamed_ast) => correct.push(renamed_ast),
                         None => any_errors = true,
                     }
                 }

@@ -39,9 +39,9 @@ use super::{
         ast::{BinOp, GenericId, Type, UnOp, WrapSpan},
         error::{Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType},
     },
-    semantic_errors::{self, SemanticError, StatementErrors},
+    semantic_errors::{SemanticError, StatementErrors},
 };
-use std::{fmt::Display, ops::Add};
+use std::fmt::Display;
 
 /// Takes errors from semantic analysis and converts them into:
 /// - A vector of erroneous (semantic) statements/definitions
@@ -187,7 +187,7 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                     SummaryType::Error,
                     208,
                     binop_span,
-                    format!("Invalid application of operator {} on {} and {}.", found_left, found_right, found_op)
+                    format!("Invalid application of operator {} on {} and {}.", found_op, found_left, found_right)
                 ).set_shorthand(format!("{} {}",
                         if possible_types.is_empty() {
                             format!("There are no possible input types for the operator {}.", found_op)
@@ -243,7 +243,8 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                     fun_span,
                     format!("Repeat definition of function {}.", fun_span)
                 ).set_shorthand(format!("To amend change the function name to something other than {}.", fun_span))
-                .set_note(String::from("A function can only be defined once, to amend use a different identifier.")),
+                .set_note(String::from("A function can only be defined once, to amend use a different identifier."))
+                .set_declaration(orig_def_span),
             SemanticError::FunctionParametersLengthMismatch(fun_span, expected, found) =>
                 SummaryComponent::new(
                     SummaryType::Error,
@@ -394,7 +395,7 @@ impl Display for Type {
             Type::Bool => write!(f, "bool"),
             Type::Char => write!(f, "char"),
             Type::String => write!(f, "string"),
-            Type::Any => write!(f, ""),
+            Type::Any => write!(f, "any"),
             Type::Generic(n) => write!(f, "{}", generic_to_alpha(*n)),
             Type::Pair(box t1, box t2) => write!(f, "pair({},{})", t1, t2),
             Type::Array(box t, n) => {
