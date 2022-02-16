@@ -42,7 +42,8 @@ pages:
   script:
     - cargo doc
     - mkdir public
-    - mv target/doc public
+    - mv target/doc/* public
+    - echo '<meta http-equiv="refresh" content="0; url=compile/index.html">' > public/index.html
   artifacts:
     paths:
       - public
