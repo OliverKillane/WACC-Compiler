@@ -1,6 +1,4 @@
-//! Integration tests for the parser and semantic analyser.
 #![allow(non_snake_case)]
-#![cfg(test)]
 
 use super::*;
 #[test]
@@ -2452,7 +2450,6 @@ fn commentInLine() {
 }
 
 #[test]
-#[should_panic]
 fn funcExpr2() {
     let input = include_str!("invalid/syntaxErr/function/funcExpr2.wacc");
     let res = analyse(input);
@@ -2461,11 +2458,10 @@ fn funcExpr2() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionMissingCall() {
     let input = include_str!("invalid/syntaxErr/function/functionMissingCall.wacc");
     let res = analyse(input);
@@ -2474,11 +2470,10 @@ fn functionMissingCall() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionEndingNotReturn() {
     let input = include_str!("invalid/syntaxErr/function/functionEndingNotReturn.wacc");
     let res = analyse(input);
@@ -2487,11 +2482,10 @@ fn functionEndingNotReturn() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionMissingParam() {
     let input = include_str!("invalid/syntaxErr/function/functionMissingParam.wacc");
     let res = analyse(input);
@@ -2500,11 +2494,10 @@ fn functionMissingParam() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionReturnInLoop() {
     let input = include_str!("invalid/syntaxErr/function/functionReturnInLoop.wacc");
     let res = analyse(input);
@@ -2513,11 +2506,10 @@ fn functionReturnInLoop() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badlyPlaced() {
     let input = include_str!("invalid/syntaxErr/function/badlyPlaced.wacc");
     let res = analyse(input);
@@ -2526,11 +2518,10 @@ fn badlyPlaced() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badlyNamed() {
     let input = include_str!("invalid/syntaxErr/function/badlyNamed.wacc");
     let res = analyse(input);
@@ -2539,11 +2530,10 @@ fn badlyNamed() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn funcExpr() {
     let input = include_str!("invalid/syntaxErr/function/funcExpr.wacc");
     let res = analyse(input);
@@ -2552,11 +2542,10 @@ fn funcExpr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionMissingType() {
     let input = include_str!("invalid/syntaxErr/function/functionMissingType.wacc");
     let res = analyse(input);
@@ -2565,11 +2554,10 @@ fn functionMissingType() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionMissingPType() {
     let input = include_str!("invalid/syntaxErr/function/functionMissingPType.wacc");
     let res = analyse(input);
@@ -2578,11 +2566,10 @@ fn functionMissingPType() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn thisIsNotC() {
     let input = include_str!("invalid/syntaxErr/function/thisIsNotC.wacc");
     let res = analyse(input);
@@ -2591,11 +2578,10 @@ fn thisIsNotC() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionScopeDef() {
     let input = include_str!("invalid/syntaxErr/function/functionScopeDef.wacc");
     let res = analyse(input);
@@ -2604,11 +2590,10 @@ fn functionScopeDef() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionLateDefine() {
     let input = include_str!("invalid/syntaxErr/function/functionLateDefine.wacc");
     let res = analyse(input);
@@ -2617,11 +2602,10 @@ fn functionLateDefine() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn noBodyAfterFuncs() {
     let input = include_str!("invalid/syntaxErr/function/noBodyAfterFuncs.wacc");
     let res = analyse(input);
@@ -2630,11 +2614,10 @@ fn noBodyAfterFuncs() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionNoReturn() {
     let input = include_str!("invalid/syntaxErr/function/functionNoReturn.wacc");
     let res = analyse(input);
@@ -2643,11 +2626,10 @@ fn functionNoReturn() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn mutualRecursionNoReturn() {
     let input = include_str!("invalid/syntaxErr/function/mutualRecursionNoReturn.wacc");
     let res = analyse(input);
@@ -2656,11 +2638,10 @@ fn mutualRecursionNoReturn() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionConditionalNoReturn() {
     let input = include_str!("invalid/syntaxErr/function/functionConditionalNoReturn.wacc");
     let res = analyse(input);
@@ -2669,11 +2650,10 @@ fn functionConditionalNoReturn() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badintAssignments() {
     let input = include_str!("invalid/syntaxErr/variables/badintAssignments.wacc");
     let res = analyse(input);
@@ -2682,11 +2662,10 @@ fn badintAssignments() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn bigIntAssignment() {
     let input = include_str!("invalid/syntaxErr/variables/bigIntAssignment.wacc");
     let res = analyse(input);
@@ -2695,11 +2674,10 @@ fn bigIntAssignment() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn varNoName() {
     let input = include_str!("invalid/syntaxErr/variables/varNoName.wacc");
     let res = analyse(input);
@@ -2708,11 +2686,10 @@ fn varNoName() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badintAssignments2() {
     let input = include_str!("invalid/syntaxErr/variables/badintAssignments2.wacc");
     let res = analyse(input);
@@ -2721,11 +2698,10 @@ fn badintAssignments2() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badintAssignments1() {
     let input = include_str!("invalid/syntaxErr/variables/badintAssignments1.wacc");
     let res = analyse(input);
@@ -2734,11 +2710,10 @@ fn badintAssignments1() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn arrayExpr() {
     let input = include_str!("invalid/syntaxErr/array/arrayExpr.wacc");
     let res = analyse(input);
@@ -2747,11 +2722,10 @@ fn arrayExpr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn printlnCharArry() {
     let input = include_str!("invalid/syntaxErr/print/printlnCharArry.wacc");
     let res = analyse(input);
@@ -2760,11 +2734,10 @@ fn printlnCharArry() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn donoErr() {
     let input = include_str!("invalid/syntaxErr/while/donoErr.wacc");
     let res = analyse(input);
@@ -2773,11 +2746,10 @@ fn donoErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn dooErr() {
     let input = include_str!("invalid/syntaxErr/while/dooErr.wacc");
     let res = analyse(input);
@@ -2786,11 +2758,10 @@ fn dooErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn whileNodo() {
     let input = include_str!("invalid/syntaxErr/while/whileNodo.wacc");
     let res = analyse(input);
@@ -2799,11 +2770,10 @@ fn whileNodo() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn whileNodone() {
     let input = include_str!("invalid/syntaxErr/while/whileNodone.wacc");
     let res = analyse(input);
@@ -2812,11 +2782,10 @@ fn whileNodone() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn whilErr() {
     let input = include_str!("invalid/syntaxErr/while/whilErr.wacc");
     let res = analyse(input);
@@ -2825,11 +2794,10 @@ fn whilErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn missingOperand2() {
     let input = include_str!("invalid/syntaxErr/expressions/missingOperand2.wacc");
     let res = analyse(input);
@@ -2838,11 +2806,10 @@ fn missingOperand2() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn printlnConcat() {
     let input = include_str!("invalid/syntaxErr/expressions/printlnConcat.wacc");
     let res = analyse(input);
@@ -2851,11 +2818,10 @@ fn printlnConcat() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn missingOperand1() {
     let input = include_str!("invalid/syntaxErr/expressions/missingOperand1.wacc");
     let res = analyse(input);
@@ -2864,11 +2830,10 @@ fn missingOperand1() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn emptySeq() {
     let input = include_str!("invalid/syntaxErr/sequence/emptySeq.wacc");
     let res = analyse(input);
@@ -2877,11 +2842,10 @@ fn emptySeq() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn endSeq() {
     let input = include_str!("invalid/syntaxErr/sequence/endSeq.wacc");
     let res = analyse(input);
@@ -2890,11 +2854,10 @@ fn endSeq() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn extraSeq() {
     let input = include_str!("invalid/syntaxErr/sequence/extraSeq.wacc");
     let res = analyse(input);
@@ -2903,11 +2866,10 @@ fn extraSeq() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn doubleSeq() {
     let input = include_str!("invalid/syntaxErr/sequence/doubleSeq.wacc");
     let res = analyse(input);
@@ -2916,11 +2878,10 @@ fn doubleSeq() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn missingSeq() {
     let input = include_str!("invalid/syntaxErr/sequence/missingSeq.wacc");
     let res = analyse(input);
@@ -2929,11 +2890,10 @@ fn missingSeq() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn ifiErr() {
     let input = include_str!("invalid/syntaxErr/if/ifiErr.wacc");
     let res = analyse(input);
@@ -2942,11 +2902,10 @@ fn ifiErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn ifNothen() {
     let input = include_str!("invalid/syntaxErr/if/ifNothen.wacc");
     let res = analyse(input);
@@ -2955,11 +2914,10 @@ fn ifNothen() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn ifNoelse() {
     let input = include_str!("invalid/syntaxErr/if/ifNoelse.wacc");
     let res = analyse(input);
@@ -2968,11 +2926,10 @@ fn ifNoelse() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn ifNofi() {
     let input = include_str!("invalid/syntaxErr/if/ifNofi.wacc");
     let res = analyse(input);
@@ -2981,11 +2938,10 @@ fn ifNofi() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badLookup02() {
     let input = include_str!("invalid/syntaxErr/pairs/badLookup02.wacc");
     let res = analyse(input);
@@ -2994,11 +2950,10 @@ fn badLookup02() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badLookup01() {
     let input = include_str!("invalid/syntaxErr/pairs/badLookup01.wacc");
     let res = analyse(input);
@@ -3007,11 +2962,10 @@ fn badLookup01() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn unescapedChar() {
     let input = include_str!("invalid/syntaxErr/basic/unescapedChar.wacc");
     let res = analyse(input);
@@ -3020,11 +2974,10 @@ fn unescapedChar() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badEscape() {
     let input = include_str!("invalid/syntaxErr/basic/badEscape.wacc");
     let res = analyse(input);
@@ -3033,11 +2986,10 @@ fn badEscape() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badComment2() {
     let input = include_str!("invalid/syntaxErr/basic/badComment2.wacc");
     let res = analyse(input);
@@ -3046,11 +2998,10 @@ fn badComment2() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn multipleBegins() {
     let input = include_str!("invalid/syntaxErr/basic/multipleBegins.wacc");
     let res = analyse(input);
@@ -3059,11 +3010,10 @@ fn multipleBegins() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badComment() {
     let input = include_str!("invalid/syntaxErr/basic/badComment.wacc");
     let res = analyse(input);
@@ -3072,11 +3022,10 @@ fn badComment() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn beginNoend() {
     let input = include_str!("invalid/syntaxErr/basic/beginNoend.wacc");
     let res = analyse(input);
@@ -3085,11 +3034,10 @@ fn beginNoend() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn bgnErr() {
     let input = include_str!("invalid/syntaxErr/basic/bgnErr.wacc");
     let res = analyse(input);
@@ -3098,11 +3046,10 @@ fn bgnErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn noBody() {
     let input = include_str!("invalid/syntaxErr/basic/noBody.wacc");
     let res = analyse(input);
@@ -3111,11 +3058,10 @@ fn noBody() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn skpErr() {
     let input = include_str!("invalid/syntaxErr/basic/skpErr.wacc");
     let res = analyse(input);
@@ -3124,11 +3070,10 @@ fn skpErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn funcMess() {
     let input = include_str!("invalid/semanticErr/multiple/funcMess.wacc");
     let res = analyse(input);
@@ -3137,11 +3082,10 @@ fn funcMess() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn ifAndWhileErrs() {
     let input = include_str!("invalid/semanticErr/multiple/ifAndWhileErrs.wacc");
     let res = analyse(input);
@@ -3150,11 +3094,10 @@ fn ifAndWhileErrs() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn multiTypeErrs() {
     let input = include_str!("invalid/semanticErr/multiple/multiTypeErrs.wacc");
     let res = analyse(input);
@@ -3163,11 +3106,10 @@ fn multiTypeErrs() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn multiCaseSensitivity() {
     let input = include_str!("invalid/semanticErr/multiple/multiCaseSensitivity.wacc");
     let res = analyse(input);
@@ -3176,11 +3118,10 @@ fn multiCaseSensitivity() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn messyExpr() {
     let input = include_str!("invalid/semanticErr/multiple/messyExpr.wacc");
     let res = analyse(input);
@@ -3189,11 +3130,10 @@ fn messyExpr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badScopeRedefine() {
     let input = include_str!("invalid/semanticErr/scope/badScopeRedefine.wacc");
     let res = analyse(input);
@@ -3202,11 +3142,10 @@ fn badScopeRedefine() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn readTypeErr01() {
     let input = include_str!("invalid/semanticErr/read/readTypeErr01.wacc");
     let res = analyse(input);
@@ -3215,11 +3154,10 @@ fn readTypeErr01() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionOverArgs() {
     let input = include_str!("invalid/semanticErr/function/functionOverArgs.wacc");
     let res = analyse(input);
@@ -3228,11 +3166,10 @@ fn functionOverArgs() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionBadParam() {
     let input = include_str!("invalid/semanticErr/function/functionBadParam.wacc");
     let res = analyse(input);
@@ -3241,11 +3178,10 @@ fn functionBadParam() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionBadReturn() {
     let input = include_str!("invalid/semanticErr/function/functionBadReturn.wacc");
     let res = analyse(input);
@@ -3254,11 +3190,10 @@ fn functionBadReturn() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn funcVarAccess() {
     let input = include_str!("invalid/semanticErr/function/funcVarAccess.wacc");
     let res = analyse(input);
@@ -3267,11 +3202,10 @@ fn funcVarAccess() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionSwapArgs() {
     let input = include_str!("invalid/semanticErr/function/functionSwapArgs.wacc");
     let res = analyse(input);
@@ -3280,11 +3214,10 @@ fn functionSwapArgs() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionBadCall() {
     let input = include_str!("invalid/semanticErr/function/functionBadCall.wacc");
     let res = analyse(input);
@@ -3293,11 +3226,10 @@ fn functionBadCall() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionUnderArgs() {
     let input = include_str!("invalid/semanticErr/function/functionUnderArgs.wacc");
     let res = analyse(input);
@@ -3306,11 +3238,10 @@ fn functionUnderArgs() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionBadArgUse() {
     let input = include_str!("invalid/semanticErr/function/functionBadArgUse.wacc");
     let res = analyse(input);
@@ -3319,11 +3250,10 @@ fn functionBadArgUse() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionAssign() {
     let input = include_str!("invalid/semanticErr/function/functionAssign.wacc");
     let res = analyse(input);
@@ -3332,11 +3262,10 @@ fn functionAssign() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionRedefine() {
     let input = include_str!("invalid/semanticErr/function/functionRedefine.wacc");
     let res = analyse(input);
@@ -3345,11 +3274,10 @@ fn functionRedefine() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn undeclaredVar() {
     let input = include_str!("invalid/semanticErr/variables/undeclaredVar.wacc");
     let res = analyse(input);
@@ -3358,11 +3286,10 @@ fn undeclaredVar() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn basicTypeErr08() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr08.wacc");
     let res = analyse(input);
@@ -3371,11 +3298,10 @@ fn basicTypeErr08() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn basicTypeErr01() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr01.wacc");
     let res = analyse(input);
@@ -3384,11 +3310,10 @@ fn basicTypeErr01() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn basicTypeErr10() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr10.wacc");
     let res = analyse(input);
@@ -3397,11 +3322,10 @@ fn basicTypeErr10() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn undeclaredVarAccess() {
     let input = include_str!("invalid/semanticErr/variables/undeclaredVarAccess.wacc");
     let res = analyse(input);
@@ -3410,11 +3334,10 @@ fn undeclaredVarAccess() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn basicTypeErr07() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr07.wacc");
     let res = analyse(input);
@@ -3423,11 +3346,10 @@ fn basicTypeErr07() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn basicTypeErr02() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr02.wacc");
     let res = analyse(input);
@@ -3436,11 +3358,10 @@ fn basicTypeErr02() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn basicTypeErr06() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr06.wacc");
     let res = analyse(input);
@@ -3449,11 +3370,10 @@ fn basicTypeErr06() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn basicTypeErr03() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr03.wacc");
     let res = analyse(input);
@@ -3462,11 +3382,10 @@ fn basicTypeErr03() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn basicTypeErr04() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr04.wacc");
     let res = analyse(input);
@@ -3475,11 +3394,10 @@ fn basicTypeErr04() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn basicTypeErr05() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr05.wacc");
     let res = analyse(input);
@@ -3488,11 +3406,10 @@ fn basicTypeErr05() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn basicTypeErr12() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr12.wacc");
     let res = analyse(input);
@@ -3501,11 +3418,10 @@ fn basicTypeErr12() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn doubleDeclare() {
     let input = include_str!("invalid/semanticErr/variables/doubleDeclare.wacc");
     let res = analyse(input);
@@ -3514,11 +3430,10 @@ fn doubleDeclare() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn caseMatters() {
     let input = include_str!("invalid/semanticErr/variables/caseMatters.wacc");
     let res = analyse(input);
@@ -3527,11 +3442,10 @@ fn caseMatters() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn undeclaredScopeVar() {
     let input = include_str!("invalid/semanticErr/variables/undeclaredScopeVar.wacc");
     let res = analyse(input);
@@ -3540,11 +3454,10 @@ fn undeclaredScopeVar() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn basicTypeErr11() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr11.wacc");
     let res = analyse(input);
@@ -3553,11 +3466,10 @@ fn basicTypeErr11() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn basicTypeErr09() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr09.wacc");
     let res = analyse(input);
@@ -3566,11 +3478,10 @@ fn basicTypeErr09() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn printTypeErr01() {
     let input = include_str!("invalid/semanticErr/print/printTypeErr01.wacc");
     let res = analyse(input);
@@ -3579,11 +3490,10 @@ fn printTypeErr01() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badCharExit() {
     let input = include_str!("invalid/semanticErr/exit/badCharExit.wacc");
     let res = analyse(input);
@@ -3592,11 +3502,10 @@ fn badCharExit() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn globalReturn() {
     let input = include_str!("invalid/semanticErr/exit/globalReturn.wacc");
     let res = analyse(input);
@@ -3605,11 +3514,10 @@ fn globalReturn() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn exitNonInt() {
     let input = include_str!("invalid/semanticErr/exit/exitNonInt.wacc");
     let res = analyse(input);
@@ -3618,11 +3526,10 @@ fn exitNonInt() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn readTypeErr() {
     let input = include_str!("invalid/semanticErr/IO/readTypeErr.wacc");
     let res = analyse(input);
@@ -3631,11 +3538,10 @@ fn readTypeErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn falsErr() {
     let input = include_str!("invalid/semanticErr/while/falsErr.wacc");
     let res = analyse(input);
@@ -3644,11 +3550,10 @@ fn falsErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn truErr() {
     let input = include_str!("invalid/semanticErr/while/truErr.wacc");
     let res = analyse(input);
@@ -3657,11 +3562,10 @@ fn truErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn whileIntCondition() {
     let input = include_str!("invalid/semanticErr/while/whileIntCondition.wacc");
     let res = analyse(input);
@@ -3670,11 +3574,10 @@ fn whileIntCondition() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn exprTypeErr() {
     let input = include_str!("invalid/semanticErr/expressions/exprTypeErr.wacc");
     let res = analyse(input);
@@ -3683,11 +3586,10 @@ fn exprTypeErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn boolOpTypeErr() {
     let input = include_str!("invalid/semanticErr/expressions/boolOpTypeErr.wacc");
     let res = analyse(input);
@@ -3696,11 +3598,10 @@ fn boolOpTypeErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn intOpTypeErr() {
     let input = include_str!("invalid/semanticErr/expressions/intOpTypeErr.wacc");
     let res = analyse(input);
@@ -3709,11 +3610,10 @@ fn intOpTypeErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn moreArrExpr() {
     let input = include_str!("invalid/semanticErr/expressions/moreArrExpr.wacc");
     let res = analyse(input);
@@ -3722,11 +3622,10 @@ fn moreArrExpr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn lessPairExpr() {
     let input = include_str!("invalid/semanticErr/expressions/lessPairExpr.wacc");
     let res = analyse(input);
@@ -3735,11 +3634,10 @@ fn lessPairExpr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn stringElemErr() {
     let input = include_str!("invalid/semanticErr/expressions/stringElemErr.wacc");
     let res = analyse(input);
@@ -3748,11 +3646,10 @@ fn stringElemErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn mixedOpTypeErr() {
     let input = include_str!("invalid/semanticErr/expressions/mixedOpTypeErr.wacc");
     let res = analyse(input);
@@ -3761,11 +3658,10 @@ fn mixedOpTypeErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn ifIntCondition() {
     let input = include_str!("invalid/semanticErr/if/ifIntCondition.wacc");
     let res = analyse(input);
@@ -3774,11 +3670,10 @@ fn ifIntCondition() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn sndNull() {
     let input = include_str!("invalid/semanticErr/pairs/sndNull.wacc");
     let res = analyse(input);
@@ -3787,11 +3682,10 @@ fn sndNull() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn fstNull() {
     let input = include_str!("invalid/semanticErr/pairs/fstNull.wacc");
     let res = analyse(input);
@@ -3800,11 +3694,10 @@ fn fstNull() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn freeNonPair() {
     let input = include_str!("invalid/semanticErr/pairs/freeNonPair.wacc");
     let res = analyse(input);
@@ -3813,5 +3706,5 @@ fn freeNonPair() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }

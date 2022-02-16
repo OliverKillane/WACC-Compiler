@@ -5,9 +5,9 @@ mod parser;
 mod semantic;
 mod tests;
 
-use self::semantic::analyse_semantics;
 pub use error::Summary;
-pub use parser::{collect_errors, parse};
+use parser::{collect_errors, parse};
+use semantic::analyse_semantics;
 
 /// Parse the source code, and then run semantic analysis.
 ///

@@ -3090,7 +3090,6 @@ fn freeNonPair() {
 }
 
 #[test]
-#[should_panic]
 fn funcExpr2() {
     let input = include_str!("../tests/invalid/syntaxErr/function/funcExpr2.wacc");
     let res = parse(input);
@@ -3099,11 +3098,10 @@ fn funcExpr2() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionMissingCall() {
     let input = include_str!("../tests/invalid/syntaxErr/function/functionMissingCall.wacc");
     let res = parse(input);
@@ -3112,11 +3110,10 @@ fn functionMissingCall() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionMissingParam() {
     let input = include_str!("../tests/invalid/syntaxErr/function/functionMissingParam.wacc");
     let res = parse(input);
@@ -3125,11 +3122,10 @@ fn functionMissingParam() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badlyPlaced() {
     let input = include_str!("../tests/invalid/syntaxErr/function/badlyPlaced.wacc");
     let res = parse(input);
@@ -3138,11 +3134,10 @@ fn badlyPlaced() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badlyNamed() {
     let input = include_str!("../tests/invalid/syntaxErr/function/badlyNamed.wacc");
     let res = parse(input);
@@ -3151,11 +3146,10 @@ fn badlyNamed() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn funcExpr() {
     let input = include_str!("../tests/invalid/syntaxErr/function/funcExpr.wacc");
     let res = parse(input);
@@ -3164,11 +3158,10 @@ fn funcExpr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionMissingType() {
     let input = include_str!("../tests/invalid/syntaxErr/function/functionMissingType.wacc");
     let res = parse(input);
@@ -3177,11 +3170,10 @@ fn functionMissingType() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionMissingPType() {
     let input = include_str!("../tests/invalid/syntaxErr/function/functionMissingPType.wacc");
     let res = parse(input);
@@ -3190,11 +3182,10 @@ fn functionMissingPType() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn thisIsNotC() {
     let input = include_str!("../tests/invalid/syntaxErr/function/thisIsNotC.wacc");
     let res = parse(input);
@@ -3203,11 +3194,10 @@ fn thisIsNotC() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionScopeDef() {
     let input = include_str!("../tests/invalid/syntaxErr/function/functionScopeDef.wacc");
     let res = parse(input);
@@ -3216,11 +3206,10 @@ fn functionScopeDef() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn functionLateDefine() {
     let input = include_str!("../tests/invalid/syntaxErr/function/functionLateDefine.wacc");
     let res = parse(input);
@@ -3229,11 +3218,10 @@ fn functionLateDefine() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn noBodyAfterFuncs() {
     let input = include_str!("../tests/invalid/syntaxErr/function/noBodyAfterFuncs.wacc");
     let res = parse(input);
@@ -3242,11 +3230,10 @@ fn noBodyAfterFuncs() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badintAssignments() {
     let input = include_str!("../tests/invalid/syntaxErr/variables/badintAssignments.wacc");
     let res = parse(input);
@@ -3255,11 +3242,10 @@ fn badintAssignments() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn bigIntAssignment() {
     let input = include_str!("../tests/invalid/syntaxErr/variables/bigIntAssignment.wacc");
     let res = parse(input);
@@ -3268,11 +3254,10 @@ fn bigIntAssignment() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn varNoName() {
     let input = include_str!("../tests/invalid/syntaxErr/variables/varNoName.wacc");
     let res = parse(input);
@@ -3281,11 +3266,10 @@ fn varNoName() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badintAssignments2() {
     let input = include_str!("../tests/invalid/syntaxErr/variables/badintAssignments2.wacc");
     let res = parse(input);
@@ -3294,11 +3278,10 @@ fn badintAssignments2() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badintAssignments1() {
     let input = include_str!("../tests/invalid/syntaxErr/variables/badintAssignments1.wacc");
     let res = parse(input);
@@ -3307,11 +3290,10 @@ fn badintAssignments1() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn arrayExpr() {
     let input = include_str!("../tests/invalid/syntaxErr/array/arrayExpr.wacc");
     let res = parse(input);
@@ -3320,11 +3302,10 @@ fn arrayExpr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn printlnCharArry() {
     let input = include_str!("../tests/invalid/syntaxErr/print/printlnCharArry.wacc");
     let res = parse(input);
@@ -3333,11 +3314,10 @@ fn printlnCharArry() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn donoErr() {
     let input = include_str!("../tests/invalid/syntaxErr/while/donoErr.wacc");
     let res = parse(input);
@@ -3346,11 +3326,10 @@ fn donoErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn dooErr() {
     let input = include_str!("../tests/invalid/syntaxErr/while/dooErr.wacc");
     let res = parse(input);
@@ -3359,11 +3338,10 @@ fn dooErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn whileNodo() {
     let input = include_str!("../tests/invalid/syntaxErr/while/whileNodo.wacc");
     let res = parse(input);
@@ -3372,11 +3350,10 @@ fn whileNodo() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn whileNodone() {
     let input = include_str!("../tests/invalid/syntaxErr/while/whileNodone.wacc");
     let res = parse(input);
@@ -3385,11 +3362,10 @@ fn whileNodone() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn whilErr() {
     let input = include_str!("../tests/invalid/syntaxErr/while/whilErr.wacc");
     let res = parse(input);
@@ -3398,11 +3374,10 @@ fn whilErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn missingOperand2() {
     let input = include_str!("../tests/invalid/syntaxErr/expressions/missingOperand2.wacc");
     let res = parse(input);
@@ -3411,11 +3386,10 @@ fn missingOperand2() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn printlnConcat() {
     let input = include_str!("../tests/invalid/syntaxErr/expressions/printlnConcat.wacc");
     let res = parse(input);
@@ -3424,11 +3398,10 @@ fn printlnConcat() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn missingOperand1() {
     let input = include_str!("../tests/invalid/syntaxErr/expressions/missingOperand1.wacc");
     let res = parse(input);
@@ -3437,11 +3410,10 @@ fn missingOperand1() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn emptySeq() {
     let input = include_str!("../tests/invalid/syntaxErr/sequence/emptySeq.wacc");
     let res = parse(input);
@@ -3450,11 +3422,10 @@ fn emptySeq() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn endSeq() {
     let input = include_str!("../tests/invalid/syntaxErr/sequence/endSeq.wacc");
     let res = parse(input);
@@ -3463,11 +3434,10 @@ fn endSeq() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn extraSeq() {
     let input = include_str!("../tests/invalid/syntaxErr/sequence/extraSeq.wacc");
     let res = parse(input);
@@ -3476,11 +3446,10 @@ fn extraSeq() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn doubleSeq() {
     let input = include_str!("../tests/invalid/syntaxErr/sequence/doubleSeq.wacc");
     let res = parse(input);
@@ -3489,11 +3458,10 @@ fn doubleSeq() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn missingSeq() {
     let input = include_str!("../tests/invalid/syntaxErr/sequence/missingSeq.wacc");
     let res = parse(input);
@@ -3502,11 +3470,10 @@ fn missingSeq() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn ifiErr() {
     let input = include_str!("../tests/invalid/syntaxErr/if/ifiErr.wacc");
     let res = parse(input);
@@ -3515,11 +3482,10 @@ fn ifiErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn ifNothen() {
     let input = include_str!("../tests/invalid/syntaxErr/if/ifNothen.wacc");
     let res = parse(input);
@@ -3528,11 +3494,10 @@ fn ifNothen() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn ifNoelse() {
     let input = include_str!("../tests/invalid/syntaxErr/if/ifNoelse.wacc");
     let res = parse(input);
@@ -3541,11 +3506,10 @@ fn ifNoelse() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn ifNofi() {
     let input = include_str!("../tests/invalid/syntaxErr/if/ifNofi.wacc");
     let res = parse(input);
@@ -3554,11 +3518,10 @@ fn ifNofi() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badLookup02() {
     let input = include_str!("../tests/invalid/syntaxErr/pairs/badLookup02.wacc");
     let res = parse(input);
@@ -3567,11 +3530,10 @@ fn badLookup02() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badLookup01() {
     let input = include_str!("../tests/invalid/syntaxErr/pairs/badLookup01.wacc");
     let res = parse(input);
@@ -3580,11 +3542,10 @@ fn badLookup01() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn unescapedChar() {
     let input = include_str!("../tests/invalid/syntaxErr/basic/unescapedChar.wacc");
     let res = parse(input);
@@ -3593,11 +3554,10 @@ fn unescapedChar() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badEscape() {
     let input = include_str!("../tests/invalid/syntaxErr/basic/badEscape.wacc");
     let res = parse(input);
@@ -3606,11 +3566,10 @@ fn badEscape() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badComment2() {
     let input = include_str!("../tests/invalid/syntaxErr/basic/badComment2.wacc");
     let res = parse(input);
@@ -3619,11 +3578,10 @@ fn badComment2() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn multipleBegins() {
     let input = include_str!("../tests/invalid/syntaxErr/basic/multipleBegins.wacc");
     let res = parse(input);
@@ -3632,11 +3590,10 @@ fn multipleBegins() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn badComment() {
     let input = include_str!("../tests/invalid/syntaxErr/basic/badComment.wacc");
     let res = parse(input);
@@ -3645,11 +3602,10 @@ fn badComment() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn beginNoend() {
     let input = include_str!("../tests/invalid/syntaxErr/basic/beginNoend.wacc");
     let res = parse(input);
@@ -3658,11 +3614,10 @@ fn beginNoend() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn bgnErr() {
     let input = include_str!("../tests/invalid/syntaxErr/basic/bgnErr.wacc");
     let res = parse(input);
@@ -3671,11 +3626,10 @@ fn bgnErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn noBody() {
     let input = include_str!("../tests/invalid/syntaxErr/basic/noBody.wacc");
     let res = parse(input);
@@ -3684,11 +3638,10 @@ fn noBody() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
 
 #[test]
-#[should_panic]
 fn skpErr() {
     let input = include_str!("../tests/invalid/syntaxErr/basic/skpErr.wacc");
     let res = parse(input);
@@ -3697,5 +3650,5 @@ fn skpErr() {
             println!("{}", e)
         }
     };
-    assert!(res.is_ok());
+    assert!(res.is_err());
 }
