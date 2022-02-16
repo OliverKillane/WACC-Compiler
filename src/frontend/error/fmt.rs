@@ -142,10 +142,10 @@ impl<'l> SummaryCell<'l> {
         let mut line_nums: HashMap<usize, LinkedList<(&str, String, Color)>> = HashMap::new();
         for annotation @ (span, _, _) in annotations {
             let line_num = input_locator.get_line_num(span);
-            if let Some(annotations) = line_nums.get_mut(&line_num) {
-                annotations.push_back(annotation);
+            if let Some(anns) = line_nums.get_mut(&line_num) {
+                anns.push_back(annotation)
             } else {
-                line_nums.insert(line_num, LinkedList::new());
+                line_nums.insert(line_num, LinkedList::from([annotation]));
             }
         }
         line_nums
@@ -359,7 +359,7 @@ impl<'l> SummaryCell<'l> {
             }
         }
 
-        // Spreading the neighbouring spans out so that there are spaces between them
+        // Spreading the neighboring spans out so that there are spaces between them
         Self::fmt_refs_line_spread_out(
             &mut line,
             &mut unincluded_prefix,
@@ -596,10 +596,11 @@ impl<'l> SummaryCell<'l> {
 
         // if there are no components, or there is a component with no span, use
         // the statement span, otherwise use the minimum coordinate
-        let (span_line, span_column) = match components.get(0) {
-            Some(comp) => input_locator.get_coords(comp.span),
-            _ => input_locator.get_coords(self.span),
-        };
+        let (span_line, span_column) = input_locator.get_coords(
+            components
+                .first()
+                .map_or_else(|| self.span, |comp| comp.span),
+        );
 
         format!(
             "{}",
@@ -643,7 +644,7 @@ impl<'l> Display for Summary<'l> {
         let cell_strings = self
             .cells
             .iter()
-            .map(|cell| cell.fmt(self.filepath.as_ref().map(|s| &s[..]), self.input))
+            .map(|cell| cell.fmt(self.filepath.as_deref(), self.input))
             .collect::<LinkedList<_>>();
 
         let max_cell_width = cell_strings

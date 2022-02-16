@@ -71,6 +71,7 @@ impl<'l> SummaryComponent<'l> {
     /// Sets a declaration of the item causing a problem to be the given span
     /// within the input code.
     pub fn set_declaration(mut self, declaration: &'l str) -> Self {
+        #[cfg(debug_assertions)]
         assert!(!declaration.is_empty());
         self.declaration = Some(declaration);
         self
@@ -78,6 +79,7 @@ impl<'l> SummaryComponent<'l> {
 
     /// Sets a shorthand message for the component to be the given string.
     pub fn set_shorthand(mut self, shorthand: String) -> Self {
+        #[cfg(debug_assertions)]
         if shorthand.contains('\n') {
             panic!("Shorthand must be one-line only");
         }
@@ -111,6 +113,7 @@ pub struct SummaryCell<'l> {
 impl<'l> SummaryCell<'l> {
     /// Creates a new error cell. Sets the span to the provided span.
     pub fn new(span: &'l str) -> Self {
+        #[cfg(debug_assertions)]
         assert!(!span.is_empty());
         SummaryCell {
             span,
@@ -167,6 +170,7 @@ impl<'l> Summary<'l> {
     /// Creates a new error summary. Sets the input and stage of the summary to
     /// the values provided.
     pub fn new(input: &'l str, stage: SummaryStage) -> Self {
+        #[cfg(debug_assertions)]
         assert!(!input.is_empty());
         Self {
             filepath: None,
