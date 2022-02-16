@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet, LinkedList},
+    iter::zip,
+};
 
 /// The representation of an identifier of a variable.
 pub type VarRepr = usize;
@@ -21,7 +24,7 @@ pub enum Expr {
 }
 
 /// Types of arithmetic operations on [numeric expressions](NumExpr).
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ArithOp {
     /// Addition (+).
     Add,
@@ -36,7 +39,7 @@ pub enum ArithOp {
 }
 
 /// Size of the [numeric expression](NumExpr).
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum NumSize {
     /// Signifies a 4-byte expression, for example an int
     DWord,
@@ -79,7 +82,7 @@ pub enum NumExpr {
 }
 
 /// Types of boolean operations on [boolean expressions](BoolExpr).
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum BoolOp {
     /// Conjunction (&&).
     And,
@@ -216,7 +219,7 @@ pub struct Block(pub Vec<BlockId>, pub Vec<Stat>, pub BlockEnding);
 pub type BlockGraph = Vec<Block>;
 
 /// Type of an expression.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Type {
     /// A numeric expression type, with the given expression size.
     Num(NumSize),
@@ -250,3 +253,298 @@ pub struct Program(
     pub BlockGraph,
     pub HashMap<DataRef, Vec<Expr>>,
 );
+
+fn cond_result(b: bool) -> Result<(), ()> {
+    if b {
+        Ok(())
+    } else {
+        Err(())
+    }
+}
+
+impl BoolExpr {
+    fn validate(
+        &self,
+        functions: &HashMap<String, Function>,
+        vars: &HashMap<VarRepr, Type>,
+        data_refs: &HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<(), ()> {
+        match self {
+            BoolExpr::Const(_) => Ok(()),
+            BoolExpr::Var(var) => cond_result(Type::Bool == *vars.get(var).ok_or(())?),
+            BoolExpr::Deref(ptr_expr) => ptr_expr.validate(functions, vars, data_refs),
+            BoolExpr::TestZero(num_expr) | BoolExpr::TestPositive(num_expr) => {
+                num_expr.validate(functions, vars, data_refs).map(|_| ())
+            }
+            BoolExpr::PtrEq(ptr_expr1, ptr_expr2) => {
+                ptr_expr1.validate(functions, vars, data_refs)?;
+                ptr_expr2.validate(functions, vars, data_refs)
+            }
+            BoolExpr::BoolOp(box bool_expr1, _, box bool_expr2) => {
+                bool_expr1.validate(functions, vars, data_refs)?;
+                bool_expr2.validate(functions, vars, data_refs)
+            }
+            BoolExpr::Not(box bool_expr) => bool_expr.validate(functions, vars, data_refs),
+            BoolExpr::Call(name, exprs) => {
+                let function = functions.get(name).ok_or(())?;
+                cond_result(
+                    Type::Bool == function.validate_call(exprs, functions, vars, data_refs)?,
+                )
+            }
+        }
+    }
+}
+
+impl PtrExpr {
+    fn validate(
+        &self,
+        functions: &HashMap<String, Function>,
+        vars: &HashMap<VarRepr, Type>,
+        data_refs: &HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<(), ()> {
+        match self {
+            PtrExpr::Null => Ok(()),
+            PtrExpr::DataRef(data_ref) => data_refs.get(data_ref).ok_or(()).map(|_| ()),
+            PtrExpr::Var(var) => cond_result(Type::Ptr == *vars.get(var).ok_or(())?),
+            PtrExpr::Deref(box ptr_expr) => ptr_expr.validate(functions, vars, data_refs),
+            PtrExpr::Offset(box ptr_expr, box num_expr) => {
+                if let NumSize::DWord = num_expr.validate(functions, vars, data_refs)? {
+                    ptr_expr.validate(functions, vars, data_refs)
+                } else {
+                    return Err(());
+                }
+            }
+            PtrExpr::Malloc(exprs) | PtrExpr::WideMalloc(exprs) => {
+                for expr in exprs {
+                    expr.validate(functions, vars, data_refs)?;
+                }
+                Ok(())
+            }
+            PtrExpr::Call(name, exprs) => {
+                let function = functions.get(name).ok_or(())?;
+                cond_result(Type::Ptr == function.validate_call(exprs, functions, vars, data_refs)?)
+            }
+        }
+    }
+}
+
+impl NumExpr {
+    fn validate(
+        &self,
+        functions: &HashMap<String, Function>,
+        vars: &HashMap<VarRepr, Type>,
+        data_refs: &HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<NumSize, ()> {
+        Ok(match self {
+            NumExpr::SizeOf(_) | NumExpr::SizeOfWideAlloc => NumSize::DWord,
+            NumExpr::Const(size, _) => *size,
+            NumExpr::Var(var) => {
+                if let Type::Num(size) = vars.get(var).ok_or(())? {
+                    *size
+                } else {
+                    return Err(());
+                }
+            }
+            NumExpr::Deref(size, ptr_expr) => {
+                ptr_expr.validate(functions, vars, data_refs)?;
+                *size
+            }
+            NumExpr::ArithOp(box num_expr1, _, box num_expr2) => {
+                let size1 = num_expr1.validate(functions, vars, data_refs)?;
+                let size2 = num_expr2.validate(functions, vars, data_refs)?;
+                if size1 == size2 {
+                    return Err(());
+                }
+                size1
+            }
+            NumExpr::Cast(size, _) => *size,
+            NumExpr::Call(name, exprs) => {
+                let function = functions.get(name).ok_or(())?;
+                if let Type::Num(size) =
+                    function.validate_call(exprs, functions, vars, data_refs)?
+                {
+                    size
+                } else {
+                    return Err(());
+                }
+            }
+        })
+    }
+}
+
+impl Expr {
+    fn validate(
+        &self,
+        functions: &HashMap<String, Function>,
+        vars: &HashMap<VarRepr, Type>,
+        data_refs: &HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<Type, ()> {
+        Ok(match self {
+            Expr::Num(num_expr) => Type::Num(num_expr.validate(functions, vars, data_refs)?),
+            Expr::Bool(bool_expr) => {
+                bool_expr.validate(functions, vars, data_refs)?;
+                Type::Bool
+            }
+            Expr::Ptr(ptr_expr) => {
+                ptr_expr.validate(functions, vars, data_refs)?;
+                Type::Ptr
+            }
+        })
+    }
+}
+
+impl Stat {
+    fn validate(
+        &self,
+        functions: &HashMap<String, Function>,
+        vars: &HashMap<VarRepr, Type>,
+        data_refs: &HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<(), ()> {
+        match self {
+            Stat::AssignVar(var, expr) => {
+                cond_result(*vars.get(var).ok_or(())? == expr.validate(functions, vars, data_refs)?)
+            }
+            Stat::AssignPtr(ptr_expr, expr) => {
+                ptr_expr.validate(functions, vars, data_refs)?;
+                expr.validate(functions, vars, data_refs).map(|_| ())
+            }
+            Stat::ReadIntVar(var) => {
+                cond_result(Type::Num(NumSize::DWord) == *vars.get(var).ok_or(())?)
+            }
+            Stat::ReadCharVar(var) => {
+                cond_result(Type::Num(NumSize::Byte) == *vars.get(var).ok_or(())?)
+            }
+            Stat::ReadIntPtr(ptr_expr) | Stat::ReadCharPtr(ptr_expr) => {
+                ptr_expr.validate(functions, vars, data_refs)
+            }
+            Stat::Free(ptr_expr, num_expr) | Stat::PrintStr(ptr_expr, num_expr) => {
+                num_expr.validate(functions, vars, data_refs)?;
+                ptr_expr.validate(functions, vars, data_refs)
+            }
+            Stat::PrintExpr(expr) => expr.validate(functions, vars, data_refs).map(|_| ()),
+            Stat::PrintChar(num_expr) => {
+                cond_result(NumSize::Byte == num_expr.validate(functions, vars, data_refs)?)
+            }
+            Stat::PrintEol() => Ok(()),
+        }
+    }
+}
+
+fn validate_block_graph(
+    graph: &BlockGraph,
+    functions: &HashMap<String, Function>,
+    vars: &HashMap<VarRepr, Type>,
+    data_refs: &HashMap<DataRef, Vec<Expr>>,
+) -> Result<Option<Type>, ()> {
+    let size = graph.len();
+    let mut incoming = HashMap::<BlockId, LinkedList<BlockId>>::new();
+    let mut return_type = None;
+    for (block_idx, Block(_, stats, ending)) in graph.iter().enumerate() {
+        for stat in stats {
+            stat.validate(functions, vars, data_refs)?;
+        }
+        match ending {
+            BlockEnding::CondJumps(cond_jumps, jump) => {
+                for (bool_expr, jump) in cond_jumps {
+                    bool_expr.validate(functions, vars, data_refs)?;
+                    if *jump >= size {
+                        return Err(());
+                    } else {
+                        if let Some(incoming_list) = incoming.get_mut(jump) {
+                            incoming_list.push_back(block_idx);
+                        } else {
+                            let mut incoming_list = LinkedList::new();
+                            incoming_list.push_back(block_idx);
+                            incoming.insert(*jump, incoming_list);
+                        }
+                    }
+                }
+                if *jump >= size {
+                    return Err(());
+                } else {
+                    if let Some(incoming_list) = incoming.get_mut(jump) {
+                        incoming_list.push_back(block_idx);
+                    } else {
+                        let mut incoming_list = LinkedList::new();
+                        incoming_list.push_back(block_idx);
+                        incoming.insert(*jump, incoming_list);
+                    }
+                }
+            }
+            BlockEnding::Exit(num_expr) => {
+                num_expr.validate(functions, vars, data_refs)?;
+            }
+            BlockEnding::Return(expr) => {
+                let expr_type = expr.validate(functions, vars, data_refs)?;
+                if let None = return_type {
+                    return_type = Some(expr_type);
+                } else {
+                    return Err(());
+                }
+            }
+        }
+    }
+    for (block_idx, Block(incoming_vec, _, _)) in graph.iter().enumerate() {
+        if incoming_vec.iter().collect::<HashSet<_>>()
+            != incoming
+                .get(&block_idx)
+                .ok_or(())?
+                .iter()
+                .collect::<HashSet<_>>()
+        {
+            return Err(());
+        }
+    }
+    Ok(return_type)
+}
+
+impl Function {
+    fn validate(
+        &self,
+        functions: &HashMap<String, Function>,
+        data_refs: &HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<(), ()> {
+        let Function(ret_type, args, vars, graph) = self;
+        let mut vars = vars.clone();
+        for &(arg_type, var) in args {
+            if let Some(_) = vars.insert(var, arg_type) {
+                return Err(());
+            }
+        }
+        cond_result(Some(*ret_type) == validate_block_graph(graph, functions, &vars, data_refs)?)
+    }
+
+    fn validate_call(
+        &self,
+        arg_values: &Vec<Expr>,
+        functions: &HashMap<String, Function>,
+        vars: &HashMap<VarRepr, Type>,
+        data_refs: &HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<Type, ()> {
+        let Function(ret_type, args, _, _) = self;
+        if arg_values.len() != args.len() {
+            return Err(());
+        }
+        for ((arg_type, _), arg_value) in zip(args, arg_values) {
+            if *arg_type != arg_value.validate(functions, vars, data_refs)? {
+                return Err(());
+            }
+        }
+        Ok(*ret_type)
+    }
+}
+
+impl Program {
+    fn validate(&self) -> Result<(), ()> {
+        let Program(functions, vars, graph, data_refs) = self;
+        for (_, exprs) in data_refs {
+            for expr in exprs {
+                expr.validate(&HashMap::new(), &HashMap::new(), &HashMap::new())?;
+            }
+        }
+        for (_, function) in functions {
+            function.validate(functions, data_refs)?;
+        }
+        cond_result(None == validate_block_graph(graph, functions, vars, data_refs)?)
+    }
+}
