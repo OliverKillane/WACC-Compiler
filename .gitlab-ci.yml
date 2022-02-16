@@ -8,10 +8,10 @@
 image: rustlang/rust:nightly
 
 stages:
-  - doc
   - build
   - test
   - lint
+  - doc
 
 build:
   stage: build
@@ -47,3 +47,6 @@ pages:
   artifacts:
     paths:
       - public
+    expire_in: 1 week
+  only:
+    - master
