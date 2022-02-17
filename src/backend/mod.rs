@@ -33,7 +33,7 @@ struct Options {
 }
 
 /// Compiles the given program into an arm32 assembly
-fn compile(program: &Program, options: Options) -> String {
+fn compile(program: Program, options: Options) -> String {
     let three_code = ThreeCode::from((program, &options));
     let ssa = StaticSingleAssignment::from(three_code);
     let ssa = optimize_ssa(ssa, &options);

@@ -111,8 +111,8 @@ pub(super) struct ThreeCode(
     HashMap<DataRef, Vec<u8>>,
 );
 
-impl From<(&ir::Program, &Options)> for ThreeCode {
-    fn from((program, options): (&ir::Program, &Options)) -> ThreeCode {
+impl From<(ir::Program, &Options)> for ThreeCode {
+    fn from((program, options): (ir::Program, &Options)) -> ThreeCode {
         todo!()
     }
 }
