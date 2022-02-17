@@ -6,6 +6,7 @@ use std::collections::HashMap;
 type StatId = usize;
 
 /// Type of the source operand for an operation
+#[derive(Debug, PartialEq, Eq)]
 enum OpType {
     /// Constant value
     Const(u32),
@@ -16,6 +17,7 @@ enum OpType {
 }
 
 /// Size of the source operand
+#[derive(Debug, PartialEq, Eq)]
 enum Size {
     /// 1 byte
     Byte,
@@ -26,9 +28,11 @@ enum Size {
 }
 
 /// Operand with its size and type
+#[derive(Debug, PartialEq, Eq)]
 struct OpSrc(OpType, Size);
 
 /// Binary operation code
+#[derive(Debug, PartialEq, Eq)]
 enum BinOp {
     /// Addition (+)
     Add,
@@ -63,6 +67,7 @@ enum BinOp {
 }
 
 /// Statement type
+#[derive(Debug, PartialEq, Eq)]
 enum StatCode {
     /// Assignment of a binary operation to a variable
     Assign(VarRepr, OpSrc, BinOp, OpSrc),
@@ -89,6 +94,7 @@ enum StatCode {
 /// Single statement in a dataflow graph - possible incoming statements,
 /// statement type, conditional jumps to other statements (evaluated consecutively)
 /// and the else branch if all other statements are equal to 0.
+#[derive(Debug, PartialEq, Eq)]
 struct Stat(Vec<StatId>, StatCode, Vec<(VarRepr, StatId)>, StatId);
 
 /// Graph of statements. The index of a statement signifies the
@@ -99,20 +105,82 @@ type StatGraph = Vec<Stat>;
 /// Function representation. The first vector are the variables to which the
 /// arguments will be assigned to and the [statement graph](StatGraph) is the dataflow graph
 /// that is evaluated.
+#[derive(Debug, PartialEq, Eq)]
 struct Function(Vec<VarRepr>, StatGraph);
 
 /// The entire program in the three-code representation. The first map is a map
 /// of all functions defined by the program. The [statement graph](StatGraph) is
 /// the main body of the program. The last map is a map of all statically-defined
 /// data in the program.
+#[derive(Debug, PartialEq, Eq)]
 pub(super) struct ThreeCode(
     HashMap<String, Function>,
     StatGraph,
     HashMap<DataRef, Vec<u8>>,
 );
 
+fn convert_function(
+    function: ir::Function,
+    options: &Options,
+    data_map: &mut HashMap<ir::DataRef, Vec<ir::Expr>>,
+) -> Function {
+    todo!()
+}
+
+fn convert_block_graph(
+    block_graph: ir::BlockGraph,
+    types: &HashMap<usize, ir::Type>,
+    options: &Options,
+    data_map: &mut HashMap<ir::DataRef, Vec<ir::Expr>>,
+) -> StatGraph {
+    let mut var_repr_counter = types
+        .keys()
+        .max()
+        .map(ToOwned::to_owned)
+        .unwrap_or_default()
+        + 1;
+
+    todo!()
+}
+
 impl From<(ir::Program, &Options)> for ThreeCode {
     fn from((program, options): (ir::Program, &Options)) -> ThreeCode {
+        let ir::Program(functions, types, block_graph, static_data) = program;
+
+        let mut data_map = HashMap::new();
+
+        let new_functions: HashMap<String, Function> = functions
+            .into_iter()
+            .map(|(s, f)| (s, convert_function(f, options, &mut data_map)))
+            .collect();
+
+        // let stat_graph: StatGraph = block_graph
+        //     .into_iter()
+        //     .map(|b| (s, convert_function(f, options, &mut data_map)))
+        //     .collect();
+
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    // use crate::intermediate::*;
+    #[test]
+    fn from_one_statement() {
+        let ir = ir::Program(
+            HashMap::from([]),
+            HashMap::from([]),
+            vec![ir::Block(
+                vec![],
+                vec![ir::Stat::AssignVar(
+                    0,
+                    ir::Expr::Bool(ir::BoolExpr::Const(true)),
+                )],
+                ir::BlockEnding::Return(ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::DWord, 0))),
+            )],
+            HashMap::from([]),
+        );
     }
 }
