@@ -13,7 +13,7 @@ pub type BlockId = usize;
 pub type DataRef = u64;
 
 /// A common container for all types of expressions.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     /// A [number expression](NumExpr)
     Num(NumExpr),
@@ -51,7 +51,7 @@ pub enum NumSize {
 
 /// A numeric expression. Can represent for example
 /// character or integer expressions.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum NumExpr {
     /// Size of the given type in the memory. The type of this expression is
     /// always a DWord.
@@ -93,7 +93,7 @@ pub enum BoolOp {
 }
 
 /// A boolean expression.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BoolExpr {
     /// A boolean constant. Can be either true or false.
     Const(bool),
@@ -121,7 +121,7 @@ pub enum BoolExpr {
 }
 
 /// A pointer manipulation expressiion.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PtrExpr {
     /// A null-pointer expression. Dereferencing it will cause a segmentation fault.
     Null,
@@ -155,7 +155,7 @@ pub enum PtrExpr {
 }
 
 /// An execution statement.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Stat {
     /// Assigns the value of an expression to a variable. The variable must have
     /// a matching type in the symbol table attached to each
@@ -194,7 +194,7 @@ pub enum Stat {
 }
 
 /// An action to be performed after a block of statements is executed.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BlockEnding {
     /// Represents a conditional jump. The boolean expressions in the vector are
     /// evaluated consecutively. If a boolean expression is true, then the
@@ -233,7 +233,7 @@ pub enum Type {
 /// for the arguments, the table of types for local variables used and the
 /// [block graph](BlockGraph) for its body. The execution starts off from the
 /// first block in the block graph.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Function(
     pub Type,
     pub Vec<(Type, VarRepr)>,
@@ -246,7 +246,7 @@ pub struct Function(
 /// map of structs in the data section for the whole program. The execution starts
 /// off from the first block in the block graph. The expressions in the data
 /// section structs may not use any variable references.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Program(
     pub HashMap<String, Function>,
     pub HashMap<VarRepr, Type>,
@@ -337,7 +337,19 @@ impl NumExpr {
     ) -> Result<NumSize, ()> {
         Ok(match self {
             NumExpr::SizeOf(_) | NumExpr::SizeOfWideAlloc => NumSize::DWord,
-            NumExpr::Const(size, _) => *size,
+            NumExpr::Const(size, val) => {
+                if *val
+                    == match size {
+                        NumSize::DWord => *val,
+                        NumSize::Word => *val as i16 as i32,
+                        NumSize::Byte => *val as i8 as i32,
+                    }
+                {
+                    *size
+                } else {
+                    return Err(());
+                }
+            }
             NumExpr::Var(var) => {
                 if let Type::Num(size) = vars.get(var).ok_or(())? {
                     *size
@@ -461,24 +473,24 @@ fn validate_block_graph(
                 }
                 if *jump >= size {
                     return Err(());
+                } else if let Some(incoming_list) = incoming.get_mut(jump) {
+                    incoming_list.push_back(block_idx);
                 } else {
-                    if let Some(incoming_list) = incoming.get_mut(jump) {
-                        incoming_list.push_back(block_idx);
-                    } else {
-                        let mut incoming_list = LinkedList::new();
-                        incoming_list.push_back(block_idx);
-                        incoming.insert(*jump, incoming_list);
-                    }
+                    let mut incoming_list = LinkedList::new();
+                    incoming_list.push_back(block_idx);
+                    incoming.insert(*jump, incoming_list);
                 }
             }
             BlockEnding::Exit(num_expr) => {
-                num_expr.validate(functions, vars, data_refs)?;
+                if NumSize::DWord != num_expr.validate(functions, vars, data_refs)? {
+                    return Err(());
+                }
             }
             BlockEnding::Return(expr) => {
                 let expr_type = expr.validate(functions, vars, data_refs)?;
                 if let None = return_type {
                     return_type = Some(expr_type);
-                } else {
+                } else if return_type != Some(expr_type) {
                     return Err(());
                 }
             }
@@ -488,7 +500,7 @@ fn validate_block_graph(
         if incoming_vec.iter().collect::<HashSet<_>>()
             != incoming
                 .get(&block_idx)
-                .ok_or(())?
+                .unwrap_or(&LinkedList::new())
                 .iter()
                 .collect::<HashSet<_>>()
         {
@@ -511,7 +523,10 @@ impl Function {
                 return Err(());
             }
         }
-        cond_result(Some(*ret_type) == validate_block_graph(graph, functions, &vars, data_refs)?)
+        cond_result(
+            validate_block_graph(graph, functions, &vars, data_refs)?
+                .map_or(true, |block_type| block_type == *ret_type),
+        )
     }
 
     fn validate_call(
@@ -546,5 +561,119 @@ impl Program {
             function.validate(functions, data_refs)?;
         }
         cond_result(None == validate_block_graph(graph, functions, vars, data_refs)?)
+    }
+}
+
+#[test]
+fn test() {
+    Program(
+        HashMap::from([]),
+        HashMap::from([]),
+        vec![Block(vec![0], vec![], BlockEnding::CondJumps(vec![], 0))],
+        HashMap::from([]),
+    )
+    .validate()
+    .unwrap()
+}
+
+#[cfg(test)]
+mod test {
+    use super::{
+        Block, BlockEnding, DataRef, Expr, NumExpr, NumSize, Program, Stat, Type, VarRepr,
+    };
+    use std::collections::HashMap;
+
+    fn validate_num_expr(
+        num_expr: NumExpr,
+        vars: HashMap<VarRepr, Type>,
+        data_refs: HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<(), ()> {
+        validate_expr(Expr::Num(num_expr), vars, data_refs)
+    }
+
+    fn validate_expr(
+        expr: Expr,
+        vars: HashMap<VarRepr, Type>,
+        data_refs: HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<(), ()> {
+        Program(
+            HashMap::new(),
+            vars,
+            vec![Block(
+                vec![],
+                vec![Stat::PrintExpr(expr)],
+                BlockEnding::Exit(NumExpr::Const(NumSize::DWord, 0)),
+            )],
+            data_refs,
+        )
+        .validate()
+    }
+
+    #[test]
+    fn check_const_bounds_ok() {
+        assert_eq!(
+            validate_num_expr(
+                NumExpr::Const(NumSize::Byte, -128),
+                HashMap::new(),
+                HashMap::new()
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn check_const_bounds_err() {
+        assert_eq!(
+            validate_num_expr(
+                NumExpr::Const(NumSize::Byte, -129),
+                HashMap::new(),
+                HashMap::new()
+            ),
+            Err(())
+        );
+    }
+
+    #[test]
+    fn check_var_exists_ok() {
+        assert_eq!(
+            validate_num_expr(
+                NumExpr::Var(0),
+                HashMap::from([(0, Type::Num(NumSize::DWord))]),
+                HashMap::new()
+            ),
+            Ok(())
+        )
+    }
+
+    #[test]
+    fn check_var_exists_err() {
+        assert_eq!(
+            validate_num_expr(NumExpr::Var(0), HashMap::new(), HashMap::new()),
+            Err(())
+        )
+    }
+
+    #[test]
+    fn check_var_type_ok() {
+        assert_eq!(
+            validate_num_expr(
+                NumExpr::Var(0),
+                HashMap::from([(0, Type::Num(NumSize::DWord))]),
+                HashMap::new()
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn check_var_type_err() {
+        assert_eq!(
+            validate_num_expr(
+                NumExpr::Var(0),
+                HashMap::from([(0, Type::Ptr)]),
+                HashMap::new()
+            ),
+            Err(())
+        );
     }
 }
