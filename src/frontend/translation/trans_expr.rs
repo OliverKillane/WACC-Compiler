@@ -69,6 +69,7 @@ pub fn translate_expr<'a>(
             _ => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!"),
         },
 
+        // Should change this so that boolean operations are short-circuited
         Expr::BinOp(box e1, o, box e2) => {
             match (
                 translate_expr(e1, var_symb),
