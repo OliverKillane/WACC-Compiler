@@ -9,6 +9,8 @@ type StatId = usize;
 enum OpSrc {
     /// Constant value
     Const(u32),
+    /// Value of a data reference to the static data in the static data vector in [program](ThreeCode)
+    DataRef(DataRef),
     /// Variable with a given [id](VarRepr)
     Var(VarRepr),
 }
