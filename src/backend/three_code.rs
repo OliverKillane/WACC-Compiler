@@ -6,16 +6,14 @@ use std::collections::HashMap;
 type StatId = usize;
 
 /// Type of the source operand for an operation
-enum OpType {
+enum OpSrc {
     /// Constant value
     Const(u32),
-    /// Data reference to the static data in the static data vector in [program](ThreeCode)
-    DataRef(DataRef),
     /// Variable with a given [id](VarRepr)
     Var(VarRepr),
 }
 
-/// Size of the source operand
+/// Size of the load/store operations
 enum Size {
     /// 1 byte
     Byte,
@@ -25,16 +23,13 @@ enum Size {
     DWord,
 }
 
-/// Operand with its size and type
-struct OpSrc(OpType, Size);
-
 /// Binary operation code
 enum BinOp {
     /// Addition (+)
     Add,
     /// Subtraction (-)
     Sub,
-    /// Multiplication (*)
+    /// Signed multiplication (*)
     Mul,
     /// Division (/)
     Div,
@@ -64,8 +59,10 @@ enum BinOp {
 
 /// Statement type
 enum StatCode {
+    /// Assignment of one variable to another
+    Assign(VarRepr, OpSrc),
     /// Assignment of a binary operation to a variable
-    Assign(VarRepr, OpSrc, BinOp, OpSrc),
+    AssignOp(VarRepr, OpSrc, BinOp, OpSrc),
     /// Load from a reference to static data. The
     /// number of bytes loaded is signified by the [size](Size) field.
     LoadImm(VarRepr, DataRef, Size),
@@ -96,10 +93,13 @@ struct Stat(Vec<StatId>, StatCode, Vec<(VarRepr, StatId)>, StatId);
 /// graph starts at the first statement.
 type StatGraph = Vec<Stat>;
 
+/// Local variables that have to be represented in memory during program execution.
+type LocalVars = HashMap<VarRepr, DataRef>;
+
 /// Function representation. The first vector are the variables to which the
 /// arguments will be assigned to and the [statement graph](StatGraph) is the dataflow graph
 /// that is evaluated.
-struct Function(Vec<VarRepr>, StatGraph);
+struct Function(Vec<VarRepr>, LocalVars, StatGraph);
 
 /// The entire program in the three-code representation. The first map is a map
 /// of all functions defined by the program. The [statement graph](StatGraph) is
@@ -107,6 +107,7 @@ struct Function(Vec<VarRepr>, StatGraph);
 /// data in the program.
 pub(super) struct ThreeCode(
     HashMap<String, Function>,
+    LocalVars,
     StatGraph,
     HashMap<DataRef, Vec<u8>>,
 );
