@@ -316,7 +316,7 @@ impl PtrExpr {
                 if let NumSize::DWord = num_expr.validate(functions, vars, data_refs)? {
                     ptr_expr.validate(functions, vars, data_refs)
                 } else {
-                    return Err(());
+                    Err(())
                 }
             }
             PtrExpr::Malloc(exprs) | PtrExpr::WideMalloc(exprs) => {
@@ -479,14 +479,12 @@ fn validate_block_graph(
                     bool_expr.validate(functions, vars, data_refs)?;
                     if *jump >= size {
                         return Err(());
+                    } else if let Some(incoming_list) = incoming.get_mut(jump) {
+                        incoming_list.push_back(block_idx);
                     } else {
-                        if let Some(incoming_list) = incoming.get_mut(jump) {
-                            incoming_list.push_back(block_idx);
-                        } else {
-                            let mut incoming_list = LinkedList::new();
-                            incoming_list.push_back(block_idx);
-                            incoming.insert(*jump, incoming_list);
-                        }
+                        let mut incoming_list = LinkedList::new();
+                        incoming_list.push_back(block_idx);
+                        incoming.insert(*jump, incoming_list);
                     }
                 }
                 if *jump >= size {
@@ -506,7 +504,7 @@ fn validate_block_graph(
             }
             BlockEnding::Return(expr) => {
                 let expr_type = expr.validate(functions, vars, data_refs)?;
-                if let None = return_type {
+                if return_type.is_none() {
                     return_type = Some(expr_type);
                 } else if return_type != Some(expr_type) {
                     return Err(());
@@ -539,7 +537,7 @@ impl Function {
         let Function(ret_type, args, vars, graph) = self;
         let mut vars = vars.clone();
         for &(arg_type, var) in args {
-            if let Some(_) = vars.insert(var, arg_type) {
+            if vars.insert(var, arg_type).is_some() {
                 return Err(());
             }
         }
@@ -553,7 +551,7 @@ impl Function {
     /// length matching on arguments.
     fn validate_call(
         &self,
-        arg_values: &Vec<Expr>,
+        arg_values: &[Expr],
         functions: &HashMap<String, Function>,
         vars: &HashMap<VarRepr, Type>,
         data_refs: &HashMap<DataRef, Vec<Expr>>,
@@ -576,12 +574,12 @@ impl Program {
     /// and the validity of static data references (valid expressions + expressions are constant).
     pub fn validate(&self) -> Result<(), ()> {
         let Program(functions, vars, graph, data_refs) = self;
-        for (_, exprs) in data_refs {
+        for exprs in data_refs.values() {
             for expr in exprs {
                 expr.validate(&HashMap::new(), &HashMap::new(), &HashMap::new())?;
             }
         }
-        for (_, function) in functions {
+        for function in functions.values() {
             function.validate(functions, data_refs)?;
         }
         cond_result(None == validate_block_graph(graph, functions, vars, data_refs)?)
