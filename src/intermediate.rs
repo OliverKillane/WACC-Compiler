@@ -64,11 +64,11 @@ pub enum ArithOp {
 /// Size of the [numeric expression](NumExpr).
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum NumSize {
-    /// Signifies a 4-byte expression, for example an int
+    /// Signifies a signed 4-byte expression, for example an int
     DWord,
-    /// Signifies a 2-byte expression
+    /// Signifies a unsigned 2-byte expression
     Word,
-    /// Signifies a 1-byte expression, for example a char
+    /// Signifies a unsigned 1-byte expression, for example a char
     Byte,
 }
 
