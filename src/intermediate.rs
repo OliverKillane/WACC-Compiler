@@ -18,7 +18,7 @@
 //!    the same as if executed without short-circuiting. This means that, if
 //!    a function call is a sub-expression in an arithmetic or a boolean operation
 //!    then there is no guarantee if it will be actually executed, only that the
-//!    result of the operatio will be preserved.
+//!    result of the operation will be preserved.
 //!  - In all other cases all direct sub-expressions are executed.
 
 use std::{
