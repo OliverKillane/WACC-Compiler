@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet, LinkedList},
+    iter::zip,
+};
 
 /// The representation of an identifier of a variable.
 pub type VarRepr = usize;
@@ -10,7 +13,7 @@ pub type BlockId = usize;
 pub type DataRef = u64;
 
 /// A common container for all types of expressions.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     /// A [number expression](NumExpr)
     Num(NumExpr),
@@ -21,7 +24,7 @@ pub enum Expr {
 }
 
 /// Types of arithmetic operations on [numeric expressions](NumExpr).
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ArithOp {
     /// Addition (+).
     Add,
@@ -36,7 +39,7 @@ pub enum ArithOp {
 }
 
 /// Size of the [numeric expression](NumExpr).
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum NumSize {
     /// Signifies a 4-byte expression, for example an int
     DWord,
@@ -48,7 +51,7 @@ pub enum NumSize {
 
 /// A numeric expression. Can represent for example
 /// character or integer expressions.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum NumExpr {
     /// Size of the given type in the memory. The type of this expression is
     /// always a DWord.
@@ -79,7 +82,7 @@ pub enum NumExpr {
 }
 
 /// Types of boolean operations on [boolean expressions](BoolExpr).
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum BoolOp {
     /// Conjunction (&&).
     And,
@@ -90,7 +93,7 @@ pub enum BoolOp {
 }
 
 /// A boolean expression.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BoolExpr {
     /// A boolean constant. Can be either true or false.
     Const(bool),
@@ -118,7 +121,7 @@ pub enum BoolExpr {
 }
 
 /// A pointer manipulation expressiion.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PtrExpr {
     /// A null-pointer expression. Dereferencing it will cause a segmentation fault.
     Null,
@@ -152,7 +155,7 @@ pub enum PtrExpr {
 }
 
 /// An execution statement.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Stat {
     /// Assigns the value of an expression to a variable. The variable must have
     /// a matching type in the symbol table attached to each
@@ -191,7 +194,7 @@ pub enum Stat {
 }
 
 /// An action to be performed after a block of statements is executed.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BlockEnding {
     /// Represents a conditional jump. The boolean expressions in the vector are
     /// evaluated consecutively. If a boolean expression is true, then the
@@ -207,16 +210,16 @@ pub enum BlockEnding {
     Return(Expr),
 }
 
-/// A block of statements. Contains the blocks that have conditional jumps to it. The
-/// list of statements must not be empty.
-#[derive(Debug, PartialEq, Eq)]
+/// A block of statements. Contains the blocks that have conditional jumps to it.
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Block(pub Vec<BlockId>, pub Vec<Stat>, pub BlockEnding);
 /// A graph of blocks. The index of the block in the block graph signifies the
-/// [block id](BlockId) of that block.
+/// [block id](BlockId) of that block. The block graph must have at least one
+/// block in it.
 pub type BlockGraph = Vec<Block>;
 
 /// Type of an expression.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Type {
     /// A numeric expression type, with the given expression size.
     Num(NumSize),
@@ -230,7 +233,7 @@ pub enum Type {
 /// for the arguments, the table of types for local variables used and the
 /// [block graph](BlockGraph) for its body. The execution starts off from the
 /// first block in the block graph.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Function(
     pub Type,
     pub Vec<(Type, VarRepr)>,
@@ -243,10 +246,757 @@ pub struct Function(
 /// map of structs in the data section for the whole program. The execution starts
 /// off from the first block in the block graph. The expressions in the data
 /// section structs may not use any variable references.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Program(
     pub HashMap<String, Function>,
     pub HashMap<VarRepr, Type>,
     pub BlockGraph,
     pub HashMap<DataRef, Vec<Expr>>,
 );
+
+/// Returns an Ok or an Err based on the value of the boolean
+fn cond_result(b: bool) -> Result<(), ()> {
+    if b {
+        Ok(())
+    } else {
+        Err(())
+    }
+}
+
+impl BoolExpr {
+    /// Validates a boolean expression: variable existence and type, function
+    /// call type and validity of sub-expressions.
+    fn validate(
+        &self,
+        functions: &HashMap<String, Function>,
+        vars: &HashMap<VarRepr, Type>,
+        data_refs: &HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<(), ()> {
+        match self {
+            BoolExpr::Const(_) => Ok(()),
+            BoolExpr::Var(var) => cond_result(Type::Bool == *vars.get(var).ok_or(())?),
+            BoolExpr::Deref(ptr_expr) => ptr_expr.validate(functions, vars, data_refs),
+            BoolExpr::TestZero(num_expr) | BoolExpr::TestPositive(num_expr) => {
+                num_expr.validate(functions, vars, data_refs).map(|_| ())
+            }
+            BoolExpr::PtrEq(ptr_expr1, ptr_expr2) => {
+                ptr_expr1.validate(functions, vars, data_refs)?;
+                ptr_expr2.validate(functions, vars, data_refs)
+            }
+            BoolExpr::BoolOp(box bool_expr1, _, box bool_expr2) => {
+                bool_expr1.validate(functions, vars, data_refs)?;
+                bool_expr2.validate(functions, vars, data_refs)
+            }
+            BoolExpr::Not(box bool_expr) => bool_expr.validate(functions, vars, data_refs),
+            BoolExpr::Call(name, exprs) => {
+                let function = functions.get(name).ok_or(())?;
+                cond_result(
+                    Type::Bool == function.validate_call(exprs, functions, vars, data_refs)?,
+                )
+            }
+        }
+    }
+}
+
+impl PtrExpr {
+    /// Validates a pointer expression: data reference existence, variable existence
+    /// and type, pointer offset size, function call type and validity of sub-expressions.
+    fn validate(
+        &self,
+        functions: &HashMap<String, Function>,
+        vars: &HashMap<VarRepr, Type>,
+        data_refs: &HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<(), ()> {
+        match self {
+            PtrExpr::Null => Ok(()),
+            PtrExpr::DataRef(data_ref) => data_refs.get(data_ref).ok_or(()).map(|_| ()),
+            PtrExpr::Var(var) => cond_result(Type::Ptr == *vars.get(var).ok_or(())?),
+            PtrExpr::Deref(box ptr_expr) => ptr_expr.validate(functions, vars, data_refs),
+            PtrExpr::Offset(box ptr_expr, box num_expr) => {
+                if let NumSize::DWord = num_expr.validate(functions, vars, data_refs)? {
+                    ptr_expr.validate(functions, vars, data_refs)
+                } else {
+                    Err(())
+                }
+            }
+            PtrExpr::Malloc(exprs) | PtrExpr::WideMalloc(exprs) => {
+                for expr in exprs {
+                    expr.validate(functions, vars, data_refs)?;
+                }
+                Ok(())
+            }
+            PtrExpr::Call(name, exprs) => {
+                let function = functions.get(name).ok_or(())?;
+                cond_result(Type::Ptr == function.validate_call(exprs, functions, vars, data_refs)?)
+            }
+        }
+    }
+}
+
+impl NumExpr {
+    /// Checks the size of a numeric expression and validates it: bounds on a
+    /// constant, variable existence and type, equal-sizeness of arithmetic
+    /// operation arms, function call type and validity of sub-expressions.
+    fn validate(
+        &self,
+        functions: &HashMap<String, Function>,
+        vars: &HashMap<VarRepr, Type>,
+        data_refs: &HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<NumSize, ()> {
+        Ok(match self {
+            NumExpr::SizeOf(_) | NumExpr::SizeOfWideAlloc => NumSize::DWord,
+            NumExpr::Const(size, val) => {
+                if *val
+                    == match size {
+                        NumSize::DWord => *val,
+                        NumSize::Word => *val as i16 as i32,
+                        NumSize::Byte => *val as i8 as i32,
+                    }
+                {
+                    *size
+                } else {
+                    return Err(());
+                }
+            }
+            NumExpr::Var(var) => {
+                if let Type::Num(size) = vars.get(var).ok_or(())? {
+                    *size
+                } else {
+                    return Err(());
+                }
+            }
+            NumExpr::Deref(size, ptr_expr) => {
+                ptr_expr.validate(functions, vars, data_refs)?;
+                *size
+            }
+            NumExpr::ArithOp(box num_expr1, _, box num_expr2) => {
+                let size1 = num_expr1.validate(functions, vars, data_refs)?;
+                let size2 = num_expr2.validate(functions, vars, data_refs)?;
+                if size1 != size2 {
+                    return Err(());
+                }
+                size1
+            }
+            NumExpr::Cast(size, _) => *size,
+            NumExpr::Call(name, exprs) => {
+                let function = functions.get(name).ok_or(())?;
+                if let Type::Num(size) =
+                    function.validate_call(exprs, functions, vars, data_refs)?
+                {
+                    size
+                } else {
+                    return Err(());
+                }
+            }
+        })
+    }
+}
+
+impl Expr {
+    /// Checks the type of an expression and validates the underlying typed expression.
+    fn validate(
+        &self,
+        functions: &HashMap<String, Function>,
+        vars: &HashMap<VarRepr, Type>,
+        data_refs: &HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<Type, ()> {
+        Ok(match self {
+            Expr::Num(num_expr) => Type::Num(num_expr.validate(functions, vars, data_refs)?),
+            Expr::Bool(bool_expr) => {
+                bool_expr.validate(functions, vars, data_refs)?;
+                Type::Bool
+            }
+            Expr::Ptr(ptr_expr) => {
+                ptr_expr.validate(functions, vars, data_refs)?;
+                Type::Ptr
+            }
+        })
+    }
+}
+
+impl Stat {
+    /// Validates a statement: variable assignment sizeness, sizeness of reads,
+    /// print char sizeness and the validity of sub-expressions.
+    fn validate(
+        &self,
+        functions: &HashMap<String, Function>,
+        vars: &HashMap<VarRepr, Type>,
+        data_refs: &HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<(), ()> {
+        match self {
+            Stat::AssignVar(var, expr) => {
+                cond_result(*vars.get(var).ok_or(())? == expr.validate(functions, vars, data_refs)?)
+            }
+            Stat::AssignPtr(ptr_expr, expr) => {
+                ptr_expr.validate(functions, vars, data_refs)?;
+                expr.validate(functions, vars, data_refs).map(|_| ())
+            }
+            Stat::ReadIntVar(var) => {
+                cond_result(Type::Num(NumSize::DWord) == *vars.get(var).ok_or(())?)
+            }
+            Stat::ReadCharVar(var) => {
+                cond_result(Type::Num(NumSize::Byte) == *vars.get(var).ok_or(())?)
+            }
+            Stat::ReadIntPtr(ptr_expr) | Stat::ReadCharPtr(ptr_expr) => {
+                ptr_expr.validate(functions, vars, data_refs)
+            }
+            Stat::Free(ptr_expr, num_expr) | Stat::PrintStr(ptr_expr, num_expr) => {
+                num_expr.validate(functions, vars, data_refs)?;
+                ptr_expr.validate(functions, vars, data_refs)
+            }
+            Stat::PrintExpr(expr) => expr.validate(functions, vars, data_refs).map(|_| ()),
+            Stat::PrintChar(num_expr) => {
+                cond_result(NumSize::Byte == num_expr.validate(functions, vars, data_refs)?)
+            }
+            Stat::PrintEol() => Ok(()),
+        }
+    }
+}
+
+/// Checks the return type of a block graph and validates it:
+/// non-emptyness, equal return types, exit expression type and size and validity
+/// of sub-expressions.
+fn validate_block_graph(
+    graph: &BlockGraph,
+    functions: &HashMap<String, Function>,
+    vars: &HashMap<VarRepr, Type>,
+    data_refs: &HashMap<DataRef, Vec<Expr>>,
+) -> Result<Option<Type>, ()> {
+    let size = graph.len();
+    if size == 0 {
+        return Err(());
+    }
+
+    let mut incoming = HashMap::<BlockId, LinkedList<BlockId>>::new();
+    let mut return_type = None;
+    for (block_idx, Block(_, stats, ending)) in graph.iter().enumerate() {
+        for stat in stats {
+            stat.validate(functions, vars, data_refs)?;
+        }
+        match ending {
+            BlockEnding::CondJumps(cond_jumps, jump) => {
+                for (bool_expr, jump) in cond_jumps {
+                    bool_expr.validate(functions, vars, data_refs)?;
+                    if *jump >= size {
+                        return Err(());
+                    } else if let Some(incoming_list) = incoming.get_mut(jump) {
+                        incoming_list.push_back(block_idx);
+                    } else {
+                        let mut incoming_list = LinkedList::new();
+                        incoming_list.push_back(block_idx);
+                        incoming.insert(*jump, incoming_list);
+                    }
+                }
+                if *jump >= size {
+                    return Err(());
+                } else if let Some(incoming_list) = incoming.get_mut(jump) {
+                    incoming_list.push_back(block_idx);
+                } else {
+                    let mut incoming_list = LinkedList::new();
+                    incoming_list.push_back(block_idx);
+                    incoming.insert(*jump, incoming_list);
+                }
+            }
+            BlockEnding::Exit(num_expr) => {
+                if NumSize::DWord != num_expr.validate(functions, vars, data_refs)? {
+                    return Err(());
+                }
+            }
+            BlockEnding::Return(expr) => {
+                let expr_type = expr.validate(functions, vars, data_refs)?;
+                if return_type.is_none() {
+                    return_type = Some(expr_type);
+                } else if return_type != Some(expr_type) {
+                    return Err(());
+                }
+            }
+        }
+    }
+    for (block_idx, Block(incoming_vec, _, _)) in graph.iter().enumerate() {
+        if incoming_vec.iter().collect::<HashSet<_>>()
+            != incoming
+                .get(&block_idx)
+                .unwrap_or(&LinkedList::new())
+                .iter()
+                .collect::<HashSet<_>>()
+        {
+            return Err(());
+        }
+    }
+    Ok(return_type)
+}
+
+impl Function {
+    /// Validates a function definition: non-collision between local variables and arguments
+    /// and the validity of the underlying block graph.
+    fn validate(
+        &self,
+        functions: &HashMap<String, Function>,
+        data_refs: &HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<(), ()> {
+        let Function(ret_type, args, vars, graph) = self;
+        let mut vars = vars.clone();
+        for &(arg_type, var) in args {
+            if vars.insert(var, arg_type).is_some() {
+                return Err(());
+            }
+        }
+        cond_result(
+            validate_block_graph(graph, functions, &vars, data_refs)?
+                .map_or(true, |block_type| block_type == *ret_type),
+        )
+    }
+
+    /// Validates a function call: validity of argument expressions and type and
+    /// length matching on arguments.
+    fn validate_call(
+        &self,
+        arg_values: &[Expr],
+        functions: &HashMap<String, Function>,
+        vars: &HashMap<VarRepr, Type>,
+        data_refs: &HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<Type, ()> {
+        let Function(ret_type, args, _, _) = self;
+        if arg_values.len() != args.len() {
+            return Err(());
+        }
+        for ((arg_type, _), arg_value) in zip(args, arg_values) {
+            if *arg_type != arg_value.validate(functions, vars, data_refs)? {
+                return Err(());
+            }
+        }
+        Ok(*ret_type)
+    }
+}
+
+impl Program {
+    /// Validates a program: validity of functions, main program body, no returns in the main function
+    /// and the validity of static data references (valid expressions + expressions are constant).
+    pub fn validate(&self) -> Result<(), ()> {
+        let Program(functions, vars, graph, data_refs) = self;
+        for exprs in data_refs.values() {
+            for expr in exprs {
+                expr.validate(&HashMap::new(), &HashMap::new(), &HashMap::new())?;
+            }
+        }
+        for function in functions.values() {
+            function.validate(functions, data_refs)?;
+        }
+        cond_result(None == validate_block_graph(graph, functions, vars, data_refs)?)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{
+        ArithOp, Block, BlockEnding, BoolExpr, DataRef, Expr, Function, NumExpr, NumSize, Program,
+        PtrExpr, Stat, Type, VarRepr,
+    };
+    use std::collections::HashMap;
+
+    fn validate_num_expr(
+        num_expr: NumExpr,
+        vars: HashMap<VarRepr, Type>,
+        data_refs: HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<(), ()> {
+        validate_expr(Expr::Num(num_expr), vars, data_refs)
+    }
+
+    fn validate_expr(
+        expr: Expr,
+        vars: HashMap<VarRepr, Type>,
+        data_refs: HashMap<DataRef, Vec<Expr>>,
+    ) -> Result<(), ()> {
+        Program(
+            HashMap::new(),
+            vars,
+            vec![Block(
+                vec![],
+                vec![Stat::PrintExpr(expr)],
+                BlockEnding::Exit(NumExpr::Const(NumSize::DWord, 0)),
+            )],
+            data_refs,
+        )
+        .validate()
+    }
+
+    fn validate_call(
+        expr: Expr,
+        fname: String,
+        args: Vec<(Type, VarRepr)>,
+        ret_type: Type,
+    ) -> Result<(), ()> {
+        Program(
+            HashMap::from([(
+                fname,
+                Function(
+                    ret_type,
+                    args,
+                    HashMap::from([(0, ret_type)]),
+                    vec![Block(
+                        vec![],
+                        vec![Stat::PrintEol()],
+                        BlockEnding::Return(match ret_type {
+                            Type::Ptr => Expr::Ptr(PtrExpr::Var(0)),
+                            Type::Bool => Expr::Bool(BoolExpr::Var(0)),
+                            Type::Num(_) => Expr::Num(NumExpr::Var(0)),
+                        }),
+                    )],
+                ),
+            )]),
+            HashMap::new(),
+            vec![Block(
+                vec![],
+                vec![Stat::PrintExpr(expr)],
+                BlockEnding::Exit(NumExpr::Const(NumSize::DWord, 0)),
+            )],
+            HashMap::new(),
+        )
+        .validate()
+    }
+
+    fn validate_block_graph(graph: Vec<Block>) -> Result<(), ()> {
+        Program(HashMap::new(), HashMap::new(), graph, HashMap::new()).validate()
+    }
+
+    #[test]
+    fn check_const_bounds_ok() {
+        assert_eq!(
+            validate_num_expr(
+                NumExpr::Const(NumSize::Byte, -128),
+                HashMap::new(),
+                HashMap::new()
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn check_const_bounds_err() {
+        assert_eq!(
+            validate_num_expr(
+                NumExpr::Const(NumSize::Byte, -129),
+                HashMap::new(),
+                HashMap::new()
+            ),
+            Err(())
+        );
+    }
+
+    #[test]
+    fn check_var_exists_ok() {
+        assert_eq!(
+            validate_num_expr(
+                NumExpr::Var(0),
+                HashMap::from([(0, Type::Num(NumSize::DWord))]),
+                HashMap::new()
+            ),
+            Ok(())
+        )
+    }
+
+    #[test]
+    fn check_var_exists_err() {
+        assert_eq!(
+            validate_num_expr(NumExpr::Var(0), HashMap::new(), HashMap::new()),
+            Err(())
+        )
+    }
+
+    #[test]
+    fn check_var_type_ok() {
+        for (var_expr, var_type) in [
+            (Expr::Num(NumExpr::Var(0)), Type::Num(NumSize::DWord)),
+            (Expr::Bool(BoolExpr::Var(0)), Type::Bool),
+            (Expr::Ptr(PtrExpr::Var(0)), Type::Ptr),
+        ] {
+            assert_eq!(
+                validate_expr(var_expr, HashMap::from([(0, var_type)]), HashMap::new()),
+                Ok(())
+            );
+        }
+    }
+
+    #[test]
+    fn check_var_type_err() {
+        for (var_expr, var_type) in [
+            (Expr::Num(NumExpr::Var(0)), Type::Ptr),
+            (Expr::Bool(BoolExpr::Var(0)), Type::Num(NumSize::Byte)),
+            (Expr::Ptr(PtrExpr::Var(0)), Type::Bool),
+        ] {
+            assert_eq!(
+                validate_expr(var_expr, HashMap::from([(0, var_type)]), HashMap::new()),
+                Err(())
+            );
+        }
+    }
+
+    #[test]
+    fn check_arith_op_ok() {
+        assert_eq!(
+            validate_num_expr(
+                NumExpr::ArithOp(
+                    box NumExpr::Const(NumSize::Word, 0),
+                    ArithOp::Add,
+                    box NumExpr::Const(NumSize::Word, 0)
+                ),
+                HashMap::new(),
+                HashMap::new()
+            ),
+            Ok(())
+        )
+    }
+
+    #[test]
+    fn check_arith_op_err() {
+        assert_eq!(
+            validate_num_expr(
+                NumExpr::ArithOp(
+                    box NumExpr::Const(NumSize::Byte, 0),
+                    ArithOp::Add,
+                    box NumExpr::Const(NumSize::DWord, 0)
+                ),
+                HashMap::new(),
+                HashMap::new()
+            ),
+            Err(())
+        )
+    }
+
+    #[test]
+    fn check_call_ok() {
+        for (call_expr, ret_type) in [
+            (
+                Expr::Num(NumExpr::Call("f".to_string(), vec![])),
+                Type::Num(NumSize::Byte),
+            ),
+            (
+                Expr::Bool(BoolExpr::Call("f".to_string(), vec![])),
+                Type::Bool,
+            ),
+            (Expr::Ptr(PtrExpr::Call("f".to_string(), vec![])), Type::Ptr),
+        ] {
+            assert_eq!(
+                validate_call(call_expr, "f".to_string(), vec![], ret_type),
+                Ok(())
+            )
+        }
+    }
+
+    #[test]
+    fn check_call_exists_err() {
+        assert_eq!(
+            validate_call(
+                Expr::Bool(BoolExpr::Call("f".to_string(), vec![])),
+                "g".to_string(),
+                vec![],
+                Type::Bool
+            ),
+            Err(())
+        )
+    }
+
+    #[test]
+    fn check_call_args_num_err() {
+        assert_eq!(
+            validate_call(
+                Expr::Bool(BoolExpr::Call(
+                    "f".to_string(),
+                    vec![Expr::Bool(BoolExpr::Const(true))]
+                )),
+                "g".to_string(),
+                vec![],
+                Type::Bool
+            ),
+            Err(())
+        )
+    }
+
+    #[test]
+    fn check_call_args_types_err() {
+        assert_eq!(
+            validate_call(
+                Expr::Bool(BoolExpr::Call(
+                    "f".to_string(),
+                    vec![Expr::Bool(BoolExpr::Const(true))]
+                )),
+                "f".to_string(),
+                vec![(Type::Ptr, 1)],
+                Type::Bool
+            ),
+            Err(())
+        )
+    }
+
+    #[test]
+    fn check_call_args_collision_err() {
+        assert_eq!(
+            validate_call(
+                Expr::Bool(BoolExpr::Call(
+                    "f".to_string(),
+                    vec![
+                        Expr::Bool(BoolExpr::Const(true)),
+                        Expr::Bool(BoolExpr::Const(true))
+                    ]
+                )),
+                "f".to_string(),
+                vec![(Type::Bool, 1), (Type::Bool, 1)],
+                Type::Bool
+            ),
+            Err(())
+        )
+    }
+
+    #[test]
+    fn check_call_ret_type_err() {
+        for (call_expr, ret_type) in [
+            (
+                Expr::Num(NumExpr::ArithOp(
+                    box NumExpr::Call("f".to_string(), vec![]),
+                    ArithOp::Add,
+                    box NumExpr::Const(NumSize::DWord, 0),
+                )),
+                Type::Num(NumSize::Byte),
+            ),
+            (
+                Expr::Bool(BoolExpr::Call("f".to_string(), vec![])),
+                Type::Ptr,
+            ),
+            (
+                Expr::Ptr(PtrExpr::Call("f".to_string(), vec![])),
+                Type::Bool,
+            ),
+        ] {
+            assert_eq!(
+                validate_call(call_expr, "f".to_string(), vec![], ret_type),
+                Err(())
+            )
+        }
+    }
+
+    #[test]
+    fn check_dataref_exists_ok() {
+        assert_eq!(
+            validate_expr(
+                Expr::Ptr(PtrExpr::DataRef(0)),
+                HashMap::new(),
+                HashMap::from([(0, vec![Expr::Bool(BoolExpr::Const(true))])])
+            ),
+            Ok(())
+        )
+    }
+
+    #[test]
+    fn check_dataref_exists_err() {
+        assert_eq!(
+            validate_expr(
+                Expr::Ptr(PtrExpr::DataRef(0)),
+                HashMap::new(),
+                HashMap::new()
+            ),
+            Err(())
+        )
+    }
+
+    #[test]
+    fn check_incoming_properly_defined() {
+        assert_eq!(
+            validate_block_graph(vec![Block(
+                vec![],
+                vec![Stat::PrintEol()],
+                BlockEnding::CondJumps(vec![], 0)
+            )]),
+            Err(())
+        )
+    }
+
+    #[test]
+    fn check_main_no_return() {
+        assert_eq!(
+            validate_block_graph(vec![Block(
+                vec![],
+                vec![],
+                BlockEnding::Return(Expr::Num(NumExpr::Const(NumSize::DWord, 0)))
+            )]),
+            Err(())
+        )
+    }
+
+    #[test]
+    fn check_different_typed_returns() {
+        assert_eq!(
+            Program(
+                HashMap::from([(
+                    "f".to_string(),
+                    Function(
+                        Type::Num(NumSize::Byte),
+                        vec![],
+                        HashMap::new(),
+                        vec![Block(
+                            vec![],
+                            vec![],
+                            BlockEnding::Return(Expr::Num(NumExpr::Const(NumSize::Word, 0)))
+                        )],
+                    )
+                )]),
+                HashMap::new(),
+                vec![Block(
+                    vec![],
+                    vec![],
+                    BlockEnding::Exit(NumExpr::Const(NumSize::DWord, 0))
+                )],
+                HashMap::new()
+            )
+            .validate(),
+            Err(())
+        )
+    }
+
+    #[test]
+    fn check_exit_dword() {
+        assert_eq!(
+            Program(
+                HashMap::new(),
+                HashMap::new(),
+                vec![Block(
+                    vec![],
+                    vec![],
+                    BlockEnding::Exit(NumExpr::Const(NumSize::Word, 0))
+                )],
+                HashMap::new()
+            )
+            .validate(),
+            Err(())
+        )
+    }
+
+    #[test]
+    fn check_static_expressions_const() {
+        assert_eq!(
+            Program(
+                HashMap::from([(
+                    "f".to_string(),
+                    Function(
+                        Type::Num(NumSize::DWord),
+                        vec![],
+                        HashMap::new(),
+                        vec![Block(
+                            vec![],
+                            vec![],
+                            BlockEnding::Return(Expr::Num(NumExpr::Const(NumSize::DWord, 0)))
+                        )]
+                    )
+                )]),
+                HashMap::new(),
+                vec![Block(
+                    vec![],
+                    vec![],
+                    BlockEnding::Exit(NumExpr::Const(NumSize::DWord, 0))
+                )],
+                HashMap::from([(0, vec![Expr::Num(NumExpr::Call("f".to_string(), vec![]))],)])
+            )
+            .validate(),
+            Err(())
+        )
+    }
+}
