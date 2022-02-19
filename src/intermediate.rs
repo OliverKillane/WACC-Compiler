@@ -1,3 +1,26 @@
+//! An intermediate representation between the frontend and the backend.
+//!
+//! # Backend behavior guarantees
+//!
+//! ## Statement Evaluation
+//!
+//! The statements are guaranteed to produce the same behavior as if evaluated
+//! in the order they are given in.
+//!
+//! ## Expression Evaluation
+//!
+//! For evaluation of expression trees (consisting of [generic expressions](Expr),
+//! [numeric expressions](NumExpr), [pointer expressions](PtrExpr) and
+//! [boolean expressions](BoolExpr)):
+//!  - If the sub-expression is a part of an arithmetic operation on 2 numeric
+//!    expressions or a boolean operation on 2 boolean expressions,
+//!    the only guarantee is that the result of the arithmetic operation will be
+//!    the same as if executed without short-circuiting. This means that, if
+//!    a function call is a sub-expression in an arithmetic or a boolean operation
+//!    then there is no guarantee if it will be actually executed, only that the
+//!    result of the operatio will be preserved.
+//!  - In all other cases all direct sub-expressions are executed.
+
 use std::{
     collections::{HashMap, HashSet, LinkedList},
     iter::zip,
@@ -49,8 +72,7 @@ pub enum NumSize {
     Byte,
 }
 
-/// A numeric expression. Can represent for example
-/// character or integer expressions.
+/// A numeric expression. Can represent for example character or integer expressions.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum NumExpr {
     /// Size of the given type in the memory. The type of this expression is
@@ -92,7 +114,7 @@ pub enum BoolOp {
     Xor,
 }
 
-/// A boolean expression.
+/// A boolean expression. Can have a value of either true or false.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BoolExpr {
     /// A boolean constant. Can be either true or false.
@@ -120,7 +142,7 @@ pub enum BoolExpr {
     Call(String, Vec<Expr>),
 }
 
-/// A pointer manipulation expressiion.
+/// A pointer manipulation expression.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PtrExpr {
     /// A null-pointer expression. Dereferencing it will cause a segmentation fault.
