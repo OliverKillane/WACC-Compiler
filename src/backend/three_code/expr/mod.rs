@@ -7,7 +7,6 @@ use self::{
     num::{propagate_num_const, translate_num_expr},
     ptr::{propagate_ptr_const, translate_ptr_expr},
 };
-
 use super::{super::Options, OpSrc, StatCode};
 use crate::{
     backend::PropagationOpt,
@@ -24,14 +23,19 @@ impl From<i32> for OpSrc {
     }
 }
 
+/// Static data from the function/program the expression is being translated in.
 #[derive(Clone, Copy)]
 pub(super) struct ExprTranslationData<'l> {
+    /// All the local variables and their types.
     vars: &'l HashMap<VarRepr, ir::Type>,
+    /// All the functions and their definitions
     functions: &'l HashMap<String, ir::Function>,
+    /// Compilation options
     options: &'l Options,
 }
 
 impl<'l> ExprTranslationData<'l> {
+    /// Creates a expression translation data struct.
     fn new(
         vars: &'l HashMap<VarRepr, ir::Type>,
         functions: &'l HashMap<String, ir::Function>,
@@ -44,11 +48,14 @@ impl<'l> ExprTranslationData<'l> {
         }
     }
 
+    /// Returns whether the compilation options state that constant propagation
+    /// should be performed.
     fn should_propagate(&self) -> bool {
         self.options.propagation != PropagationOpt::None
     }
 }
 
+/// Helper function for translating function call expressions.
 fn translate_function_call(
     name: String,
     args: Vec<ir::Expr>,
@@ -72,6 +79,8 @@ fn translate_function_call(
     stats.push(stat_code);
 }
 
+/// Translates a single general expression. The result of the expression is placed
+/// in the result variable. Returns the type of the expression.
 pub(super) fn translate_expr(
     expr: ir::Expr,
     result: VarRepr,

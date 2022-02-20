@@ -27,12 +27,19 @@ impl From<ir::ArithOp> for BinOp {
     }
 }
 
-pub(super) fn propagate_num_const(result: VarRepr, stats: &mut Vec<StatCode>, val: Option<i32>) {
-    if let Some(val) = val {
-        stats.push(StatCode::Assign(result, val.into()));
+/// If a constant was returned during expression translation instead of having been
+/// pushed as a statement, it will be flushed as a statement forcefully here.
+pub(super) fn propagate_num_const(
+    result: VarRepr,
+    stats: &mut Vec<StatCode>,
+    num_const: Option<i32>,
+) {
+    if let Some(num_const) = num_const {
+        stats.push(StatCode::Assign(result, num_const.into()));
     }
 }
 
+/// If a constant is bigger than the variable size, then trims it to fit in that size.
 pub(super) fn clip_num_const(num_const: i32, size: &ir::NumSize) -> i32 {
     match size {
         ir::NumSize::DWord => num_const,
@@ -41,6 +48,12 @@ pub(super) fn clip_num_const(num_const: i32, size: &ir::NumSize) -> i32 {
     }
 }
 
+/// Translates a numerical expression into a series of statements. The result of the
+/// expression tree is placed in the result field. If the expression was expressible
+/// as a constant value, the constand value is returned instead as the first item in
+/// the returned tuple and no statements are added to the stats vector. The second
+/// item in the tuple represents the size of the resulting numerical expression, i.e.
+/// the size of the variable placed in result.
 pub(super) fn translate_num_expr(
     num_expr: ir::NumExpr,
     result: VarRepr,
