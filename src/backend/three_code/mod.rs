@@ -1,9 +1,8 @@
-use super::{Options, PropagationOpt};
+mod expr;
+
+use super::Options;
 use crate::intermediate::{self as ir, DataRef, VarRepr};
-use std::{
-    collections::HashMap,
-    iter::{successors, zip},
-};
+use std::collections::HashMap;
 
 /// Id of a statement in a statement graph
 pub(super) type StatId = usize;
