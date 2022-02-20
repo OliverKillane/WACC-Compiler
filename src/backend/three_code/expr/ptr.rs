@@ -17,7 +17,7 @@ impl From<PtrSrc> for OpSrc {
 
 /// If a constant was returned during expression translation instead of having been
 /// pushed as a statement, it will be flushed as a statement forcefully here.
-pub(super) fn propagate_ptr_const(
+pub(in super::super) fn propagate_ptr_const(
     result: VarRepr,
     stats: &mut Vec<StatCode>,
     ptr_const: Option<PtrSrc>,
@@ -31,7 +31,7 @@ pub(super) fn propagate_ptr_const(
 /// expression tree is placed in the result field. If the expression was expressible
 /// as a constant pointer, the pointer is returned instead and no statements are added
 /// to the stats vector.
-pub(super) fn translate_ptr_expr(
+pub(in super::super) fn translate_ptr_expr(
     ptr_expr: ir::PtrExpr,
     result: VarRepr,
     stats: &mut Vec<StatCode>,

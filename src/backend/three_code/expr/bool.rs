@@ -18,7 +18,7 @@ impl From<ir::BoolOp> for BinOp {
 
 /// If a constant was returned during expression translation instead of having been
 /// pushed as a statement, it will be flushed as a statement forcefully here.
-pub(super) fn propagate_bool_const(
+pub(in super::super) fn propagate_bool_const(
     result: VarRepr,
     stats: &mut Vec<StatCode>,
     bool_const: Option<bool>,
@@ -32,7 +32,7 @@ pub(super) fn propagate_bool_const(
 /// expression tree is placed in the result field. If the expression was expressible
 /// as a constant boolean, the boolean is returned instead and no statements are added
 /// to the stats vector.
-pub(super) fn translate_bool_expr(
+pub(in super::super) fn translate_bool_expr(
     bool_expr: ir::BoolExpr,
     result: VarRepr,
     stats: &mut Vec<StatCode>,

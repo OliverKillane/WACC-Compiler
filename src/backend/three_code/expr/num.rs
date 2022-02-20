@@ -29,7 +29,7 @@ impl From<ir::ArithOp> for BinOp {
 
 /// If a constant was returned during expression translation instead of having been
 /// pushed as a statement, it will be flushed as a statement forcefully here.
-pub(super) fn propagate_num_const(
+pub(in super::super) fn propagate_num_const(
     result: VarRepr,
     stats: &mut Vec<StatCode>,
     num_const: Option<i32>,
@@ -40,7 +40,7 @@ pub(super) fn propagate_num_const(
 }
 
 /// If a constant is bigger than the variable size, then trims it to fit in that size.
-pub(super) fn clip_num_const(num_const: i32, size: &ir::NumSize) -> i32 {
+fn clip_num_const(num_const: i32, size: &ir::NumSize) -> i32 {
     match size {
         ir::NumSize::DWord => num_const,
         ir::NumSize::Word => num_const as u16 as i32,
@@ -54,7 +54,7 @@ pub(super) fn clip_num_const(num_const: i32, size: &ir::NumSize) -> i32 {
 /// the returned tuple and no statements are added to the stats vector. The second
 /// item in the tuple represents the size of the resulting numerical expression, i.e.
 /// the size of the variable placed in result.
-pub(super) fn translate_num_expr(
+pub(in super::super) fn translate_num_expr(
     num_expr: ir::NumExpr,
     result: VarRepr,
     stats: &mut Vec<StatCode>,
