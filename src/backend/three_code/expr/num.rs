@@ -1,9 +1,31 @@
 use super::ptr::{propagate_ptr_const, translate_ptr_expr};
 use super::{
-    super::{BinOp, OpSrc, StatCode},
+    super::{BinOp, OpSrc, Size, StatCode},
     translate_function_call, ExprTranslationData,
 };
 use crate::intermediate::{self as ir, VarRepr};
+
+impl From<ir::NumSize> for Size {
+    fn from(size: ir::NumSize) -> Self {
+        match size {
+            ir::NumSize::DWord => Size::DWord,
+            ir::NumSize::Word => Size::Word,
+            ir::NumSize::Byte => Size::Byte,
+        }
+    }
+}
+
+impl From<ir::ArithOp> for BinOp {
+    fn from(arith_op: ir::ArithOp) -> Self {
+        match arith_op {
+            ir::ArithOp::Add => BinOp::Add,
+            ir::ArithOp::Sub => BinOp::Sub,
+            ir::ArithOp::Mul => BinOp::Mul,
+            ir::ArithOp::Div => BinOp::Div,
+            ir::ArithOp::Mod => BinOp::Mod,
+        }
+    }
+}
 
 pub(super) fn propagate_num_const(result: VarRepr, stats: &mut Vec<StatCode>, val: Option<i32>) {
     if let Some(val) = val {
@@ -61,7 +83,7 @@ pub(super) fn translate_num_expr(
             let (num_const, size1) =
                 translate_num_expr(num_expr1, sub_result, stats, translation_data);
             let op_src1 = if let Some(num_const) = num_const && translation_data.should_propagate() {
-                num_const.into()
+                OpSrc::from(num_const)
             } else {
                 propagate_num_const(sub_result, stats, num_const);
                 let op_src = OpSrc::Var(sub_result);
@@ -71,7 +93,7 @@ pub(super) fn translate_num_expr(
             let (num_const, size2) =
                 translate_num_expr(num_expr2, sub_result, stats, translation_data);
             let op_src2 = if let Some(num_const) = num_const && translation_data.should_propagate() {
-                num_const.into()
+                OpSrc::from(num_const)
             } else {
                 propagate_num_const(sub_result, stats, num_const);
                 OpSrc::Var(sub_result)
@@ -109,10 +131,10 @@ pub(super) fn translate_num_expr(
                 propagate_num_const(result, stats, num_const);
                 match (size, old_size) {
                     (ir::NumSize::Byte, ir::NumSize::DWord | ir::NumSize::Word) => {
-                        stats.push(StatCode::AssignOp(result, OpSrc::Var(result), BinOp::And, 0xFF.into()));
+                        stats.push(StatCode::AssignOp(result, OpSrc::Var(result), BinOp::And, OpSrc::from(0xFF)));
                     }
                     (ir::NumSize::Word, ir::NumSize::DWord) => {
-                        stats.push(StatCode::AssignOp(result, OpSrc::Var(result), BinOp::And, 0xFFFF.into()));
+                        stats.push(StatCode::AssignOp(result, OpSrc::Var(result), BinOp::And, OpSrc::from(0xFFFF)));
                     }
                     _ => {}
                 }

@@ -2,7 +2,13 @@ mod bool;
 mod num;
 mod ptr;
 
-use super::{super::Options, BinOp, OpSrc, PtrSrc, Size, StatCode};
+use self::{
+    bool::{propagate_bool_const, translate_bool_expr},
+    num::{propagate_num_const, translate_num_expr},
+    ptr::{propagate_ptr_const, translate_ptr_expr},
+};
+
+use super::{super::Options, OpSrc, StatCode};
 use crate::{
     backend::PropagationOpt,
     intermediate::{self as ir, VarRepr},
@@ -15,37 +21,6 @@ use std::{
 impl From<i32> for OpSrc {
     fn from(num: i32) -> Self {
         OpSrc::Const(num)
-    }
-}
-
-impl From<PtrSrc> for OpSrc {
-    fn from(ptr_const: PtrSrc) -> Self {
-        match ptr_const {
-            PtrSrc::DataRef(data_ref, offset) => OpSrc::DataRef(data_ref, offset),
-            PtrSrc::Null => OpSrc::Const(0),
-        }
-    }
-}
-
-impl From<ir::NumSize> for Size {
-    fn from(size: ir::NumSize) -> Self {
-        match size {
-            ir::NumSize::DWord => Size::DWord,
-            ir::NumSize::Word => Size::Word,
-            ir::NumSize::Byte => Size::Byte,
-        }
-    }
-}
-
-impl From<ir::ArithOp> for BinOp {
-    fn from(arith_op: ir::ArithOp) -> Self {
-        match arith_op {
-            ir::ArithOp::Add => BinOp::Add,
-            ir::ArithOp::Sub => BinOp::Sub,
-            ir::ArithOp::Mul => BinOp::Mul,
-            ir::ArithOp::Div => BinOp::Div,
-            ir::ArithOp::Mod => BinOp::Mod,
-        }
     }
 }
 
@@ -102,8 +77,22 @@ pub(super) fn translate_expr(
     result: VarRepr,
     stats: &mut Vec<StatCode>,
     translation_data: ExprTranslationData,
-) {
+) -> ir::Type {
     match expr {
-        _ => todo!(),
+        ir::Expr::Num(num_expr) => {
+            let (num_const, size) = translate_num_expr(num_expr, result, stats, translation_data);
+            propagate_num_const(result, stats, num_const);
+            ir::Type::Num(size)
+        }
+        ir::Expr::Bool(bool_expr) => {
+            let bool_const = translate_bool_expr(bool_expr, result, stats, translation_data);
+            propagate_bool_const(result, stats, bool_const);
+            ir::Type::Bool
+        }
+        ir::Expr::Ptr(ptr_expr) => {
+            let ptr_const = translate_ptr_expr(ptr_expr, result, stats, translation_data);
+            propagate_ptr_const(result, stats, ptr_const);
+            ir::Type::Bool
+        }
     }
 }

@@ -22,7 +22,7 @@ pub(super) fn propagate_bool_const(
     bool_const: Option<bool>,
 ) {
     if let Some(bool_const) = bool_const {
-        stats.push(StatCode::Assign(result, (bool_const as i32).into()));
+        stats.push(StatCode::Assign(result, OpSrc::from(bool_const as i32)));
     }
 }
 
@@ -50,7 +50,7 @@ pub(super) fn translate_bool_expr(
                 result,
                 OpSrc::Var(result),
                 BinOp::And,
-                0x01.into(),
+                OpSrc::from(0x01),
             ));
             None
         }
@@ -60,7 +60,7 @@ pub(super) fn translate_bool_expr(
                 Some(num_const == 0)
             } else {
                 propagate_num_const(result, stats, num_const);
-                stats.push(StatCode::AssignOp(result, OpSrc::Var(result), BinOp::Eq, 0x00.into()));
+                stats.push(StatCode::AssignOp(result, OpSrc::Var(result), BinOp::Eq, OpSrc::from(0x00)));
                 None
             }
         }
@@ -70,7 +70,7 @@ pub(super) fn translate_bool_expr(
                 Some(num_const == 0)
             } else {
                 propagate_num_const(result, stats, num_const);
-                stats.push(StatCode::AssignOp(result, OpSrc::Var(result), BinOp::Gt, 0x00.into()));
+                stats.push(StatCode::AssignOp(result, OpSrc::Var(result), BinOp::Gt, OpSrc::from(0x00)));
                 None
             }
         }
@@ -78,7 +78,7 @@ pub(super) fn translate_bool_expr(
             let mut sub_result = result;
             let ptr_const = translate_ptr_expr(ptr_expr1, sub_result, stats, translation_data);
             let op_src1 = if let Some(ptr_const) = ptr_const && translation_data.should_propagate() {
-                ptr_const.into()
+                OpSrc::from(ptr_const)
             } else {
                 propagate_ptr_const(sub_result, stats, ptr_const);
                 let op_src = OpSrc::Var(sub_result);
@@ -87,7 +87,7 @@ pub(super) fn translate_bool_expr(
             };
             let ptr_const = translate_ptr_expr(ptr_expr2, sub_result, stats, translation_data);
             let op_src2 = if let Some(ptr_const) = ptr_const && translation_data.should_propagate() {
-                ptr_const.into()
+                OpSrc::from(ptr_const)
             } else {
                 propagate_ptr_const(sub_result, stats, ptr_const);
                 OpSrc::Var(sub_result)
@@ -107,7 +107,7 @@ pub(super) fn translate_bool_expr(
             let mut sub_result = result;
             let bool_const = translate_bool_expr(bool_expr1, sub_result, stats, translation_data);
             let op_src1 = if let Some(bool_const) = bool_const && translation_data.should_propagate() {
-                (bool_const as i32).into()
+                OpSrc::from(bool_const as i32)
             } else {
                 propagate_bool_const(sub_result, stats, bool_const);
                 let op_src = OpSrc::Var(sub_result);
@@ -116,7 +116,7 @@ pub(super) fn translate_bool_expr(
             };
             let bool_const = translate_bool_expr(bool_expr2, sub_result, stats, translation_data);
             let op_src2 = if let Some(bool_const) = bool_const && translation_data.should_propagate() {
-                (bool_const as i32).into()
+                OpSrc::from(bool_const as i32)
             } else {
                 propagate_bool_const(sub_result, stats, bool_const);
                 OpSrc::Var(sub_result)
@@ -140,7 +140,7 @@ pub(super) fn translate_bool_expr(
                 Some(!bool_const)
             } else {
                 propagate_bool_const(result, stats, bool_const);
-                stats.push(StatCode::AssignOp(result, OpSrc::Var(result), BinOp::Xor, 0x01.into()));
+                stats.push(StatCode::AssignOp(result, OpSrc::Var(result), BinOp::Xor, OpSrc::from(0x01)));
                 None
             }
         }
