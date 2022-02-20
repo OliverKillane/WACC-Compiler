@@ -14,7 +14,7 @@ use three_code::ThreeCode;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum PropagationOpt {
-    Procedural,
+    Symbolic,
     Constant,
     None,
 }
