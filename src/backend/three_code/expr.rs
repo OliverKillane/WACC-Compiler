@@ -1,138 +1,90 @@
-use super::{Options, PropagationOpt};
-use crate::intermediate::{self as ir, DataRef, VarRepr};
-use std::{
-    collections::HashMap,
-    iter::{self, successors, zip},
-};
-
-/// Id of a statement in a statement graph
-type StatId = usize;
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-/// Type of the source operand for an operation
-enum OpSrc {
-    /// Constant value
-    Const(i32),
-    /// Value of a data reference to the static data in the static data vector in [program](ThreeCode)
-    DataRef(DataRef, i32),
-    /// Variable with a given [id](VarRepr)
-    Var(VarRepr),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-/// Size of the load/store operations
-enum Size {
-    /// 1 byte
-    Byte,
-    /// 2 bytes
-    Word,
-    /// 4 bytes
-    DWord,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-/// Binary operation code
-enum BinOp {
-    /// Addition (+)
-    Add,
-    /// Subtraction (-)
-    Sub,
-    /// Signed multiplication (*)
-    Mul,
-    /// Division (/)
-    Div,
-    /// Modulo (%)
-    Mod,
-
-    /// Equality (==)
-    Eq,
-    /// Not equality (!=)
-    Ne,
-    /// Greater than (>)
-    Gt,
-    /// Greater than or equal (>=)
-    Gte,
-    /// Less than (<)
-    Lt,
-    /// Less than or equal (<=)
-    Lte,
-
-    /// Logical And (&&)
-    And,
-    /// Logical Or (||)
-    Or,
-    /// Logical Xor (^)
-    Xor,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-enum PtrSrc {
-    DataRef(DataRef, i32),
-    Null,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-/// Statement type
-enum StatCode {
-    /// Assignment of one variable to another
-    Assign(VarRepr, OpSrc),
-    /// Assignment of a binary operation to a variable
-    AssignOp(VarRepr, OpSrc, BinOp, OpSrc),
-    /// Load from a reference to static data. The
-    /// number of bytes loaded is signified by the [size](Size) field.
-    LoadImm(VarRepr, PtrSrc, Size),
-    /// Load from a reference to a pointer. The first variable reference is
-    /// the load destination and the second one is the pointer to the data. The
-    /// number of bytes loaded is signified by the [size](Size) field.
-    LoadVar(VarRepr, VarRepr, Size),
-    /// Store to a static data reference. The number of bytes stored is signified
-    /// by the [size](Size) field.
-    StoreImm(PtrSrc, VarRepr, Size),
-    /// Store to a pointer reference. The first variable reference is the pointer to the
-    /// store destination and the second one is the variable to store the data from.
-    /// The number of bytes stored is signified by the [size](Size) field.
-    StoreVar(VarRepr, VarRepr, Size),
-    /// A call to a function. If the function name is not in the list of the
-    /// [program](ThreeCode) functions then it is assumed to be external and linked
-    /// to by the linker.
-    Call(VarRepr, String, Vec<VarRepr>),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-/// Single statement in a dataflow graph - possible incoming statements,
-/// statement type, conditional jumps to other statements (evaluated consecutively)
-/// and the else branch if all other statements are equal to 0.
-struct Stat(Vec<StatId>, StatCode, Vec<(VarRepr, StatId)>, StatId);
-
-/// Graph of statements. The index of a statement signifies the
-/// [statement id](StatId) of that statement. The evaluation of the statement
-/// graph starts at the first statement.
-type StatGraph = Vec<Stat>;
-
-/// Local variables that have to be represented in memory during program execution.
-type LocalVars = HashMap<VarRepr, DataRef>;
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-/// Function representation. The first vector are the variables to which the
-/// arguments will be assigned to and the [statement graph](StatGraph) is the dataflow graph
-/// that is evaluated.
-struct Function(Vec<VarRepr>, LocalVars, StatGraph);
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-/// The entire program in the three-code representation. The first map is a map
-/// of all functions defined by the program. The [statement graph](StatGraph) is
-/// the main body of the program. The last map is a map of all statically-defined
-/// data in the program.
-pub(super) struct ThreeCode(
-    HashMap<String, Function>,
-    LocalVars,
-    StatGraph,
-    HashMap<DataRef, Vec<u8>>,
-);
-
 impl From<i32> for OpSrc {
     fn from(num: i32) -> Self {
         OpSrc::Const(num)
+    }
+}
+
+impl From<PtrSrc> for OpSrc {
+    fn from(ptr_const: PtrSrc) -> Self {
+        match ptr_const {
+            PtrSrc::DataRef(data_ref, offset) => OpSrc::DataRef(data_ref, offset),
+            PtrSrc::Null => OpSrc::Const(0),
+        }
+    }
+}
+
+impl From<ir::NumSize> for Size {
+    fn from(size: ir::NumSize) -> Self {
+        match size {
+            ir::NumSize::DWord => Size::DWord,
+            ir::NumSize::Word => Size::Word,
+            ir::NumSize::Byte => Size::Byte,
+        }
+    }
+}
+
+impl From<ir::ArithOp> for BinOp {
+    fn from(arith_op: ir::ArithOp) -> Self {
+        match arith_op {
+            ir::ArithOp::Add => BinOp::Add,
+            ir::ArithOp::Sub => BinOp::Sub,
+            ir::ArithOp::Mul => BinOp::Mul,
+            ir::ArithOp::Div => BinOp::Div,
+            ir::ArithOp::Mod => BinOp::Mod,
+        }
+    }
+}
+
+impl From<ir::BoolOp> for BinOp {
+    fn from(bool_op: ir::BoolOp) -> Self {
+        match bool_op {
+            ir::BoolOp::And => BinOp::And,
+            ir::BoolOp::Or => BinOp::Or,
+            ir::BoolOp::Xor => BinOp::Xor,
+        }
+    }
+}
+
+fn optional_propagate_const<
+    Expr,
+    TransRet,
+    TransExpr,
+    CheckConst,
+    PropConst,
+    ModifyConst,
+    ModifyStats,
+>(
+    expr: Expr,
+    result: VarRepr,
+    stats: &mut Vec<StatCode>,
+    vars: &HashMap<VarRepr, ir::Type>,
+    functions: &HashMap<String, ir::Function>,
+    options: &Options,
+    trans_expr: TransExpr,
+    check_const: CheckConst,
+    prop_const: PropConst,
+    modify_const: ModifyConst,
+    modify_stats: ModifyStats,
+) where
+    TransExpr: FnOnce(
+        Expr,
+        VarRepr,
+        &mut Vec<StatCode>,
+        &HashMap<VarRepr, ir::Type>,
+        &HashMap<String, ir::Function>,
+        &Options,
+    ) -> TransRet,
+    CheckConst: FnOnce(TransRet) -> bool,
+    PropConst: FnOnce(VarRepr, &mut Vec<StatCode>, TransRet),
+    ModifyConst: Fn(TransRet) -> TransRet,
+    ModifyStats: FnOnce(TransRet, &mut Vec<StatCode>) -> TransRet,
+{
+    let expr_const = trans_expr(expr, result, stats, vars, functions, options);
+    if check_const(expr_const) && options.propagation != PropagationOpt::None {
+        modify_const(expr_const)
+    } else {
+        prop_const(result, stats, expr_const);
+        modify_stats(expr_const, stats)
     }
 }
 
@@ -159,28 +111,6 @@ fn translate_function_call(
         .collect(),
     );
     stats.push(stat_code);
-}
-
-impl From<ir::NumSize> for Size {
-    fn from(size: ir::NumSize) -> Self {
-        match size {
-            ir::NumSize::DWord => Size::DWord,
-            ir::NumSize::Word => Size::Word,
-            ir::NumSize::Byte => Size::Byte,
-        }
-    }
-}
-
-impl From<ir::ArithOp> for BinOp {
-    fn from(arith_op: ir::ArithOp) -> Self {
-        match arith_op {
-            ir::ArithOp::Add => BinOp::Add,
-            ir::ArithOp::Sub => BinOp::Sub,
-            ir::ArithOp::Mul => BinOp::Mul,
-            ir::ArithOp::Div => BinOp::Div,
-            ir::ArithOp::Mod => BinOp::Mod,
-        }
-    }
 }
 
 fn propagate_num_const(result: VarRepr, stats: &mut Vec<StatCode>, val: Option<i32>) {
@@ -309,16 +239,6 @@ fn translate_num_expr(
             };
             translate_function_call(name, args, result, stats, vars, functions, options);
             (None, size.into())
-        }
-    }
-}
-
-impl From<ir::BoolOp> for BinOp {
-    fn from(bool_op: ir::BoolOp) -> Self {
-        match bool_op {
-            ir::BoolOp::And => BinOp::And,
-            ir::BoolOp::Or => BinOp::Or,
-            ir::BoolOp::Xor => BinOp::Xor,
         }
     }
 }
@@ -463,15 +383,6 @@ fn translate_bool_expr(
     }
 }
 
-impl From<PtrSrc> for OpSrc {
-    fn from(ptr_const: PtrSrc) -> Self {
-        match ptr_const {
-            PtrSrc::DataRef(data_ref, offset) => OpSrc::DataRef(data_ref, offset),
-            PtrSrc::Null => OpSrc::Const(0),
-        }
-    }
-}
-
 fn propagate_ptr_const(result: VarRepr, stats: &mut Vec<StatCode>, ptr_const: Option<PtrSrc>) {
     if let Some(ptr_const) = ptr_const {
         stats.push(StatCode::Assign(result, ptr_const.into()));
@@ -542,7 +453,7 @@ fn translate_ptr_expr(
     }
 }
 
-fn translate_expr(
+pub(super) fn translate_expr(
     expr: ir::Expr,
     result: VarRepr,
     stats: &mut Vec<StatCode>,
@@ -552,11 +463,5 @@ fn translate_expr(
 ) {
     match expr {
         _ => todo!(),
-    }
-}
-
-impl From<(ir::Program, &Options)> for ThreeCode {
-    fn from((program, options): (ir::Program, &Options)) -> ThreeCode {
-        todo!()
     }
 }
