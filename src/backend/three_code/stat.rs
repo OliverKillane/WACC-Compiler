@@ -3,7 +3,7 @@ use super::{
     expr::{translate_bool_expr, translate_expr, translate_num_expr, translate_ptr_expr},
     OpSrc, Size, StatCode, StatGraph, StatNode, StatType,
 };
-use crate::graph::{Deleted, NodeRef};
+use crate::graph::Deleted;
 use crate::intermediate::{self as ir, DataRef, VarRepr};
 use std::collections::HashMap;
 
@@ -104,13 +104,13 @@ fn translate_statement(
             let store_width =
                 get_type_width(translate_expr(expr, free_var, &mut stats, vars, functions));
             let ptr_const = translate_ptr_expr(ptr_expr, free_var + 1, &mut stats, vars, functions);
-            stats.push(StatCode::StoreVar(free_var + 1, free_var, store_width));
+            stats.push(StatCode::Store(free_var + 1, free_var, store_width));
             push_stats_statgraph(stats, stat_graph, end_stat);
         }
         ir::Stat::Free(ptr_expr, _) => {
             let mut stats = Vec::new();
             translate_ptr_expr(ptr_expr, free_var, &mut stats, vars, functions);
-            stats.push(StatCode::Call(free_var, "free".to_string(), vec![free_var]));
+            stats.push(StatCode::VoidCall("free".to_string(), vec![free_var]));
             push_stats_statgraph(stats, stat_graph, end_stat);
         }
         ir::Stat::PrintExpr(ir::Expr::Num(num_expr)) => {
@@ -122,8 +122,7 @@ fn translate_statement(
                 free_var + 1,
                 OpSrc::DataRef(integer_format, 0),
             ));
-            stats.push(StatCode::Call(
-                free_var,
+            stats.push(StatCode::VoidCall(
                 "printf".to_string(),
                 vec![free_var + 1, free_var],
             ));
@@ -148,8 +147,7 @@ fn translate_statement(
 
             let print_node = stat_graph
                 .graph
-                .new_node(StatType::new_final(StatCode::Call(
-                    free_var,
+                .new_node(StatType::new_final(StatCode::VoidCall(
                     "printf".to_string(),
                     vec![free_var + 1],
                 )));
@@ -195,8 +193,7 @@ fn translate_statement(
                 free_var + 1,
                 OpSrc::DataRef(hex_format, 0),
             ));
-            stats.push(StatCode::Call(
-                free_var,
+            stats.push(StatCode::VoidCall(
                 "printf".to_string(),
                 vec![free_var + 1, free_var],
             ));
@@ -211,8 +208,7 @@ fn translate_statement(
                 free_var + 1,
                 OpSrc::DataRef(integer_format, 0),
             ));
-            stats.push(StatCode::Call(
-                free_var,
+            stats.push(StatCode::VoidCall(
                 "printf".to_string(),
                 vec![free_var + 1, free_var],
             ));
@@ -232,8 +228,7 @@ fn translate_statement(
                 free_var + 2,
                 OpSrc::DataRef(string_format, 0),
             ));
-            stats.push(StatCode::Call(
-                free_var,
+            stats.push(StatCode::VoidCall(
                 "printf".to_string(),
                 vec![free_var + 2, free_var + 1, free_var],
             ));
@@ -244,11 +239,7 @@ fn translate_statement(
             let eol_format =
                 ensure_format(free_data_ref, data_refs, "\n", &mut print_fmt_flags.eol);
             stats.push(StatCode::Assign(free_var, OpSrc::DataRef(eol_format, 0)));
-            stats.push(StatCode::Call(
-                free_var,
-                "printf".to_string(),
-                vec![free_var],
-            ));
+            stats.push(StatCode::VoidCall("printf".to_string(), vec![free_var]));
             push_stats_statgraph(stats, stat_graph, end_stat);
         }
         _ => todo!(),

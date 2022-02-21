@@ -93,7 +93,7 @@ pub(super) fn translate_num_expr(
         }
         ir::NumExpr::Deref(size, ptr_expr) => {
             translate_ptr_expr(ptr_expr, result, stats, vars, functions);
-            stats.push(StatCode::LoadVar(result, result, size.into()));
+            stats.push(StatCode::Load(result, result, size.into()));
             size.into()
         }
         ir::NumExpr::ArithOp(box num_expr1, arith_op, box num_expr2) => {
@@ -173,7 +173,7 @@ pub(super) fn translate_bool_expr(
         }
         ir::BoolExpr::Deref(ptr_expr) => {
             translate_ptr_expr(ptr_expr, result, stats, vars, functions);
-            stats.push(StatCode::LoadVar(result, result, Size::Byte));
+            stats.push(StatCode::Load(result, result, Size::Byte));
             stats.push(StatCode::AssignOp(
                 result,
                 OpSrc::Var(result),
@@ -268,7 +268,7 @@ pub(super) fn translate_ptr_expr(
         }
         ir::PtrExpr::Deref(box ptr_expr) => {
             translate_ptr_expr(ptr_expr, result, stats, vars, functions);
-            stats.push(StatCode::LoadVar(result, result, Size::DWord));
+            stats.push(StatCode::Load(result, result, Size::DWord));
         }
         ir::PtrExpr::Offset(box ptr_expr, box num_expr) => {
             translate_ptr_expr(ptr_expr, result, stats, vars, functions);
