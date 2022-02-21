@@ -46,6 +46,7 @@ extern crate lazy_static;
 
 mod backend;
 mod frontend;
+mod graph;
 mod intermediate;
 
 use clap::Parser;
