@@ -1,6 +1,8 @@
 #![allow(non_snake_case)]
+#![cfg(test)]
 
-use super::*;
+use super::analyse;
+
 #[test]
 fn scopeRedefine() {
     let input = include_str!("valid/scope/scopeRedefine.wacc");

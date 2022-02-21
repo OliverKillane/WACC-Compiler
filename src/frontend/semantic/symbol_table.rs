@@ -12,7 +12,7 @@ use super::{
     semantic_errors::{SemanticError, StatementErrors},
 };
 
-use std::{collections::HashMap, slice::SliceIndex};
+use std::collections::HashMap;
 
 type FunctionType<'a> = (Type, Vec<(&'a str, Type)>);
 
