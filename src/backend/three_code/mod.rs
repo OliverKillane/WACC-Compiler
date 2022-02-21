@@ -161,7 +161,7 @@ impl StatType {
             Self::Simple(incoming, _, _)
             | Self::Final(incoming, _)
             | Self::Branch(incoming, _, _, _) => incoming.push(node),
-            Deleted => panic!("Node has been deleted"),
+            Self::Deleted => panic!("Node has been deleted"),
         }
     }
 }
