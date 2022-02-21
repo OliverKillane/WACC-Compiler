@@ -1,6 +1,6 @@
 use super::ptr::{propagate_ptr_const, translate_ptr_expr};
 use super::{
-    super::{BinOp, OpSrc, Size, StatCode},
+    super::{get_type_width, BinOp, OpSrc, Size, StatCode},
     translate_function_call, ExprTranslationData,
 };
 use crate::intermediate::{self as ir, VarRepr};
@@ -53,7 +53,8 @@ fn clip_num_const(num_const: i32, size: &ir::NumSize) -> i32 {
 /// as a constant value, the constand value is returned instead as the first item in
 /// the returned tuple and no statements are added to the stats vector. The second
 /// item in the tuple represents the size of the resulting numerical expression, i.e.
-/// the size of the variable placed in result.
+/// the size of the variable placed in result. It is assumed that no variables after
+/// the result variable are used.
 pub(in super::super) fn translate_num_expr(
     num_expr: ir::NumExpr,
     result: VarRepr,
@@ -61,16 +62,9 @@ pub(in super::super) fn translate_num_expr(
     translation_data: ExprTranslationData,
 ) -> (Option<i32>, ir::NumSize) {
     match num_expr {
-        ir::NumExpr::SizeOf(size) => (
-            Some(match size {
-                ir::Type::Num(ir::NumSize::DWord) => 4,
-                ir::Type::Num(ir::NumSize::Word) => 2,
-                ir::Type::Num(ir::NumSize::Byte) => 1,
-                ir::Type::Ptr => 4,
-                ir::Type::Bool => 1,
-            }),
-            ir::NumSize::DWord,
-        ),
+        ir::NumExpr::SizeOf(expr_type) => {
+            (Some(get_type_width(expr_type).into()), ir::NumSize::DWord)
+        }
         ir::NumExpr::SizeOfWideAlloc => (Some(4), ir::NumSize::DWord),
         ir::NumExpr::Const(size, val) => (Some(val), size),
         ir::NumExpr::Var(var) => {
@@ -92,24 +86,20 @@ pub(in super::super) fn translate_num_expr(
             (None, size.into())
         }
         ir::NumExpr::ArithOp(box num_expr1, arith_op, box num_expr2) => {
-            let mut sub_result = result;
-            let (num_const, size1) =
-                translate_num_expr(num_expr1, sub_result, stats, translation_data);
+            let (num_const, size1) = translate_num_expr(num_expr1, result, stats, translation_data);
             let op_src1 = if let Some(num_const) = num_const && translation_data.should_propagate() {
                 OpSrc::from(num_const)
             } else {
-                propagate_num_const(sub_result, stats, num_const);
-                let op_src = OpSrc::Var(sub_result);
-                sub_result += 1;
-                op_src
+                propagate_num_const(result, stats, num_const);
+                OpSrc::Var(result)
             };
             let (num_const, size2) =
-                translate_num_expr(num_expr2, sub_result, stats, translation_data);
+                translate_num_expr(num_expr2, result + 1, stats, translation_data);
             let op_src2 = if let Some(num_const) = num_const && translation_data.should_propagate() {
                 OpSrc::from(num_const)
             } else {
-                propagate_num_const(sub_result, stats, num_const);
-                OpSrc::Var(sub_result)
+                propagate_num_const(result + 1, stats, num_const);
+                OpSrc::Var(result + 1)
             };
             if let (OpSrc::Const(num_const1), OpSrc::Const(num_const2)) = (op_src1, op_src2) {
                 (

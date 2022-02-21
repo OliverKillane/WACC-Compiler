@@ -1,6 +1,6 @@
 use super::num::{propagate_num_const, translate_num_expr};
 use super::{
-    super::{BinOp, OpSrc, PtrSrc, Size, StatCode},
+    super::{get_type_width, BinOp, OpSrc, PtrSrc, Size, StatCode},
     translate_expr, translate_function_call, ExprTranslationData,
 };
 use crate::intermediate::{self as ir, VarRepr};
@@ -30,7 +30,7 @@ pub(in super::super) fn propagate_ptr_const(
 /// Translates a pointer expression into a series of statements. The result of the
 /// expression tree is placed in the result field. If the expression was expressible
 /// as a constant pointer, the pointer is returned instead and no statements are added
-/// to the stats vector.
+/// to the stats vector. It is assumed that no variables after the result variable are used.
 pub(in super::super) fn translate_ptr_expr(
     ptr_expr: ir::PtrExpr,
     result: VarRepr,
@@ -55,22 +55,19 @@ pub(in super::super) fn translate_ptr_expr(
             None
         }
         ir::PtrExpr::Offset(box ptr_expr, box num_expr) => {
-            let mut sub_result = result;
-            let ptr_const = translate_ptr_expr(ptr_expr, sub_result, stats, translation_data);
+            let ptr_const = translate_ptr_expr(ptr_expr, result, stats, translation_data);
             let ptr_op_src = if let Some(ptr_const) = ptr_const && translation_data.should_propagate() {
                 OpSrc::from(ptr_const)
             } else {
-                propagate_ptr_const(sub_result, stats, ptr_const);
-                let op_src = OpSrc::Var(sub_result);
-                sub_result += 1;
-                op_src
+                propagate_ptr_const(result, stats, ptr_const);
+                OpSrc::Var(result)
             };
-            let (num_const, _) = translate_num_expr(num_expr, sub_result, stats, translation_data);
+            let (num_const, _) = translate_num_expr(num_expr, result + 1, stats, translation_data);
             let num_op_src = if let Some(num_const) = num_const && translation_data.should_propagate() {
                 OpSrc::from(num_const)
             } else {
-                propagate_num_const(sub_result, stats, num_const);
-                OpSrc::Var(sub_result)
+                propagate_num_const(result + 1, stats, num_const);
+                OpSrc::Var(result + 1)
             };
             if let (OpSrc::DataRef(data_ref, offset1), OpSrc::Const(offset2)) =
                 (ptr_op_src, num_op_src)
@@ -108,14 +105,15 @@ pub(in super::super) fn translate_ptr_expr(
             .into_iter()
             .map(|(expr, sub_result)| {
                 if is_wide {
-                    return 4;
-                }
-                match translate_expr(expr, sub_result, &mut setting_stats, translation_data) {
-                    ir::Type::Num(ir::NumSize::DWord) => 4,
-                    ir::Type::Num(ir::NumSize::Word) => 2,
-                    ir::Type::Num(ir::NumSize::Byte) => 1,
-                    ir::Type::Bool => 1,
-                    ir::Type::Ptr => 4,
+                    4
+                } else {
+                    get_type_width(translate_expr(
+                        expr,
+                        sub_result,
+                        &mut setting_stats,
+                        translation_data,
+                    ))
+                    .into()
                 }
             })
             .sum();

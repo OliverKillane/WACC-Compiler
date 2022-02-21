@@ -1,6 +1,6 @@
-mod bool;
-mod num;
-mod ptr;
+pub(super) mod bool;
+pub(super) mod num;
+pub(super) mod ptr;
 
 use self::{
     bool::{propagate_bool_const, translate_bool_expr},
@@ -36,7 +36,7 @@ pub(super) struct ExprTranslationData<'l> {
 
 impl<'l> ExprTranslationData<'l> {
     /// Creates a expression translation data struct.
-    fn new(
+    pub(super) fn new(
         vars: &'l HashMap<VarRepr, ir::Type>,
         functions: &'l HashMap<String, ir::Function>,
         options: &'l Options,
@@ -80,7 +80,8 @@ fn translate_function_call(
 }
 
 /// Translates a single general expression. The result of the expression is placed
-/// in the result variable. Returns the type of the expression.
+/// in the result variable. Returns the type of the expression. It is assumed that
+/// no variables after the result variable are used.
 pub(super) fn translate_expr(
     expr: ir::Expr,
     result: VarRepr,
