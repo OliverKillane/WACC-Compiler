@@ -13,7 +13,7 @@
 
 use super::{
     super::ast::{Function, Param, WrapSpan},
-    semantic_errors::{SemanticError, StatementErrors},
+    semantic_errors::StatementErrors,
     statement_analysis::analyse_block,
     symbol_table::{FunctionSymbolTable, LocalSymbolTable, VariableSymbolTable},
 };

@@ -47,19 +47,16 @@ mod type_constraints;
 
 use std::collections::HashMap;
 
-use nom::error::convert_error;
-
 use self::{
     error_conversion::convert_errors,
     function_analysis::analyse_function,
-    semantic_errors::{SemanticError, StatementErrors},
     statement_analysis::analyse_block,
     symbol_table::{get_fn_symbols, LocalSymbolTable, VariableSymbolTable},
 };
 
 use super::{
-    ast::{FunSpan, Function, Program, StatSpan, WrapSpan},
-    error::{Summary, SummaryCell},
+    ast::{FunSpan, Program, StatSpan, WrapSpan},
+    error::Summary,
 };
 
 /// Analyses a program, either returning a flat variable and function symbol table
