@@ -15,30 +15,33 @@ pub struct Graph<T: Deleted>(HashSet<NodeRef<T>>);
 /// A node reference. Represents a node in the graph.
 pub struct NodeRef<T: Deleted>(Rc<RefCell<T>>);
 
-/// A trait used in the graph to delete nodes whenever they become obsolete.
+/// A trait used in the [graph](Graph) to delete nodes whenever they become obsolete.
 pub trait Deleted {
     fn deleted() -> Self;
 }
 
 impl<T: Deleted> Graph<T> {
+    /// Creates a new empty graph.
     pub fn new() -> Self {
         Graph(HashSet::new())
     }
 
+    /// Creates a new node reference wth the given node contents inside.
     pub fn new_node(&mut self, node: T) -> NodeRef<T> {
         let node_ref = NodeRef(Rc::new(RefCell::new(node)));
         self.0.insert(node_ref.clone());
         node_ref
     }
 
-    /// Description
+    /// [Deletes](Deleted) the specific [node](NodeRef).
     pub fn remove_node(&mut self, node_ref: NodeRef<T>) {
         self.0.remove(&node_ref);
         node_ref.delete();
     }
 
-    pub fn iter(&self) -> <HashSet<NodeRef<T>> as IntoIterator>::IntoIter {
-        self.0.clone().into_iter()
+    /// Iterates over all the [nodes](NodeRef) in the graph.
+    pub fn iter(&self) -> impl Iterator<Item = NodeRef<T>> {
+        self.into_iter()
     }
 }
 
@@ -53,24 +56,28 @@ impl<T: Deleted> IntoIterator for &Graph<T> {
     type IntoIter = <HashSet<NodeRef<T>> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.iter()
+        self.0.clone().into_iter()
     }
 }
 
 impl<T: Deleted> NodeRef<T> {
+    /// Sets the value of the node to a new value and returns the old value
     pub fn set(&self, mut data: T) -> T {
         mem::swap(&mut data, &mut self.0.borrow_mut());
         data
     }
 
+    /// Gets a [ref cell](RefCell) reference to the node.
     pub fn get(&self) -> Ref<'_, T> {
         self.0.borrow()
     }
 
+    /// Gets a mutable [ref cell](RefCell) reference to the node.
     pub fn get_mut(&self) -> RefMut<'_, T> {
         self.0.borrow_mut()
     }
 
+    /// [Deletes](Deleted) a node.
     fn delete(&self) {
         *self.0.borrow_mut() = T::deleted()
     }
