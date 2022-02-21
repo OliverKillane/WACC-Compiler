@@ -104,46 +104,39 @@ pub(super) enum StatCode {
 
 pub(super) enum StatType {
     Deleted,
-    Simple(StatCode, NodeRef<StatNode>),
-    Final(StatCode),
-    Branch(VarRepr, NodeRef<StatNode>, NodeRef<StatNode>),
+    Simple(Vec<StatNode>, StatCode, StatNode),
+    Final(Vec<StatNode>, StatCode),
+    Branch(Vec<StatNode>, VarRepr, StatNode, StatNode),
 }
 
-#[derive(Debug, Clone)]
-pub(super) struct StatNode {
-    pub(super) incoming: Vec<NodeRef<StatNode>>,
-    pub(super) stat_type: StatType,
-}
+type StatNode = NodeRef<StatType>;
 
-impl StatNode {
+impl StatType {
     fn new_final(stat_code: StatCode) -> Self {
-        StatNode {
-            incoming: Vec::new(),
-            stat_type: StatType::Final(stat_code),
-        }
+        StatType::Final(Vec::new(), stat_code)
     }
 
-    fn new_simple(stat_code: StatCode, next: NodeRef<StatNode>) -> Self {
-        StatNode {
-            incoming: Vec::new(),
-            stat_type: StatType::Simple(stat_code, next),
-        }
+    fn new_simple(stat_code: StatCode, next: StatNode) -> Self {
+        StatType::Simple(Vec::new(), stat_code, next)
     }
 
-    fn new_branch(cond: VarRepr, if_true: NodeRef<StatNode>, if_false: NodeRef<StatNode>) -> Self {
-        StatNode {
-            incoming: Vec::new(),
-            stat_type: StatType::Branch(cond, if_true, if_false),
+    fn new_branch(cond: VarRepr, if_true: StatNode, if_false: StatNode) -> Self {
+        StatType::Branch(Vec::new(), cond, if_true, if_false)
+    }
+
+    fn add_incoming(&mut self, node: StatNode) {
+        match self {
+            Self::Simple(incoming, _, _)
+            | Self::Final(incoming, _)
+            | Self::Branch(incoming, _, _, _) => incoming.push(node),
+            Deleted => panic!("Node has been deleted"),
         }
     }
 }
 
-impl Deleted for StatNode {
+impl Deleted for StatType {
     fn deleted() -> Self {
-        StatNode {
-            incoming: Vec::new(),
-            stat_type: StatType::Deleted,
-        }
+        StatType::Deleted
     }
 }
 
@@ -152,8 +145,8 @@ impl Deleted for StatNode {
 /// graph starts at the first statement.
 #[derive(Debug, Clone)]
 pub(super) struct StatGraph {
-    start: Option<NodeRef<StatNode>>,
-    graph: Graph<StatNode>,
+    start: Option<StatNode>,
+    graph: Graph<StatType>,
 }
 
 /// Local variables that have to be represented in memory during program execution.

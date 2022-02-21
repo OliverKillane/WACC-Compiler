@@ -40,19 +40,19 @@ struct PrintFmtDataRefFlags {
 fn push_stats_statgraph(
     stats: Vec<StatCode>,
     stat_graph: &mut StatGraph,
-    end: &mut Option<NodeRef<StatNode>>,
+    end: &mut Option<StatNode>,
 ) {
     for stat in stats {
-        let new_node = stat_graph.graph.new_node(StatNode::new_final(stat));
+        let new_node = stat_graph.graph.new_node(StatType::new_final(stat));
         if let Some(end) = end {
-            let mut end_node = end.set(StatNode::deleted());
-            if let StatType::Final(stat_code) = end_node.stat_type {
-                end_node.stat_type = StatType::Simple(stat_code, new_node.clone());
+            let mut end_node = end.set(StatType::deleted());
+            if let StatType::Final(incoming, stat_code) = end_node {
+                end_node = StatType::Simple(incoming, stat_code, new_node.clone());
             } else {
                 panic!("End node not a terminal node")
             }
             end.set(end_node);
-            new_node.get_mut().incoming.push(end.clone());
+            new_node.get_mut().add_incoming(end.clone());
         } else {
             stat_graph.start = Some(new_node.clone());
         }
@@ -85,7 +85,7 @@ fn translate_statement(
     stat: ir::Stat,
     free_var: VarRepr,
     stat_graph: &mut StatGraph,
-    end_stat: &mut Option<NodeRef<StatNode>>,
+    end_stat: &mut Option<StatNode>,
     free_data_ref: &mut DataRef,
     data_refs: &mut HashMap<DataRef, Vec<u8>>,
     print_fmt_flags: &mut PrintFmtDataRefFlags,
@@ -148,38 +148,38 @@ fn translate_statement(
 
             let print_node = stat_graph
                 .graph
-                .new_node(StatNode::new_final(StatCode::Call(
+                .new_node(StatType::new_final(StatCode::Call(
                     free_var,
                     "printf".to_string(),
                     vec![free_var + 1],
                 )));
-            let true_set = stat_graph.graph.new_node(StatNode::new_simple(
+            let true_set = stat_graph.graph.new_node(StatType::new_simple(
                 StatCode::Assign(free_var + 1, OpSrc::DataRef(true_format, 0)),
                 print_node.clone(),
             ));
-            let false_set = stat_graph.graph.new_node(StatNode::new_simple(
+            let false_set = stat_graph.graph.new_node(StatType::new_simple(
                 StatCode::Assign(free_var + 1, OpSrc::DataRef(false_format, 0)),
                 print_node.clone(),
             ));
-            print_node.get_mut().incoming.push(true_set.clone());
-            print_node.get_mut().incoming.push(false_set.clone());
+            print_node.get_mut().add_incoming(true_set.clone());
+            print_node.get_mut().add_incoming(false_set.clone());
 
-            let branch_node = stat_graph.graph.new_node(StatNode::new_branch(
+            let branch_node = stat_graph.graph.new_node(StatType::new_branch(
                 free_var,
                 true_set.clone(),
                 false_set.clone(),
             ));
-            true_set.get_mut().incoming.push(branch_node.clone());
-            false_set.get_mut().incoming.push(branch_node.clone());
+            true_set.get_mut().add_incoming(branch_node.clone());
+            false_set.get_mut().add_incoming(branch_node.clone());
             if let Some(end_stat) = end_stat {
-                let mut end_node = end_stat.set(StatNode::deleted());
-                if let StatType::Final(stat_code) = end_node.stat_type {
-                    end_node.stat_type = StatType::Simple(stat_code, branch_node.clone());
+                let mut end_node = end_stat.set(StatType::deleted());
+                if let StatType::Final(incoming, stat_code) = end_node {
+                    end_node = StatType::Simple(incoming, stat_code, branch_node.clone());
                 } else {
                     unreachable!()
                 }
                 end_stat.set(end_node);
-                branch_node.get_mut().incoming.push(end_stat.clone());
+                branch_node.get_mut().add_incoming(end_stat.clone());
             } else {
                 panic!("No calculation steps for the boolean constant");
             }
