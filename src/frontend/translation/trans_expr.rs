@@ -24,26 +24,29 @@ pub fn translate_expr<'a>(
 
         // Use ptr to the vec that represents the String?
         // character array
-        // vec([size]), [items]..[items])
+        // map each char to a vec of Expr
+        // take in daratef hashmap
         Expr::String(s) => {
             todo!()
         }
 
         Expr::Var(v) => match var_symb.get_type_from_id(v) {
             Some(t) => match t {
-                // ast::Type::Int => Num(NumExpr::Var(v)),
+                ast::Type::Int => Num(NumExpr::Var(v as u32)),
                 ast::Type::Bool => todo!(),
                 ast::Type::Char => todo!(),
                 ast::Type::String => todo!(),
                 ast::Type::Any => todo!(),
-                ast::Type::Generic(_) => todo!(),
                 ast::Type::Pair(_, _) => todo!(),
                 ast::Type::Array(_, _) => todo!(),
-                _ => todo!()
+                _ => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!")
             },
             None => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!"),
         }
 
+        // Function call
+        // create fun deref_array
+        // i'm gonna be happy and everyone's gonna be super cool
         Expr::ArrayElem(_, _) => {
             todo!()
         }
