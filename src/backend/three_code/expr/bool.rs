@@ -1,5 +1,5 @@
-use super::num::{propagate_num_const, translate_num_expr};
-use super::ptr::{propagate_ptr_const, translate_ptr_expr};
+use super::num::translate_num_expr;
+use super::ptr::translate_ptr_expr;
 use super::{
     super::{BinOp, OpSrc, Size, StatCode},
     translate_function_call, ExprTranslationData,
@@ -16,138 +16,81 @@ impl From<ir::BoolOp> for BinOp {
     }
 }
 
-/// If a constant was returned during expression translation instead of having been
-/// pushed as a statement, it will be flushed as a statement forcefully here.
-pub(in super::super) fn propagate_bool_const(
-    result: VarRepr,
-    stats: &mut Vec<StatCode>,
-    bool_const: Option<bool>,
-) {
-    if let Some(bool_const) = bool_const {
-        stats.push(StatCode::Assign(result, OpSrc::from(bool_const as i32)));
-    }
-}
-
 /// Translates a boolean expression into a series of statements. The result of the
-/// expression tree is placed in the result field. If the expression was expressible
-/// as a constant boolean, the boolean is returned instead and no statements are added
-/// to the stats vector. It is assumed that no variables after the result
-/// variable are used.
+/// expression tree is placed in the result field. It is assumed that no variables
+/// after the result variable are used.
 pub(in super::super) fn translate_bool_expr(
     bool_expr: ir::BoolExpr,
     result: VarRepr,
     stats: &mut Vec<StatCode>,
     translation_data: ExprTranslationData,
-) -> Option<bool> {
+) {
     match bool_expr {
-        ir::BoolExpr::Const(val) => Some(val),
+        ir::BoolExpr::Const(bool_const) => {
+            stats.push(StatCode::Assign(result, OpSrc::from(bool_const as i32)));
+        }
         ir::BoolExpr::Var(var) => {
             stats.push(StatCode::Assign(result, OpSrc::Var(var)));
-            None
         }
         ir::BoolExpr::Deref(ptr_expr) => {
-            let ptr_const = translate_ptr_expr(ptr_expr, result, stats, translation_data);
-            if let Some(ptr_const) = ptr_const && translation_data.should_propagate() {
-                stats.push(StatCode::LoadImm(result, ptr_const, Size::Byte));
-            } else {
-                propagate_ptr_const(result, stats, ptr_const);
-                stats.push(StatCode::LoadVar(result, result, Size::Byte));
-            }
+            translate_ptr_expr(ptr_expr, result, stats, translation_data);
+            stats.push(StatCode::LoadVar(result, result, Size::Byte));
             stats.push(StatCode::AssignOp(
                 result,
                 OpSrc::Var(result),
                 BinOp::And,
                 OpSrc::from(0x01),
             ));
-            None
         }
         ir::BoolExpr::TestZero(num_expr) => {
-            let (num_const, _) = translate_num_expr(num_expr, result, stats, translation_data);
-            if let Some(num_const) = num_const && translation_data.should_propagate() {
-                Some(num_const == 0)
-            } else {
-                propagate_num_const(result, stats, num_const);
-                stats.push(StatCode::AssignOp(result, OpSrc::Var(result), BinOp::Eq, OpSrc::from(0x00)));
-                None
-            }
+            translate_num_expr(num_expr, result, stats, translation_data);
+            stats.push(StatCode::AssignOp(
+                result,
+                OpSrc::Var(result),
+                BinOp::Eq,
+                OpSrc::from(0x00),
+            ));
         }
         ir::BoolExpr::TestPositive(num_expr) => {
-            let (num_const, _) = translate_num_expr(num_expr, result, stats, translation_data);
-            if let Some(num_const) = num_const && translation_data.should_propagate() {
-                Some(num_const == 0)
-            } else {
-                propagate_num_const(result, stats, num_const);
-                stats.push(StatCode::AssignOp(result, OpSrc::Var(result), BinOp::Gt, OpSrc::from(0x00)));
-                None
-            }
+            translate_num_expr(num_expr, result, stats, translation_data);
+            stats.push(StatCode::AssignOp(
+                result,
+                OpSrc::Var(result),
+                BinOp::Gt,
+                OpSrc::from(0x00),
+            ));
         }
         ir::BoolExpr::PtrEq(ptr_expr1, ptr_expr2) => {
-            let ptr_const = translate_ptr_expr(ptr_expr1, result, stats, translation_data);
-            let op_src1 = if let Some(ptr_const) = ptr_const && translation_data.should_propagate() {
-                OpSrc::from(ptr_const)
-            } else {
-                propagate_ptr_const(result, stats, ptr_const);
-                OpSrc::Var(result)
-            };
-            let ptr_const = translate_ptr_expr(ptr_expr2, result + 1, stats, translation_data);
-            let op_src2 = if let Some(ptr_const) = ptr_const && translation_data.should_propagate() {
-                OpSrc::from(ptr_const)
-            } else {
-                propagate_ptr_const(result + 1, stats, ptr_const);
-                OpSrc::Var(result + 1)
-            };
-            if let (
-                OpSrc::DataRef(_, _) | OpSrc::Const(_),
-                OpSrc::DataRef(_, _) | OpSrc::Const(_),
-            ) = (op_src1, op_src2)
-            {
-                Some(op_src1 == op_src2)
-            } else {
-                stats.push(StatCode::AssignOp(result, op_src1, BinOp::Eq, op_src2));
-                None
-            }
+            translate_ptr_expr(ptr_expr1, result, stats, translation_data);
+            translate_ptr_expr(ptr_expr2, result + 1, stats, translation_data);
+            stats.push(StatCode::AssignOp(
+                result,
+                OpSrc::Var(result),
+                BinOp::Eq,
+                OpSrc::Var(result + 1),
+            ));
         }
         ir::BoolExpr::BoolOp(box bool_expr1, bool_op, box bool_expr2) => {
-            let bool_const = translate_bool_expr(bool_expr1, result, stats, translation_data);
-            let op_src1 = if let Some(bool_const) = bool_const && translation_data.should_propagate() {
-                OpSrc::from(bool_const as i32)
-            } else {
-                propagate_bool_const(result, stats, bool_const);
-                OpSrc::Var(result)
-            };
-            let bool_const = translate_bool_expr(bool_expr2, result + 1, stats, translation_data);
-            let op_src2 = if let Some(bool_const) = bool_const && translation_data.should_propagate() {
-                OpSrc::from(bool_const as i32)
-            } else {
-                propagate_bool_const(result + 1, stats, bool_const);
-                OpSrc::Var(result + 1)
-            };
-            if let (OpSrc::Const(bool_const1), OpSrc::Const(bool_const2)) = (op_src1, op_src2) {
-                let bool_const1 = bool_const1 != 0;
-                let bool_const2 = bool_const2 != 0;
-                Some(match bool_op {
-                    ir::BoolOp::And => bool_const1 && bool_const2,
-                    ir::BoolOp::Or => bool_const1 || bool_const2,
-                    ir::BoolOp::Xor => bool_const1 ^ bool_const2,
-                })
-            } else {
-                stats.push(StatCode::AssignOp(result, op_src1, bool_op.into(), op_src2));
-                None
-            }
+            translate_bool_expr(bool_expr1, result, stats, translation_data);
+            translate_bool_expr(bool_expr2, result + 1, stats, translation_data);
+            stats.push(StatCode::AssignOp(
+                result,
+                OpSrc::Var(result),
+                bool_op.into(),
+                OpSrc::Var(result + 1),
+            ));
         }
         ir::BoolExpr::Not(box bool_expr) => {
             let bool_const = translate_bool_expr(bool_expr, result, stats, translation_data);
-            if let Some(bool_const) = bool_const && translation_data.should_propagate() {
-                Some(!bool_const)
-            } else {
-                propagate_bool_const(result, stats, bool_const);
-                stats.push(StatCode::AssignOp(result, OpSrc::Var(result), BinOp::Xor, OpSrc::from(0x01)));
-                None
-            }
+            stats.push(StatCode::AssignOp(
+                result,
+                OpSrc::Var(result),
+                BinOp::Xor,
+                OpSrc::from(0x01),
+            ));
         }
         ir::BoolExpr::Call(name, args) => {
             translate_function_call(name, args, result, stats, translation_data);
-            None
         }
     }
 }

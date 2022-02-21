@@ -2,16 +2,9 @@ pub(super) mod bool;
 pub(super) mod num;
 pub(super) mod ptr;
 
-use self::{
-    bool::{propagate_bool_const, translate_bool_expr},
-    num::{propagate_num_const, translate_num_expr},
-    ptr::{propagate_ptr_const, translate_ptr_expr},
-};
+use self::{bool::translate_bool_expr, num::translate_num_expr, ptr::translate_ptr_expr};
 use super::{super::Options, OpSrc, StatCode};
-use crate::{
-    backend::PropagationOpt,
-    intermediate::{self as ir, VarRepr},
-};
+use crate::intermediate::{self as ir, VarRepr};
 use std::{
     collections::HashMap,
     iter::{successors, zip},
@@ -30,8 +23,6 @@ pub(super) struct ExprTranslationData<'l> {
     vars: &'l HashMap<VarRepr, ir::Type>,
     /// All the functions and their definitions
     functions: &'l HashMap<String, ir::Function>,
-    /// Compilation options
-    options: &'l Options,
 }
 
 impl<'l> ExprTranslationData<'l> {
@@ -39,19 +30,8 @@ impl<'l> ExprTranslationData<'l> {
     pub(super) fn new(
         vars: &'l HashMap<VarRepr, ir::Type>,
         functions: &'l HashMap<String, ir::Function>,
-        options: &'l Options,
     ) -> Self {
-        ExprTranslationData {
-            vars,
-            functions,
-            options,
-        }
-    }
-
-    /// Returns whether the compilation options state that constant propagation
-    /// should be performed.
-    fn should_propagate(&self) -> bool {
-        self.options.propagation != PropagationOpt::None
+        ExprTranslationData { vars, functions }
     }
 }
 
@@ -90,19 +70,16 @@ pub(super) fn translate_expr(
 ) -> ir::Type {
     match expr {
         ir::Expr::Num(num_expr) => {
-            let (num_const, size) = translate_num_expr(num_expr, result, stats, translation_data);
-            propagate_num_const(result, stats, num_const);
+            let size = translate_num_expr(num_expr, result, stats, translation_data);
             ir::Type::Num(size)
         }
         ir::Expr::Bool(bool_expr) => {
-            let bool_const = translate_bool_expr(bool_expr, result, stats, translation_data);
-            propagate_bool_const(result, stats, bool_const);
+            translate_bool_expr(bool_expr, result, stats, translation_data);
             ir::Type::Bool
         }
         ir::Expr::Ptr(ptr_expr) => {
-            let ptr_const = translate_ptr_expr(ptr_expr, result, stats, translation_data);
-            propagate_ptr_const(result, stats, ptr_const);
-            ir::Type::Bool
+            translate_ptr_expr(ptr_expr, result, stats, translation_data);
+            ir::Type::Ptr
         }
     }
 }
