@@ -45,6 +45,12 @@ impl<T: Deleted> Graph<T> {
     }
 }
 
+impl<T: Deleted> Default for Graph<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Deleted> Drop for Graph<T> {
     fn drop(&mut self) {
         self.0.iter().for_each(NodeRef::delete);
