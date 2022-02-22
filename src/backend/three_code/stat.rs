@@ -1,9 +1,8 @@
 use super::{
     super::Options,
     expr::{translate_bool_expr, translate_expr, translate_num_expr, translate_ptr_expr},
-    OpSrc, Size, StatCode, StatGraph, StatNode, StatType,
+    OpSrc, Size, StatCode, StatLine, StatType,
 };
-use crate::graph::Deleted;
 use crate::intermediate::{self as ir, DataRef, VarRepr};
 use std::collections::HashMap;
 
@@ -27,7 +26,8 @@ impl Into<i32> for Size {
     }
 }
 
-struct PrintFmtDataRefFlags {
+#[derive(Default)]
+pub(super) struct FmtDataRefFlags {
     integer: Option<DataRef>,
     ptr: Option<DataRef>,
     bool_true: Option<DataRef>,
@@ -35,29 +35,6 @@ struct PrintFmtDataRefFlags {
     string: Option<DataRef>,
     char: Option<DataRef>,
     eol: Option<DataRef>,
-}
-
-fn push_stats_statgraph(
-    stats: Vec<StatCode>,
-    stat_graph: &mut StatGraph,
-    end: &mut Option<StatNode>,
-) {
-    for stat in stats {
-        let new_node = stat_graph.graph.new_node(StatType::new_final(stat));
-        if let Some(end) = end {
-            let mut end_node = end.set(StatType::deleted());
-            if let StatType::Final(incoming, stat_code) = end_node {
-                end_node = StatType::Simple(incoming, stat_code, new_node.clone());
-            } else {
-                panic!("End node not a terminal node")
-            }
-            end.set(end_node);
-            new_node.get_mut().add_incoming(end.clone());
-        } else {
-            stat_graph.start = Some(new_node.clone());
-        }
-        *end = Some(new_node);
-    }
 }
 
 fn ensure_format(
@@ -81,167 +58,224 @@ fn ensure_format(
     }
 }
 
-fn translate_statement(
+pub(super) fn translate_statement(
     stat: ir::Stat,
     free_var: VarRepr,
-    stat_graph: &mut StatGraph,
-    end_stat: &mut Option<StatNode>,
+    stat_line: &mut StatLine,
     free_data_ref: &mut DataRef,
     data_refs: &mut HashMap<DataRef, Vec<u8>>,
-    print_fmt_flags: &mut PrintFmtDataRefFlags,
+    read_ref: &mut Option<DataRef>,
+    fmt_flags: &mut FmtDataRefFlags,
     vars: &HashMap<VarRepr, ir::Type>,
-    functions: &HashMap<String, ir::Function>,
+    function_types: &HashMap<String, ir::Type>,
     options: &Options,
 ) {
     match stat {
         ir::Stat::AssignVar(var, expr) => {
-            let mut stats = Vec::new();
-            translate_expr(expr, var, &mut stats, vars, functions);
-            push_stats_statgraph(stats, stat_graph, end_stat);
+            translate_expr(expr, var, stat_line, vars, function_types, options);
         }
         ir::Stat::AssignPtr(ptr_expr, expr) => {
-            let mut stats = Vec::new();
-            let store_width =
-                get_type_width(translate_expr(expr, free_var, &mut stats, vars, functions));
-            let ptr_const = translate_ptr_expr(ptr_expr, free_var + 1, &mut stats, vars, functions);
-            stats.push(StatCode::Store(free_var + 1, free_var, store_width));
-            push_stats_statgraph(stats, stat_graph, end_stat);
+            let store_width = get_type_width(translate_expr(
+                expr,
+                free_var,
+                stat_line,
+                vars,
+                function_types,
+                options,
+            ));
+            let ptr_const = translate_ptr_expr(
+                ptr_expr,
+                free_var + 1,
+                stat_line,
+                vars,
+                function_types,
+                options,
+            );
+            stat_line.add_stat(StatCode::Store(free_var + 1, free_var, store_width));
         }
         ir::Stat::Free(ptr_expr, _) => {
-            let mut stats = Vec::new();
-            translate_ptr_expr(ptr_expr, free_var, &mut stats, vars, functions);
-            stats.push(StatCode::VoidCall("free".to_string(), vec![free_var]));
-            push_stats_statgraph(stats, stat_graph, end_stat);
+            translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
+            stat_line.add_stat(StatCode::VoidCall("free".to_string(), vec![free_var]));
         }
-        ir::Stat::PrintExpr(ir::Expr::Num(num_expr)) => {
-            let mut stats = Vec::new();
-            translate_num_expr(num_expr, free_var, &mut stats, vars, functions);
+        ir::Stat::ReadIntVar(var) => {
+            let read_ref = *read_ref.get_or_insert_with(|| {
+                let data_ref = *free_data_ref;
+                *free_data_ref += 1;
+                data_ref
+            });
             let integer_format =
-                ensure_format(free_data_ref, data_refs, "%d", &mut print_fmt_flags.integer);
-            stats.push(StatCode::Assign(
+                ensure_format(free_data_ref, data_refs, "%d", &mut fmt_flags.integer);
+
+            stat_line.add_stat(StatCode::Assign(free_var, OpSrc::DataRef(read_ref, 0)));
+            stat_line.add_stat(StatCode::Store(free_var, var, Size::DWord));
+            stat_line.add_stat(StatCode::Assign(
                 free_var + 1,
                 OpSrc::DataRef(integer_format, 0),
             ));
-            stats.push(StatCode::VoidCall(
+            stat_line.add_stat(StatCode::VoidCall(
+                "scanf".to_string(),
+                vec![free_var + 1, free_var],
+            ));
+            stat_line.add_stat(StatCode::Load(var, free_var, Size::DWord));
+        }
+        ir::Stat::ReadIntPtr(ptr_expr) => {
+            translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
+            let integer_format =
+                ensure_format(free_data_ref, data_refs, "%d", &mut fmt_flags.integer);
+            stat_line.add_stat(StatCode::Assign(
+                free_var + 1,
+                OpSrc::DataRef(integer_format, 0),
+            ));
+            stat_line.add_stat(StatCode::VoidCall(
+                "scanf".to_string(),
+                vec![free_var + 1, free_var],
+            ));
+        }
+        ir::Stat::ReadCharVar(var) => {
+            let read_ref = *read_ref.get_or_insert_with(|| {
+                let data_ref = *free_data_ref;
+                *free_data_ref += 1;
+                data_ref
+            });
+            let char_format = ensure_format(free_data_ref, data_refs, "%c", &mut fmt_flags.char);
+            stat_line.add_stat(StatCode::Assign(free_var, OpSrc::DataRef(read_ref, 0)));
+            stat_line.add_stat(StatCode::Store(free_var, var, Size::Byte));
+            stat_line.add_stat(StatCode::Assign(
+                free_var + 1,
+                OpSrc::DataRef(char_format, 0),
+            ));
+            stat_line.add_stat(StatCode::VoidCall(
+                "scanf".to_string(),
+                vec![free_var + 1, free_var],
+            ));
+            stat_line.add_stat(StatCode::Load(var, free_var, Size::Byte));
+        }
+        ir::Stat::ReadCharPtr(ptr_expr) => {
+            translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
+            let char_format = ensure_format(free_data_ref, data_refs, "%c", &mut fmt_flags.char);
+            stat_line.add_stat(StatCode::Assign(
+                free_var + 1,
+                OpSrc::DataRef(char_format, 0),
+            ));
+            stat_line.add_stat(StatCode::VoidCall(
+                "scanf".to_string(),
+                vec![free_var + 1, free_var],
+            ));
+        }
+        ir::Stat::PrintExpr(ir::Expr::Num(num_expr)) => {
+            translate_num_expr(num_expr, free_var, stat_line, vars, function_types, options);
+            let integer_format =
+                ensure_format(free_data_ref, data_refs, "%d", &mut fmt_flags.integer);
+            stat_line.add_stat(StatCode::Assign(
+                free_var + 1,
+                OpSrc::DataRef(integer_format, 0),
+            ));
+            stat_line.add_stat(StatCode::VoidCall(
                 "printf".to_string(),
                 vec![free_var + 1, free_var],
             ));
-            push_stats_statgraph(stats, stat_graph, end_stat);
         }
         ir::Stat::PrintExpr(ir::Expr::Bool(bool_expr)) => {
-            let mut stats = Vec::new();
-            translate_bool_expr(bool_expr, free_var, &mut stats, vars, functions);
-            push_stats_statgraph(stats, stat_graph, end_stat);
-            let true_format = ensure_format(
-                free_data_ref,
-                data_refs,
-                "true",
-                &mut print_fmt_flags.bool_true,
+            translate_bool_expr(
+                bool_expr,
+                free_var,
+                stat_line,
+                vars,
+                function_types,
+                options,
             );
-            let false_format = ensure_format(
-                free_data_ref,
-                data_refs,
-                "false",
-                &mut print_fmt_flags.bool_false,
-            );
+            let true_format =
+                ensure_format(free_data_ref, data_refs, "true", &mut fmt_flags.bool_true);
+            let false_format =
+                ensure_format(free_data_ref, data_refs, "false", &mut fmt_flags.bool_false);
 
-            let print_node = stat_graph
-                .graph
-                .new_node(StatType::new_final(StatCode::VoidCall(
-                    "printf".to_string(),
-                    vec![free_var + 1],
-                )));
-            let true_set = stat_graph.graph.new_node(StatType::new_simple(
-                StatCode::Assign(free_var + 1, OpSrc::DataRef(true_format, 0)),
-                print_node.clone(),
-            ));
-            let false_set = stat_graph.graph.new_node(StatType::new_simple(
-                StatCode::Assign(free_var + 1, OpSrc::DataRef(false_format, 0)),
-                print_node.clone(),
-            ));
+            let print_node =
+                stat_line
+                    .graph()
+                    .borrow_mut()
+                    .new_node(StatType::new_final(StatCode::VoidCall(
+                        "printf".to_string(),
+                        vec![free_var + 1],
+                    )));
+            let true_set = stat_line
+                .graph()
+                .borrow_mut()
+                .new_node(StatType::new_simple(
+                    StatCode::Assign(free_var + 1, OpSrc::DataRef(true_format, 0)),
+                    print_node.clone(),
+                ));
+            let false_set = stat_line
+                .graph()
+                .borrow_mut()
+                .new_node(StatType::new_simple(
+                    StatCode::Assign(free_var + 1, OpSrc::DataRef(false_format, 0)),
+                    print_node.clone(),
+                ));
             print_node.get_mut().add_incoming(true_set.clone());
             print_node.get_mut().add_incoming(false_set.clone());
 
-            let branch_node = stat_graph.graph.new_node(StatType::new_branch(
-                free_var,
-                true_set.clone(),
-                false_set.clone(),
-            ));
+            let branch_node = stat_line
+                .graph()
+                .borrow_mut()
+                .new_node(StatType::new_branch(
+                    free_var,
+                    true_set.clone(),
+                    false_set.clone(),
+                ));
             true_set.get_mut().add_incoming(branch_node.clone());
             false_set.get_mut().add_incoming(branch_node.clone());
-            if let Some(end_stat) = end_stat {
-                let mut end_node = end_stat.set(StatType::deleted());
-                if let StatType::Final(incoming, stat_code) = end_node {
-                    end_node = StatType::Simple(incoming, stat_code, branch_node.clone());
-                } else {
-                    unreachable!()
-                }
-                end_stat.set(end_node);
-                branch_node.get_mut().add_incoming(end_stat.clone());
-            } else {
-                panic!("No calculation steps for the boolean constant");
-            }
 
-            *end_stat = Some(print_node);
+            stat_line.splice(branch_node, print_node);
         }
         ir::Stat::PrintExpr(ir::Expr::Ptr(ptr_expr)) => {
-            let mut stats = Vec::new();
-            translate_ptr_expr(ptr_expr, free_var, &mut stats, vars, functions);
-            let hex_format =
-                ensure_format(free_data_ref, data_refs, "%x", &mut print_fmt_flags.ptr);
-            stats.push(StatCode::Assign(
+            translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
+            let hex_format = ensure_format(free_data_ref, data_refs, "%x", &mut fmt_flags.ptr);
+            stat_line.add_stat(StatCode::Assign(
                 free_var + 1,
                 OpSrc::DataRef(hex_format, 0),
             ));
-            stats.push(StatCode::VoidCall(
+            stat_line.add_stat(StatCode::VoidCall(
                 "printf".to_string(),
                 vec![free_var + 1, free_var],
             ));
-            push_stats_statgraph(stats, stat_graph, end_stat);
         }
         ir::Stat::PrintChar(num_expr) => {
-            let mut stats = Vec::new();
-            translate_num_expr(num_expr, free_var, &mut stats, vars, functions);
-            let integer_format =
-                ensure_format(free_data_ref, data_refs, "%c", &mut print_fmt_flags.char);
-            stats.push(StatCode::Assign(
+            translate_num_expr(num_expr, free_var, stat_line, vars, function_types, options);
+            let integer_format = ensure_format(free_data_ref, data_refs, "%c", &mut fmt_flags.char);
+            stat_line.add_stat(StatCode::Assign(
                 free_var + 1,
                 OpSrc::DataRef(integer_format, 0),
             ));
-            stats.push(StatCode::VoidCall(
+            stat_line.add_stat(StatCode::VoidCall(
                 "printf".to_string(),
                 vec![free_var + 1, free_var],
             ));
-            push_stats_statgraph(stats, stat_graph, end_stat);
         }
         ir::Stat::PrintStr(ptr_expr, num_expr) => {
-            let mut stats = Vec::new();
-            translate_ptr_expr(ptr_expr, free_var, &mut stats, vars, functions);
-            translate_num_expr(num_expr, free_var + 1, &mut stats, vars, functions);
-            let string_format = ensure_format(
-                free_data_ref,
-                data_refs,
-                "%.*s",
-                &mut print_fmt_flags.string,
+            translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
+            translate_num_expr(
+                num_expr,
+                free_var + 1,
+                stat_line,
+                vars,
+                function_types,
+                options,
             );
-            stats.push(StatCode::Assign(
+            let string_format =
+                ensure_format(free_data_ref, data_refs, "%.*s", &mut fmt_flags.string);
+            stat_line.add_stat(StatCode::Assign(
                 free_var + 2,
                 OpSrc::DataRef(string_format, 0),
             ));
-            stats.push(StatCode::VoidCall(
+            stat_line.add_stat(StatCode::VoidCall(
                 "printf".to_string(),
                 vec![free_var + 2, free_var + 1, free_var],
             ));
-            push_stats_statgraph(stats, stat_graph, end_stat);
         }
         ir::Stat::PrintEol() => {
-            let mut stats = Vec::new();
-            let eol_format =
-                ensure_format(free_data_ref, data_refs, "\n", &mut print_fmt_flags.eol);
-            stats.push(StatCode::Assign(free_var, OpSrc::DataRef(eol_format, 0)));
-            stats.push(StatCode::VoidCall("printf".to_string(), vec![free_var]));
-            push_stats_statgraph(stats, stat_graph, end_stat);
+            let eol_format = ensure_format(free_data_ref, data_refs, "\n", &mut fmt_flags.eol);
+            stat_line.add_stat(StatCode::Assign(free_var, OpSrc::DataRef(eol_format, 0)));
+            stat_line.add_stat(StatCode::VoidCall("printf".to_string(), vec![free_var]));
         }
-        _ => todo!(),
     }
 }

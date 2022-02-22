@@ -1,4 +1,4 @@
-use super::{stat::get_type_width, BinOp, OpSrc, PtrSrc, Size, StatCode};
+use super::{super::Options, stat::get_type_width, BinOp, OpSrc, Size, StatCode, StatLine};
 use crate::intermediate::{self as ir, VarRepr};
 use std::{
     collections::HashMap,
@@ -16,9 +16,10 @@ fn translate_function_call(
     name: String,
     args: Vec<ir::Expr>,
     result: VarRepr,
-    stats: &mut Vec<StatCode>,
+    stat_line: &mut StatLine,
     vars: &HashMap<VarRepr, ir::Type>,
-    functions: &HashMap<String, ir::Function>,
+    function_types: &HashMap<String, ir::Type>,
+    options: &Options,
 ) {
     let stat_code = StatCode::Call(
         result,
@@ -28,12 +29,12 @@ fn translate_function_call(
             successors(Some(result), |arg_result| Some(*arg_result + 1)),
         )
         .map(|(expr, arg_result)| {
-            translate_expr(expr, arg_result, stats, vars, functions);
+            translate_expr(expr, arg_result, stat_line, vars, function_types, options);
             arg_result
         })
         .collect(),
     );
-    stats.push(stat_code);
+    stat_line.add_stat(stat_code);
 }
 
 impl From<ir::NumSize> for Size {
@@ -65,26 +66,27 @@ impl From<ir::ArithOp> for BinOp {
 pub(super) fn translate_num_expr(
     num_expr: ir::NumExpr,
     result: VarRepr,
-    stats: &mut Vec<StatCode>,
+    stat_line: &mut StatLine,
     vars: &HashMap<VarRepr, ir::Type>,
-    functions: &HashMap<String, ir::Function>,
+    function_types: &HashMap<String, ir::Type>,
+    options: &Options,
 ) -> ir::NumSize {
     match num_expr {
         ir::NumExpr::SizeOf(expr_type) => {
             let type_width: i32 = get_type_width(expr_type).into();
-            stats.push(StatCode::Assign(result, OpSrc::from(type_width)));
+            stat_line.add_stat(StatCode::Assign(result, OpSrc::from(type_width)));
             ir::NumSize::DWord
         }
         ir::NumExpr::SizeOfWideAlloc => {
-            stats.push(StatCode::Assign(result, OpSrc::from(4)));
+            stat_line.add_stat(StatCode::Assign(result, OpSrc::from(4)));
             ir::NumSize::DWord
         }
         ir::NumExpr::Const(size, val) => {
-            stats.push(StatCode::Assign(result, OpSrc::from(val)));
+            stat_line.add_stat(StatCode::Assign(result, OpSrc::from(val)));
             size
         }
         ir::NumExpr::Var(var) => {
-            stats.push(StatCode::Assign(result, OpSrc::Var(var)));
+            stat_line.add_stat(StatCode::Assign(result, OpSrc::Var(var)));
             let size = match vars.get(&var).expect("Variable not found") {
                 ir::Type::Num(size) => *size,
                 _ => panic!("Variable of a wrong type"),
@@ -92,14 +94,22 @@ pub(super) fn translate_num_expr(
             size.into()
         }
         ir::NumExpr::Deref(size, ptr_expr) => {
-            translate_ptr_expr(ptr_expr, result, stats, vars, functions);
-            stats.push(StatCode::Load(result, result, size.into()));
+            translate_ptr_expr(ptr_expr, result, stat_line, vars, function_types, options);
+            stat_line.add_stat(StatCode::Load(result, result, size.into()));
             size.into()
         }
         ir::NumExpr::ArithOp(box num_expr1, arith_op, box num_expr2) => {
-            let size1 = translate_num_expr(num_expr1, result, stats, vars, functions);
-            let size2 = translate_num_expr(num_expr2, result + 1, stats, vars, functions);
-            stats.push(StatCode::AssignOp(
+            let size1 =
+                translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
+            let size2 = translate_num_expr(
+                num_expr2,
+                result + 1,
+                stat_line,
+                vars,
+                function_types,
+                options,
+            );
+            stat_line.add_stat(StatCode::AssignOp(
                 result,
                 OpSrc::Var(result),
                 arith_op.into(),
@@ -108,10 +118,11 @@ pub(super) fn translate_num_expr(
             size1
         }
         ir::NumExpr::Cast(size, box num_expr) => {
-            let old_size = translate_num_expr(num_expr, result, stats, vars, functions);
+            let old_size =
+                translate_num_expr(num_expr, result, stat_line, vars, function_types, options);
             match (size, old_size) {
                 (ir::NumSize::Byte, ir::NumSize::DWord | ir::NumSize::Word) => {
-                    stats.push(StatCode::AssignOp(
+                    stat_line.add_stat(StatCode::AssignOp(
                         result,
                         OpSrc::Var(result),
                         BinOp::And,
@@ -119,7 +130,7 @@ pub(super) fn translate_num_expr(
                     ));
                 }
                 (ir::NumSize::Word, ir::NumSize::DWord) => {
-                    stats.push(StatCode::AssignOp(
+                    stat_line.add_stat(StatCode::AssignOp(
                         result,
                         OpSrc::Var(result),
                         BinOp::And,
@@ -131,14 +142,14 @@ pub(super) fn translate_num_expr(
             size.into()
         }
         ir::NumExpr::Call(name, args) => {
-            let size = if let ir::Function(ir::Type::Num(size), _, _, _) =
-                functions.get(&name).expect("Function not found")
+            let size = if let ir::Type::Num(size) =
+                function_types.get(&name).expect("Function not found")
             {
                 *size
             } else {
                 panic!("Function has a wrong return type")
             };
-            translate_function_call(name, args, result, stats, vars, functions);
+            translate_function_call(name, args, result, stat_line, vars, function_types, options);
             size.into()
         }
     }
@@ -160,21 +171,22 @@ impl From<ir::BoolOp> for BinOp {
 pub(super) fn translate_bool_expr(
     bool_expr: ir::BoolExpr,
     result: VarRepr,
-    stats: &mut Vec<StatCode>,
+    stat_line: &mut StatLine,
     vars: &HashMap<VarRepr, ir::Type>,
-    functions: &HashMap<String, ir::Function>,
+    function_types: &HashMap<String, ir::Type>,
+    options: &Options,
 ) {
     match bool_expr {
         ir::BoolExpr::Const(bool_const) => {
-            stats.push(StatCode::Assign(result, OpSrc::from(bool_const as i32)));
+            stat_line.add_stat(StatCode::Assign(result, OpSrc::from(bool_const as i32)));
         }
         ir::BoolExpr::Var(var) => {
-            stats.push(StatCode::Assign(result, OpSrc::Var(var)));
+            stat_line.add_stat(StatCode::Assign(result, OpSrc::Var(var)));
         }
         ir::BoolExpr::Deref(ptr_expr) => {
-            translate_ptr_expr(ptr_expr, result, stats, vars, functions);
-            stats.push(StatCode::Load(result, result, Size::Byte));
-            stats.push(StatCode::AssignOp(
+            translate_ptr_expr(ptr_expr, result, stat_line, vars, function_types, options);
+            stat_line.add_stat(StatCode::Load(result, result, Size::Byte));
+            stat_line.add_stat(StatCode::AssignOp(
                 result,
                 OpSrc::Var(result),
                 BinOp::And,
@@ -182,8 +194,8 @@ pub(super) fn translate_bool_expr(
             ));
         }
         ir::BoolExpr::TestZero(num_expr) => {
-            translate_num_expr(num_expr, result, stats, vars, functions);
-            stats.push(StatCode::AssignOp(
+            translate_num_expr(num_expr, result, stat_line, vars, function_types, options);
+            stat_line.add_stat(StatCode::AssignOp(
                 result,
                 OpSrc::Var(result),
                 BinOp::Eq,
@@ -191,8 +203,8 @@ pub(super) fn translate_bool_expr(
             ));
         }
         ir::BoolExpr::TestPositive(num_expr) => {
-            translate_num_expr(num_expr, result, stats, vars, functions);
-            stats.push(StatCode::AssignOp(
+            translate_num_expr(num_expr, result, stat_line, vars, function_types, options);
+            stat_line.add_stat(StatCode::AssignOp(
                 result,
                 OpSrc::Var(result),
                 BinOp::Gt,
@@ -200,9 +212,16 @@ pub(super) fn translate_bool_expr(
             ));
         }
         ir::BoolExpr::PtrEq(ptr_expr1, ptr_expr2) => {
-            translate_ptr_expr(ptr_expr1, result, stats, vars, functions);
-            translate_ptr_expr(ptr_expr2, result + 1, stats, vars, functions);
-            stats.push(StatCode::AssignOp(
+            translate_ptr_expr(ptr_expr1, result, stat_line, vars, function_types, options);
+            translate_ptr_expr(
+                ptr_expr2,
+                result + 1,
+                stat_line,
+                vars,
+                function_types,
+                options,
+            );
+            stat_line.add_stat(StatCode::AssignOp(
                 result,
                 OpSrc::Var(result),
                 BinOp::Eq,
@@ -210,9 +229,16 @@ pub(super) fn translate_bool_expr(
             ));
         }
         ir::BoolExpr::BoolOp(box bool_expr1, bool_op, box bool_expr2) => {
-            translate_bool_expr(bool_expr1, result, stats, vars, functions);
-            translate_bool_expr(bool_expr2, result + 1, stats, vars, functions);
-            stats.push(StatCode::AssignOp(
+            translate_bool_expr(bool_expr1, result, stat_line, vars, function_types, options);
+            translate_bool_expr(
+                bool_expr2,
+                result + 1,
+                stat_line,
+                vars,
+                function_types,
+                options,
+            );
+            stat_line.add_stat(StatCode::AssignOp(
                 result,
                 OpSrc::Var(result),
                 bool_op.into(),
@@ -220,8 +246,9 @@ pub(super) fn translate_bool_expr(
             ));
         }
         ir::BoolExpr::Not(box bool_expr) => {
-            let bool_const = translate_bool_expr(bool_expr, result, stats, vars, functions);
-            stats.push(StatCode::AssignOp(
+            let bool_const =
+                translate_bool_expr(bool_expr, result, stat_line, vars, function_types, options);
+            stat_line.add_stat(StatCode::AssignOp(
                 result,
                 OpSrc::Var(result),
                 BinOp::Xor,
@@ -229,16 +256,7 @@ pub(super) fn translate_bool_expr(
             ));
         }
         ir::BoolExpr::Call(name, args) => {
-            translate_function_call(name, args, result, stats, vars, functions);
-        }
-    }
-}
-
-impl From<PtrSrc> for OpSrc {
-    fn from(ptr_const: PtrSrc) -> Self {
-        match ptr_const {
-            PtrSrc::DataRef(data_ref, offset) => OpSrc::DataRef(data_ref, offset),
-            PtrSrc::Null => OpSrc::Const(0),
+            translate_function_call(name, args, result, stat_line, vars, function_types, options);
         }
     }
 }
@@ -249,31 +267,36 @@ impl From<PtrSrc> for OpSrc {
 pub(super) fn translate_ptr_expr(
     ptr_expr: ir::PtrExpr,
     result: VarRepr,
-    stats: &mut Vec<StatCode>,
+    stat_line: &mut StatLine,
     vars: &HashMap<VarRepr, ir::Type>,
-    functions: &HashMap<String, ir::Function>,
+    function_types: &HashMap<String, ir::Type>,
+    options: &Options,
 ) {
     match ptr_expr {
         ir::PtrExpr::Null => {
-            stats.push(StatCode::Assign(result, OpSrc::from(PtrSrc::Null)));
+            stat_line.add_stat(StatCode::Assign(result, OpSrc::Const(0)));
         }
         ir::PtrExpr::DataRef(data_ref) => {
-            stats.push(StatCode::Assign(
-                result,
-                OpSrc::from(PtrSrc::DataRef(data_ref, 0)),
-            ));
+            stat_line.add_stat(StatCode::Assign(result, OpSrc::DataRef(data_ref, 0)));
         }
         ir::PtrExpr::Var(var) => {
-            stats.push(StatCode::Assign(result, OpSrc::Var(var)));
+            stat_line.add_stat(StatCode::Assign(result, OpSrc::Var(var)));
         }
         ir::PtrExpr::Deref(box ptr_expr) => {
-            translate_ptr_expr(ptr_expr, result, stats, vars, functions);
-            stats.push(StatCode::Load(result, result, Size::DWord));
+            translate_ptr_expr(ptr_expr, result, stat_line, vars, function_types, options);
+            stat_line.add_stat(StatCode::Load(result, result, Size::DWord));
         }
         ir::PtrExpr::Offset(box ptr_expr, box num_expr) => {
-            translate_ptr_expr(ptr_expr, result, stats, vars, functions);
-            translate_num_expr(num_expr, result + 1, stats, vars, functions);
-            stats.push(StatCode::AssignOp(
+            translate_ptr_expr(ptr_expr, result, stat_line, vars, function_types, options);
+            translate_num_expr(
+                num_expr,
+                result + 1,
+                stat_line,
+                vars,
+                function_types,
+                options,
+            );
+            stat_line.add_stat(StatCode::AssignOp(
                 result,
                 OpSrc::Var(result),
                 BinOp::Add,
@@ -294,7 +317,7 @@ pub(super) fn translate_ptr_expr(
                 unreachable!();
             };
 
-            let mut setting_stats = Vec::new();
+            let mut setting_stat_line = StatLine::new(stat_line.graph());
             let width: i32 = zip(
                 exprs,
                 successors(Some(result + 1), |sub_result| Some(sub_result + 1)),
@@ -307,21 +330,27 @@ pub(super) fn translate_ptr_expr(
                     get_type_width(translate_expr(
                         expr,
                         sub_result,
-                        &mut setting_stats,
+                        &mut setting_stat_line,
                         vars,
-                        functions,
+                        function_types,
+                        options,
                     ))
                     .into()
                 }
             })
             .sum();
 
-            stats.push(StatCode::Assign(result, OpSrc::from(width)));
-            stats.push(StatCode::Call(result, "malloc".to_string(), vec![result]));
-            stats.append(&mut setting_stats);
+            if let Some(setting_stat_line_start) = setting_stat_line.start_node() {
+                stat_line.add_stat(StatCode::Assign(result, OpSrc::from(width)));
+                stat_line.add_stat(StatCode::Call(result, "malloc".to_string(), vec![result]));
+                stat_line.splice(
+                    setting_stat_line_start,
+                    setting_stat_line.end_node().unwrap(),
+                );
+            }
         }
         ir::PtrExpr::Call(name, args) => {
-            translate_function_call(name, args, result, stats, vars, functions);
+            translate_function_call(name, args, result, stat_line, vars, function_types, options);
         }
     }
 }
@@ -332,21 +361,23 @@ pub(super) fn translate_ptr_expr(
 pub(super) fn translate_expr(
     expr: ir::Expr,
     result: VarRepr,
-    stats: &mut Vec<StatCode>,
+    stat_line: &mut StatLine,
     vars: &HashMap<VarRepr, ir::Type>,
-    functions: &HashMap<String, ir::Function>,
+    function_types: &HashMap<String, ir::Type>,
+    options: &Options,
 ) -> ir::Type {
     match expr {
         ir::Expr::Num(num_expr) => {
-            let size = translate_num_expr(num_expr, result, stats, vars, functions);
+            let size =
+                translate_num_expr(num_expr, result, stat_line, vars, function_types, options);
             ir::Type::Num(size)
         }
         ir::Expr::Bool(bool_expr) => {
-            translate_bool_expr(bool_expr, result, stats, vars, functions);
+            translate_bool_expr(bool_expr, result, stat_line, vars, function_types, options);
             ir::Type::Bool
         }
         ir::Expr::Ptr(ptr_expr) => {
-            translate_ptr_expr(ptr_expr, result, stats, vars, functions);
+            translate_ptr_expr(ptr_expr, result, stat_line, vars, function_types, options);
             ir::Type::Ptr
         }
     }
