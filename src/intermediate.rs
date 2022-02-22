@@ -267,7 +267,8 @@ pub struct Function(
 /// for local variables used, the [block graph](BlockGraph) for its body and the
 /// map of structs in the data section for the whole program. The execution starts
 /// off from the first block in the block graph. The expressions in the data
-/// section structs may not use any variable references.
+/// section structs must be constant expressions, i.e. they must be capable of
+/// static evaluation.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Program(
     pub HashMap<String, Function>,
@@ -293,27 +294,36 @@ impl BoolExpr {
         functions: &HashMap<String, Function>,
         vars: &HashMap<VarRepr, Type>,
         data_refs: &HashMap<DataRef, Vec<Expr>>,
+        const_eval: bool,
     ) -> Result<(), ()> {
         match self {
             BoolExpr::Const(_) => Ok(()),
-            BoolExpr::Var(var) => cond_result(Type::Bool == *vars.get(var).ok_or(())?),
-            BoolExpr::Deref(ptr_expr) => ptr_expr.validate(functions, vars, data_refs),
-            BoolExpr::TestZero(num_expr) | BoolExpr::TestPositive(num_expr) => {
-                num_expr.validate(functions, vars, data_refs).map(|_| ())
+            BoolExpr::Var(var) => {
+                cond_result(Type::Bool == *vars.get(var).ok_or(())? && !const_eval)
             }
+            BoolExpr::Deref(ptr_expr) => {
+                ptr_expr.validate(functions, vars, data_refs, const_eval)?;
+                cond_result(!const_eval)
+            }
+            BoolExpr::TestZero(num_expr) | BoolExpr::TestPositive(num_expr) => num_expr
+                .validate(functions, vars, data_refs, const_eval)
+                .map(|_| ()),
             BoolExpr::PtrEq(ptr_expr1, ptr_expr2) => {
-                ptr_expr1.validate(functions, vars, data_refs)?;
-                ptr_expr2.validate(functions, vars, data_refs)
+                ptr_expr1.validate(functions, vars, data_refs, const_eval)?;
+                ptr_expr2.validate(functions, vars, data_refs, const_eval)
             }
             BoolExpr::BoolOp(box bool_expr1, _, box bool_expr2) => {
-                bool_expr1.validate(functions, vars, data_refs)?;
-                bool_expr2.validate(functions, vars, data_refs)
+                bool_expr1.validate(functions, vars, data_refs, const_eval)?;
+                bool_expr2.validate(functions, vars, data_refs, const_eval)
             }
-            BoolExpr::Not(box bool_expr) => bool_expr.validate(functions, vars, data_refs),
+            BoolExpr::Not(box bool_expr) => {
+                bool_expr.validate(functions, vars, data_refs, const_eval)
+            }
             BoolExpr::Call(name, exprs) => {
                 let function = functions.get(name).ok_or(())?;
                 cond_result(
-                    Type::Bool == function.validate_call(exprs, functions, vars, data_refs)?,
+                    Type::Bool == function.validate_call(exprs, functions, vars, data_refs)?
+                        && !const_eval,
                 )
             }
         }
@@ -328,28 +338,38 @@ impl PtrExpr {
         functions: &HashMap<String, Function>,
         vars: &HashMap<VarRepr, Type>,
         data_refs: &HashMap<DataRef, Vec<Expr>>,
+        const_eval: bool,
     ) -> Result<(), ()> {
         match self {
             PtrExpr::Null => Ok(()),
-            PtrExpr::DataRef(data_ref) => data_refs.get(data_ref).ok_or(()).map(|_| ()),
-            PtrExpr::Var(var) => cond_result(Type::Ptr == *vars.get(var).ok_or(())?),
-            PtrExpr::Deref(box ptr_expr) => ptr_expr.validate(functions, vars, data_refs),
+            PtrExpr::DataRef(data_ref) => {
+                data_refs.get(data_ref).ok_or(())?;
+                cond_result(!const_eval)
+            }
+            PtrExpr::Var(var) => cond_result(Type::Ptr == *vars.get(var).ok_or(())? && !const_eval),
+            PtrExpr::Deref(box ptr_expr) => {
+                ptr_expr.validate(functions, vars, data_refs, const_eval)?;
+                cond_result(!const_eval)
+            }
             PtrExpr::Offset(box ptr_expr, box num_expr) => {
-                if let NumSize::DWord = num_expr.validate(functions, vars, data_refs)? {
-                    ptr_expr.validate(functions, vars, data_refs)
+                if let NumSize::DWord = num_expr.validate(functions, vars, data_refs, const_eval)? {
+                    ptr_expr.validate(functions, vars, data_refs, const_eval)
                 } else {
                     Err(())
                 }
             }
             PtrExpr::Malloc(exprs) | PtrExpr::WideMalloc(exprs) => {
                 for expr in exprs {
-                    expr.validate(functions, vars, data_refs)?;
+                    expr.validate(functions, vars, data_refs, const_eval)?;
                 }
-                Ok(())
+                cond_result(!const_eval)
             }
             PtrExpr::Call(name, exprs) => {
                 let function = functions.get(name).ok_or(())?;
-                cond_result(Type::Ptr == function.validate_call(exprs, functions, vars, data_refs)?)
+                cond_result(
+                    Type::Ptr == function.validate_call(exprs, functions, vars, data_refs)?
+                        && !const_eval,
+                )
             }
         }
     }
@@ -364,6 +384,7 @@ impl NumExpr {
         functions: &HashMap<String, Function>,
         vars: &HashMap<VarRepr, Type>,
         data_refs: &HashMap<DataRef, Vec<Expr>>,
+        const_eval: bool,
     ) -> Result<NumSize, ()> {
         Ok(match self {
             NumExpr::SizeOf(_) | NumExpr::SizeOfWideAlloc => NumSize::DWord,
@@ -381,29 +402,35 @@ impl NumExpr {
                 }
             }
             NumExpr::Var(var) => {
-                if let Type::Num(size) = vars.get(var).ok_or(())? {
+                if let Type::Num(size) = vars.get(var).ok_or(())? && !const_eval {
                     *size
                 } else {
                     return Err(());
                 }
             }
             NumExpr::Deref(size, ptr_expr) => {
-                ptr_expr.validate(functions, vars, data_refs)?;
+                ptr_expr.validate(functions, vars, data_refs, const_eval)?;
+                if const_eval {
+                    return Err(());
+                }
                 *size
             }
             NumExpr::ArithOp(box num_expr1, _, box num_expr2) => {
-                let size1 = num_expr1.validate(functions, vars, data_refs)?;
-                let size2 = num_expr2.validate(functions, vars, data_refs)?;
+                let size1 = num_expr1.validate(functions, vars, data_refs, const_eval)?;
+                let size2 = num_expr2.validate(functions, vars, data_refs, const_eval)?;
                 if size1 != size2 {
                     return Err(());
                 }
                 size1
             }
-            NumExpr::Cast(size, _) => *size,
+            NumExpr::Cast(size, box num_expr) => {
+                num_expr.validate(functions, vars, data_refs, const_eval)?;
+                *size
+            },
             NumExpr::Call(name, exprs) => {
                 let function = functions.get(name).ok_or(())?;
                 if let Type::Num(size) =
-                    function.validate_call(exprs, functions, vars, data_refs)?
+                    function.validate_call(exprs, functions, vars, data_refs)? && !const_eval
                 {
                     size
                 } else {
@@ -421,15 +448,18 @@ impl Expr {
         functions: &HashMap<String, Function>,
         vars: &HashMap<VarRepr, Type>,
         data_refs: &HashMap<DataRef, Vec<Expr>>,
+        const_eval: bool,
     ) -> Result<Type, ()> {
         Ok(match self {
-            Expr::Num(num_expr) => Type::Num(num_expr.validate(functions, vars, data_refs)?),
+            Expr::Num(num_expr) => {
+                Type::Num(num_expr.validate(functions, vars, data_refs, const_eval)?)
+            }
             Expr::Bool(bool_expr) => {
-                bool_expr.validate(functions, vars, data_refs)?;
+                bool_expr.validate(functions, vars, data_refs, const_eval)?;
                 Type::Bool
             }
             Expr::Ptr(ptr_expr) => {
-                ptr_expr.validate(functions, vars, data_refs)?;
+                ptr_expr.validate(functions, vars, data_refs, const_eval)?;
                 Type::Ptr
             }
         })
@@ -446,12 +476,12 @@ impl Stat {
         data_refs: &HashMap<DataRef, Vec<Expr>>,
     ) -> Result<(), ()> {
         match self {
-            Stat::AssignVar(var, expr) => {
-                cond_result(*vars.get(var).ok_or(())? == expr.validate(functions, vars, data_refs)?)
-            }
+            Stat::AssignVar(var, expr) => cond_result(
+                *vars.get(var).ok_or(())? == expr.validate(functions, vars, data_refs, false)?,
+            ),
             Stat::AssignPtr(ptr_expr, expr) => {
-                ptr_expr.validate(functions, vars, data_refs)?;
-                expr.validate(functions, vars, data_refs).map(|_| ())
+                ptr_expr.validate(functions, vars, data_refs, false)?;
+                expr.validate(functions, vars, data_refs, false).map(|_| ())
             }
             Stat::ReadIntVar(var) => {
                 cond_result(Type::Num(NumSize::DWord) == *vars.get(var).ok_or(())?)
@@ -460,15 +490,15 @@ impl Stat {
                 cond_result(Type::Num(NumSize::Byte) == *vars.get(var).ok_or(())?)
             }
             Stat::ReadIntPtr(ptr_expr) | Stat::ReadCharPtr(ptr_expr) => {
-                ptr_expr.validate(functions, vars, data_refs)
+                ptr_expr.validate(functions, vars, data_refs, false)
             }
             Stat::Free(ptr_expr, num_expr) | Stat::PrintStr(ptr_expr, num_expr) => {
-                num_expr.validate(functions, vars, data_refs)?;
-                ptr_expr.validate(functions, vars, data_refs)
+                num_expr.validate(functions, vars, data_refs, false)?;
+                ptr_expr.validate(functions, vars, data_refs, false)
             }
-            Stat::PrintExpr(expr) => expr.validate(functions, vars, data_refs).map(|_| ()),
+            Stat::PrintExpr(expr) => expr.validate(functions, vars, data_refs, false).map(|_| ()),
             Stat::PrintChar(num_expr) => {
-                cond_result(NumSize::Byte == num_expr.validate(functions, vars, data_refs)?)
+                cond_result(NumSize::Byte == num_expr.validate(functions, vars, data_refs, false)?)
             }
             Stat::PrintEol() => Ok(()),
         }
@@ -498,7 +528,7 @@ fn validate_block_graph(
         match ending {
             BlockEnding::CondJumps(cond_jumps, jump) => {
                 for (bool_expr, jump) in cond_jumps {
-                    bool_expr.validate(functions, vars, data_refs)?;
+                    bool_expr.validate(functions, vars, data_refs, false)?;
                     if *jump >= size {
                         return Err(());
                     } else if let Some(incoming_list) = incoming.get_mut(jump) {
@@ -520,12 +550,12 @@ fn validate_block_graph(
                 }
             }
             BlockEnding::Exit(num_expr) => {
-                if NumSize::DWord != num_expr.validate(functions, vars, data_refs)? {
+                if NumSize::DWord != num_expr.validate(functions, vars, data_refs, false)? {
                     return Err(());
                 }
             }
             BlockEnding::Return(expr) => {
-                let expr_type = expr.validate(functions, vars, data_refs)?;
+                let expr_type = expr.validate(functions, vars, data_refs, false)?;
                 if return_type.is_none() {
                     return_type = Some(expr_type);
                 } else if return_type != Some(expr_type) {
@@ -583,7 +613,7 @@ impl Function {
             return Err(());
         }
         for ((arg_type, _), arg_value) in zip(args, arg_values) {
-            if *arg_type != arg_value.validate(functions, vars, data_refs)? {
+            if *arg_type != arg_value.validate(functions, vars, data_refs, false)? {
                 return Err(());
             }
         }
@@ -598,7 +628,7 @@ impl Program {
         let Program(functions, vars, graph, data_refs) = self;
         for exprs in data_refs.values() {
             for expr in exprs {
-                expr.validate(&HashMap::new(), &HashMap::new(), &HashMap::new())?;
+                expr.validate(&HashMap::new(), &HashMap::new(), &HashMap::new(), true)?;
             }
         }
         for function in functions.values() {
