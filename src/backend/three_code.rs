@@ -90,7 +90,6 @@ pub(super) enum StatCode {
 
 /// General type of the statement. Used in the dataflow graph.
 #[derive(Debug, Clone)]
-
 pub(super) enum StatType {
     /// Used internally for the purposes of creating the graph.
     Dummy(Vec<StatNode>),
@@ -106,29 +105,32 @@ pub(super) enum StatType {
     Loop(Vec<StatNode>),
 }
 
-/// A [statement graph](StatGraph) node.
+/// A statement graph node.
 type StatNode = NodeRef<StatType>;
 
 #[derive(Debug, Clone)]
-/// Function representation. The first vector are the variables to which the
-/// arguments will be assigned to and the [statement graph](StatGraph) is the dataflow graph
-/// that is evaluated.
+/// Function representation.
 pub(super) struct Function {
+    /// Variables for function argumetns
     pub args: Vec<VarRepr>,
+    /// First statement of the program
     pub code: Option<StatNode>,
+    /// Reference for usage when calling scanf
     pub read_ref: Option<DataRef>,
 }
 
 #[derive(Debug, Clone)]
-/// The entire program in the three-code representation. The first map is a map
-/// of all functions defined by the program. The [statement graph](StatGraph) is
-/// the main body of the program. The last map is a map of all statically-defined
-/// data in the program.
+/// The entire program in the three-code representation.
 pub(super) struct ThreeCode {
+    /// All functions in the program
     pub functions: HashMap<String, Function>,
+    /// Static data references in the program
     pub data_refs: HashMap<DataRef, Vec<u8>>,
+    /// Graph of all statement nodes in the program
     pub graph: Graph<StatType>,
+    /// Reference for usage when calling scanf
     pub read_ref: Option<DataRef>,
+    /// First statement of the program
     pub code: Option<StatNode>,
 }
 
