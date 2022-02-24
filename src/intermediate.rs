@@ -264,17 +264,19 @@ pub struct Function(
 );
 
 /// An entire program. Contains the definitions of functions, the table of types
-/// for local variables used, the [block graph](BlockGraph) for its body and the
-/// map of structs in the data section for the whole program. The execution starts
-/// off from the first block in the block graph. The expressions in the data
-/// section structs must be constant expressions, i.e. they must be capable of
-/// static evaluation.
+/// for local variables used, the [block graph](BlockGraph) for its body, the
+/// map of structs in the data section for the whole program and the optional function
+/// name to be called in case of an integer overflow or underlow(this function should
+/// take no arguments). The execution starts off from the first block in the block
+/// graph. The expressions in the data section structs must be constant expressions,
+/// i.e. they must be capable of static evaluation.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Program(
     pub HashMap<String, Function>,
     pub HashMap<VarRepr, Type>,
     pub BlockGraph,
     pub HashMap<DataRef, Vec<Expr>>,
+    pub Option<String>,
 );
 
 /// Returns an Ok or an Err based on the value of the boolean
@@ -625,7 +627,7 @@ impl Program {
     /// Validates a program: validity of functions, main program body, no returns in the main function
     /// and the validity of static data references (valid expressions + expressions are constant).
     pub fn validate(&self) -> Result<(), ()> {
-        let Program(functions, vars, graph, data_refs) = self;
+        let Program(functions, vars, graph, data_refs, int_handler) = self;
         for exprs in data_refs.values() {
             for expr in exprs {
                 expr.validate(&HashMap::new(), &HashMap::new(), &HashMap::new(), true)?;
@@ -633,6 +635,11 @@ impl Program {
         }
         for function in functions.values() {
             function.validate(functions, data_refs)?;
+        }
+        if let Some(int_handler) = int_handler {
+            if let Function(_, args, _, _) = functions.get(int_handler).ok_or(())? && !args.is_empty() {
+                return Err(());
+            }
         }
         cond_result(None == validate_block_graph(graph, functions, vars, data_refs)?)
     }
@@ -668,6 +675,7 @@ mod test {
                 BlockEnding::Exit(NumExpr::Const(NumSize::DWord, 0)),
             )],
             data_refs,
+            None,
         )
         .validate()
     }
@@ -703,12 +711,13 @@ mod test {
                 BlockEnding::Exit(NumExpr::Const(NumSize::DWord, 0)),
             )],
             HashMap::new(),
+            None,
         )
         .validate()
     }
 
     fn validate_block_graph(graph: Vec<Block>) -> Result<(), ()> {
-        Program(HashMap::new(), HashMap::new(), graph, HashMap::new()).validate()
+        Program(HashMap::new(), HashMap::new(), graph, HashMap::new(), None).validate()
     }
 
     #[test]
@@ -997,7 +1006,8 @@ mod test {
                     vec![],
                     BlockEnding::Exit(NumExpr::Const(NumSize::DWord, 0))
                 )],
-                HashMap::new()
+                HashMap::new(),
+                None,
             )
             .validate(),
             Err(())
@@ -1015,7 +1025,8 @@ mod test {
                     vec![],
                     BlockEnding::Exit(NumExpr::Const(NumSize::Word, 0))
                 )],
-                HashMap::new()
+                HashMap::new(),
+                None,
             )
             .validate(),
             Err(())
@@ -1045,7 +1056,39 @@ mod test {
                     vec![],
                     BlockEnding::Exit(NumExpr::Const(NumSize::DWord, 0))
                 )],
-                HashMap::from([(0, vec![Expr::Num(NumExpr::Call("f".to_string(), vec![]))],)])
+                HashMap::from([(0, vec![Expr::Num(NumExpr::Call("f".to_string(), vec![]))],)]),
+                None,
+            )
+            .validate(),
+            Err(())
+        )
+    }
+
+    #[test]
+    fn check_int_handler_args() {
+        assert_eq!(
+            Program(
+                HashMap::from([(
+                    "f".to_string(),
+                    Function(
+                        Type::Num(NumSize::DWord),
+                        vec![(Type::Ptr, 0)],
+                        HashMap::new(),
+                        vec![Block(
+                            vec![],
+                            vec![],
+                            BlockEnding::Return(Expr::Num(NumExpr::Const(NumSize::DWord, 0))),
+                        )],
+                    ),
+                )]),
+                HashMap::new(),
+                vec![Block(
+                    vec![],
+                    vec![],
+                    BlockEnding::Exit(NumExpr::Const(NumSize::DWord, 0)),
+                )],
+                HashMap::new(),
+                Some("f".to_string()),
             )
             .validate(),
             Err(())
