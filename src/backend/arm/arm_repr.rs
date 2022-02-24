@@ -1,26 +1,28 @@
-///! A structure representing a subset of arm assembly, to be generated as the final stage of the compiler, and written to a file (formatted)
+//! A structure representing a subset of arm assembly, to be generated as the 
+//! final stage of the compiler, and written to a file (formatted)
+use super::int_constraints::ConstrainedInt;
 
 /// Condition suffixes to be used in conditionally executing instructions.
-enum Cond {
-    EQ,
-    NE,
-    HS,
-    LO,
-    MI,
-    PL,
-    VS,
-    VC,
-    HI,
-    LS,
-    GE,
-    LT,
-    GT,
-    LE,
-    AL,
+pub enum Cond {
+    Eq,
+    Ne,
+    Hs,
+    Lo,
+    Mi,
+    Pl,
+    Vs,
+    Vc,
+    Hi,
+    Ls,
+    Ge,
+    Lt,
+    Gt,
+    Le,
+    Al,
 }
 
 /// All general purpose register accessible in user mode.
-enum Register {
+pub enum Register {
     R0,
     R1,
     R2,
@@ -34,132 +36,168 @@ enum Register {
     R10,
     R11,
     R12,
-    SP,
-    LR,
-    PC,
+    Sp,
+    Lr,
+    Pc,
 }
 
-enum Shift {
-    /// Arithmetic Right Shift, copies the sign bit for two complement to fill 
+pub enum Shift {
+    /// Arithmetic Right Shift, copies the sign bit for two complement to fill
     /// shifted in region. Must shift by `1 <= n <= 32`
-    ASR,
+    Asr(ConstrainedInt<1, 32>),
     /// Logical Left Shift, shift bits left. Must shift by `0 <= n <= 31`
-    LSL,
+    Lsl(ConstrainedInt<0, 31>),
     /// Logical shift right, shift bits right. Must shift `1 <= n <= 32`
-    LSR,
+    Lsr(ConstrainedInt<1, 32>),
     /// Rotate right shift. Must shift `1 <= n <= 31`
-    ROR,
+    Ror(ConstrainedInt<1, 31>),
+    /// Rotate right by one bit, with extension.
+    Rxx,
 }
 
-enum FlexOperand{ 
+pub enum FlexOperand {
     /// Use an immediate operand, must be a shifted 8-bit pattern
     Imm(u32),
     /// Shift register to get operand value
-    /// 
+    ///
     /// Note:
-    /// - Register cannot be `R15`/`PC` 
-    ShiftReg(Register, Shift, u8),
+    /// - Register cannot be `R15`/`PC`
+    ShiftReg(Register, Option<Shift>),
 }
 
 /// Regular operations, two operands and a destination.
-enum RegOp {
+pub enum RegOp {
     /// Arithmetic addition.
-    ADD,
+    Add,
     /// Arithmetic subtraction.
-    SUB,
+    Sub,
     /// Reverse Subtract .
     /// ```text
     /// SUB Rd, Rn, Op2: Rd = Op2 - Rn
     /// ```
-    RSB,
+    Rsb,
     /// Add with carry (addition include the carry flag)
-    ADC,
+    Adc,
     /// Subtract with carry.
-    SBC,
+    Sbc,
     /// Reverse Subtract with carry.
-    RSC,
+    Rsc,
     /// Bitwise and.
-    AND,
+    And,
     /// Bitwise or.
-    ORR,
+    Orr,
     /// Bitwise exclusive or (XOR).
-    EOR,
+    Eor,
     /// Clears bits in the first, based on the second operand.
     /// ```text
     /// BIC Rd, Rn, Operand2: Rd = Rn & ~Operand2
     /// ```
-    BIC
+    Bic,
 }
 
 /// Move a flexible operand to a register.
-enum MovOp {
+pub enum MovOp {
     /// Move value from one register to another.
-    MOV,
+    Mov,
     /// Move and bitwise negation.
-    MVN,
+    Mvn,
 }
 
-/// Compare a register and flexible operand. 
-enum CmpOp {
+/// Compare a register and flexible operand.
+pub enum CmpOp {
     /// Sets conditions bits as set by SUBS.
-    CMP,
+    Cmp,
     /// Sets conditions bits as set by ADDS.
-    CMN,
+    Cmn,
     /// Sets condition bits based on bitwise and
-    TST,
+    Tst,
     /// Sets condition bits based on exclusive or.
-    TEQ,
+    Teq,
 }
 
 /// Sets but does not clear the Q flag for overflows, sets accordingly.
-enum SatOp {
+pub enum SatOp {
     /// Arithmetic addition.
-    QADD,
+    Add,
     /// Arithmetic subtraction.
-    QSUB,
+    Sub,
     /// Double second argument, then add (if either saturates, set flag).
-    QDADD,
+    DAdd,
     /// Double second argument, then subtract (if either saturates, set flag).
-    QDSUB,
+    DSub,
 }
 
-enum BranchOp {
+pub enum BranchOp {
     /// Branch (go to a new label).
     B,
     /// Branch and link (set the R14/LR to the next instruction).
-    BL,
+    Bl,
 }
 
-enum MulOp {
+pub enum MulOp {
     /// Unsigned multiplication.
-    UMULL,
-    /// Unsigned multlipication, but the result it added to what is contained 
+    UMulL,
+    /// Unsigned multiplication, but the result it added to what is contained
     /// in the Hi and Lo result registers.
-    UMLAL,
+    UMlAL,
     /// Signed multiplication.
-    SMULL,
-    /// Signed multlipication that adds to existing values in Hi and Lo result 
+    SMulL,
+    /// Signed multiplication that adds to existing values in Hi and Lo result
     /// registers.
-    SMLAL,
+    SMlAL,
 }
 
-enum Stat {
+/// Memory operation type
+pub enum MemOp {
+    /// Load-register instruction.
+    Ldr,
+    /// Store-register instruction
+    Str,
+}
+
+/// Memory operand is the second operand of the [memory operand](MemOp).
+pub enum MemOperand {
+    /// Indirect memory location stored in [Register].
+    Zero(Register),
+    /// Indirect memory location stored in [Register] with offset [FlexOffset]. 
+    /// If [bool] is true then we update the value in the register with offset 
+    /// before accessing the memory location.
+    PreIndex(Register, FlexOffset, bool),
+    /// Direct from the label in the data section indicated by [String].
+    Label(String),
+    /// Immediate 32-bit integer value.
+    Expression(i32),
+    /// Indirect memory location stored in [Register]. [Register] is updated by
+    /// [FlexOffset] after the memory access has taken place.
+    PostIndex(Register, FlexOffset),
+}
+
+/// Offset for LDR/STR instructions. 
+pub enum FlexOffset {
+    /// Constant offset between -4095 and 4095 inclusive.
+    Expr(ConstrainedInt<-4095, 4095>),
+    /// [bool] represents if this is a negative offset. [Register] is the
+    /// the value we are offsetting by, shifted by [Shift].
+    ShiftReg(bool, Register, Option<Shift>),
+}
+
+pub enum Stat {
     /// A normal register operation of form:
     /// ```text
     /// (Operation, Condition, Set Condition Bits?, Register Destination, Register Operand, Flexible Second Operand)
     /// ```
-    /// 
+    ///
     /// Note:
     /// - `R15`/`PC` should not be used with the S suffix (set condition bits), as
     ///  this is undefined behaviour, and the assembler will not warn.
-    /// - 
     ApplyOp(RegOp, Cond, bool, Register, Register, FlexOperand),
 
     /// Basic multiplication taking only the 32 least significant bits
-    MUL(Cond, bool, Register, Register, Register),
-    /// Basic Multiplication with addition added. Takes 32 least significant 
+    Mul(Cond, bool, Register, Register, Register),
+
+    /// Basic Multiplication with addition added. Takes 32 least significant
     /// bits.
-    MULA(Cond, bool, Register, Register, Register, Register),
+    MulA(Cond, bool, Register, Register, Register, Register),
 
     /// A multiply operation using 4 register.
     /// ```text
@@ -190,7 +228,7 @@ enum Stat {
     /// Flag:  N  |Z  |C  |V  |Q
     ///  Bit: 31 |30 |29 |28 |27
     /// ```
-    ReadPSR(Register),
+    ReadCPSR(Register),
 
     /// Branch to a label.
     /// ```text
@@ -198,9 +236,30 @@ enum Stat {
     /// ```
     Branch(BranchOp, Cond, String),
 
-    /// A literal pool assembler directive, allowing the compiler to place parts 
+    /// Memory Operation (a load or store).
+    MemOp(MemOp, Cond, bool, Register, MemOperand),
+
+    /// Push thumb instruction.
+    Push(Vec<Register>),
+
+    /// Pop thumb instruction, R15/PC can only be used as the last register to 
+    /// pop (prevent jump before popping other registers).
+    Pop(Vec<Register>),
+
+    /// A literal pool assembler directive, allowing the compiler to place parts
     /// of the data section in the pool so they are in range of the instructions
     /// that use them.
     LiteralPool,
+
+    /// Label to allow branches, labels must be unique.
+    Label(String),
 }
 
+/// All types of data that can be kept in the binary.
+pub enum Data {
+    /// An ascii value
+    Ascii(String)
+}
+
+/// The main program containing text ([instructions](Stat)) and [data](Data).
+pub struct Program(pub Vec<Data>, pub Vec<Stat>);
