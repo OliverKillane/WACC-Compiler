@@ -5,6 +5,7 @@ mod graph_coloring;
 mod ssa;
 mod ssa_opt;
 mod three_code;
+mod arm;
 
 use crate::intermediate::Program;
 use graph_coloring::GeneralAssembly;
