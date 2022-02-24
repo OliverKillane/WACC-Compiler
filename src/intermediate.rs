@@ -637,7 +637,7 @@ impl Program {
             function.validate(functions, data_refs)?;
         }
         if let Some(int_handler) = int_handler {
-            if let Function(_, args, _, _) = functions.get(int_handler).ok_or(())? && args.len() > 0 {
+            if let Function(_, args, _, _) = functions.get(int_handler).ok_or(())? && !args.is_empty() {
                 return Err(());
             }
         }
