@@ -1,4 +1,4 @@
-//! A structure representing a subset of arm assembly, to be generated as the 
+//! A structure representing a subset of arm assembly, to be generated as the
 //! final stage of the compiler, and written to a file (formatted)
 use super::int_constraints::ConstrainedInt;
 
@@ -41,6 +41,7 @@ pub enum Register {
     Pc,
 }
 
+#[derive(Clone, Copy)]
 pub enum Shift {
     /// Arithmetic Right Shift, copies the sign bit for two complement to fill
     /// shifted in region. Must shift by `1 <= n <= 32`
@@ -159,8 +160,8 @@ pub enum MemOp {
 pub enum MemOperand {
     /// Indirect memory location stored in [Register].
     Zero(Register),
-    /// Indirect memory location stored in [Register] with offset [FlexOffset]. 
-    /// If [bool] is true then we update the value in the register with offset 
+    /// Indirect memory location stored in [Register] with offset [FlexOffset].
+    /// If [bool] is true then we update the value in the register with offset
     /// before accessing the memory location.
     PreIndex(Register, FlexOffset, bool),
     /// Direct from the label in the data section indicated by [String].
@@ -172,7 +173,7 @@ pub enum MemOperand {
     PostIndex(Register, FlexOffset),
 }
 
-/// Offset for LDR/STR instructions. 
+/// Offset for LDR/STR instructions.
 pub enum FlexOffset {
     /// Constant offset between -4095 and 4095 inclusive.
     Expr(ConstrainedInt<-4095, 4095>),
@@ -221,7 +222,7 @@ pub enum Stat {
     /// ```text
     /// (Saturating operation, Register Desination, Register Operand, Second Register Operand)
     /// ```
-    SatOp(SatOp, Register, Register, Register),
+    SatOp(SatOp, Cond, Register, Register, Register),
 
     /// Read the CSPR register into a general purpose register.
     /// ```text
@@ -240,26 +241,31 @@ pub enum Stat {
     MemOp(MemOp, Cond, bool, Register, MemOperand),
 
     /// Push thumb instruction.
-    Push(Vec<Register>),
+    Push(Cond, Vec<Register>),
 
-    /// Pop thumb instruction, R15/PC can only be used as the last register to 
+    /// Pop thumb instruction, R15/PC can only be used as the last register to
     /// pop (prevent jump before popping other registers).
-    Pop(Vec<Register>),
+    Pop(Cond, Vec<Register>),
 
     /// A literal pool assembler directive, allowing the compiler to place parts
     /// of the data section in the pool so they are in range of the instructions
     /// that use them.
     LiteralPool,
 
+    /// Declares a label global.
+    Global(String),
+
     /// Label to allow branches, labels must be unique.
     Label(String),
 }
 
-/// All types of data that can be kept in the binary.
-pub enum Data {
+pub enum DataKind {
     /// An ascii value
-    Ascii(String)
+    Ascii(String),
 }
+
+/// All types of data that can be kept in the binary.
+pub struct Data(pub String, pub DataKind);
 
 /// The main program containing text ([instructions](Stat)) and [data](Data).
 pub struct Program(pub Vec<Data>, pub Vec<Stat>);
