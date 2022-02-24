@@ -66,7 +66,7 @@ pub(super) enum BinOp {
 pub(super) enum StatCode {
     /// Assignment of one variable to another
     Assign(VarRepr, OpSrc),
-    /// Assignment of a binary operation to a variable
+    /// Assignment of a binary operation to a variable.
     AssignOp(VarRepr, OpSrc, BinOp, OpSrc),
     /// Load from a reference to a pointer. The first variable reference is
     /// the load destination and the second one is the pointer to the data. The
@@ -132,6 +132,9 @@ pub(super) struct ThreeCode {
     pub read_ref: Option<DataRef>,
     /// First statement of the program
     pub code: Option<StatNode>,
+    /// Function to call as an int overflow/underflow handler for checking for
+    /// 32-bit overflows.
+    pub int_handler: Option<String>,
 }
 
 impl StatType {
