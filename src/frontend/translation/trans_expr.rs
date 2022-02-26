@@ -40,12 +40,12 @@ pub fn translate_expr<'a>(
         Expr::Var(v) => match var_symb.get_type_from_id(v) {
             Some(t) => match t {
                 ast::Type::Int => Num(NumExpr::Var(v)),
-                ast::Type::Bool => todo!(),
-                ast::Type::Char => todo!(),
-                ast::Type::String => todo!(),
-                ast::Type::Any => todo!(),
-                ast::Type::Pair(_, _) => todo!(),
-                ast::Type::Array(_, _) => todo!(),
+                ast::Type::Bool => Bool(BoolExpr::Var(v)),
+                ast::Type::Char => Num(NumExpr::Var(v)),
+                ast::Type::String => Ptr(PtrExpr::Var(v)),
+                ast::Type::Any => Ptr(PtrExpr::Var(v)),
+                ast::Type::Pair(_, _) => Ptr(PtrExpr::Var(v)),
+                ast::Type::Array(_, _) => Ptr(PtrExpr::Var(v)),
                 _ => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!")
             },
             None => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!"),
