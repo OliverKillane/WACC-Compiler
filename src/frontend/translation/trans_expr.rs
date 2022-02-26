@@ -1,8 +1,10 @@
 //! Expression translator for AST to IR
 
+use std::collections::HashMap;
+
 use crate::frontend::ast;
 use crate::frontend::semantic::symbol_table::VariableSymbolTable;
-use crate::intermediate::{ArithOp, BoolExpr, BoolOp, Expr::*, NumExpr, NumSize::*, PtrExpr, Type};
+use crate::intermediate::{ArithOp, BoolExpr, BoolOp, Expr::*, NumExpr, NumSize::*, PtrExpr, Type, DataRef};
 
 use super::super::super::intermediate::Expr as IRExpr;
 use super::super::ast::{Expr, ExprSpan, UnOp, WrapSpan};
@@ -11,6 +13,7 @@ use super::super::ast::{Expr, ExprSpan, UnOp, WrapSpan};
 pub fn translate_expr<'a>(
     WrapSpan(_, ast_expr): ExprSpan<'a, usize>,
     var_symb: &VariableSymbolTable,
+    dataref_map: &mut HashMap<DataRef, Vec<IRExpr>>
 ) -> IRExpr {
     match ast_expr {
         // pair literal 'null' - maybe define null as PtrExpr in IR?
@@ -22,17 +25,21 @@ pub fn translate_expr<'a>(
 
         Expr::Char(c) => Num(NumExpr::Const(Byte, c as i32)),
 
-        // Use ptr to the vec that represents the String?
-        // character array
-        // map each char to a vec of Expr
-        // take in daratef hashmap
         Expr::String(s) => {
-            todo!()
+            let dataref: u64 = dataref_map.len() as u64;
+            let mut char_vec: Vec<IRExpr> = Vec::new();
+
+            for c in s.chars() {
+                char_vec.push(Num(NumExpr::Const(Byte, c as i32)));
+            }
+
+            dataref_map.insert(dataref, char_vec);
+            Ptr(PtrExpr::DataRef(dataref))
         }
 
         Expr::Var(v) => match var_symb.get_type_from_id(v) {
             Some(t) => match t {
-                ast::Type::Int => Num(NumExpr::Var(v as u32)),
+                ast::Type::Int => Num(NumExpr::Var(v)),
                 ast::Type::Bool => todo!(),
                 ast::Type::Char => todo!(),
                 ast::Type::String => todo!(),
@@ -51,7 +58,7 @@ pub fn translate_expr<'a>(
             todo!()
         }
 
-        Expr::UnOp(o, box e) => match (o, translate_expr(e, var_symb)) {
+        Expr::UnOp(o, box e) => match (o, translate_expr(e, var_symb, dataref_map)) {
             (UnOp::Neg, Bool(b)) => Bool(BoolExpr::Not(box b)),
             (UnOp::Minus, Num(n)) => Num(NumExpr::ArithOp(
                 box NumExpr::Const(DWord, -1),
@@ -75,9 +82,9 @@ pub fn translate_expr<'a>(
         // Should change this so that boolean operations are short-circuited
         Expr::BinOp(box e1, o, box e2) => {
             match (
-                translate_expr(e1, var_symb),
+                translate_expr(e1, var_symb, dataref_map),
                 o,
-                translate_expr(e2, var_symb),
+                translate_expr(e2, var_symb, dataref_map),
             ) {
                 (Num(n1), ast::BinOp::Add, Num(n2)) => {
                     Num(NumExpr::ArithOp(box n1, ArithOp::Add, box n2))
@@ -147,6 +154,7 @@ mod tests {
     #[test]
     fn check_boolean_expression() {
         let var_symb = VariableSymbolTable::new();
+        let mut dataref_map: HashMap<DataRef, Vec<IRExpr>> = HashMap::new();
 
         let expr: WrapSpan<Expr<usize>> = WrapSpan(
             "!true",
@@ -155,7 +163,7 @@ mod tests {
 
         let translated: intermediate::Expr = Bool(BoolExpr::Not(box BoolExpr::Const(true)));
 
-        assert_eq!(translate_expr(expr, &var_symb), translated);
+        assert_eq!(translate_expr(expr, &var_symb, &mut dataref_map), translated);
 
         let expr2: WrapSpan<Expr<usize>> = WrapSpan(
             "(ord 'a' == 65) || (true && !false)",
@@ -200,6 +208,6 @@ mod tests {
             ),
         ));
 
-        assert_eq!(translate_expr(expr2, &var_symb), translated2);
+        assert_eq!(translate_expr(expr2, &var_symb, &mut dataref_map), translated2);
     }
 }
