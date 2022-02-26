@@ -1,29 +1,10 @@
 //! Converts [ARM Representation](Program) into a string format, suitable for
-//! assembly. 
+//! assembly.
+
+use lazy_static::__Deref;
 
 use super::arm_repr::*;
-use std::fmt::Display;
-
-impl Display for Program {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}{}\n{}{}\n",
-            if !self.0.is_empty() { ".data\n\n" } else { "" },
-            self.0
-                .iter()
-                .map(|t| format!("{}", t))
-                .collect::<Vec<_>>()
-                .join("\n"),
-            if !self.1.is_empty() { ".text\n\n" } else { "" },
-            self.1
-                .iter()
-                .map(|t| format!("{}", t))
-                .collect::<Vec<_>>()
-                .join("\n")
-        )
-    }
-}
+use std::{collections::HashMap, fmt::Display};
 
 impl Display for Cond {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -93,7 +74,7 @@ impl Display for Shift {
     }
 }
 
-impl Display for FlexOperand {
+impl<T: Display> Display for FlexOperand<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -212,7 +193,7 @@ impl Display for MemOp {
     }
 }
 
-impl Display for MemOperand {
+impl<T: Display> Display for MemOperand<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -247,34 +228,179 @@ impl Display for FlexOffset {
     }
 }
 
-impl Display for Stat {
+impl<T: Display> Display for Stat<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let conv = |s: &bool| if *s {"S".to_owned()} else {String::from("")};
-        write!(f, "{}", match self {
-            Stat::ApplyOp(op, cond, s, dest, operand, operand2) => format!("\t{}{}{}\t{},\t{},\t{}", op, cond, conv(s), dest, operand, operand2),
-            Stat::Mul(cond, s, dest, operand, operand2) => format!("\tMUL{}{}\t{},\t{},\t{}", cond, conv(s), dest, operand, operand2),
-            Stat::MulA(cond, s, dest, operand, operand2, operand3) => format!("\tMULA{}{}\t{},\t{},\t{},\t{}", cond, conv(s), dest, operand, operand2, operand3),
-            Stat::MulOp(op, cond, s, hi, lo, operand, operand2) => format!("\t{}{}{}\t{},\t{},\t{},\t{}", op, cond, conv(s), hi, lo, operand, operand2),
-            Stat::Move(op, cond, s, register, operand) => format!("\t{}{}{}\t{},\t{}", op, cond, conv(s), register, operand),
-            Stat::Cmp(op, cond, register, operand) => format!("\t{}{}\t{},\t{}", op, cond, register, operand),
-            Stat::SatOp(op, cond, dest, operand, operand2) => format!("\t{}{}\t{},\t{},\t{}", op, cond, dest, operand, operand2),
-            Stat::ReadCPSR(reg) => format!("\tMSR\t{},\tCPSR", reg),
-            Stat::Branch(op, cond, label) => format!("\t{}{}\t{}", op, cond, label),
-            Stat::MemOp(op, cond, s, register, operand) => format!("\t{}{}{}\t{},\t{}", op, cond, conv(s), register, operand),
-            Stat::Push(cond, reglist) => format!("\tPUSH{}\t{{{}}}", cond, reglist.iter().map(|t| format!("{}", t)).collect::<Vec<_>>().join(",")),
-            Stat::Pop(cond, reglist) => format!("\tPOP{}\t{{{}}}", cond, reglist.iter().map(|t| format!("{}", t)).collect::<Vec<_>>().join(",")),
-            Stat::LiteralPool => "\t.ltorg".to_owned(),
-            Stat::Global(label) => format!(".global\t{}", label),
-            Stat::Label(label) => format!("{}:", label),
-        })
+        let conv = |s: &bool| if *s { "S".to_owned() } else { String::from("") };
+        write!(
+            f,
+            "{}",
+            match self {
+                Stat::ApplyOp(op, cond, s, dest, operand, operand2) => format!(
+                    "\t{}{}{}\t{},\t{},\t{}",
+                    op,
+                    cond,
+                    conv(s),
+                    dest,
+                    operand,
+                    operand2
+                ),
+                Stat::Mul(cond, s, dest, operand, operand2) => format!(
+                    "\tMUL{}{}\t{},\t{},\t{}",
+                    cond,
+                    conv(s),
+                    dest,
+                    operand,
+                    operand2
+                ),
+                Stat::MulA(cond, s, dest, operand, operand2, operand3) => format!(
+                    "\tMULA{}{}\t{},\t{},\t{},\t{}",
+                    cond,
+                    conv(s),
+                    dest,
+                    operand,
+                    operand2,
+                    operand3
+                ),
+                Stat::MulOp(op, cond, s, hi, lo, operand, operand2) => format!(
+                    "\t{}{}{}\t{},\t{},\t{},\t{}",
+                    op,
+                    cond,
+                    conv(s),
+                    hi,
+                    lo,
+                    operand,
+                    operand2
+                ),
+                Stat::Move(op, cond, s, ident, operand) =>
+                    format!("\t{}{}{}\t{},\t{}", op, cond, conv(s), ident, operand),
+                Stat::Cmp(op, cond, ident, operand) =>
+                    format!("\t{}{}\t{},\t{}", op, cond, ident, operand),
+                Stat::SatOp(op, cond, dest, operand, operand2) =>
+                    format!("\t{}{}\t{},\t{},\t{}", op, cond, dest, operand, operand2),
+                Stat::ReadCPSR(reg) => format!("\tMSR\t{},\tCPSR", reg),
+                Stat::MemOp(op, cond, s, ident, operand) =>
+                    format!("\t{}{}{}\t{},\t{}", op, cond, conv(s), ident, operand),
+                Stat::Push(cond, identlist) => format!(
+                    "\tPUSH{}\t{{{}}}",
+                    cond,
+                    identlist
+                        .iter()
+                        .map(|t| format!("{}", t))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+                Stat::Pop(cond, identlist) => format!(
+                    "\tPOP{}\t{{{}}}",
+                    cond,
+                    identlist
+                        .iter()
+                        .map(|t| format!("{}", t))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+            }
+        )
+    }
+}
+
+impl<T: Display> Display for ArmNode<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Used to store label numbers based on the nodes connected, and a
+        // boolean describing if their code has been generated yet.
+        let mut label_map: HashMap<ArmNode<T>, (usize, bool)> = HashMap::new();
+
+        // Label identifier conversion tpo strings.
+        let label_conv = |id: &usize| format!("b_label_{}", id);
+
+        let mut next_node = Some(self.clone());
+
+        loop {
+            while let Some(current_node) = next_node {
+                label_map
+                    .entry(current_node.clone())
+                    .and_modify(|label_passed| label_passed.1 = true);
+
+                next_node = match current_node.get().deref() {
+                    ControlFlow::Start(next) => Some(next.clone()),
+                    ControlFlow::Simple(_, stat, next) => {
+                        writeln!(f, "{}", stat)?;
+                        Some(next.clone())
+                    }
+                    ControlFlow::Branching(_, branch_to, Some((cond, next))) => {
+                        // For a conditional branch, branch with the condition, and continue to the (condition failed) next statements.
+
+                        match label_map.get(branch_to) {
+                            Some((id, _)) => writeln!(f, "\t B{}\t{}", cond, label_conv(id))?,
+                            None => {
+                                let id = label_map.len();
+                                label_map.insert(branch_to.clone(), (id, false));
+                                writeln!(f, "\tB{}\t{}", cond, label_conv(&id))?
+                            }
+                        }
+
+                        Some(next.clone())
+                    }
+                    ControlFlow::Branching(_, branch_to, None) => {
+                        match label_map.get(branch_to) {
+                            Some((id, _)) => {
+                                // IF the label already exists, branch to it
+                                writeln!(f, "\tB\t{}", label_conv(id))?;
+                            }
+                            None => {
+                                let id = label_map.len();
+                                writeln!(f, "\tB\t{}", label_conv(&id))?;
+                                label_map.insert(branch_to.clone(), (id, false));
+                            }
+                        };
+                        None
+                    }
+                    ControlFlow::Call(_, fun_name, None) => {
+                        writeln!(f, "\tBL\t{}", fun_name)?;
+                        None
+                    }
+                    ControlFlow::Call(_, fun_name, Some((cond, next))) => {
+                        writeln!(f, "\tBL{}\t{}", cond, fun_name)?;
+                        Some(next.clone())
+                    }
+                    ControlFlow::Multi(_, next) => {
+                        let id = label_map.len();
+                        let id = label_map
+                            .entry(current_node.clone())
+                            .and_modify(|data| {
+                                data.1 = true;
+                            })
+                            .or_insert((id, true))
+                            .0;
+
+                        writeln!(f, "{}:", label_conv(&id))?;
+
+                        Some(next.clone())
+                    }
+                    ControlFlow::End(_) => None,
+                    ControlFlow::Removed => {
+                        unreachable!("Removed should not be found when displaying ARM code")
+                    }
+                };
+            }
+
+            let next_node = label_map
+                .iter()
+                .find(|(node, (_, passed))| !passed)
+                .map(|res| res.0);
+        }
     }
 }
 
 impl Display for DataKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            DataKind::Ascii(string) => format!("\t\t.word {}\n\t\t.ascii \"{}\"", string.len(), string),
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                DataKind::Ascii(string) =>
+                    format!("\t\t.word {}\n\t\t.ascii \"{}\"", string.len(), string),
+            }
+        )
     }
 }
 
@@ -284,22 +410,27 @@ impl Display for Data {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+impl<T: Display> Display for Program<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Program {
+            data,
+            main,
+            functions,
+            cfg,
+        } = self;
+        if !data.is_empty() {
+            writeln!(f, ".data")?;
+            for dataref in data {
+                write!(f, "{}", dataref)?;
+            }
+        };
 
-    #[test]
-    fn this_is_not_a_test() {
-        println!("{}", Program(vec![], vec![
-            Stat::Global(String::from("main")),
-            Stat::Label(String::from("main")),
-            Stat::Push(Cond::Al, vec![Register::Lr]),
-            Stat::MemOp(MemOp::Ldr, Cond::Al, false, Register::R4, MemOperand::Expression(-1)),
-            Stat::Move(MovOp::Mov, Cond::Al, false, Register::R0, FlexOperand::ShiftReg(Register::R4, None)),
-            Stat::Branch(BranchOp::Bl, Cond::Al, String::from("exit")),
-            Stat::MemOp(MemOp::Ldr, Cond::Al, false, Register::R0, MemOperand::Expression(0)),
-            Stat::Pop(Cond::Al, vec![Register::Pc]),
-            Stat::LiteralPool,
-        ]));
+        writeln!(f, ".text\n.global main\nmain:\n{}", main)?;
+
+        for (fun_name, Function { args, start_node }) in functions {
+            write!(f, "{}:\n{}", fun_name, start_node)?;
+        }
+
+        writeln!(f)
     }
 }
