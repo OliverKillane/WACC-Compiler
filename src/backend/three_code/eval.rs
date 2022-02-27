@@ -87,7 +87,7 @@ fn eval_ptr_expr(ptr_expr: ir::PtrExpr) -> i32 {
     }
 }
 
-/// Evaluates a constant pointer expression. Assumes no variable refrences or
+/// Evaluates a general expression. Assumes no variable refrences or
 /// function calls present. Returns the size of the expression and its value.
 pub(super) fn eval_expr(expr: ir::Expr) -> (Size, i32) {
     match expr {
@@ -103,5 +103,199 @@ pub(super) fn eval_expr(expr: ir::Expr) -> (Size, i32) {
             let ptr_const = eval_ptr_expr(ptr_expr);
             (Size::DWord, ptr_const)
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{super::Size, eval_bool_expr};
+    use crate::{
+        backend::three_code::eval::{eval_expr, eval_num_expr, eval_ptr_expr},
+        intermediate as ir,
+    };
+
+    #[test]
+    fn const_bool_expressions() {
+        assert_eq!(eval_bool_expr(ir::BoolExpr::Const(true)), true);
+    }
+
+    #[test]
+    fn test_positive_bool_expressions() {
+        assert_eq!(
+            eval_bool_expr(ir::BoolExpr::TestPositive(ir::NumExpr::Const(
+                ir::NumSize::Word,
+                -42
+            ))),
+            false
+        );
+    }
+
+    #[test]
+    fn test_zero_bool_expressions() {
+        assert_eq!(
+            eval_bool_expr(ir::BoolExpr::TestZero(ir::NumExpr::Const(
+                ir::NumSize::Byte,
+                0
+            ))),
+            true
+        );
+    }
+
+    #[test]
+    fn ptr_eq_bool_expressions() {
+        assert_eq!(
+            eval_bool_expr(ir::BoolExpr::PtrEq(
+                ir::PtrExpr::Offset(
+                    box ir::PtrExpr::Null,
+                    box ir::NumExpr::Const(ir::NumSize::DWord, 2)
+                ),
+                ir::PtrExpr::Null
+            )),
+            false
+        );
+    }
+
+    #[test]
+    fn bin_op_bool_expressions() {
+        assert_eq!(
+            eval_bool_expr(ir::BoolExpr::BoolOp(
+                box ir::BoolExpr::Const(true),
+                ir::BoolOp::Or,
+                box ir::BoolExpr::Const(false)
+            )),
+            true
+        );
+        assert_eq!(
+            eval_bool_expr(ir::BoolExpr::BoolOp(
+                box ir::BoolExpr::Const(true),
+                ir::BoolOp::And,
+                box ir::BoolExpr::Const(false)
+            )),
+            false
+        );
+        assert_eq!(
+            eval_bool_expr(ir::BoolExpr::BoolOp(
+                box ir::BoolExpr::Const(true),
+                ir::BoolOp::Xor,
+                box ir::BoolExpr::Const(false)
+            )),
+            true
+        );
+    }
+
+    #[test]
+    fn not_bool_expressions() {
+        assert_eq!(
+            eval_bool_expr(ir::BoolExpr::Not(box ir::BoolExpr::Const(true))),
+            false
+        );
+    }
+
+    #[test]
+    fn const_num_expressions() {
+        assert_eq!(
+            eval_num_expr(ir::NumExpr::Const(ir::NumSize::Word, 2)),
+            (ir::NumSize::Word, 2)
+        );
+    }
+
+    #[test]
+    fn size_num_expressions() {
+        assert_eq!(
+            eval_num_expr(ir::NumExpr::SizeOf(ir::Type::Bool)),
+            (ir::NumSize::DWord, 1)
+        );
+        assert_eq!(
+            eval_num_expr(ir::NumExpr::SizeOfWideAlloc),
+            (ir::NumSize::DWord, 4)
+        );
+    }
+
+    #[test]
+    #[allow(overflowing_literals)]
+    fn cast_num_expressions() {
+        assert_eq!(
+            eval_num_expr(ir::NumExpr::Cast(
+                ir::NumSize::Byte,
+                box ir::NumExpr::Const(ir::NumSize::DWord, 42069)
+            )),
+            (ir::NumSize::Byte, 42069 as u8 as i32)
+        );
+    }
+
+    #[test]
+    fn arith_op_num_expressions() {
+        assert_eq!(
+            eval_num_expr(ir::NumExpr::ArithOp(
+                box ir::NumExpr::Const(ir::NumSize::DWord, 2),
+                ir::ArithOp::Add,
+                box ir::NumExpr::Const(ir::NumSize::DWord, 2)
+            )),
+            (ir::NumSize::DWord, 4)
+        );
+        assert_eq!(
+            eval_num_expr(ir::NumExpr::ArithOp(
+                box ir::NumExpr::Const(ir::NumSize::DWord, 4),
+                ir::ArithOp::Sub,
+                box ir::NumExpr::Const(ir::NumSize::DWord, 2)
+            )),
+            (ir::NumSize::DWord, 2)
+        );
+        assert_eq!(
+            eval_num_expr(ir::NumExpr::ArithOp(
+                box ir::NumExpr::Const(ir::NumSize::DWord, 2),
+                ir::ArithOp::Mul,
+                box ir::NumExpr::Const(ir::NumSize::DWord, 3)
+            )),
+            (ir::NumSize::DWord, 6)
+        );
+        assert_eq!(
+            eval_num_expr(ir::NumExpr::ArithOp(
+                box ir::NumExpr::Const(ir::NumSize::DWord, 3),
+                ir::ArithOp::Div,
+                box ir::NumExpr::Const(ir::NumSize::DWord, 2)
+            )),
+            (ir::NumSize::DWord, 1)
+        );
+        assert_eq!(
+            eval_num_expr(ir::NumExpr::ArithOp(
+                box ir::NumExpr::Const(ir::NumSize::DWord, 5),
+                ir::ArithOp::Mod,
+                box ir::NumExpr::Const(ir::NumSize::DWord, 2)
+            )),
+            (ir::NumSize::DWord, 1)
+        );
+    }
+
+    #[test]
+    fn null_ptr_expressions() {
+        assert_eq!(eval_ptr_expr(ir::PtrExpr::Null), 0)
+    }
+
+    #[test]
+    fn offset_ptr_expressions() {
+        assert_eq!(
+            eval_ptr_expr(ir::PtrExpr::Offset(
+                box ir::PtrExpr::Null,
+                box ir::NumExpr::Const(ir::NumSize::DWord, 2)
+            )),
+            2
+        )
+    }
+
+    #[test]
+    fn general_expressions() {
+        assert_eq!(
+            eval_expr(ir::Expr::Ptr(ir::PtrExpr::Null)),
+            (Size::DWord, 0)
+        );
+        assert_eq!(
+            eval_expr(ir::Expr::Bool(ir::BoolExpr::Const(true))),
+            (Size::Byte, 1)
+        );
+        assert_eq!(
+            eval_expr(ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::Word, 55))),
+            (Size::Word, 55)
+        );
     }
 }
