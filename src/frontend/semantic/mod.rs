@@ -15,6 +15,12 @@
 //! The spans associated with errors are returned, this ensures that the span
 //! of erroneous code in the source is kept for error printing later.
 //!
+//! If no errors occur, the types (if relevant) of reach ast node is used in 
+//! the [ASTWrapper]. The type is contained for:
+//! - Function names in calls
+//! - All expressions (will be some)
+//! - Right hand sides of assignments
+//! 
 //! For each statement the errors is given as:
 //! (span of statement, [list of semantic errors (can contain internal spans)])
 //! this is covered in more detail in [semantic errors](semantic_errors).
