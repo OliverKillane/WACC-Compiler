@@ -14,8 +14,6 @@ use std::iter::zip;
 use std::mem;
 use std::rc::Rc;
 
-pub(super) type LocalRef = u64;
-
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 /// Type of the source operand for an operation
 pub(super) enum OpSrc {
@@ -78,7 +76,7 @@ pub(super) enum BinOp {
 pub(super) enum StatCode {
     /// Assignment of one variable to another
     Assign(VarRepr, OpSrc),
-    /// Assignment of a binary operation to a variable
+    /// Assignment of a binary operation to a variable.
     AssignOp(VarRepr, OpSrc, BinOp, OpSrc),
     /// Load from a reference to a pointer. The first variable reference is
     /// the load destination and the second one is the pointer to the data. The
@@ -102,7 +100,6 @@ pub(super) enum StatCode {
 
 /// General type of the statement. Used in the dataflow graph.
 #[derive(Debug, Clone)]
-
 pub(super) enum StatType {
     /// Used internally for the purposes of creating the graph.
     Dummy(Vec<StatNode>),
@@ -118,30 +115,36 @@ pub(super) enum StatType {
     Loop(Vec<StatNode>),
 }
 
-/// A [statement graph](StatGraph) node.
+/// A statement graph node.
 type StatNode = NodeRef<StatType>;
 
 #[derive(Debug, Clone)]
-/// Function representation. The first vector are the variables to which the
-/// arguments will be assigned to and the [statement graph](StatGraph) is the dataflow graph
-/// that is evaluated.
+/// Function representation.
 pub(super) struct Function {
+    /// Variables for function argumetns
     pub args: Vec<VarRepr>,
+    /// First statement of the program
     pub code: Option<StatNode>,
+    /// Reference for usage when calling scanf
     pub read_ref: Option<DataRef>,
 }
 
 #[derive(Debug, Clone)]
-/// The entire program in the three-code representation. The first map is a map
-/// of all functions defined by the program. The [statement graph](StatGraph) is
-/// the main body of the program. The last map is a map of all statically-defined
-/// data in the program.
+/// The entire program in the three-code representation.
 pub(super) struct ThreeCode {
+    /// All functions in the program
     pub functions: HashMap<String, Function>,
+    /// Static data references in the program
     pub data_refs: HashMap<DataRef, Vec<u8>>,
+    /// Graph of all statement nodes in the program
     pub graph: Graph<StatType>,
+    /// Reference for usage when calling scanf
     pub read_ref: Option<DataRef>,
+    /// First statement of the program
     pub code: Option<StatNode>,
+    /// Function to call as an int overflow/underflow handler for checking for
+    /// 32-bit overflows.
+    pub int_handler: Option<String>,
 }
 
 impl StatType {
@@ -199,6 +202,12 @@ impl StatType {
             _ => panic!("Node not final"),
         };
         mem::swap(self, &mut tmp_node);
+    }
+}
+
+impl Deleted for StatType {
+    fn deleted() -> Self {
+        Self::Dummy(Vec::new())
     }
 }
 
@@ -618,15 +627,9 @@ fn translate_function(
     }
 }
 
-impl Deleted for StatType {
-    fn deleted() -> Self {
-        StatType::Dummy(Vec::new())
-    }
-}
-
 impl From<(ir::Program, &Options)> for ThreeCode {
     fn from(
-        (ir::Program(functions, local_vars, block_graph, data_refs), options): (
+        (ir::Program(functions, local_vars, block_graph, data_refs, int_handler), options): (
             ir::Program,
             &Options,
         ),
@@ -703,6 +706,7 @@ impl From<(ir::Program, &Options)> for ThreeCode {
                 .into_inner(),
             read_ref,
             code: start_node,
+            int_handler: int_handler,
         }
     }
 }
