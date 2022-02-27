@@ -72,7 +72,7 @@ fn eval_num_expr(num_expr: ir::NumExpr) -> (ir::NumSize, i32) {
     }
 }
 
-/// Evaluates a constant boolean expression. Assumes no variable refrences or
+/// Evaluates a constant pointer expression. Assumes no variable refrences or
 /// function calls present. Returns the numeric value of the pointer, since no
 /// data references are allowed.
 fn eval_ptr_expr(ptr_expr: ir::PtrExpr) -> i32 {
@@ -87,6 +87,8 @@ fn eval_ptr_expr(ptr_expr: ir::PtrExpr) -> i32 {
     }
 }
 
+/// Evaluates a constant pointer expression. Assumes no variable refrences or
+/// function calls present. Returns the size of the expression and its value.
 pub(super) fn eval_expr(expr: ir::Expr) -> (Size, i32) {
     match expr {
         ir::Expr::Num(num_expr) => {
