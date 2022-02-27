@@ -122,8 +122,10 @@ pub(super) struct Function {
 /// Type of the data reference under a [data reference id](DataRef).
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub(super) enum DataRefType {
-    Integer(Vec<i32>),
+    /// Represents an ascii string
     String(Vec<u8>),
+    /// Represents a numerical struct with no padding
+    Struct(Vec<(Size, i32)>),
 }
 
 #[derive(Debug, Clone)]
