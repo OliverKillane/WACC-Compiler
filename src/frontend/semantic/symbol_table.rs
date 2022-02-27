@@ -8,7 +8,7 @@
 //! renamed identifiers and the types.
 
 use super::{
-    super::ast::{FunSpan, Function, Param, Type, WrapSpan},
+    super::ast::{ASTWrapper, FunWrap, Function, Param, Type},
     semantic_errors::{SemanticError, StatementErrors},
 };
 
@@ -176,10 +176,10 @@ impl<'a, 'b> LocalSymbolTable<'a, 'b> {
 /// *Note:* the parameter identifiers are not checked, that is done when the
 /// function body analysis is done.
 pub fn get_fn_symbols<'a>(
-    fn_defs: Vec<WrapSpan<'a, Function<'a, &'a str>>>,
+    fn_defs: Vec<FunWrap<&'a str, &'a str>>,
 ) -> (
     FunctionSymbolTable,
-    Vec<FunSpan<'a, &'a str>>,
+    Vec<FunWrap<&'a str, &'a str>>,
     Vec<StatementErrors<'a>>,
 ) {
     let mut fun_symb = FunctionSymbolTable::new();
@@ -187,9 +187,13 @@ pub fn get_fn_symbols<'a>(
     let mut valid_fun = Vec::new();
     let mut errors = Vec::new();
 
-    for WrapSpan(fn_def_span, Function(ret_type, fn_name, params, stats)) in fn_defs {
+    for ASTWrapper(
+        fn_def_span,
+        Function(ret_type, fn_name_wrapped @ ASTWrapper(fn_name, _), params, stats),
+    ) in fn_defs
+    {
         match def_table.insert(fn_name, fn_def_span) {
-            Some(orig) => errors.push(WrapSpan(
+            Some(orig) => errors.push(ASTWrapper(
                 fn_def_span,
                 vec![SemanticError::RepeatDefinitionFunction(fn_name, orig)],
             )),
@@ -200,13 +204,13 @@ pub fn get_fn_symbols<'a>(
                         ret_type.clone(),
                         params
                             .iter()
-                            .map(|WrapSpan(_, Param(t, name))| (*name, t.clone()))
+                            .map(|ASTWrapper(_, Param(t, name))| (*name, t.clone()))
                             .collect(),
                     ),
                 );
-                valid_fun.push(WrapSpan(
+                valid_fun.push(ASTWrapper(
                     fn_def_span,
-                    Function(ret_type, fn_name, params, stats),
+                    Function(ret_type, fn_name_wrapped, params, stats),
                 ))
             }
         }
@@ -586,35 +590,35 @@ mod tests {
     #[test]
     fn get_fn_symbols_can_get_valid_function_symbols() {
         let fn_defs = vec![
-            WrapSpan(
+            ASTWrapper(
                 "int fun1(int a)",
                 Function(
                     Type::Int,
-                    "fun1",
-                    vec![WrapSpan("int a", Param(Type::Int, "a"))],
+                    ASTWrapper("fun1", String::from("fun1")),
+                    vec![ASTWrapper("int a", Param(Type::Int, "a"))],
                     vec![],
                 ),
             ),
-            WrapSpan(
+            ASTWrapper(
                 "char example(int a, string b)",
                 Function(
                     Type::Char,
-                    "example",
+                    ASTWrapper("example", String::from("example")),
                     vec![
-                        WrapSpan("int a", Param(Type::Int, "a")),
-                        WrapSpan("string b", Param(Type::String, "b")),
+                        ASTWrapper("int a", Param(Type::Int, "a")),
+                        ASTWrapper("string b", Param(Type::String, "b")),
                     ],
                     vec![],
                 ),
             ),
-            WrapSpan(
+            ASTWrapper(
                 "bool logical_or(bool x, bool y)",
                 Function(
                     Type::Bool,
-                    "logical_or",
+                    ASTWrapper("logical_or", String::from("logical_or")),
                     vec![
-                        WrapSpan("bool x", Param(Type::Bool, "x")),
-                        WrapSpan("bool y", Param(Type::Bool, "y")),
+                        ASTWrapper("bool x", Param(Type::Bool, "x")),
+                        ASTWrapper("bool y", Param(Type::Bool, "y")),
                     ],
                     vec![],
                 ),
@@ -635,35 +639,35 @@ mod tests {
         );
 
         let valid_fns_expected = vec![
-            WrapSpan(
+            ASTWrapper(
                 "int fun1(int a)",
                 Function(
                     Type::Int,
-                    "fun1",
-                    vec![WrapSpan("int a", Param(Type::Int, "a"))],
+                    ASTWrapper("fun1", String::from("fun1")),
+                    vec![ASTWrapper("int a", Param(Type::Int, "a"))],
                     vec![],
                 ),
             ),
-            WrapSpan(
+            ASTWrapper(
                 "char example(int a, string b)",
                 Function(
                     Type::Char,
-                    "example",
+                    ASTWrapper("example", String::from("example")),
                     vec![
-                        WrapSpan("int a", Param(Type::Int, "a")),
-                        WrapSpan("string b", Param(Type::String, "b")),
+                        ASTWrapper("int a", Param(Type::Int, "a")),
+                        ASTWrapper("string b", Param(Type::String, "b")),
                     ],
                     vec![],
                 ),
             ),
-            WrapSpan(
+            ASTWrapper(
                 "bool logical_or(bool x, bool y)",
                 Function(
                     Type::Bool,
-                    "logical_or",
+                    ASTWrapper("logical_or", String::from("logical_or")),
                     vec![
-                        WrapSpan("bool x", Param(Type::Bool, "x")),
-                        WrapSpan("bool y", Param(Type::Bool, "y")),
+                        ASTWrapper("bool x", Param(Type::Bool, "x")),
+                        ASTWrapper("bool y", Param(Type::Bool, "y")),
                     ],
                     vec![],
                 ),
@@ -678,35 +682,35 @@ mod tests {
     #[test]
     fn get_fn_symbols_detects_function_redefinition() {
         let fn_defs = vec![
-            WrapSpan(
+            ASTWrapper(
                 "int fun1(int a)",
                 Function(
                     Type::Int,
-                    "fun1",
-                    vec![WrapSpan("int a", Param(Type::Int, "a"))],
+                    ASTWrapper("fun1", String::from("fun1")),
+                    vec![ASTWrapper("int a", Param(Type::Int, "a"))],
                     vec![],
                 ),
             ),
-            WrapSpan(
+            ASTWrapper(
                 "char example(int a, string b)",
                 Function(
                     Type::Char,
-                    "example",
+                    ASTWrapper("example", String::from("example")),
                     vec![
-                        WrapSpan("int a", Param(Type::Int, "a")),
-                        WrapSpan("string b", Param(Type::String, "b")),
+                        ASTWrapper("int a", Param(Type::Int, "a")),
+                        ASTWrapper("string b", Param(Type::String, "b")),
                     ],
                     vec![],
                 ),
             ),
-            WrapSpan(
+            ASTWrapper(
                 "bool fun1(bool x, bool y)",
                 Function(
                     Type::Bool,
-                    "fun1",
+                    ASTWrapper("fun1", String::from("fun1")),
                     vec![
-                        WrapSpan("bool x", Param(Type::Bool, "x")),
-                        WrapSpan("bool y", Param(Type::Bool, "y")),
+                        ASTWrapper("bool x", Param(Type::Bool, "x")),
+                        ASTWrapper("bool y", Param(Type::Bool, "y")),
                     ],
                     vec![],
                 ),
@@ -723,30 +727,30 @@ mod tests {
         );
 
         let valid_fns_expected = vec![
-            WrapSpan(
+            ASTWrapper(
                 "int fun1(int a)",
                 Function(
                     Type::Int,
-                    "fun1",
-                    vec![WrapSpan("int a", Param(Type::Int, "a"))],
+                    ASTWrapper("fun1", String::from("fun1")),
+                    vec![ASTWrapper("int a", Param(Type::Int, "a"))],
                     vec![],
                 ),
             ),
-            WrapSpan(
+            ASTWrapper(
                 "char example(int a, string b)",
                 Function(
                     Type::Char,
-                    "example",
+                    ASTWrapper("example", String::from("example")),
                     vec![
-                        WrapSpan("int a", Param(Type::Int, "a")),
-                        WrapSpan("string b", Param(Type::String, "b")),
+                        ASTWrapper("int a", Param(Type::Int, "a")),
+                        ASTWrapper("string b", Param(Type::String, "b")),
                     ],
                     vec![],
                 ),
             ),
         ];
 
-        let errors_expected = vec![WrapSpan(
+        let errors_expected = vec![ASTWrapper(
             "bool fun1(bool x, bool y)",
             vec![SemanticError::RepeatDefinitionFunction(
                 "fun1",
@@ -763,35 +767,35 @@ mod tests {
     fn get_fn_symbols_ignores_parameter_names() {
         // As noted in get_fn_symbols, parameter naming issues are ignored and checked later.
         let fn_defs = vec![
-            WrapSpan(
+            ASTWrapper(
                 "int fun1(int a)",
                 Function(
                     Type::Int,
-                    "fun1",
-                    vec![WrapSpan("int a", Param(Type::Int, "a"))],
+                    ASTWrapper("fun1", String::from("fun1")),
+                    vec![ASTWrapper("int a", Param(Type::Int, "a"))],
                     vec![],
                 ),
             ),
-            WrapSpan(
+            ASTWrapper(
                 "char example(int a, string begin)",
                 Function(
                     Type::Char,
-                    "example",
+                    ASTWrapper("example", String::from("example")),
                     vec![
-                        WrapSpan("int a", Param(Type::Int, "a")),
-                        WrapSpan("string str", Param(Type::String, "str")),
+                        ASTWrapper("int a", Param(Type::Int, "a")),
+                        ASTWrapper("string str", Param(Type::String, "str")),
                     ],
                     vec![],
                 ),
             ),
-            WrapSpan(
+            ASTWrapper(
                 "bool logical_or(bool x, bool y)",
                 Function(
                     Type::Bool,
-                    "logical_or",
+                    ASTWrapper("logical_or", String::from("logical_or")),
                     vec![
-                        WrapSpan("bool x", Param(Type::Bool, "x")),
-                        WrapSpan("bool y", Param(Type::Bool, "y")),
+                        ASTWrapper("bool x", Param(Type::Bool, "x")),
+                        ASTWrapper("bool y", Param(Type::Bool, "y")),
                     ],
                     vec![],
                 ),
@@ -812,35 +816,35 @@ mod tests {
         );
 
         let valid_fns_expected = vec![
-            WrapSpan(
+            ASTWrapper(
                 "int fun1(int a)",
                 Function(
                     Type::Int,
-                    "fun1",
-                    vec![WrapSpan("int a", Param(Type::Int, "a"))],
+                    ASTWrapper("fun1", String::from("fun1")),
+                    vec![ASTWrapper("int a", Param(Type::Int, "a"))],
                     vec![],
                 ),
             ),
-            WrapSpan(
+            ASTWrapper(
                 "char example(int a, string begin)",
                 Function(
                     Type::Char,
-                    "example",
+                    ASTWrapper("example", String::from("example")),
                     vec![
-                        WrapSpan("int a", Param(Type::Int, "a")),
-                        WrapSpan("string str", Param(Type::String, "str")),
+                        ASTWrapper("int a", Param(Type::Int, "a")),
+                        ASTWrapper("string str", Param(Type::String, "str")),
                     ],
                     vec![],
                 ),
             ),
-            WrapSpan(
+            ASTWrapper(
                 "bool logical_or(bool x, bool y)",
                 Function(
                     Type::Bool,
-                    "logical_or",
+                    ASTWrapper("logical_or", String::from("logical_or")),
                     vec![
-                        WrapSpan("bool x", Param(Type::Bool, "x")),
-                        WrapSpan("bool y", Param(Type::Bool, "y")),
+                        ASTWrapper("bool x", Param(Type::Bool, "x")),
+                        ASTWrapper("bool y", Param(Type::Bool, "y")),
                     ],
                     vec![],
                 ),
