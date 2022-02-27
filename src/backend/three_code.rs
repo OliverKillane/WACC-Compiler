@@ -119,8 +119,6 @@ pub(super) struct Function {
     pub read_ref: Option<DataRef>,
 }
 
-/// Type of the data reference under a [data reference id](DataRef).
-#[derive(Debug, PartialEq, Eq, Clone)]
 pub(super) enum DataRefType {
     Integer(Vec<i32>),
     String(Vec<u8>),
@@ -131,10 +129,8 @@ pub(super) enum DataRefType {
 pub(super) struct ThreeCode {
     /// All functions in the program
     pub functions: HashMap<String, Function>,
-    /// String static data references in the program
-    pub string_data_refs: HashMap<DataRef, Vec<u8>>,
-    /// Integer data references in the program
-    pub int_data_refs: HashMap<DataRef, Vec<i32>>,
+    /// Static data references in the program
+    pub data_refs: HashMap<DataRef, DataRefType>,
     /// Graph of all statement nodes in the program
     pub graph: Graph<StatType>,
     /// Reference for usage when calling scanf
