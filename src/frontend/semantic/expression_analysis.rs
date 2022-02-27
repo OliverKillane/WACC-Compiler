@@ -7,7 +7,7 @@
 //! Extensively pushes forwards with finding errors, potentially from every
 //! leaf node of an expression tree.
 use super::{
-    super::ast::{Expr, Type, UnOp, ASTWrapper, ExprWrap},
+    super::ast::{ASTWrapper, Expr, ExprWrap, Type, UnOp},
     semantic_errors::SemanticError,
     symbol_table::{LocalSymbolTable, VariableSymbolTable},
     type_constraints::{binop_match, de_index, unop_match},
@@ -26,9 +26,10 @@ pub fn analyse_expression<'a, 'b>(
 ) -> Option<ExprWrap<Option<Type>, usize>> {
     match expr {
         // Primitive expression checking (will always succeed)
-        Expr::Null => Some(
-            ASTWrapper(Some(Type::Pair(box Type::Any, box Type::Any)), Expr::Null),
-        ),
+        Expr::Null => Some(ASTWrapper(
+            Some(Type::Pair(box Type::Any, box Type::Any)),
+            Expr::Null,
+        )),
         Expr::Int(n) => Some(ASTWrapper(Some(Type::Int), Expr::Int(n))),
         Expr::Bool(b) => Some(ASTWrapper(Some(Type::Bool), Expr::Bool(b))),
         Expr::Char(c) => Some(ASTWrapper(Some(Type::Char), Expr::Char(c))),
@@ -59,7 +60,9 @@ pub fn analyse_expression<'a, 'b>(
                     Some(ASTWrapper(Some(index_type), _)) => {
                         errors.push(SemanticError::InvalidIndex(index_span, index_type))
                     }
-                    Some(ASTWrapper(None, _)) => panic!("Correctly typed expressions must always have a type"),
+                    Some(ASTWrapper(None, _)) => {
+                        panic!("Correctly typed expressions must always have a type")
+                    }
                     None => any_errors = true,
                 }
             }
@@ -84,7 +87,10 @@ pub fn analyse_expression<'a, 'b>(
             };
 
             if let (false, Some((rename, t))) = (any_errors, symb) {
-                Some(ASTWrapper(Some(t), Expr::ArrayElem(rename, correct_indexes)))
+                Some(ASTWrapper(
+                    Some(t),
+                    Expr::ArrayElem(rename, correct_indexes),
+                ))
             } else {
                 None
             }
@@ -103,9 +109,10 @@ pub fn analyse_expression<'a, 'b>(
         Expr::UnOp(op, box inner_expr) => {
             match analyse_expression(inner_expr, local_symb, var_symb, errors) {
                 Some(ASTWrapper(Some(inner_t), ast)) => match unop_match(&op, &inner_t) {
-                    Ok(unop_t) => Some(
-                        ASTWrapper(Some(unop_t), Expr::UnOp(op, box ASTWrapper(Some(inner_t), ast))),
-                    ),
+                    Ok(unop_t) => Some(ASTWrapper(
+                        Some(unop_t),
+                        Expr::UnOp(op, box ASTWrapper(Some(inner_t), ast)),
+                    )),
                     Err((pot_types, pot_ops)) => {
                         errors.push(SemanticError::InvalidUnOp(
                             span, pot_types, pot_ops, inner_t, op,
@@ -113,7 +120,9 @@ pub fn analyse_expression<'a, 'b>(
                         None
                     }
                 },
-                Some(ASTWrapper(None, _)) => panic!("Correctly typed expressions must always have a type"),
+                Some(ASTWrapper(None, _)) => {
+                    panic!("Correctly typed expressions must always have a type")
+                }
                 None => None,
             }
         }
@@ -130,16 +139,14 @@ pub fn analyse_expression<'a, 'b>(
                     Some(ASTWrapper(Some(left_type), left_ast)),
                     Some(ASTWrapper(Some(right_type), right_ast)),
                 ) => match binop_match(&op, &left_type, &right_type) {
-                    Ok(t) => Some(
-                        ASTWrapper(
-                            Some(t),
-                            Expr::BinOp(
-                                box ASTWrapper(Some(left_type), left_ast),
-                                op,
-                                box ASTWrapper(Some(right_type), right_ast),
-                            ),
+                    Ok(t) => Some(ASTWrapper(
+                        Some(t),
+                        Expr::BinOp(
+                            box ASTWrapper(Some(left_type), left_ast),
+                            op,
+                            box ASTWrapper(Some(right_type), right_ast),
                         ),
-                    ),
+                    )),
                     Err((pot_types, pot_ops)) => {
                         errors.push(SemanticError::InvalidBinOp(
                             span,
@@ -151,7 +158,9 @@ pub fn analyse_expression<'a, 'b>(
                         None
                     }
                 },
-                (Some(ASTWrapper(None, _)), _) | (_, Some(ASTWrapper(None, _))) => panic!("Correctly typed expressions must always have a type"),
+                (Some(ASTWrapper(None, _)), _) | (_, Some(ASTWrapper(None, _))) => {
+                    panic!("Correctly typed expressions must always have a type")
+                }
                 _ => None,
             }
         }
@@ -561,7 +570,10 @@ mod tests {
                                         UnOp::Ord,
                                         box ASTWrapper(
                                             "chr 'a'",
-                                            Expr::UnOp(UnOp::Chr, box ASTWrapper("9", Expr::Int(9))),
+                                            Expr::UnOp(
+                                                UnOp::Chr,
+                                                box ASTWrapper("9", Expr::Int(9)),
+                                            ),
                                         ),
                                     ),
                                 ),
@@ -793,7 +805,10 @@ mod tests {
         );
 
         match analyse_expression(expr3, &local_symb, &var_symb, &mut Vec::new()) {
-            Some(ASTWrapper(Some(Type::Pair(box Type::Int, box Type::Pair(box Type::Int, box Type::Char))), _)) => {
+            Some(ASTWrapper(
+                Some(Type::Pair(box Type::Int, box Type::Pair(box Type::Int, box Type::Char))),
+                _,
+            )) => {
                 assert!(true)
             }
             _ => assert!(false),
@@ -831,7 +846,10 @@ mod tests {
         );
 
         match analyse_expression(expr1, &local_symb, &var_symb, &mut Vec::new()) {
-            Some(ASTWrapper(Some(Type::Pair(box Type::Array(box Type::Bool, 2), box Type::Int)), _)) => {
+            Some(ASTWrapper(
+                Some(Type::Pair(box Type::Array(box Type::Bool, 2), box Type::Int)),
+                _,
+            )) => {
                 assert!(true)
             }
             _ => assert!(false),

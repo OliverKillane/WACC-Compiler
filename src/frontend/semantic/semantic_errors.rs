@@ -5,7 +5,7 @@
 //! The semantic analyser can find multiple semantic errors, including multiple
 //! in a single statement or expression.
 
-use super::super::ast::{BinOp, Type, UnOp, ASTWrapper};
+use super::super::ast::{ASTWrapper, BinOp, Type, UnOp};
 
 /// A collection of semantic errors associated with the span of a statement.
 pub type StatementErrors<'a> = ASTWrapper<&'a str, Vec<SemanticError<'a>>>;

@@ -36,7 +36,7 @@
 
 use super::{
     super::{
-        ast::{BinOp, GenericId, Type, UnOp, ASTWrapper},
+        ast::{ASTWrapper, BinOp, GenericId, Type, UnOp},
         error::{Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType},
     },
     semantic_errors::{SemanticError, StatementErrors},

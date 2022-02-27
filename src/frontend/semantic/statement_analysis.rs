@@ -2,7 +2,7 @@
 //! AST or the errors produced.
 
 use super::{
-    super::ast::{AssignLhs, AssignRhs, Stat, StatWrap, Type, ASTWrapper},
+    super::ast::{ASTWrapper, AssignLhs, AssignRhs, Stat, StatWrap, Type},
     expression_analysis::analyse_expression,
     semantic_errors::{SemanticError, StatementErrors},
     symbol_table::{FunctionSymbolTable, LocalSymbolTable, VariableSymbolTable},
@@ -199,7 +199,10 @@ fn analyse_statement<'a, 'b>(
                     if can_coerce(&Type::Pair(box Type::Any, box Type::Any), &expr_type)
                         || can_coerce(&Type::Array(box Type::Any, 1), &expr_type)
                     {
-                        Some(ASTWrapper(None, Stat::Free(ASTWrapper(Some(expr_type), expr_ast))))
+                        Some(ASTWrapper(
+                            None,
+                            Stat::Free(ASTWrapper(Some(expr_type), expr_ast)),
+                        ))
                     } else {
                         add_error(ASTWrapper(
                             span,
@@ -207,7 +210,9 @@ fn analyse_statement<'a, 'b>(
                         ))
                     }
                 }
-                Some(ASTWrapper(None, _)) => panic!("Correctly typed expressions must always have a type"),
+                Some(ASTWrapper(None, _)) => {
+                    panic!("Correctly typed expressions must always have a type")
+                }
                 None => add_error(ASTWrapper(span, stat_errors)),
             }
         }
@@ -217,7 +222,10 @@ fn analyse_statement<'a, 'b>(
                 Some(ASTWrapper(Some(expr_type), expr_ast)) => match &ret_type {
                     Some(return_type) => {
                         if can_coerce(return_type, &expr_type) {
-                            Some(ASTWrapper(None, Stat::Return(ASTWrapper(Some(expr_type), expr_ast))))
+                            Some(ASTWrapper(
+                                None,
+                                Stat::Return(ASTWrapper(Some(expr_type), expr_ast)),
+                            ))
                         } else {
                             add_error(ASTWrapper(
                                 span,
@@ -234,16 +242,21 @@ fn analyse_statement<'a, 'b>(
                         vec![SemanticError::ReturnStatementMisplaced(span)],
                     )),
                 },
-                Some(ASTWrapper(None, _)) => panic!("Correctly typed expressions must always have a type"),
+                Some(ASTWrapper(None, _)) => {
+                    panic!("Correctly typed expressions must always have a type")
+                }
                 None => add_error(ASTWrapper(span, stat_errors)),
             }
         }
-        Stat::Exit(expr @ ASTWrapper(expr_span, _ )) => {
+        Stat::Exit(expr @ ASTWrapper(expr_span, _)) => {
             let mut stat_errors = Vec::new();
             match analyse_expression(expr, local_symb, var_symb, &mut stat_errors) {
                 Some(ASTWrapper(Some(expr_type), expr_ast)) => {
                     if can_coerce(&Type::Int, &expr_type) {
-                        Some(ASTWrapper(None, Stat::Exit(ASTWrapper(Some(expr_type), expr_ast))))
+                        Some(ASTWrapper(
+                            None,
+                            Stat::Exit(ASTWrapper(Some(expr_type), expr_ast)),
+                        ))
                     } else {
                         add_error(ASTWrapper(
                             span,
@@ -251,7 +264,9 @@ fn analyse_statement<'a, 'b>(
                         ))
                     }
                 }
-                Some(ASTWrapper(None, _)) => panic!("Correctly typed expressions must always have a type"),
+                Some(ASTWrapper(None, _)) => {
+                    panic!("Correctly typed expressions must always have a type")
+                }
                 None => add_error(ASTWrapper(span, stat_errors)),
             }
         }
@@ -290,7 +305,9 @@ fn analyse_statement<'a, 'b>(
                         None
                     }
                 }
-                Some(ASTWrapper(None, _)) => panic!("Correctly typed expressions must always have a type"),
+                Some(ASTWrapper(None, _)) => {
+                    panic!("Correctly typed expressions must always have a type")
+                }
                 None => {
                     errors.push(ASTWrapper(span, stat_errors));
                     None
@@ -343,7 +360,9 @@ fn analyse_statement<'a, 'b>(
                             None
                         }
                     }
-                    Some(ASTWrapper(None, _)) => panic!("Correctly typed expressions must always have a type"),
+                    Some(ASTWrapper(None, _)) => {
+                        panic!("Correctly typed expressions must always have a type")
+                    }
                     None => {
                         errors.push(ASTWrapper(span, stat_errors));
                         None
@@ -399,23 +418,30 @@ fn analyse_rhs<'a, 'b>(
     errors: &mut Vec<SemanticError<'a>>,
 ) -> Option<AssignRhs<Option<Type>, usize>> {
     match rhs {
-        AssignRhs::Expr(expr @ ASTWrapper(expr_span, _)) => match analyse_expression(expr, local_symb, var_symb, errors) {
-            Some(ASTWrapper(Some(expr_t), expr_ast)) => {
-                if can_coerce(expected, &expr_t) {
-                    // if the type is coercible, the entire expression should go to this type
-                    Some(AssignRhs::Expr(ASTWrapper(Some(expected.clone()), expr_ast)))
-                } else {
-                    errors.push(SemanticError::InvalidType(
-                        expr_span,
-                        expected.clone(),
-                        expr_t,
-                    ));
-                    None
+        AssignRhs::Expr(expr @ ASTWrapper(expr_span, _)) => {
+            match analyse_expression(expr, local_symb, var_symb, errors) {
+                Some(ASTWrapper(Some(expr_t), expr_ast)) => {
+                    if can_coerce(expected, &expr_t) {
+                        // if the type is coercible, the entire expression should go to this type
+                        Some(AssignRhs::Expr(ASTWrapper(
+                            Some(expected.clone()),
+                            expr_ast,
+                        )))
+                    } else {
+                        errors.push(SemanticError::InvalidType(
+                            expr_span,
+                            expected.clone(),
+                            expr_t,
+                        ));
+                        None
+                    }
                 }
+                Some(ASTWrapper(None, _)) => {
+                    panic!("Correctly typed expressions must always have a type")
+                }
+                None => None,
             }
-            Some(ASTWrapper(None,_ )) => panic!("Correctly typed expressions must always have a type"),
-            None => None,
-        },
+        }
         AssignRhs::Array(ASTWrapper(span, vals)) => {
             // check if assignment is possible
             let vals_len = vals.len();
@@ -434,7 +460,9 @@ fn analyse_rhs<'a, 'b>(
                 let mut arr_lit_type = None;
 
                 for ASTWrapper(expr_type, _) in renamed_vals.iter() {
-                    let expr_type = expr_type.clone().expect("Correctly typed expressions must always have a type");
+                    let expr_type = expr_type
+                        .clone()
+                        .expect("Correctly typed expressions must always have a type");
                     match &arr_lit_type {
                         Some(t) => {
                             if can_coerce(t, &expr_type) {
@@ -464,7 +492,15 @@ fn analyse_rhs<'a, 'b>(
 
                 if let Some(expected_item_type) = de_index(expected, 1) {
                     if can_coerce(&expected_item_type, &array_lit_type) {
-                        Some(AssignRhs::Array(ASTWrapper(Some(expected.clone()), renamed_vals.into_iter().map(|ASTWrapper(_, item_ast)| ASTWrapper(Some(expected_item_type.clone()), item_ast)).collect::<Vec<_>>())))
+                        Some(AssignRhs::Array(ASTWrapper(
+                            Some(expected.clone()),
+                            renamed_vals
+                                .into_iter()
+                                .map(|ASTWrapper(_, item_ast)| {
+                                    ASTWrapper(Some(expected_item_type.clone()), item_ast)
+                                })
+                                .collect::<Vec<_>>(),
+                        )))
                     } else {
                         errors.push(SemanticError::InvalidType(
                             span,
@@ -520,7 +556,10 @@ fn analyse_rhs<'a, 'b>(
                     }
 
                     if errors.is_empty() {
-                        Some(AssignRhs::Call(ASTWrapper(Some(expected.clone()), fun_name_string), correct))
+                        Some(AssignRhs::Call(
+                            ASTWrapper(Some(expected.clone()), fun_name_string),
+                            correct,
+                        ))
                     } else {
                         None
                     }
@@ -608,32 +647,46 @@ fn analyse_lhs<'a, 'b>(
                 }
             }
         }
-        AssignLhs::PairFst(expr @ ASTWrapper(expr_span, _ )) => match analyse_expression(expr, local_symb, var_symb, errors) {
-            Some( ASTWrapper(Some(Type::Pair(box t, t2)), renamed_ast)) => Some((t.clone(), AssignLhs::PairFst(ASTWrapper(Some(Type::Pair(box t, t2)), renamed_ast)))),
-            Some( ASTWrapper(Some(index_type), _)) => {
-                errors.push(SemanticError::InvalidType(
-                    expr_span,
-                    Type::Pair(box Type::Any, box Type::Any),
-                    index_type,
-                ));
-                None
+        AssignLhs::PairFst(expr @ ASTWrapper(expr_span, _)) => {
+            match analyse_expression(expr, local_symb, var_symb, errors) {
+                Some(ASTWrapper(Some(Type::Pair(box t, t2)), renamed_ast)) => Some((
+                    t.clone(),
+                    AssignLhs::PairFst(ASTWrapper(Some(Type::Pair(box t, t2)), renamed_ast)),
+                )),
+                Some(ASTWrapper(Some(index_type), _)) => {
+                    errors.push(SemanticError::InvalidType(
+                        expr_span,
+                        Type::Pair(box Type::Any, box Type::Any),
+                        index_type,
+                    ));
+                    None
+                }
+                Some(ASTWrapper(None, _)) => {
+                    panic!("Correctly typed expressions must always have a type")
+                }
+                None => None,
             }
-            Some(ASTWrapper(None, _)) => panic!("Correctly typed expressions must always have a type"),
-            None => None,
-        },
-        AssignLhs::PairSnd(expr @ ASTWrapper(expr_span, _), ) => match analyse_expression(expr, local_symb, var_symb, errors) {
-            Some(ASTWrapper(Some(Type::Pair(t2, box t)), renamed_ast)) => Some((t.clone(), AssignLhs::PairSnd(ASTWrapper(Some(Type::Pair(t2, box t)), renamed_ast)))),
-            Some(ASTWrapper(Some(index_type), _)) => {
-                errors.push(SemanticError::InvalidType(
-                    expr_span,
-                    Type::Pair(box Type::Any, box Type::Any),
-                    index_type,
-                ));
-                None
+        }
+        AssignLhs::PairSnd(expr @ ASTWrapper(expr_span, _)) => {
+            match analyse_expression(expr, local_symb, var_symb, errors) {
+                Some(ASTWrapper(Some(Type::Pair(t2, box t)), renamed_ast)) => Some((
+                    t.clone(),
+                    AssignLhs::PairSnd(ASTWrapper(Some(Type::Pair(t2, box t)), renamed_ast)),
+                )),
+                Some(ASTWrapper(Some(index_type), _)) => {
+                    errors.push(SemanticError::InvalidType(
+                        expr_span,
+                        Type::Pair(box Type::Any, box Type::Any),
+                        index_type,
+                    ));
+                    None
+                }
+                Some(ASTWrapper(None, _)) => {
+                    panic!("Correctly typed expressions must always have a type")
+                }
+                None => None,
             }
-            Some(ASTWrapper(None, _)) => panic!("Correctly typed expressions must always have a type"),
-            None => None,
-        },
+        }
     }
 }
 
@@ -678,7 +731,10 @@ mod tests {
             ),
             Some(AssignRhs::Call(
                 ASTWrapper(Some(Type::Int), String::from("fun1")),
-                vec![ASTWrapper(Some(Type::Int), Expr::Int(3)), ASTWrapper(Some(Type::Int), Expr::Int(4))]
+                vec![
+                    ASTWrapper(Some(Type::Int), Expr::Int(3)),
+                    ASTWrapper(Some(Type::Int), Expr::Int(4))
+                ]
             ))
         );
         assert_eq!(
@@ -690,7 +746,10 @@ mod tests {
                 &mut var_symb,
                 &mut Vec::new()
             ),
-            Some(AssignRhs::Call(ASTWrapper(Some(Type::Int), String::from("fun2")), vec![]))
+            Some(AssignRhs::Call(
+                ASTWrapper(Some(Type::Int), String::from("fun2")),
+                vec![]
+            ))
         );
         assert_eq!(
             analyse_rhs(
@@ -737,13 +796,22 @@ mod tests {
         assert_eq!(
             analyse_rhs(
                 &Type::Char,
-                AssignRhs::Call(ASTWrapper("fun3", String::from("fun3")), vec![ASTWrapper("a", Expr::Var("a"))]),
+                AssignRhs::Call(
+                    ASTWrapper("fun3", String::from("fun3")),
+                    vec![ASTWrapper("a", Expr::Var("a"))]
+                ),
                 &fun_symb,
                 &mut local_symb,
                 &mut var_symb,
                 &mut Vec::new()
             ),
-            Some(AssignRhs::Call(ASTWrapper(Some(Type::Char), String::from("fun3")), vec![ASTWrapper(Some(Type::Pair(box Type::Int, box Type::Int)), Expr::Var(0))]))
+            Some(AssignRhs::Call(
+                ASTWrapper(Some(Type::Char), String::from("fun3")),
+                vec![ASTWrapper(
+                    Some(Type::Pair(box Type::Int, box Type::Int)),
+                    Expr::Var(0)
+                )]
+            ))
         );
         assert_eq!(
             analyse_rhs(
@@ -764,7 +832,13 @@ mod tests {
                 ASTWrapper(Some(Type::Int), String::from("fun4")),
                 vec![ASTWrapper(
                     Some(Type::Int),
-                    Expr::UnOp(UnOp::Fst, box ASTWrapper(Some(Type::Pair(box Type::Int, box Type::Int)), Expr::Var(0)))
+                    Expr::UnOp(
+                        UnOp::Fst,
+                        box ASTWrapper(
+                            Some(Type::Pair(box Type::Int, box Type::Int)),
+                            Expr::Var(0)
+                        )
+                    )
                 )]
             ))
         );
@@ -804,7 +878,10 @@ mod tests {
         let mut errors1 = Vec::new();
         match analyse_rhs(
             &Type::Char,
-            AssignRhs::Call(ASTWrapper("fun1", String::from("fun1")), vec![ASTWrapper("pair_a", Expr::Var("pair_a"))]),
+            AssignRhs::Call(
+                ASTWrapper("fun1", String::from("fun1")),
+                vec![ASTWrapper("pair_a", Expr::Var("pair_a"))],
+            ),
             &fun_symb,
             &mut local_symb,
             &mut var_symb,

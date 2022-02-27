@@ -8,7 +8,7 @@
 //! renamed identifiers and the types.
 
 use super::{
-    super::ast::{FunWrap, Function, Param, Type, ASTWrapper},
+    super::ast::{ASTWrapper, FunWrap, Function, Param, Type},
     semantic_errors::{SemanticError, StatementErrors},
 };
 
@@ -187,7 +187,11 @@ pub fn get_fn_symbols<'a>(
     let mut valid_fun = Vec::new();
     let mut errors = Vec::new();
 
-    for ASTWrapper(fn_def_span, Function(ret_type,fn_name_wrapped @ ASTWrapper(fn_name, _), params, stats)) in fn_defs {
+    for ASTWrapper(
+        fn_def_span,
+        Function(ret_type, fn_name_wrapped @ ASTWrapper(fn_name, _), params, stats),
+    ) in fn_defs
+    {
         match def_table.insert(fn_name, fn_def_span) {
             Some(orig) => errors.push(ASTWrapper(
                 fn_def_span,

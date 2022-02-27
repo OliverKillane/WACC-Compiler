@@ -426,7 +426,7 @@ type ArrayWrap<W, IdRepr> = ASTWrapper<W, Vec<ExprWrap<W, IdRepr>>>;
 
 /// Statements for assignment, control flow and definitions.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum Stat<W,  IdRepr> {
+pub enum Stat<W, IdRepr> {
     /// A _no-operation_ instruction.
     Skip,
 
@@ -520,7 +520,7 @@ pub enum Stat<W,  IdRepr> {
     ///     a = 120
     /// end ;
     /// ```
-    Block(Vec<StatWrap<W,  IdRepr>>),
+    Block(Vec<StatWrap<W, IdRepr>>),
 }
 
 /// Alias for WarpSpans around statements

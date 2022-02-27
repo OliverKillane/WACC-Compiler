@@ -8,8 +8,8 @@ mod tests;
 mod lexer;
 
 use super::ast::{
-    AssignLhs, AssignRhs, BinOp, Expr, ExprWrap, Function, Param, Program, Stat, StatWrap, Type,
-    UnOp, ASTWrapper,
+    ASTWrapper, AssignLhs, AssignRhs, BinOp, Expr, ExprWrap, Function, Param, Program, Stat,
+    StatWrap, Type, UnOp,
 };
 use lexer::{parse_ident, ws, Lexer};
 use nom::{
@@ -320,7 +320,7 @@ fn parse_base_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
 }
 
 /// Parser for the left-hand side of an assign expression.
-fn parse_lhs(input: &str) -> IResult<&str, AssignLhs<&str,&str>, ErrorTree<&str>> {
+fn parse_lhs(input: &str) -> IResult<&str, AssignLhs<&str, &str>, ErrorTree<&str>> {
     alt((
         map(preceded(Lexer::Fst.parser(), parse_expr.cut()), |pair| {
             AssignLhs::PairFst(pair)
@@ -378,7 +378,9 @@ fn parse_rhs(input: &str) -> IResult<&str, AssignRhs<&str, &str>, ErrorTree<&str
     context(
         "Assign RHS",
         alt((
-            map(call, |(id, es)| AssignRhs::Call(ASTWrapper(id, id.into()), es)),
+            map(call, |(id, es)| {
+                AssignRhs::Call(ASTWrapper(id, id.into()), es)
+            }),
             map(
                 span(preceded(Lexer::Fst.parser(), parse_expr.cut())),
                 |ASTWrapper(s, e)| AssignRhs::Expr(ASTWrapper(s, Expr::UnOp(UnOp::Fst, box e))),

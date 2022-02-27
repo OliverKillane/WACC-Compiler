@@ -14,7 +14,7 @@
 use crate::frontend::ast::FunWrap;
 
 use super::{
-    super::ast::{Function, Param, ASTWrapper, Type},
+    super::ast::{ASTWrapper, Function, Param, Type},
     semantic_errors::StatementErrors,
     statement_analysis::analyse_block,
     symbol_table::{FunctionSymbolTable, LocalSymbolTable, VariableSymbolTable},
@@ -68,7 +68,15 @@ pub fn analyse_function<'a>(
         Some(block_ast) => {
             if errors.is_empty() {
                 Ok((
-                    ASTWrapper(None, Function(ret_type, ASTWrapper(None, string_name), param_correct, block_ast)),
+                    ASTWrapper(
+                        None,
+                        Function(
+                            ret_type,
+                            ASTWrapper(None, string_name),
+                            param_correct,
+                            block_ast,
+                        ),
+                    ),
                     var_symb,
                 ))
             } else {
