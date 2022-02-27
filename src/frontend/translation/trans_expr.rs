@@ -2,19 +2,24 @@
 
 use std::collections::HashMap;
 
+use super::super::ast::{Expr, ExprSpan, UnOp, WrapSpan};
 use crate::frontend::ast;
 use crate::frontend::semantic::symbol_table::VariableSymbolTable;
-use super::super::ast::{Expr, ExprSpan, UnOp, WrapSpan};
 
-use crate::intermediate::{ArithOp, BoolExpr, BoolOp, Expr::*, NumExpr, NumSize::{self, *}, PtrExpr, Type, DataRef};
 use super::super::super::intermediate::Expr as IRExpr;
-
+use crate::intermediate::{
+    ArithOp, BoolExpr, BoolOp, DataRef,
+    Expr::*,
+    NumExpr,
+    NumSize::{self, *},
+    PtrExpr, Type,
+};
 
 /// usize -> &'a str
 pub fn translate_expr<'a>(
     WrapSpan(_, ast_expr): ExprSpan<'a, usize>,
     var_symb: &VariableSymbolTable,
-    dataref_map: &mut HashMap<DataRef, Vec<IRExpr>>
+    dataref_map: &mut HashMap<DataRef, Vec<IRExpr>>,
 ) -> IRExpr {
     match ast_expr {
         // pair literal 'null' - maybe define null as PtrExpr in IR?
@@ -157,7 +162,10 @@ mod tests {
 
         let translated: intermediate::Expr = Bool(BoolExpr::Not(box BoolExpr::Const(true)));
 
-        assert_eq!(translate_expr(expr, &var_symb, &mut dataref_map), translated);
+        assert_eq!(
+            translate_expr(expr, &var_symb, &mut dataref_map),
+            translated
+        );
 
         let expr2: WrapSpan<Expr<usize>> = WrapSpan(
             "(ord 'a' == 65) || (true && !false)",
@@ -202,6 +210,9 @@ mod tests {
             ),
         ));
 
-        assert_eq!(translate_expr(expr2, &var_symb, &mut dataref_map), translated2);
+        assert_eq!(
+            translate_expr(expr2, &var_symb, &mut dataref_map),
+            translated2
+        );
     }
 }
