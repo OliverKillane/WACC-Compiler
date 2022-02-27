@@ -119,6 +119,7 @@ pub(super) struct Function {
     pub read_ref: Option<DataRef>,
 }
 
+/// Type of the data reference under a [data reference id](DataRef).
 pub(super) enum DataRefType {
     Integer(Vec<i32>),
     String(Vec<u8>),
