@@ -120,7 +120,7 @@ pub(super) struct Function {
 }
 
 /// Type of the data reference under a [data reference id](DataRef).
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub(super) enum DataRefType {
     Integer(Vec<i32>),
     String(Vec<u8>),
