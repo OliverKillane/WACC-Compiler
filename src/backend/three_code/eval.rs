@@ -1,6 +1,8 @@
 use super::stat::get_type_width;
 use crate::intermediate as ir;
 
+/// Evaluates a constant boolean expression. Assumes no variable refrences or
+/// function calls present.
 fn eval_bool_expr(bool_expr: ir::BoolExpr) -> bool {
     match bool_expr {
         ir::BoolExpr::Const(bool_const) => bool_const,
@@ -29,6 +31,7 @@ fn eval_bool_expr(bool_expr: ir::BoolExpr) -> bool {
     }
 }
 
+/// Trims the numeric constant to the given size.
 fn trim_num_const(size: ir::NumSize, num_const: i32) -> i32 {
     match size {
         ir::NumSize::DWord => num_const,
@@ -37,6 +40,8 @@ fn trim_num_const(size: ir::NumSize, num_const: i32) -> i32 {
     }
 }
 
+/// Evaluates a constant numeric expression. Assumes no variable refrences or
+/// function calls present. Returns the size and the value of the expression.
 fn eval_num_expr(num_expr: ir::NumExpr) -> (ir::NumSize, i32) {
     match num_expr {
         ir::NumExpr::SizeOf(expr_type) => (ir::NumSize::DWord, get_type_width(expr_type).into()),
@@ -67,6 +72,9 @@ fn eval_num_expr(num_expr: ir::NumExpr) -> (ir::NumSize, i32) {
     }
 }
 
+/// Evaluates a constant boolean expression. Assumes no variable refrences or
+/// function calls present. Returns the numeric value of the pointer, since no
+/// data references are allowed.
 fn eval_ptr_expr(ptr_expr: ir::PtrExpr) -> i32 {
     match ptr_expr {
         ir::PtrExpr::Null => 0,
@@ -84,8 +92,8 @@ pub(super) fn eval_expr(expr: ir::Expr) -> Vec<u8> {
         ir::Expr::Num(num_expr) => {
             let (size, num_const) = eval_num_expr(num_expr);
             match size {
-                ir::NumSize::DWord => Vec::from(num_const.to_ne_bytes()),
-                ir::NumSize::Word => Vec::from((num_const as u16).to_ne_bytes()),
+                ir::NumSize::DWord => Vec::from(num_const.to_le_bytes()),
+                ir::NumSize::Word => Vec::from((num_const as u16).to_le_bytes()),
                 ir::NumSize::Byte => vec![num_const as u8],
             }
         }
