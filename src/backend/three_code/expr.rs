@@ -317,36 +317,59 @@ pub(super) fn translate_ptr_expr(
                 unreachable!();
             };
 
-            let mut setting_stat_line = StatLine::new(stat_line.graph());
-            let width: i32 = zip(
-                exprs,
-                successors(Some(result + 1), |sub_result| Some(sub_result + 1)),
-            )
-            .into_iter()
-            .map(|(expr, sub_result)| {
-                if is_wide {
-                    4
-                } else {
-                    get_type_width(translate_expr(
+            let (width, width_prefixes) = exprs
+                .into_iter()
+                .map(|expr| {
+                    let mut setting_stat_line = StatLine::new(stat_line.graph());
+                    let expr_type = translate_expr(
                         expr,
-                        sub_result,
+                        result + 1,
                         &mut setting_stat_line,
                         vars,
                         function_types,
                         options,
-                    ))
-                    .into()
-                }
-            })
-            .sum();
+                    );
+                    (
+                        if is_wide {
+                            4
+                        } else {
+                            get_type_width(expr_type).into()
+                        },
+                        get_type_width(expr_type),
+                        setting_stat_line,
+                    )
+                })
+                .fold(
+                    (0, Vec::new()),
+                    |(total_width, mut width_prefixes),
+                     (mem_width, store_width, setting_stat_line)| {
+                        width_prefixes.push((total_width, store_width, setting_stat_line));
+                        (total_width + mem_width, width_prefixes)
+                    },
+                );
 
-            if let Some(setting_stat_line_start) = setting_stat_line.start_node() {
+            if width_prefixes.len() > 0 {
                 stat_line.add_stat(StatCode::Assign(result, OpSrc::from(width)));
                 stat_line.add_stat(StatCode::Call(result, "malloc".to_string(), vec![result]));
-                stat_line.splice(
-                    setting_stat_line_start,
-                    setting_stat_line.end_node().unwrap(),
-                );
+                for (offset, store_width, setting_stat_line) in width_prefixes {
+                    stat_line.splice(
+                        setting_stat_line
+                            .start_node()
+                            .expect("No calculation of the expression value"),
+                        setting_stat_line
+                            .end_node()
+                            .expect("No calculation of the expression value"),
+                    );
+                    stat_line.add_stat(StatCode::AssignOp(
+                        result + 2,
+                        OpSrc::Var(result),
+                        BinOp::Add,
+                        OpSrc::from(offset),
+                    ));
+                    stat_line.add_stat(StatCode::Store(result + 2, result + 1, store_width))
+                }
+            } else {
+                stat_line.add_stat(StatCode::Assign(result, OpSrc::Const(0)))
             }
         }
         ir::PtrExpr::Call(name, args) => {
@@ -380,5 +403,479 @@ pub(super) fn translate_expr(
             translate_ptr_expr(ptr_expr, result, stat_line, vars, function_types, options);
             ir::Type::Ptr
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
+    use super::{
+        super::{
+            super::{Options, PropagationOpt},
+            OpSrc, Size, StatCode, StatType,
+        },
+        translate_expr,
+    };
+    use crate::{
+        backend::three_code::{BinOp, StatLine},
+        graph::Graph,
+        intermediate::{self as ir, VarRepr},
+    };
+
+    fn match_line_stat_vec(
+        expr: ir::Expr,
+        result: VarRepr,
+        stats: Vec<StatCode>,
+        vars: &HashMap<VarRepr, ir::Type>,
+        function_types: &HashMap<String, ir::Type>,
+        expr_type: ir::Type,
+    ) {
+        let graph = Rc::new(RefCell::new(Graph::new()));
+        let mut stat_line = StatLine::new(graph.clone());
+        assert_eq!(
+            translate_expr(
+                expr,
+                result,
+                &mut stat_line,
+                vars,
+                function_types,
+                &Options {
+                    sethi_ullman_weights: false,
+                    dead_code_removal: false,
+                    propagation: PropagationOpt::None,
+                    inlining: false,
+                    tail_call: false,
+                    hoisting: false,
+                    strength_reduction: false,
+                    loop_unrolling: false,
+                    common_expressions: false
+                }
+            ),
+            expr_type
+        );
+        let mut node = stat_line.start_node().expect("No start node");
+        let mut stats = stats.into_iter();
+        while node != stat_line.end_node().expect("No end node") {
+            let next_node = if let StatType::Simple(_, node_stat_code, next_node) = &*node.get() {
+                assert_eq!(
+                    *node_stat_code,
+                    stats.next().expect("More statements than expected")
+                );
+                next_node.clone()
+            } else {
+                panic!("Expected a simple statement")
+            };
+            node = next_node;
+        }
+        if let StatType::Final(_, node_stat_code) = &*node.get() {
+            assert_eq!(
+                *node_stat_code,
+                stats.next().expect("More statements than expected")
+            );
+        } else {
+            panic!("Expected a final statement")
+        };
+        assert_eq!(stats.next(), None)
+    }
+
+    #[test]
+    fn translate_sizeof_num_expr() {
+        match_line_stat_vec(
+            ir::Expr::Num(ir::NumExpr::SizeOf(ir::Type::Bool)),
+            0,
+            vec![StatCode::Assign(0, OpSrc::Const(1))],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Num(ir::NumSize::DWord),
+        );
+        match_line_stat_vec(
+            ir::Expr::Num(ir::NumExpr::SizeOfWideAlloc),
+            0,
+            vec![StatCode::Assign(0, OpSrc::Const(4))],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Num(ir::NumSize::DWord),
+        );
+    }
+
+    #[test]
+    fn translate_const_num_expr() {
+        match_line_stat_vec(
+            ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::Word, 42)),
+            0,
+            vec![StatCode::Assign(0, OpSrc::Const(42))],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Num(ir::NumSize::Word),
+        )
+    }
+
+    #[test]
+    fn translate_var_num_expr() {
+        match_line_stat_vec(
+            ir::Expr::Num(ir::NumExpr::Var(1)),
+            0,
+            vec![StatCode::Assign(0, OpSrc::Var(1))],
+            &HashMap::from([(1, ir::Type::Num(ir::NumSize::Word))]),
+            &HashMap::new(),
+            ir::Type::Num(ir::NumSize::Word),
+        )
+    }
+
+    #[test]
+    fn translate_deref_num_expr() {
+        match_line_stat_vec(
+            ir::Expr::Num(ir::NumExpr::Deref(
+                ir::NumSize::Word,
+                ir::PtrExpr::DataRef(0),
+            )),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::DataRef(0, 0)),
+                StatCode::Load(0, 0, Size::Word),
+            ],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Num(ir::NumSize::Word),
+        )
+    }
+
+    #[test]
+    fn translate_arith_num_expr() {
+        match_line_stat_vec(
+            ir::Expr::Num(ir::NumExpr::ArithOp(
+                box ir::NumExpr::Const(ir::NumSize::Byte, 1),
+                ir::ArithOp::Add,
+                box ir::NumExpr::Const(ir::NumSize::Byte, 2),
+            )),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::Assign(1, OpSrc::Const(2)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Add, OpSrc::Var(1)),
+            ],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Num(ir::NumSize::Byte),
+        )
+    }
+
+    #[test]
+    fn translate_cast_num_expr() {
+        match_line_stat_vec(
+            ir::Expr::Num(ir::NumExpr::Cast(
+                ir::NumSize::Byte,
+                box ir::NumExpr::Var(1),
+            )),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::Var(1)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::And, OpSrc::Const(0xff)),
+            ],
+            &HashMap::from([(1, ir::Type::Num(ir::NumSize::DWord))]),
+            &HashMap::new(),
+            ir::Type::Num(ir::NumSize::Byte),
+        )
+    }
+
+    #[test]
+    fn translate_call_num_expr() {
+        match_line_stat_vec(
+            ir::Expr::Num(ir::NumExpr::Call(
+                "f".to_string(),
+                vec![
+                    ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::DWord, 1)),
+                    ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::Byte, 255)),
+                ],
+            )),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::Assign(1, OpSrc::Const(255)),
+                StatCode::Call(0, "f".to_string(), vec![0, 1]),
+            ],
+            &HashMap::new(),
+            &HashMap::from([("f".to_string(), ir::Type::Num(ir::NumSize::Word))]),
+            ir::Type::Num(ir::NumSize::Word),
+        )
+    }
+
+    #[test]
+    fn translate_const_bool_expr() {
+        match_line_stat_vec(
+            ir::Expr::Bool(ir::BoolExpr::Const(true)),
+            0,
+            vec![StatCode::Assign(0, OpSrc::Const(1))],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Bool,
+        )
+    }
+
+    #[test]
+    fn translate_var_bool_expr() {
+        match_line_stat_vec(
+            ir::Expr::Bool(ir::BoolExpr::Var(1)),
+            0,
+            vec![StatCode::Assign(0, OpSrc::Var(1))],
+            &HashMap::from([(1, ir::Type::Bool)]),
+            &HashMap::new(),
+            ir::Type::Bool,
+        )
+    }
+
+    #[test]
+    fn translate_deref_bool_expr() {
+        match_line_stat_vec(
+            ir::Expr::Bool(ir::BoolExpr::Deref(ir::PtrExpr::DataRef(0))),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::DataRef(0, 0)),
+                StatCode::Load(0, 0, Size::Byte),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::And, OpSrc::Const(0x01)),
+            ],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Bool,
+        )
+    }
+
+    #[test]
+    fn translate_test_zero_bool_expr() {
+        match_line_stat_vec(
+            ir::Expr::Bool(ir::BoolExpr::TestZero(ir::NumExpr::Const(
+                ir::NumSize::Word,
+                0,
+            ))),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::Const(0)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Eq, OpSrc::Const(0)),
+            ],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Bool,
+        )
+    }
+
+    #[test]
+    fn translate_test_positive_bool_expr() {
+        match_line_stat_vec(
+            ir::Expr::Bool(ir::BoolExpr::TestPositive(ir::NumExpr::Const(
+                ir::NumSize::Word,
+                0,
+            ))),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::Const(0)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Gt, OpSrc::Const(0)),
+            ],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Bool,
+        )
+    }
+
+    #[test]
+    fn translate_ptr_eq_bool_expr() {
+        match_line_stat_vec(
+            ir::Expr::Bool(ir::BoolExpr::PtrEq(ir::PtrExpr::Null, ir::PtrExpr::Null)),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::Const(0)),
+                StatCode::Assign(1, OpSrc::Const(0)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Eq, OpSrc::Var(1)),
+            ],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Bool,
+        )
+    }
+
+    #[test]
+    fn translate_bin_op_bool_expr() {
+        match_line_stat_vec(
+            ir::Expr::Bool(ir::BoolExpr::BoolOp(
+                box ir::BoolExpr::Const(true),
+                ir::BoolOp::And,
+                box ir::BoolExpr::Const(false),
+            )),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::Assign(1, OpSrc::Const(0)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::And, OpSrc::Var(1)),
+            ],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Bool,
+        )
+    }
+
+    #[test]
+    fn translate_call_bool_expr() {
+        match_line_stat_vec(
+            ir::Expr::Bool(ir::BoolExpr::Call(
+                "f".to_string(),
+                vec![
+                    ir::Expr::Bool(ir::BoolExpr::Const(true)),
+                    ir::Expr::Bool(ir::BoolExpr::Const(false)),
+                ],
+            )),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::Assign(1, OpSrc::Const(0)),
+                StatCode::Call(0, "f".to_string(), vec![0, 1]),
+            ],
+            &HashMap::new(),
+            &HashMap::from([("f".to_string(), ir::Type::Bool)]),
+            ir::Type::Bool,
+        )
+    }
+
+    #[test]
+    fn translate_null_ptr_expr() {
+        match_line_stat_vec(
+            ir::Expr::Ptr(ir::PtrExpr::Null),
+            0,
+            vec![StatCode::Assign(0, OpSrc::Const(1))],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Ptr,
+        )
+    }
+
+    #[test]
+    fn translate_dataref_ptr_expr() {
+        match_line_stat_vec(
+            ir::Expr::Ptr(ir::PtrExpr::DataRef(1)),
+            0,
+            vec![StatCode::Assign(0, OpSrc::DataRef(1, 0))],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Ptr,
+        )
+    }
+
+    #[test]
+    fn translate_var_ptr_expr() {
+        match_line_stat_vec(
+            ir::Expr::Ptr(ir::PtrExpr::Var(1)),
+            0,
+            vec![StatCode::Assign(0, OpSrc::Var(1))],
+            &HashMap::from([(1, ir::Type::Ptr)]),
+            &HashMap::new(),
+            ir::Type::Ptr,
+        )
+    }
+
+    #[test]
+    fn translate_deref_ptr_expr() {
+        match_line_stat_vec(
+            ir::Expr::Ptr(ir::PtrExpr::Deref(box ir::PtrExpr::DataRef(0))),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::DataRef(0, 0)),
+                StatCode::Load(0, 0, Size::DWord),
+            ],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Ptr,
+        )
+    }
+
+    #[test]
+    fn translate_offset_ptr_expr() {
+        match_line_stat_vec(
+            ir::Expr::Ptr(ir::PtrExpr::Offset(
+                box ir::PtrExpr::Null,
+                box ir::NumExpr::Const(ir::NumSize::DWord, 2),
+            )),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::Const(0)),
+                StatCode::Assign(1, OpSrc::Const(2)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Add, OpSrc::Var(1)),
+            ],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Ptr,
+        )
+    }
+
+    #[test]
+    fn translate_malloc_ptr_expr() {
+        match_line_stat_vec(
+            ir::Expr::Ptr(ir::PtrExpr::Malloc(vec![
+                ir::Expr::Bool(ir::BoolExpr::Const(true)),
+                ir::Expr::Ptr(ir::PtrExpr::Null),
+            ])),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::Const(5)),
+                StatCode::Call(0, "malloc".to_string(), vec![0]),
+                StatCode::Assign(1, OpSrc::Const(1)),
+                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(0)),
+                StatCode::Store(2, 1, Size::Byte),
+                StatCode::Assign(1, OpSrc::Const(0)),
+                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(1)),
+                StatCode::Store(2, 1, Size::DWord),
+            ],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Ptr,
+        );
+        match_line_stat_vec(
+            ir::Expr::Ptr(ir::PtrExpr::WideMalloc(vec![
+                ir::Expr::Bool(ir::BoolExpr::Const(true)),
+                ir::Expr::Ptr(ir::PtrExpr::Null),
+            ])),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::Const(8)),
+                StatCode::Call(0, "malloc".to_string(), vec![0]),
+                StatCode::Assign(1, OpSrc::Const(1)),
+                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(0)),
+                StatCode::Store(2, 1, Size::Byte),
+                StatCode::Assign(1, OpSrc::Const(0)),
+                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(4)),
+                StatCode::Store(2, 1, Size::DWord),
+            ],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Ptr,
+        );
+        match_line_stat_vec(
+            ir::Expr::Ptr(ir::PtrExpr::Malloc(vec![])),
+            0,
+            vec![StatCode::Assign(0, OpSrc::Const(0))],
+            &HashMap::new(),
+            &HashMap::new(),
+            ir::Type::Ptr,
+        );
+    }
+
+    #[test]
+    fn translate_call_ptr_expr() {
+        match_line_stat_vec(
+            ir::Expr::Ptr(ir::PtrExpr::Call(
+                "f".to_string(),
+                vec![
+                    ir::Expr::Ptr(ir::PtrExpr::DataRef(0)),
+                    ir::Expr::Ptr(ir::PtrExpr::Null),
+                ],
+            )),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::DataRef(0, 0)),
+                StatCode::Assign(1, OpSrc::Const(0)),
+                StatCode::Call(0, "f".to_string(), vec![0, 1]),
+            ],
+            &HashMap::new(),
+            &HashMap::from([("f".to_string(), ir::Type::Ptr)]),
+            ir::Type::Ptr,
+        )
     }
 }
