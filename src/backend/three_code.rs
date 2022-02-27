@@ -131,8 +131,10 @@ pub(super) enum DataRefType {
 pub(super) struct ThreeCode {
     /// All functions in the program
     pub functions: HashMap<String, Function>,
-    /// Static data references in the program
-    pub data_refs: HashMap<DataRef, DataRefType>,
+    /// String static data references in the program
+    pub string_data_refs: HashMap<DataRef, Vec<u8>>,
+    /// Integer data references in the program
+    pub int_data_refs: HashMap<DataRef, i32>,
     /// Graph of all statement nodes in the program
     pub graph: Graph<StatType>,
     /// Reference for usage when calling scanf
