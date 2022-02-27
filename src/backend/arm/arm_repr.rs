@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 /// The temporary type (used before register allocation)
 pub type Temporary = usize;
+pub type DataIdent = u64;
 
 /// All general purpose register accessible in user mode (registers are
 /// allocated in a second pass).
@@ -274,25 +275,26 @@ pub enum Stat<IdentType> {
 
 pub type ArmNode<IdentType> = NodeRef<ControlFlow<IdentType>>;
 pub enum ControlFlow<IdentType> {
-    /// The start of a control flow path (reference is to next node)
-    Start(ArmNode<IdentType>),
-
     /// Simple Control Flow
-    Simple(ArmNode<IdentType>, Stat<IdentType>, ArmNode<IdentType>),
+    Simple(
+        Option<ArmNode<IdentType>>,
+        Stat<IdentType>,
+        ArmNode<IdentType>,
+    ),
 
     /// Branch to a label.
     /// ```text
     /// (Type of branch: B/BL, Condition, Label to branch to)
     /// ```
     Branching(
-        ArmNode<IdentType>,
+        Option<ArmNode<IdentType>>,
         ArmNode<IdentType>,
         Option<(Cond, ArmNode<IdentType>)>,
     ),
 
     /// Call to a function (branch and link)
     Call(
-        ArmNode<IdentType>,
+        Option<ArmNode<IdentType>>,
         String,
         Option<(Cond, ArmNode<IdentType>)>,
     ),
@@ -301,7 +303,7 @@ pub enum ControlFlow<IdentType> {
     Multi(Vec<ArmNode<IdentType>>, ArmNode<IdentType>),
 
     /// The end of a control flow path
-    End(ArmNode<IdentType>),
+    End(Option<ArmNode<IdentType>>),
 
     /// Used to remove references when dropping elements of the graph
     Removed,
@@ -313,9 +315,9 @@ pub enum DataKind {
 }
 
 /// All types of data that can be kept in the binary.
-pub struct Data(pub String, pub DataKind);
+pub struct Data(pub DataIdent, pub DataKind);
 
-pub struct Function<IdentType> {
+pub struct Subroutine<IdentType> {
     pub args: Vec<IdentType>,
     pub start_node: ArmNode<IdentType>,
 }
@@ -324,7 +326,7 @@ pub struct Function<IdentType> {
 pub struct Program<IdentType> {
     pub data: Vec<Data>,
     pub main: ArmNode<IdentType>,
-    pub functions: HashMap<String, Function<IdentType>>,
+    pub functions: HashMap<String, Subroutine<IdentType>>,
     pub cfg: Graph<ControlFlow<IdentType>>,
 }
 
