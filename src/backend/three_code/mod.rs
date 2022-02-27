@@ -132,8 +132,10 @@ pub(super) struct Function {
 /// Type of the data reference under a [data reference id](DataRef).
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub(super) enum DataRefType {
-    Integer(Vec<i32>),
+    /// Represents an ascii string
     String(Vec<u8>),
+    /// Represents a numerical struct with no padding
+    Struct(Vec<(Size, i32)>),
 }
 
 #[derive(Debug, Clone)]
@@ -327,7 +329,7 @@ fn translate_block(
     free_var: VarRepr,
     stat_graph: Rc<RefCell<Graph<StatType>>>,
     free_data_ref: &mut DataRef,
-    data_refs: &mut HashMap<DataRef, Vec<u8>>,
+    data_refs: &mut HashMap<DataRef, DataRefType>,
     read_ref: &mut Option<DataRef>,
     fmt_flags: &mut FmtDataRefFlags,
     vars: &HashMap<VarRepr, ir::Type>,
@@ -520,7 +522,7 @@ fn translate_block_graph(
     stat_graph: Rc<RefCell<Graph<StatType>>>,
     free_var: VarRepr,
     free_data_ref: &mut DataRef,
-    data_refs: &mut HashMap<DataRef, Vec<u8>>,
+    data_refs: &mut HashMap<DataRef, DataRefType>,
     read_ref: &mut Option<ir::DataRef>,
     vars: &HashMap<VarRepr, ir::Type>,
     function_types: &HashMap<String, ir::Type>,
@@ -600,7 +602,7 @@ fn translate_function(
     ir::Function(_, args, mut local_vars, block_graph): ir::Function,
     stat_graph: Rc<RefCell<Graph<StatType>>>,
     free_data_ref: &mut DataRef,
-    data_refs: &mut HashMap<DataRef, Vec<u8>>,
+    data_refs: &mut HashMap<DataRef, DataRefType>,
     function_types: &HashMap<String, ir::Type>,
     options: &Options,
 ) -> Function {
@@ -658,17 +660,22 @@ impl From<(ir::Program, &Options)> for ThreeCode {
         let mut data_refs = data_refs
             .into_iter()
             .map(|(data_ref, exprs)| {
-                (
-                    data_ref,
-                    exprs
-                        .into_iter()
-                        .map(eval_expr)
-                        .reduce(|mut v1, mut v2| {
-                            v1.append(&mut v2);
-                            v1
-                        })
-                        .unwrap_or(Vec::new()),
-                )
+                (data_ref, {
+                    let struct_consts = exprs.into_iter().map(eval_expr).collect::<Vec<_>>();
+                    if struct_consts
+                        .iter()
+                        .all(|(const_size, _)| *const_size == Size::Byte)
+                    {
+                        DataRefType::String(
+                            struct_consts
+                                .into_iter()
+                                .map(|(_, val)| val as u8)
+                                .collect(),
+                        )
+                    } else {
+                        DataRefType::Struct(struct_consts)
+                    }
+                })
             })
             .collect::<HashMap<_, _>>();
         let mut free_data_ref = data_refs

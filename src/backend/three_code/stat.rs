@@ -1,7 +1,7 @@
 use super::{
     super::Options,
     expr::{translate_bool_expr, translate_expr, translate_num_expr, translate_ptr_expr},
-    OpSrc, Size, StatCode, StatLine, StatType,
+    DataRefType, OpSrc, Size, StatCode, StatLine, StatType,
 };
 use crate::intermediate::{self as ir, DataRef, VarRepr};
 use std::collections::HashMap;
@@ -39,7 +39,7 @@ pub(super) struct FmtDataRefFlags {
 
 fn ensure_format(
     free_data_ref: &mut DataRef,
-    data_refs: &mut HashMap<DataRef, Vec<u8>>,
+    data_refs: &mut HashMap<DataRef, DataRefType>,
     format: &str,
     fmt_flag: &mut Option<DataRef>,
 ) -> DataRef {
@@ -50,7 +50,7 @@ fn ensure_format(
         let mut format = format.to_owned().into_bytes();
         format.push(0);
         data_refs
-            .insert(*free_data_ref, format)
+            .insert(*free_data_ref, DataRefType::String(format))
             .map(|_| panic!("Data reference already used"));
         let data_ref = *free_data_ref;
         *free_data_ref += 1;
@@ -63,7 +63,7 @@ pub(super) fn translate_statement(
     free_var: VarRepr,
     stat_line: &mut StatLine,
     free_data_ref: &mut DataRef,
-    data_refs: &mut HashMap<DataRef, Vec<u8>>,
+    data_refs: &mut HashMap<DataRef, DataRefType>,
     read_ref: &mut Option<DataRef>,
     fmt_flags: &mut FmtDataRefFlags,
     vars: &HashMap<VarRepr, ir::Type>,

@@ -1,4 +1,4 @@
-use super::stat::get_type_width;
+use super::{stat::get_type_width, Size};
 use crate::intermediate as ir;
 
 /// Evaluates a constant boolean expression. Assumes no variable refrences or
@@ -87,23 +87,19 @@ fn eval_ptr_expr(ptr_expr: ir::PtrExpr) -> i32 {
     }
 }
 
-pub(super) fn eval_expr(expr: ir::Expr) -> Vec<u8> {
+pub(super) fn eval_expr(expr: ir::Expr) -> (Size, i32) {
     match expr {
         ir::Expr::Num(num_expr) => {
             let (size, num_const) = eval_num_expr(num_expr);
-            match size {
-                ir::NumSize::DWord => Vec::from(num_const.to_le_bytes()),
-                ir::NumSize::Word => Vec::from((num_const as u16).to_le_bytes()),
-                ir::NumSize::Byte => vec![num_const as u8],
-            }
+            (size.into(), num_const)
         }
         ir::Expr::Bool(bool_expr) => {
             let bool_const = eval_bool_expr(bool_expr);
-            vec![bool_const as u8]
+            (Size::Byte, bool_const as i32)
         }
         ir::Expr::Ptr(ptr_expr) => {
             let ptr_const = eval_ptr_expr(ptr_expr);
-            Vec::from(ptr_const.to_ne_bytes())
+            (Size::DWord, ptr_const)
         }
     }
 }
