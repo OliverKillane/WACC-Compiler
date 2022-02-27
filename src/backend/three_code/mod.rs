@@ -10,6 +10,7 @@ use expr::{translate_bool_expr, translate_expr, translate_num_expr};
 use stat::{translate_statement, FmtDataRefFlags};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
 use std::iter::zip;
 use std::mem;
 use std::rc::Rc;
@@ -99,7 +100,7 @@ pub(super) enum StatCode {
 }
 
 /// General type of the statement. Used in the dataflow graph.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(super) enum StatType {
     /// Used internally for the purposes of creating the graph.
     Dummy(Vec<StatNode>),
@@ -211,6 +212,18 @@ impl StatType {
             _ => panic!("Node not final"),
         };
         mem::swap(self, &mut tmp_node);
+    }
+}
+
+impl Debug for StatType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Dummy(arg0) => f.debug_tuple("Dummy").finish(),
+            Self::Simple(_, stat_code, _) => f.debug_tuple("Simple").field(stat_code).finish(),
+            Self::Final(_, stat_code) => f.debug_tuple("Final").field(stat_code).finish(),
+            Self::Branch(_, var, _, _) => f.debug_tuple("Branch").field(var).finish(),
+            Self::Loop(_) => f.debug_tuple("Loop").finish(),
+        }
     }
 }
 

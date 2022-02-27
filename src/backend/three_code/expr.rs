@@ -407,9 +407,7 @@ pub(super) fn translate_expr(
 }
 
 #[cfg(test)]
-mod test {
-    use std::{cell::RefCell, collections::HashMap, rc::Rc};
-
+mod tests {
     use super::{
         super::{
             super::{Options, PropagationOpt},
@@ -422,13 +420,14 @@ mod test {
         graph::Graph,
         intermediate::{self as ir, VarRepr},
     };
+    use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
     fn match_line_stat_vec(
         expr: ir::Expr,
         result: VarRepr,
         stats: Vec<StatCode>,
-        vars: &HashMap<VarRepr, ir::Type>,
-        function_types: &HashMap<String, ir::Type>,
+        vars: HashMap<VarRepr, ir::Type>,
+        function_types: HashMap<String, ir::Type>,
         expr_type: ir::Type,
     ) {
         let graph = Rc::new(RefCell::new(Graph::new()));
@@ -438,8 +437,8 @@ mod test {
                 expr,
                 result,
                 &mut stat_line,
-                vars,
-                function_types,
+                &vars,
+                &function_types,
                 &Options {
                     sethi_ullman_weights: false,
                     dead_code_removal: false,
@@ -485,16 +484,16 @@ mod test {
             ir::Expr::Num(ir::NumExpr::SizeOf(ir::Type::Bool)),
             0,
             vec![StatCode::Assign(0, OpSrc::Const(1))],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Num(ir::NumSize::DWord),
         );
         match_line_stat_vec(
             ir::Expr::Num(ir::NumExpr::SizeOfWideAlloc),
             0,
             vec![StatCode::Assign(0, OpSrc::Const(4))],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Num(ir::NumSize::DWord),
         );
     }
@@ -505,8 +504,8 @@ mod test {
             ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::Word, 42)),
             0,
             vec![StatCode::Assign(0, OpSrc::Const(42))],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Num(ir::NumSize::Word),
         )
     }
@@ -517,8 +516,8 @@ mod test {
             ir::Expr::Num(ir::NumExpr::Var(1)),
             0,
             vec![StatCode::Assign(0, OpSrc::Var(1))],
-            &HashMap::from([(1, ir::Type::Num(ir::NumSize::Word))]),
-            &HashMap::new(),
+            HashMap::from([(1, ir::Type::Num(ir::NumSize::Word))]),
+            HashMap::new(),
             ir::Type::Num(ir::NumSize::Word),
         )
     }
@@ -535,8 +534,8 @@ mod test {
                 StatCode::Assign(0, OpSrc::DataRef(0, 0)),
                 StatCode::Load(0, 0, Size::Word),
             ],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Num(ir::NumSize::Word),
         )
     }
@@ -555,8 +554,8 @@ mod test {
                 StatCode::Assign(1, OpSrc::Const(2)),
                 StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Add, OpSrc::Var(1)),
             ],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Num(ir::NumSize::Byte),
         )
     }
@@ -573,8 +572,8 @@ mod test {
                 StatCode::Assign(0, OpSrc::Var(1)),
                 StatCode::AssignOp(0, OpSrc::Var(0), BinOp::And, OpSrc::Const(0xff)),
             ],
-            &HashMap::from([(1, ir::Type::Num(ir::NumSize::DWord))]),
-            &HashMap::new(),
+            HashMap::from([(1, ir::Type::Num(ir::NumSize::DWord))]),
+            HashMap::new(),
             ir::Type::Num(ir::NumSize::Byte),
         )
     }
@@ -595,8 +594,8 @@ mod test {
                 StatCode::Assign(1, OpSrc::Const(255)),
                 StatCode::Call(0, "f".to_string(), vec![0, 1]),
             ],
-            &HashMap::new(),
-            &HashMap::from([("f".to_string(), ir::Type::Num(ir::NumSize::Word))]),
+            HashMap::new(),
+            HashMap::from([("f".to_string(), ir::Type::Num(ir::NumSize::Word))]),
             ir::Type::Num(ir::NumSize::Word),
         )
     }
@@ -607,8 +606,8 @@ mod test {
             ir::Expr::Bool(ir::BoolExpr::Const(true)),
             0,
             vec![StatCode::Assign(0, OpSrc::Const(1))],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Bool,
         )
     }
@@ -619,8 +618,8 @@ mod test {
             ir::Expr::Bool(ir::BoolExpr::Var(1)),
             0,
             vec![StatCode::Assign(0, OpSrc::Var(1))],
-            &HashMap::from([(1, ir::Type::Bool)]),
-            &HashMap::new(),
+            HashMap::from([(1, ir::Type::Bool)]),
+            HashMap::new(),
             ir::Type::Bool,
         )
     }
@@ -635,8 +634,8 @@ mod test {
                 StatCode::Load(0, 0, Size::Byte),
                 StatCode::AssignOp(0, OpSrc::Var(0), BinOp::And, OpSrc::Const(0x01)),
             ],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Bool,
         )
     }
@@ -653,8 +652,8 @@ mod test {
                 StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Eq, OpSrc::Const(0)),
             ],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Bool,
         )
     }
@@ -671,8 +670,8 @@ mod test {
                 StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Gt, OpSrc::Const(0)),
             ],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Bool,
         )
     }
@@ -687,8 +686,8 @@ mod test {
                 StatCode::Assign(1, OpSrc::Const(0)),
                 StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Eq, OpSrc::Var(1)),
             ],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Bool,
         )
     }
@@ -707,8 +706,8 @@ mod test {
                 StatCode::Assign(1, OpSrc::Const(0)),
                 StatCode::AssignOp(0, OpSrc::Var(0), BinOp::And, OpSrc::Var(1)),
             ],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Bool,
         )
     }
@@ -729,8 +728,8 @@ mod test {
                 StatCode::Assign(1, OpSrc::Const(0)),
                 StatCode::Call(0, "f".to_string(), vec![0, 1]),
             ],
-            &HashMap::new(),
-            &HashMap::from([("f".to_string(), ir::Type::Bool)]),
+            HashMap::new(),
+            HashMap::from([("f".to_string(), ir::Type::Bool)]),
             ir::Type::Bool,
         )
     }
@@ -741,8 +740,8 @@ mod test {
             ir::Expr::Ptr(ir::PtrExpr::Null),
             0,
             vec![StatCode::Assign(0, OpSrc::Const(1))],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Ptr,
         )
     }
@@ -753,8 +752,8 @@ mod test {
             ir::Expr::Ptr(ir::PtrExpr::DataRef(1)),
             0,
             vec![StatCode::Assign(0, OpSrc::DataRef(1, 0))],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Ptr,
         )
     }
@@ -765,8 +764,8 @@ mod test {
             ir::Expr::Ptr(ir::PtrExpr::Var(1)),
             0,
             vec![StatCode::Assign(0, OpSrc::Var(1))],
-            &HashMap::from([(1, ir::Type::Ptr)]),
-            &HashMap::new(),
+            HashMap::from([(1, ir::Type::Ptr)]),
+            HashMap::new(),
             ir::Type::Ptr,
         )
     }
@@ -780,8 +779,8 @@ mod test {
                 StatCode::Assign(0, OpSrc::DataRef(0, 0)),
                 StatCode::Load(0, 0, Size::DWord),
             ],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Ptr,
         )
     }
@@ -799,8 +798,8 @@ mod test {
                 StatCode::Assign(1, OpSrc::Const(2)),
                 StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Add, OpSrc::Var(1)),
             ],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Ptr,
         )
     }
@@ -823,8 +822,8 @@ mod test {
                 StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(1)),
                 StatCode::Store(2, 1, Size::DWord),
             ],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Ptr,
         );
         match_line_stat_vec(
@@ -843,16 +842,16 @@ mod test {
                 StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(4)),
                 StatCode::Store(2, 1, Size::DWord),
             ],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Ptr,
         );
         match_line_stat_vec(
             ir::Expr::Ptr(ir::PtrExpr::Malloc(vec![])),
             0,
             vec![StatCode::Assign(0, OpSrc::Const(0))],
-            &HashMap::new(),
-            &HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
             ir::Type::Ptr,
         );
     }
@@ -873,8 +872,8 @@ mod test {
                 StatCode::Assign(1, OpSrc::Const(0)),
                 StatCode::Call(0, "f".to_string(), vec![0, 1]),
             ],
-            &HashMap::new(),
-            &HashMap::from([("f".to_string(), ir::Type::Ptr)]),
+            HashMap::new(),
+            HashMap::from([("f".to_string(), ir::Type::Ptr)]),
             ir::Type::Ptr,
         )
     }
