@@ -11,7 +11,7 @@
 //! All other errors are associated with spans of statements within the
 //! function.
 
-use crate::frontend::ast::FunSpan;
+use crate::frontend::ast::FunWrap;
 
 use super::{
     super::ast::{Function, Param, ASTWrapper, Type},
@@ -26,14 +26,14 @@ type FunctionErrors<'a> = (&'a str, Vec<StatementErrors<'a>>);
 
 /// A correct result from a function analysis, containing the function, as well
 /// as the flat symbol table associated with it.
-type FunctionAnalysis<'a> = (FunSpan<Option<Type>, usize>, VariableSymbolTable);
+type FunctionAnalysis<'a> = (FunWrap<Option<Type>, usize>, VariableSymbolTable);
 
 /// Determine if there are any semantic errors in a function:
 /// - If correct, return a renamed ast and update the variable symbol table
 /// - If incorrect return function  name and the statements with errors
 ///   attached.
 pub fn analyse_function<'a>(
-    ASTWrapper(def_span, Function(ret_type, ASTWrapper(name, string_name), parameters, block)): FunSpan<&'a str, &'a str>,
+    ASTWrapper(def_span, Function(ret_type, ASTWrapper(name, string_name), parameters, block)): FunWrap<&'a str, &'a str>,
     fun_symb: &FunctionSymbolTable<'a>,
 ) -> Result<FunctionAnalysis<'a>, FunctionErrors<'a>> {
     let mut var_symb = VariableSymbolTable::new();

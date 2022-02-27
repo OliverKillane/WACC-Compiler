@@ -7,7 +7,7 @@
 //! Extensively pushes forwards with finding errors, potentially from every
 //! leaf node of an expression tree.
 use super::{
-    super::ast::{Expr, Type, UnOp, ASTWrapper, ExprSpan},
+    super::ast::{Expr, Type, UnOp, ASTWrapper, ExprWrap},
     semantic_errors::SemanticError,
     symbol_table::{LocalSymbolTable, VariableSymbolTable},
     type_constraints::{binop_match, de_index, unop_match},
@@ -19,11 +19,11 @@ use super::{
 /// - If the expression is invalid, a collection of semantic errors are returned
 ///   (these may be from inner expressions)
 pub fn analyse_expression<'a, 'b>(
-    ASTWrapper(span, expr): ExprSpan<&'a str, &'a str>,
+    ASTWrapper(span, expr): ExprWrap<&'a str, &'a str>,
     local_symb: &LocalSymbolTable<'a, 'b>,
     var_symb: &VariableSymbolTable,
     errors: &mut Vec<SemanticError<'a>>,
-) -> Option<ExprSpan<Option<Type>, usize>> {
+) -> Option<ExprWrap<Option<Type>, usize>> {
     match expr {
         // Primitive expression checking (will always succeed)
         Expr::Null => Some(
@@ -168,28 +168,28 @@ mod tests {
         let local_symb = LocalSymbolTable::new_root();
         let var_symb = VariableSymbolTable::new();
 
-        let expr1: ExprSpan<&str, &str> = ASTWrapper("9", Expr::Int(9));
+        let expr1: ExprWrap<&str, &str> = ASTWrapper("9", Expr::Int(9));
 
         match analyse_expression(expr1, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Int), _)) => assert!(true),
             _ => assert!(false),
         }
 
-        let expr2: ExprSpan<&str, &str> = ASTWrapper("'a'", Expr::Char('a'));
+        let expr2: ExprWrap<&str, &str> = ASTWrapper("'a'", Expr::Char('a'));
 
         match analyse_expression(expr2, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Char), _)) => assert!(true),
             _ => assert!(false),
         }
 
-        let expr3: ExprSpan<&str, &str> = ASTWrapper("true", Expr::Bool(true));
+        let expr3: ExprWrap<&str, &str> = ASTWrapper("true", Expr::Bool(true));
 
         match analyse_expression(expr3, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Bool), _)) => assert!(true),
             _ => assert!(false),
         }
 
-        let expr4: ExprSpan<&str, &str> = ASTWrapper(
+        let expr4: ExprWrap<&str, &str> = ASTWrapper(
             "\"hello world\"",
             Expr::String(String::from("\"hello world\"")),
         );
@@ -205,7 +205,7 @@ mod tests {
         let local_symb = LocalSymbolTable::new_root();
         let var_symb = VariableSymbolTable::new();
 
-        let expr1: ExprSpan<&str, &str> = ASTWrapper("x", Expr::Var("x"));
+        let expr1: ExprWrap<&str, &str> = ASTWrapper("x", Expr::Var("x"));
         let mut expr1_errors = Vec::new();
 
         match analyse_expression(expr1, &local_symb, &var_symb, &mut expr1_errors) {
@@ -215,7 +215,7 @@ mod tests {
             _ => assert!(false),
         }
 
-        let expr2: ExprSpan<&str, &str> = ASTWrapper(
+        let expr2: ExprWrap<&str, &str> = ASTWrapper(
             "'a'",
             Expr::ArrayElem("x", vec![ASTWrapper("'c'", Expr::Char('c'))]),
         );
@@ -234,7 +234,7 @@ mod tests {
         let local_symb = LocalSymbolTable::new_root();
         let var_symb = VariableSymbolTable::new();
 
-        let expr1: ExprSpan<&str, &str> = ASTWrapper(
+        let expr1: ExprWrap<&str, &str> = ASTWrapper(
             "-3",
             Expr::UnOp(UnOp::Minus, box ASTWrapper("3", Expr::Int(3))),
         );
@@ -244,7 +244,7 @@ mod tests {
             _ => assert!(false),
         }
 
-        let expr2: ExprSpan<&str, &str> = ASTWrapper(
+        let expr2: ExprWrap<&str, &str> = ASTWrapper(
             "!true",
             Expr::UnOp(UnOp::Neg, box ASTWrapper("true", Expr::Bool(true))),
         );
@@ -254,7 +254,7 @@ mod tests {
             _ => assert!(false),
         }
 
-        let expr3: ExprSpan<&str, &str> = ASTWrapper(
+        let expr3: ExprWrap<&str, &str> = ASTWrapper(
             "ord 'a'",
             Expr::UnOp(UnOp::Ord, box ASTWrapper("'a'", Expr::Char('a'))),
         );
@@ -264,7 +264,7 @@ mod tests {
             _ => assert!(false),
         }
 
-        let expr4: ExprSpan<&str, &str> = ASTWrapper(
+        let expr4: ExprWrap<&str, &str> = ASTWrapper(
             "chr 97",
             Expr::UnOp(UnOp::Chr, box ASTWrapper("97", Expr::Int(97))),
         );
@@ -280,7 +280,7 @@ mod tests {
         let local_symb = LocalSymbolTable::new_root();
         let var_symb = VariableSymbolTable::new();
 
-        let expr1: ExprSpan<&str, &str> = ASTWrapper(
+        let expr1: ExprWrap<&str, &str> = ASTWrapper(
             "- ord chr 9",
             Expr::UnOp(
                 UnOp::Minus,
@@ -302,7 +302,7 @@ mod tests {
             _ => assert!(false),
         }
 
-        let expr2: ExprSpan<&str, &str> = ASTWrapper(
+        let expr2: ExprWrap<&str, &str> = ASTWrapper(
             "chr ord chr 9",
             Expr::UnOp(
                 UnOp::Chr,
@@ -330,7 +330,7 @@ mod tests {
         let local_symb = LocalSymbolTable::new_root();
         let var_symb = VariableSymbolTable::new();
 
-        let expr1: ExprSpan<&str, &str> = ASTWrapper(
+        let expr1: ExprWrap<&str, &str> = ASTWrapper(
             "(1 + 1) >= (3 * -2)",
             Expr::BinOp(
                 box ASTWrapper(
@@ -361,7 +361,7 @@ mod tests {
             _ => assert!(false),
         }
 
-        let expr2: ExprSpan<&str, &str> = ASTWrapper(
+        let expr2: ExprWrap<&str, &str> = ASTWrapper(
             "(1 + 1) + (3 * -2)",
             Expr::BinOp(
                 box ASTWrapper(
@@ -392,7 +392,7 @@ mod tests {
             _ => assert!(false),
         }
 
-        let expr3: ExprSpan<&str, &str> = ASTWrapper(
+        let expr3: ExprWrap<&str, &str> = ASTWrapper(
             "chr ((1 + 1) + (3 * -2))",
             Expr::UnOp(
                 UnOp::Chr,
@@ -429,7 +429,7 @@ mod tests {
             _ => assert!(false),
         }
 
-        let expr4: ExprSpan<&str, &str> = ASTWrapper(
+        let expr4: ExprWrap<&str, &str> = ASTWrapper(
             "(ord 'a' == 65) || (true && !false)",
             Expr::BinOp(
                 box ASTWrapper(
@@ -463,7 +463,7 @@ mod tests {
             _ => assert!(false),
         }
 
-        let expr5: ExprSpan<&str, &str> = ASTWrapper(
+        let expr5: ExprWrap<&str, &str> = ASTWrapper(
             "(97 >= ord 'a') && (true && !false)",
             Expr::BinOp(
                 box ASTWrapper(
@@ -507,7 +507,7 @@ mod tests {
             .def_var("var1", &Type::Int, "int var1 = 9", &mut local_symb)
             .expect("variable not yet defined");
 
-        let expr1: ExprSpan<&str, &str> = ASTWrapper(
+        let expr1: ExprWrap<&str, &str> = ASTWrapper(
             "(chr var1 >= ord 'a') || (true && !false)",
             Expr::BinOp(
                 box ASTWrapper(
@@ -545,7 +545,7 @@ mod tests {
             .def_var("var2", &Type::Bool, "bool var2 = true", &mut local_symb)
             .expect("variable not yet defined");
 
-        let expr4: ExprSpan<&str, &str> = ASTWrapper(
+        let expr4: ExprWrap<&str, &str> = ASTWrapper(
             "(ord 'a' == - ord chr 9) || (true && !false)",
             Expr::BinOp(
                 box ASTWrapper(
@@ -606,7 +606,7 @@ mod tests {
             )
             .expect("variable not yet defined");
 
-        let expr1: ExprSpan<&str, &str> = ASTWrapper(
+        let expr1: ExprWrap<&str, &str> = ASTWrapper(
             "array1[5]",
             Expr::ArrayElem("array1", vec![ASTWrapper("5", Expr::Int(5))]),
         );
@@ -625,7 +625,7 @@ mod tests {
             )
             .expect("variable not yet defined");
 
-        let expr2: ExprSpan<&str, &str> = ASTWrapper(
+        let expr2: ExprWrap<&str, &str> = ASTWrapper(
             "array2[5 * 5]",
             Expr::ArrayElem(
                 "array2",
@@ -649,7 +649,7 @@ mod tests {
             .def_var("num1", &Type::Int, "int num1 = 9", &mut local_symb)
             .expect("variable not yet defined");
 
-        let expr3: ExprSpan<&str, &str> = ASTWrapper(
+        let expr3: ExprWrap<&str, &str> = ASTWrapper(
             "array2[5 * 5][num1]",
             Expr::ArrayElem(
                 "array2",
@@ -672,7 +672,7 @@ mod tests {
             _ => assert!(false),
         }
 
-        let expr4: ExprSpan<&str, &str> = ASTWrapper(
+        let expr4: ExprWrap<&str, &str> = ASTWrapper(
             "array2[5*5][array1[num1]]",
             Expr::ArrayElem(
                 "array2",
@@ -713,7 +713,7 @@ mod tests {
             )
             .expect("variable not yet defined");
 
-        let expr1: ExprSpan<&str, &str> = ASTWrapper(
+        let expr1: ExprWrap<&str, &str> = ASTWrapper(
             "pair1 == pair1",
             Expr::BinOp(
                 box ASTWrapper("pair1", Expr::Var("pair1")),
@@ -736,7 +736,7 @@ mod tests {
             )
             .expect("variable not yet defined");
 
-        let expr2: ExprSpan<&str, &str> = ASTWrapper(
+        let expr2: ExprWrap<&str, &str> = ASTWrapper(
             "pair_array[len pair_array - 1]",
             Expr::ArrayElem(
                 "pair_array",
@@ -762,7 +762,7 @@ mod tests {
             _ => assert!(false),
         }
 
-        let expr3: ExprSpan<&str, &str> = ASTWrapper(
+        let expr3: ExprWrap<&str, &str> = ASTWrapper(
             "newpair(5+5, newpair(5+5, 'a')))",
             Expr::BinOp(
                 box ASTWrapper(
@@ -815,7 +815,7 @@ mod tests {
             .expect("variable not yet defined");
 
         // example of newpair(snd pair1, fst pair1) <- swapping pair elements
-        let expr1: ExprSpan<&str, &str> = ASTWrapper(
+        let expr1: ExprWrap<&str, &str> = ASTWrapper(
             "newpair(snd pair1, fst pair2)",
             Expr::BinOp(
                 box ASTWrapper(

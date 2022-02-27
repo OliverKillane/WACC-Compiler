@@ -55,7 +55,7 @@ use self::{
 };
 
 use super::{
-    ast::{FunSpan, Program, StatSpan, ASTWrapper, Type},
+    ast::{FunWrap, Program, StatWrap, ASTWrapper, Type},
     error::Summary,
 };
 
@@ -76,9 +76,9 @@ pub fn analyse_semantics<'a>(
     source_code: &'a str,
 ) -> Result<
     (
-        Vec<StatSpan<Option<Type>, usize>>,
+        Vec<StatWrap<Option<Type>, usize>>,
         VariableSymbolTable,
-        HashMap<&'a str, (FunSpan<Option<Type>, usize>, VariableSymbolTable)>,
+        HashMap<&'a str, (FunWrap<Option<Type>, usize>, VariableSymbolTable)>,
     ),
     Vec<Summary<'a>>,
 > {

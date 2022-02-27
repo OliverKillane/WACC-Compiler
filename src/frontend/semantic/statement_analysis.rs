@@ -2,7 +2,7 @@
 //! AST or the errors produced.
 
 use super::{
-    super::ast::{AssignLhs, AssignRhs, Stat, StatSpan, Type, ASTWrapper},
+    super::ast::{AssignLhs, AssignRhs, Stat, StatWrap, Type, ASTWrapper},
     expression_analysis::analyse_expression,
     semantic_errors::{SemanticError, StatementErrors},
     symbol_table::{FunctionSymbolTable, LocalSymbolTable, VariableSymbolTable},
@@ -23,16 +23,16 @@ use super::{
 /// If the block was well formed, returns the renamed block and a boolean
 /// determining if all paths through the block terminated.
 pub fn analyse_block<'a, 'b>(
-    stats: Vec<StatSpan<&'a str, &'a str>>,
+    stats: Vec<StatWrap<&'a str, &'a str>>,
     fun_symb: &FunctionSymbolTable<'a>,
     local_symb: &mut LocalSymbolTable<'a, 'b>,
     var_symb: &mut VariableSymbolTable,
     ret_type: &Option<Type>,
     must_ret: bool,
     errors: &mut Vec<StatementErrors<'a>>,
-) -> Option<Vec<StatSpan<Option<Type>, usize>>> {
+) -> Option<Vec<StatWrap<Option<Type>, usize>>> {
     let mut any_errors = false;
-    let mut correct: Vec<StatSpan<Option<Type>, usize>> = Vec::new();
+    let mut correct: Vec<StatWrap<Option<Type>, usize>> = Vec::new();
 
     let mut stat_iter = stats.into_iter().peekable();
     while let Some(stat) = stat_iter.next() {
@@ -116,14 +116,14 @@ pub fn analyse_block<'a, 'b>(
 /// Analyse a statement, resulting in either the errors for a statement or a
 /// correct renamed ast.
 fn analyse_statement<'a, 'b>(
-    ASTWrapper(span, stat): StatSpan<&'a str, &'a str>,
+    ASTWrapper(span, stat): StatWrap<&'a str, &'a str>,
     fun_symb: &FunctionSymbolTable<'a>,
     local_symb: &mut LocalSymbolTable<'a, 'b>,
     var_symb: &mut VariableSymbolTable,
     ret_type: &Option<Type>,
     must_ret: bool,
     errors: &mut Vec<StatementErrors<'a>>,
-) -> Option<StatSpan<Option<Type>, usize>> {
+) -> Option<StatWrap<Option<Type>, usize>> {
     let mut add_error = |err| {
         errors.push(err);
         None

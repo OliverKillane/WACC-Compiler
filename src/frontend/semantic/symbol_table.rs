@@ -8,7 +8,7 @@
 //! renamed identifiers and the types.
 
 use super::{
-    super::ast::{FunSpan, Function, Param, Type, ASTWrapper},
+    super::ast::{FunWrap, Function, Param, Type, ASTWrapper},
     semantic_errors::{SemanticError, StatementErrors},
 };
 
@@ -176,10 +176,10 @@ impl<'a, 'b> LocalSymbolTable<'a, 'b> {
 /// *Note:* the parameter identifiers are not checked, that is done when the
 /// function body analysis is done.
 pub fn get_fn_symbols<'a>(
-    fn_defs: Vec<FunSpan<&'a str, &'a str>>,
+    fn_defs: Vec<FunWrap<&'a str, &'a str>>,
 ) -> (
     FunctionSymbolTable,
-    Vec<FunSpan<&'a str, &'a str>>,
+    Vec<FunWrap<&'a str, &'a str>>,
     Vec<StatementErrors<'a>>,
 ) {
     let mut fun_symb = FunctionSymbolTable::new();
