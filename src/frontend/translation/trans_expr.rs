@@ -74,7 +74,6 @@ pub fn translate_expr<'a>(
             _ => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!")
         },
 
-        // Should change this so that boolean operations are short-circuited
         Expr::BinOp(box expr_span1, bin_op, box expr_span2) => {
             match (
                 translate_expr(expr_span1, var_symb, dataref_map),
@@ -142,15 +141,17 @@ pub fn translate_expr<'a>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{frontend::ast::BinOp, intermediate};
+    use std::env::VarError;
+
+    use crate::{
+        frontend::{ast::BinOp, translation::trans_expr},
+        intermediate,
+    };
 
     use super::*;
 
     #[test]
     fn check_boolean_expression() {
-        let var_symb = VariableSymbolTable::new();
-        let mut dataref_map: HashMap<DataRef, Vec<IRExpr>> = HashMap::new();
-
         let expr: WrapSpan<Expr<usize>> = WrapSpan(
             "!true",
             Expr::UnOp(UnOp::Neg, box WrapSpan("true", Expr::Bool(true))),
@@ -159,7 +160,7 @@ mod tests {
         let translated: intermediate::Expr = Bool(BoolExpr::Not(box BoolExpr::Const(true)));
 
         assert_eq!(
-            translate_expr(expr, &var_symb, &mut dataref_map),
+            translate_expr(expr, &VariableSymbolTable::new(), &mut HashMap::new()),
             translated
         );
 
@@ -207,8 +208,68 @@ mod tests {
         ));
 
         assert_eq!(
-            translate_expr(expr2, &var_symb, &mut dataref_map),
+            translate_expr(expr2, &VariableSymbolTable::new(), &mut HashMap::new()),
             translated2
+        );
+    }
+
+    #[test]
+    fn check_integer_expression() {
+        let expr: WrapSpan<Expr<usize>> = WrapSpan(
+            "3 + 7",
+            Expr::BinOp(
+                box WrapSpan("3", Expr::Int(3)),
+                BinOp::Add,
+                box WrapSpan("7", Expr::Int(7)),
+            ),
+        );
+
+        let translated: intermediate::Expr = intermediate::Expr::Num(NumExpr::ArithOp(
+            box NumExpr::Const(NumSize::DWord, 3),
+            ArithOp::Add,
+            box NumExpr::Const(NumSize::DWord, 7),
+        ));
+
+        assert_eq!(
+            translate_expr(expr, &VariableSymbolTable::new(), &mut HashMap::new()),
+            translated
+        );
+
+        let expr: WrapSpan<Expr<usize>> = WrapSpan(
+            "a % 7 * ord 'a'",
+            Expr::BinOp(
+                box WrapSpan(
+                    "a % 7",
+                    Expr::BinOp(
+                        box WrapSpan("a", Expr::Var(0)),
+                        BinOp::Mod,
+                        box WrapSpan("7", Expr::Int(7)),
+                    ),
+                ),
+                BinOp::Mul,
+                box WrapSpan(
+                    "ord 'a'",
+                    Expr::UnOp(UnOp::Ord, box WrapSpan("'a'", Expr::Char('a'))),
+                ),
+            ),
+        );
+
+        let mut var_table = VariableSymbolTable::new();
+        var_table.0.insert(0, ast::Type::Int);
+
+        let translated: intermediate::Expr = intermediate::Expr::Num(NumExpr::ArithOp(
+            box NumExpr::ArithOp(
+                box NumExpr::Var(0),
+                ArithOp::Mod,
+                box NumExpr::Const(NumSize::DWord, 7),
+            ),
+            ArithOp::Mul,
+            box NumExpr::Cast(NumSize::DWord, box NumExpr::Const(Byte, 'a' as i32)),
+        ));
+
+        assert_eq!(
+            translate_expr(expr, &var_table, &mut HashMap::new()),
+            translated
         );
     }
 }
