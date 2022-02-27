@@ -7,7 +7,7 @@
 //! Extensively pushes forwards with finding errors, potentially from every
 //! leaf node of an expression tree.
 use super::{
-    super::ast::{Expr, Type, UnOp, WrapSpan},
+    super::ast::{ASTWrapper, Expr, ExprWrap, Type, UnOp},
     semantic_errors::SemanticError,
     symbol_table::{LocalSymbolTable, VariableSymbolTable},
     type_constraints::{binop_match, de_index, unop_match},
@@ -19,26 +19,26 @@ use super::{
 /// - If the expression is invalid, a collection of semantic errors are returned
 ///   (these may be from inner expressions)
 pub fn analyse_expression<'a, 'b>(
-    WrapSpan(span, expr): WrapSpan<'a, Expr<'a, &'a str>>,
+    ASTWrapper(span, expr): ExprWrap<&'a str, &'a str>,
     local_symb: &LocalSymbolTable<'a, 'b>,
     var_symb: &VariableSymbolTable,
     errors: &mut Vec<SemanticError<'a>>,
-) -> Option<(Type, WrapSpan<'a, Expr<'a, usize>>)> {
+) -> Option<ExprWrap<Option<Type>, usize>> {
     match expr {
         // Primitive expression checking (will always succeed)
-        Expr::Null => Some((
-            Type::Pair(box Type::Any, box Type::Any),
-            WrapSpan(span, Expr::Null),
+        Expr::Null => Some(ASTWrapper(
+            Some(Type::Pair(box Type::Any, box Type::Any)),
+            Expr::Null,
         )),
-        Expr::Int(n) => Some((Type::Int, WrapSpan(span, Expr::Int(n)))),
-        Expr::Bool(b) => Some((Type::Bool, WrapSpan(span, Expr::Bool(b)))),
-        Expr::Char(c) => Some((Type::Char, WrapSpan(span, Expr::Char(c)))),
-        Expr::String(s) => Some((Type::String, WrapSpan(span, Expr::String(s)))),
+        Expr::Int(n) => Some(ASTWrapper(Some(Type::Int), Expr::Int(n))),
+        Expr::Bool(b) => Some(ASTWrapper(Some(Type::Bool), Expr::Bool(b))),
+        Expr::Char(c) => Some(ASTWrapper(Some(Type::Char), Expr::Char(c))),
+        Expr::String(s) => Some(ASTWrapper(Some(Type::String), Expr::String(s))),
 
         // If variable defined, rename and return type, otherwise return undefined
         // error
         Expr::Var(name) => match var_symb.get_type(name, local_symb) {
-            Some((rename, t)) => Some((t, WrapSpan(span, Expr::Var(rename)))),
+            Some((rename, t)) => Some(ASTWrapper(Some(t), Expr::Var(rename))),
             None => {
                 errors.push(SemanticError::UndefinedVariableUse(name));
                 None
@@ -54,11 +54,14 @@ pub fn analyse_expression<'a, 'b>(
             let mut any_errors = false;
             let index_dim = indexes.len();
 
-            for index_expr in indexes.into_iter() {
+            for index_expr @ ASTWrapper(index_span, _) in indexes.into_iter() {
                 match analyse_expression(index_expr, local_symb, var_symb, errors) {
-                    Some((Type::Int, new_index_expr)) => correct_indexes.push(new_index_expr),
-                    Some((index_type, WrapSpan(index_span, _))) => {
+                    Some(inner @ ASTWrapper(Some(Type::Int), _)) => correct_indexes.push(inner),
+                    Some(ASTWrapper(Some(index_type), _)) => {
                         errors.push(SemanticError::InvalidIndex(index_span, index_type))
+                    }
+                    Some(ASTWrapper(None, _)) => {
+                        panic!("Correctly typed expressions must always have a type")
                     }
                     None => any_errors = true,
                 }
@@ -84,7 +87,10 @@ pub fn analyse_expression<'a, 'b>(
             };
 
             if let (false, Some((rename, t))) = (any_errors, symb) {
-                Some((t, WrapSpan(span, Expr::ArrayElem(rename, correct_indexes))))
+                Some(ASTWrapper(
+                    Some(t),
+                    Expr::ArrayElem(rename, correct_indexes),
+                ))
             } else {
                 None
             }
@@ -92,7 +98,7 @@ pub fn analyse_expression<'a, 'b>(
 
         // Capturing the `snd null` or `fst null` semantic error (personally I
         // think this makes little sense, but alas the spec).
-        Expr::UnOp(UnOp::Snd | UnOp::Fst, box WrapSpan(null_span, Expr::Null)) => {
+        Expr::UnOp(UnOp::Snd | UnOp::Fst, box ASTWrapper(null_span, Expr::Null)) => {
             errors.push(SemanticError::InvalidPairOp(null_span));
             None
         }
@@ -102,10 +108,10 @@ pub fn analyse_expression<'a, 'b>(
         // upwards.
         Expr::UnOp(op, box inner_expr) => {
             match analyse_expression(inner_expr, local_symb, var_symb, errors) {
-                Some((inner_t, WrapSpan(inner_span, ast))) => match unop_match(&op, &inner_t) {
-                    Ok(unop_t) => Some((
-                        unop_t,
-                        WrapSpan(span, Expr::UnOp(op, box WrapSpan(inner_span, ast))),
+                Some(ASTWrapper(Some(inner_t), ast)) => match unop_match(&op, &inner_t) {
+                    Ok(unop_t) => Some(ASTWrapper(
+                        Some(unop_t),
+                        Expr::UnOp(op, box ASTWrapper(Some(inner_t), ast)),
                     )),
                     Err((pot_types, pot_ops)) => {
                         errors.push(SemanticError::InvalidUnOp(
@@ -114,6 +120,9 @@ pub fn analyse_expression<'a, 'b>(
                         None
                     }
                 },
+                Some(ASTWrapper(None, _)) => {
+                    panic!("Correctly typed expressions must always have a type")
+                }
                 None => None,
             }
         }
@@ -127,18 +136,15 @@ pub fn analyse_expression<'a, 'b>(
                 analyse_expression(right_expr, local_symb, var_symb, errors),
             ) {
                 (
-                    Some((left_type, WrapSpan(left_span, left_ast))),
-                    Some((right_type, WrapSpan(right_span, right_ast))),
+                    Some(ASTWrapper(Some(left_type), left_ast)),
+                    Some(ASTWrapper(Some(right_type), right_ast)),
                 ) => match binop_match(&op, &left_type, &right_type) {
-                    Ok(t) => Some((
-                        t,
-                        WrapSpan(
-                            span,
-                            Expr::BinOp(
-                                box WrapSpan(left_span, left_ast),
-                                op,
-                                box WrapSpan(right_span, right_ast),
-                            ),
+                    Ok(t) => Some(ASTWrapper(
+                        Some(t),
+                        Expr::BinOp(
+                            box ASTWrapper(Some(left_type), left_ast),
+                            op,
+                            box ASTWrapper(Some(right_type), right_ast),
                         ),
                     )),
                     Err((pot_types, pot_ops)) => {
@@ -152,6 +158,9 @@ pub fn analyse_expression<'a, 'b>(
                         None
                     }
                 },
+                (Some(ASTWrapper(None, _)), _) | (_, Some(ASTWrapper(None, _))) => {
+                    panic!("Correctly typed expressions must always have a type")
+                }
                 _ => None,
             }
         }
@@ -168,34 +177,34 @@ mod tests {
         let local_symb = LocalSymbolTable::new_root();
         let var_symb = VariableSymbolTable::new();
 
-        let expr1: WrapSpan<Expr<&str>> = WrapSpan("9", Expr::Int(9));
+        let expr1: ExprWrap<&str, &str> = ASTWrapper("9", Expr::Int(9));
 
         match analyse_expression(expr1, &local_symb, &var_symb, &mut vec![]) {
-            Some((Type::Int, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Int), _)) => assert!(true),
             _ => assert!(false),
         }
 
-        let expr2: WrapSpan<Expr<&str>> = WrapSpan("'a'", Expr::Char('a'));
+        let expr2: ExprWrap<&str, &str> = ASTWrapper("'a'", Expr::Char('a'));
 
         match analyse_expression(expr2, &local_symb, &var_symb, &mut vec![]) {
-            Some((Type::Char, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Char), _)) => assert!(true),
             _ => assert!(false),
         }
 
-        let expr3: WrapSpan<Expr<&str>> = WrapSpan("true", Expr::Bool(true));
+        let expr3: ExprWrap<&str, &str> = ASTWrapper("true", Expr::Bool(true));
 
         match analyse_expression(expr3, &local_symb, &var_symb, &mut vec![]) {
-            Some((Type::Bool, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Bool), _)) => assert!(true),
             _ => assert!(false),
         }
 
-        let expr4: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr4: ExprWrap<&str, &str> = ASTWrapper(
             "\"hello world\"",
             Expr::String(String::from("\"hello world\"")),
         );
 
         match analyse_expression(expr4, &local_symb, &var_symb, &mut vec![]) {
-            Some((Type::String, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::String), _)) => assert!(true),
             _ => assert!(false),
         }
     }
@@ -205,7 +214,7 @@ mod tests {
         let local_symb = LocalSymbolTable::new_root();
         let var_symb = VariableSymbolTable::new();
 
-        let expr1: WrapSpan<Expr<&str>> = WrapSpan("x", Expr::Var("x"));
+        let expr1: ExprWrap<&str, &str> = ASTWrapper("x", Expr::Var("x"));
         let mut expr1_errors = Vec::new();
 
         match analyse_expression(expr1, &local_symb, &var_symb, &mut expr1_errors) {
@@ -215,9 +224,9 @@ mod tests {
             _ => assert!(false),
         }
 
-        let expr2: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr2: ExprWrap<&str, &str> = ASTWrapper(
             "'a'",
-            Expr::ArrayElem("x", vec![WrapSpan("'c'", Expr::Char('c'))]),
+            Expr::ArrayElem("x", vec![ASTWrapper("'c'", Expr::Char('c'))]),
         );
         let mut expr2_errors = Vec::new();
         match analyse_expression(expr2, &local_symb, &var_symb, &mut expr2_errors) {
@@ -234,43 +243,43 @@ mod tests {
         let local_symb = LocalSymbolTable::new_root();
         let var_symb = VariableSymbolTable::new();
 
-        let expr1: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr1: ExprWrap<&str, &str> = ASTWrapper(
             "-3",
-            Expr::UnOp(UnOp::Minus, box WrapSpan("3", Expr::Int(3))),
+            Expr::UnOp(UnOp::Minus, box ASTWrapper("3", Expr::Int(3))),
         );
 
         match analyse_expression(expr1, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Int, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Int), _)) => assert!(true),
             _ => assert!(false),
         }
 
-        let expr2: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr2: ExprWrap<&str, &str> = ASTWrapper(
             "!true",
-            Expr::UnOp(UnOp::Neg, box WrapSpan("true", Expr::Bool(true))),
+            Expr::UnOp(UnOp::Neg, box ASTWrapper("true", Expr::Bool(true))),
         );
 
         match analyse_expression(expr2, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Bool, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Bool), _)) => assert!(true),
             _ => assert!(false),
         }
 
-        let expr3: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr3: ExprWrap<&str, &str> = ASTWrapper(
             "ord 'a'",
-            Expr::UnOp(UnOp::Ord, box WrapSpan("'a'", Expr::Char('a'))),
+            Expr::UnOp(UnOp::Ord, box ASTWrapper("'a'", Expr::Char('a'))),
         );
 
         match analyse_expression(expr3, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Int, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Int), _)) => assert!(true),
             _ => assert!(false),
         }
 
-        let expr4: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr4: ExprWrap<&str, &str> = ASTWrapper(
             "chr 97",
-            Expr::UnOp(UnOp::Chr, box WrapSpan("97", Expr::Int(97))),
+            Expr::UnOp(UnOp::Chr, box ASTWrapper("97", Expr::Int(97))),
         );
 
         match analyse_expression(expr4, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Char, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Char), _)) => assert!(true),
             _ => assert!(false),
         }
     }
@@ -280,17 +289,17 @@ mod tests {
         let local_symb = LocalSymbolTable::new_root();
         let var_symb = VariableSymbolTable::new();
 
-        let expr1: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr1: ExprWrap<&str, &str> = ASTWrapper(
             "- ord chr 9",
             Expr::UnOp(
                 UnOp::Minus,
-                box WrapSpan(
+                box ASTWrapper(
                     "ord chr 9",
                     Expr::UnOp(
                         UnOp::Ord,
-                        box WrapSpan(
+                        box ASTWrapper(
                             "chr 9",
-                            Expr::UnOp(UnOp::Chr, box WrapSpan("9", Expr::Int(9))),
+                            Expr::UnOp(UnOp::Chr, box ASTWrapper("9", Expr::Int(9))),
                         ),
                     ),
                 ),
@@ -298,21 +307,21 @@ mod tests {
         );
 
         match analyse_expression(expr1, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Int, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Int), _)) => assert!(true),
             _ => assert!(false),
         }
 
-        let expr2: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr2: ExprWrap<&str, &str> = ASTWrapper(
             "chr ord chr 9",
             Expr::UnOp(
                 UnOp::Chr,
-                box WrapSpan(
+                box ASTWrapper(
                     "ord chr 9",
                     Expr::UnOp(
                         UnOp::Ord,
-                        box WrapSpan(
+                        box ASTWrapper(
                             "chr 9",
-                            Expr::UnOp(UnOp::Chr, box WrapSpan("9", Expr::Int(9))),
+                            Expr::UnOp(UnOp::Chr, box ASTWrapper("9", Expr::Int(9))),
                         ),
                     ),
                 ),
@@ -320,7 +329,7 @@ mod tests {
         );
 
         match analyse_expression(expr2, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Char, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Char), _)) => assert!(true),
             _ => assert!(false),
         }
     }
@@ -330,26 +339,26 @@ mod tests {
         let local_symb = LocalSymbolTable::new_root();
         let var_symb = VariableSymbolTable::new();
 
-        let expr1: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr1: ExprWrap<&str, &str> = ASTWrapper(
             "(1 + 1) >= (3 * -2)",
             Expr::BinOp(
-                box WrapSpan(
+                box ASTWrapper(
                     "1 + 1",
                     Expr::BinOp(
-                        box WrapSpan("1", Expr::Int(1)),
+                        box ASTWrapper("1", Expr::Int(1)),
                         BinOp::Add,
-                        box WrapSpan("1", Expr::Int(1)),
+                        box ASTWrapper("1", Expr::Int(1)),
                     ),
                 ),
                 BinOp::Gte,
-                box WrapSpan(
+                box ASTWrapper(
                     "3 * -2",
                     Expr::BinOp(
-                        box WrapSpan("3", Expr::Int(3)),
+                        box ASTWrapper("3", Expr::Int(3)),
                         BinOp::Mul,
-                        box WrapSpan(
+                        box ASTWrapper(
                             "-2",
-                            Expr::UnOp(UnOp::Minus, box WrapSpan("2", Expr::Int(2))),
+                            Expr::UnOp(UnOp::Minus, box ASTWrapper("2", Expr::Int(2))),
                         ),
                     ),
                 ),
@@ -357,30 +366,30 @@ mod tests {
         );
 
         match analyse_expression(expr1, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Bool, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Bool), _)) => assert!(true),
             _ => assert!(false),
         }
 
-        let expr2: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr2: ExprWrap<&str, &str> = ASTWrapper(
             "(1 + 1) + (3 * -2)",
             Expr::BinOp(
-                box WrapSpan(
+                box ASTWrapper(
                     "1 + 1",
                     Expr::BinOp(
-                        box WrapSpan("1", Expr::Int(1)),
+                        box ASTWrapper("1", Expr::Int(1)),
                         BinOp::Mul,
-                        box WrapSpan("1", Expr::Int(1)),
+                        box ASTWrapper("1", Expr::Int(1)),
                     ),
                 ),
                 BinOp::Add,
-                box WrapSpan(
+                box ASTWrapper(
                     "3 * -2",
                     Expr::BinOp(
-                        box WrapSpan("3", Expr::Int(3)),
+                        box ASTWrapper("3", Expr::Int(3)),
                         BinOp::Mul,
-                        box WrapSpan(
+                        box ASTWrapper(
                             "-2",
-                            Expr::UnOp(UnOp::Minus, box WrapSpan("2", Expr::Int(2))),
+                            Expr::UnOp(UnOp::Minus, box ASTWrapper("2", Expr::Int(2))),
                         ),
                     ),
                 ),
@@ -388,34 +397,34 @@ mod tests {
         );
 
         match analyse_expression(expr2, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Int, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Int), _)) => assert!(true),
             _ => assert!(false),
         }
 
-        let expr3: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr3: ExprWrap<&str, &str> = ASTWrapper(
             "chr ((1 + 1) + (3 * -2))",
             Expr::UnOp(
                 UnOp::Chr,
-                box WrapSpan(
+                box ASTWrapper(
                     "(1 + 1) + (3 * -2)",
                     Expr::BinOp(
-                        box WrapSpan(
+                        box ASTWrapper(
                             "1 + 1",
                             Expr::BinOp(
-                                box WrapSpan("1", Expr::Int(1)),
+                                box ASTWrapper("1", Expr::Int(1)),
                                 BinOp::Mul,
-                                box WrapSpan("1", Expr::Int(1)),
+                                box ASTWrapper("1", Expr::Int(1)),
                             ),
                         ),
                         BinOp::Add,
-                        box WrapSpan(
+                        box ASTWrapper(
                             "3 * -2",
                             Expr::BinOp(
-                                box WrapSpan("3", Expr::Int(3)),
+                                box ASTWrapper("3", Expr::Int(3)),
                                 BinOp::Mul,
-                                box WrapSpan(
+                                box ASTWrapper(
                                     "-2",
-                                    Expr::UnOp(UnOp::Minus, box WrapSpan("2", Expr::Int(2))),
+                                    Expr::UnOp(UnOp::Minus, box ASTWrapper("2", Expr::Int(2))),
                                 ),
                             ),
                         ),
@@ -425,33 +434,33 @@ mod tests {
         );
 
         match analyse_expression(expr3, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Char, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Char), _)) => assert!(true),
             _ => assert!(false),
         }
 
-        let expr4: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr4: ExprWrap<&str, &str> = ASTWrapper(
             "(ord 'a' == 65) || (true && !false)",
             Expr::BinOp(
-                box WrapSpan(
+                box ASTWrapper(
                     "ord 'a' == 65",
                     Expr::BinOp(
-                        box WrapSpan(
+                        box ASTWrapper(
                             "ord 'a'",
-                            Expr::UnOp(UnOp::Ord, box WrapSpan("'a'", Expr::Char('a'))),
+                            Expr::UnOp(UnOp::Ord, box ASTWrapper("'a'", Expr::Char('a'))),
                         ),
                         BinOp::Eq,
-                        box WrapSpan("65", Expr::Int(65)),
+                        box ASTWrapper("65", Expr::Int(65)),
                     ),
                 ),
                 BinOp::Or,
-                box WrapSpan(
+                box ASTWrapper(
                     "true && !false",
                     Expr::BinOp(
-                        box WrapSpan("true", Expr::Bool(true)),
+                        box ASTWrapper("true", Expr::Bool(true)),
                         BinOp::And,
-                        box WrapSpan(
+                        box ASTWrapper(
                             "!false",
-                            Expr::UnOp(UnOp::Neg, box WrapSpan("false", Expr::Bool(false))),
+                            Expr::UnOp(UnOp::Neg, box ASTWrapper("false", Expr::Bool(false))),
                         ),
                     ),
                 ),
@@ -459,33 +468,33 @@ mod tests {
         );
 
         match analyse_expression(expr4, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Bool, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Bool), _)) => assert!(true),
             _ => assert!(false),
         }
 
-        let expr5: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr5: ExprWrap<&str, &str> = ASTWrapper(
             "(97 >= ord 'a') && (true && !false)",
             Expr::BinOp(
-                box WrapSpan(
+                box ASTWrapper(
                     "97 >= ord 'a'",
                     Expr::BinOp(
-                        box WrapSpan("97", Expr::Int(97)),
+                        box ASTWrapper("97", Expr::Int(97)),
                         BinOp::Eq,
-                        box WrapSpan(
+                        box ASTWrapper(
                             "ord 'a'",
-                            Expr::UnOp(UnOp::Ord, box WrapSpan("'a''", Expr::Char('a'))),
+                            Expr::UnOp(UnOp::Ord, box ASTWrapper("'a''", Expr::Char('a'))),
                         ),
                     ),
                 ),
                 BinOp::And,
-                box WrapSpan(
+                box ASTWrapper(
                     "true && !false",
                     Expr::BinOp(
-                        box WrapSpan("true", Expr::Bool(true)),
+                        box ASTWrapper("true", Expr::Bool(true)),
                         BinOp::And,
-                        box WrapSpan(
+                        box ASTWrapper(
                             "!false",
-                            Expr::UnOp(UnOp::Neg, box WrapSpan("false", Expr::Bool(false))),
+                            Expr::UnOp(UnOp::Neg, box ASTWrapper("false", Expr::Bool(false))),
                         ),
                     ),
                 ),
@@ -493,7 +502,7 @@ mod tests {
         );
 
         match analyse_expression(expr5, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Bool, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Bool), _)) => assert!(true),
             _ => assert!(false),
         }
     }
@@ -507,29 +516,29 @@ mod tests {
             .def_var("var1", &Type::Int, "int var1 = 9", &mut local_symb)
             .expect("variable not yet defined");
 
-        let expr1: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr1: ExprWrap<&str, &str> = ASTWrapper(
             "(chr var1 >= ord 'a') || (true && !false)",
             Expr::BinOp(
-                box WrapSpan(
+                box ASTWrapper(
                     "chr var1 >= ord 'a'",
                     Expr::BinOp(
-                        box WrapSpan("var1", Expr::Var("var1")),
+                        box ASTWrapper("var1", Expr::Var("var1")),
                         BinOp::Eq,
-                        box WrapSpan(
+                        box ASTWrapper(
                             "ord 'a'",
-                            Expr::UnOp(UnOp::Ord, box WrapSpan("'a''", Expr::Char('a'))),
+                            Expr::UnOp(UnOp::Ord, box ASTWrapper("'a''", Expr::Char('a'))),
                         ),
                     ),
                 ),
                 BinOp::Or,
-                box WrapSpan(
+                box ASTWrapper(
                     "true && !false",
                     Expr::BinOp(
-                        box WrapSpan("true", Expr::Bool(true)),
+                        box ASTWrapper("true", Expr::Bool(true)),
                         BinOp::And,
-                        box WrapSpan(
+                        box ASTWrapper(
                             "!false",
-                            Expr::UnOp(UnOp::Neg, box WrapSpan("false", Expr::Bool(false))),
+                            Expr::UnOp(UnOp::Neg, box ASTWrapper("false", Expr::Bool(false))),
                         ),
                     ),
                 ),
@@ -537,7 +546,7 @@ mod tests {
         );
 
         match analyse_expression(expr1, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Bool, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Bool), _)) => assert!(true),
             _ => assert!(false),
         }
 
@@ -545,41 +554,44 @@ mod tests {
             .def_var("var2", &Type::Bool, "bool var2 = true", &mut local_symb)
             .expect("variable not yet defined");
 
-        let expr4: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr4: ExprWrap<&str, &str> = ASTWrapper(
             "(ord 'a' == - ord chr 9) || (true && !false)",
             Expr::BinOp(
-                box WrapSpan(
+                box ASTWrapper(
                     "ord 'a' == - ord chr 9",
                     Expr::BinOp(
-                        box WrapSpan(
+                        box ASTWrapper(
                             "- ord chr 9",
                             Expr::UnOp(
                                 UnOp::Minus,
-                                box WrapSpan(
+                                box ASTWrapper(
                                     "ord chr 'a'",
                                     Expr::UnOp(
                                         UnOp::Ord,
-                                        box WrapSpan(
+                                        box ASTWrapper(
                                             "chr 'a'",
-                                            Expr::UnOp(UnOp::Chr, box WrapSpan("9", Expr::Int(9))),
+                                            Expr::UnOp(
+                                                UnOp::Chr,
+                                                box ASTWrapper("9", Expr::Int(9)),
+                                            ),
                                         ),
                                     ),
                                 ),
                             ),
                         ),
                         BinOp::Eq,
-                        box WrapSpan("65", Expr::Int(65)),
+                        box ASTWrapper("65", Expr::Int(65)),
                     ),
                 ),
                 BinOp::Or,
-                box WrapSpan(
+                box ASTWrapper(
                     "true && !false",
                     Expr::BinOp(
-                        box WrapSpan("true", Expr::Bool(true)),
+                        box ASTWrapper("true", Expr::Bool(true)),
                         BinOp::And,
-                        box WrapSpan(
+                        box ASTWrapper(
                             "!false",
-                            Expr::UnOp(UnOp::Neg, box WrapSpan("false", Expr::Bool(false))),
+                            Expr::UnOp(UnOp::Neg, box ASTWrapper("false", Expr::Bool(false))),
                         ),
                     ),
                 ),
@@ -587,7 +599,7 @@ mod tests {
         );
 
         match analyse_expression(expr4, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Bool, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Bool), _)) => assert!(true),
             _ => assert!(false),
         }
     }
@@ -606,13 +618,13 @@ mod tests {
             )
             .expect("variable not yet defined");
 
-        let expr1: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr1: ExprWrap<&str, &str> = ASTWrapper(
             "array1[5]",
-            Expr::ArrayElem("array1", vec![WrapSpan("5", Expr::Int(5))]),
+            Expr::ArrayElem("array1", vec![ASTWrapper("5", Expr::Int(5))]),
         );
 
         match analyse_expression(expr1, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Int, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Int), _)) => assert!(true),
             _ => assert!(false),
         }
 
@@ -625,23 +637,23 @@ mod tests {
             )
             .expect("variable not yet defined");
 
-        let expr2: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr2: ExprWrap<&str, &str> = ASTWrapper(
             "array2[5 * 5]",
             Expr::ArrayElem(
                 "array2",
-                vec![WrapSpan(
+                vec![ASTWrapper(
                     "5 * 5",
                     Expr::BinOp(
-                        box WrapSpan("5", Expr::Int(5)),
+                        box ASTWrapper("5", Expr::Int(5)),
                         BinOp::Mul,
-                        box WrapSpan("5", Expr::Int(5)),
+                        box ASTWrapper("5", Expr::Int(5)),
                     ),
                 )],
             ),
         );
 
         match analyse_expression(expr2, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Array(box Type::Int, 1), _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Array(box Type::Int, 1)), _)) => assert!(true),
             _ => assert!(false),
         }
 
@@ -649,52 +661,52 @@ mod tests {
             .def_var("num1", &Type::Int, "int num1 = 9", &mut local_symb)
             .expect("variable not yet defined");
 
-        let expr3: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr3: ExprWrap<&str, &str> = ASTWrapper(
             "array2[5 * 5][num1]",
             Expr::ArrayElem(
                 "array2",
                 vec![
-                    WrapSpan(
+                    ASTWrapper(
                         "5 * 5",
                         Expr::BinOp(
-                            box WrapSpan("5", Expr::Int(5)),
+                            box ASTWrapper("5", Expr::Int(5)),
                             BinOp::Mul,
-                            box WrapSpan("5", Expr::Int(5)),
+                            box ASTWrapper("5", Expr::Int(5)),
                         ),
                     ),
-                    WrapSpan("num1", Expr::Var("num1")),
+                    ASTWrapper("num1", Expr::Var("num1")),
                 ],
             ),
         );
 
         match analyse_expression(expr3, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Int, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Int), _)) => assert!(true),
             _ => assert!(false),
         }
 
-        let expr4: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr4: ExprWrap<&str, &str> = ASTWrapper(
             "array2[5*5][array1[num1]]",
             Expr::ArrayElem(
                 "array2",
                 vec![
-                    WrapSpan(
+                    ASTWrapper(
                         "5 * 5",
                         Expr::BinOp(
-                            box WrapSpan("5", Expr::Int(5)),
+                            box ASTWrapper("5", Expr::Int(5)),
                             BinOp::Mul,
-                            box WrapSpan("5", Expr::Int(5)),
+                            box ASTWrapper("5", Expr::Int(5)),
                         ),
                     ),
-                    WrapSpan(
+                    ASTWrapper(
                         "array1[num1]",
-                        Expr::ArrayElem("array1", vec![WrapSpan("num1", Expr::Var("num1"))]),
+                        Expr::ArrayElem("array1", vec![ASTWrapper("num1", Expr::Var("num1"))]),
                     ),
                 ],
             ),
         );
 
         match analyse_expression(expr4, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Int, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Int), _)) => assert!(true),
             _ => assert!(false),
         }
     }
@@ -713,17 +725,17 @@ mod tests {
             )
             .expect("variable not yet defined");
 
-        let expr1: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr1: ExprWrap<&str, &str> = ASTWrapper(
             "pair1 == pair1",
             Expr::BinOp(
-                box WrapSpan("pair1", Expr::Var("pair1")),
+                box ASTWrapper("pair1", Expr::Var("pair1")),
                 BinOp::Eq,
-                box WrapSpan("pair1", Expr::Var("pair1")),
+                box ASTWrapper("pair1", Expr::Var("pair1")),
             ),
         );
 
         match analyse_expression(expr1, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Bool, _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Bool), _)) => assert!(true),
             _ => assert!(false),
         }
 
@@ -736,64 +748,67 @@ mod tests {
             )
             .expect("variable not yet defined");
 
-        let expr2: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr2: ExprWrap<&str, &str> = ASTWrapper(
             "pair_array[len pair_array - 1]",
             Expr::ArrayElem(
                 "pair_array",
-                vec![WrapSpan(
+                vec![ASTWrapper(
                     "len pair_array - 1",
                     Expr::BinOp(
-                        box WrapSpan(
+                        box ASTWrapper(
                             "len pair_array",
                             Expr::UnOp(
                                 UnOp::Len,
-                                box WrapSpan("pair_array", Expr::Var("pair_array")),
+                                box ASTWrapper("pair_array", Expr::Var("pair_array")),
                             ),
                         ),
                         BinOp::Sub,
-                        box WrapSpan("1", Expr::Int(1)),
+                        box ASTWrapper("1", Expr::Int(1)),
                     ),
                 )],
             ),
         );
 
         match analyse_expression(expr2, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Pair(box Type::Int, box Type::Int), _)) => assert!(true),
+            Some(ASTWrapper(Some(Type::Pair(box Type::Int, box Type::Int)), _)) => assert!(true),
             _ => assert!(false),
         }
 
-        let expr3: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr3: ExprWrap<&str, &str> = ASTWrapper(
             "newpair(5+5, newpair(5+5, 'a')))",
             Expr::BinOp(
-                box WrapSpan(
+                box ASTWrapper(
                     "5 + 5",
                     Expr::BinOp(
-                        box WrapSpan("5", Expr::Int(5)),
+                        box ASTWrapper("5", Expr::Int(5)),
                         BinOp::Add,
-                        box WrapSpan("5", Expr::Int(5)),
+                        box ASTWrapper("5", Expr::Int(5)),
                     ),
                 ),
                 BinOp::Newpair,
-                box WrapSpan(
+                box ASTWrapper(
                     "newpair(5+5, 'a')",
                     Expr::BinOp(
-                        box WrapSpan(
+                        box ASTWrapper(
                             "5 + 5",
                             Expr::BinOp(
-                                box WrapSpan("5", Expr::Int(5)),
+                                box ASTWrapper("5", Expr::Int(5)),
                                 BinOp::Add,
-                                box WrapSpan("5", Expr::Int(5)),
+                                box ASTWrapper("5", Expr::Int(5)),
                             ),
                         ),
                         BinOp::Newpair,
-                        box WrapSpan("'a'", Expr::Char('a')),
+                        box ASTWrapper("'a'", Expr::Char('a')),
                     ),
                 ),
             ),
         );
 
         match analyse_expression(expr3, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Pair(box Type::Int, box Type::Pair(box Type::Int, box Type::Char)), _)) => {
+            Some(ASTWrapper(
+                Some(Type::Pair(box Type::Int, box Type::Pair(box Type::Int, box Type::Char))),
+                _,
+            )) => {
                 assert!(true)
             }
             _ => assert!(false),
@@ -815,23 +830,26 @@ mod tests {
             .expect("variable not yet defined");
 
         // example of newpair(snd pair1, fst pair1) <- swapping pair elements
-        let expr1: WrapSpan<Expr<&str>> = WrapSpan(
+        let expr1: ExprWrap<&str, &str> = ASTWrapper(
             "newpair(snd pair1, fst pair2)",
             Expr::BinOp(
-                box WrapSpan(
+                box ASTWrapper(
                     "snd pair1",
-                    Expr::UnOp(UnOp::Snd, box WrapSpan("pair1", Expr::Var("pair1"))),
+                    Expr::UnOp(UnOp::Snd, box ASTWrapper("pair1", Expr::Var("pair1"))),
                 ),
                 BinOp::Newpair,
-                box WrapSpan(
+                box ASTWrapper(
                     "fst pair1",
-                    Expr::UnOp(UnOp::Fst, box WrapSpan("pair1", Expr::Var("pair1"))),
+                    Expr::UnOp(UnOp::Fst, box ASTWrapper("pair1", Expr::Var("pair1"))),
                 ),
             ),
         );
 
         match analyse_expression(expr1, &local_symb, &var_symb, &mut Vec::new()) {
-            Some((Type::Pair(box Type::Array(box Type::Bool, 2), box Type::Int), _)) => {
+            Some(ASTWrapper(
+                Some(Type::Pair(box Type::Array(box Type::Bool, 2), box Type::Int)),
+                _,
+            )) => {
                 assert!(true)
             }
             _ => assert!(false),
