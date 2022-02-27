@@ -4,10 +4,11 @@ use std::collections::HashMap;
 
 use crate::frontend::ast;
 use crate::frontend::semantic::symbol_table::VariableSymbolTable;
-use crate::intermediate::{ArithOp, BoolExpr, BoolOp, Expr::*, NumExpr, NumSize::*, PtrExpr, Type, DataRef};
-
-use super::super::super::intermediate::Expr as IRExpr;
 use super::super::ast::{Expr, ExprSpan, UnOp, WrapSpan};
+
+use crate::intermediate::{ArithOp, BoolExpr, BoolOp, Expr::*, NumExpr, NumSize::{self, *}, PtrExpr, Type, DataRef};
+use super::super::super::intermediate::Expr as IRExpr;
+
 
 /// usize -> &'a str
 pub fn translate_expr<'a>(
@@ -48,7 +49,7 @@ pub fn translate_expr<'a>(
                 ast::Type::Array(_, _) => Ptr(PtrExpr::Var(v)),
                 _ => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!")
             },
-            None => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!"),
+            None => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!")
         }
 
         // Function call
@@ -67,16 +68,9 @@ pub fn translate_expr<'a>(
             )),
             (UnOp::Chr, Num(n)) => Num(NumExpr::Cast(Byte, box n)),
             (UnOp::Ord, Num(n)) => Num(NumExpr::Cast(DWord, box n)),
-            _ => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!"),
-        },
-        // NumExpr::Deref(NumSize::DWord, PtrExpr::Var(var))
-        // someexpr::Deref(PtrExpr::Offset(PtrExpr::Var(pair), NumExpr::SizeOf(first_field_type)))
-        Expr::UnOp(o, box v) => match o {
-            // deref ptr 
-            UnOp::Len => todo!(),
-            UnOp::Fst => todo!(),
-            UnOp::Snd => todo!(),
-            _ => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!"),
+            (UnOp::Len, Ptr(p)) => Num(NumExpr::Deref(NumSize::DWord, p)),
+            (_, Ptr(p)) => todo!(),
+            _ => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!")
         },
 
         // Should change this so that boolean operations are short-circuited
