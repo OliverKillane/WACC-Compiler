@@ -15,6 +15,12 @@
 //! The spans associated with errors are returned, this ensures that the span
 //! of erroneous code in the source is kept for error printing later.
 //!
+//! If no errors occur, the types (if relevant) of reach ast node is used in
+//! the [ASTWrapper]. The type is contained for:
+//! - Function names in calls
+//! - All expressions (will be some)
+//! - Right hand sides of assignments
+//!
 //! For each statement the errors is given as:
 //! (span of statement, [list of semantic errors (can contain internal spans)])
 //! this is covered in more detail in [semantic errors](semantic_errors).
@@ -55,7 +61,7 @@ use self::{
 };
 
 use super::{
-    ast::{FunSpan, Program, StatSpan, WrapSpan},
+    ast::{ASTWrapper, FunWrap, Program, StatWrap, Type},
     error::Summary,
 };
 
@@ -72,13 +78,13 @@ use super::{
 /// - Vector of syntax error summary cells
 #[allow(clippy::type_complexity)]
 pub fn analyse_semantics<'a>(
-    Program(fn_defs, main_block): Program<'a, &'a str>,
+    Program(fn_defs, main_block): Program<&'a str, &'a str>,
     source_code: &'a str,
 ) -> Result<
     (
-        Vec<StatSpan<'a, usize>>,
+        Vec<StatWrap<Option<Type>, usize>>,
         VariableSymbolTable,
-        HashMap<&'a str, (FunSpan<'a, usize>, VariableSymbolTable)>,
+        HashMap<&'a str, (FunWrap<Option<Type>, usize>, VariableSymbolTable)>,
     ),
     Vec<Summary<'a>>,
 > {
@@ -89,8 +95,8 @@ pub fn analyse_semantics<'a>(
     let mut correct = HashMap::with_capacity(filtered_fn_defs.len());
 
     // traverse and analyse functions
-    for WrapSpan(fun_name, fun) in filtered_fn_defs {
-        match analyse_function(WrapSpan(fun_name, fun), &fun_symb) {
+    for ASTWrapper(fun_name, fun) in filtered_fn_defs {
+        match analyse_function(ASTWrapper(fun_name, fun), &fun_symb) {
             Ok(res) => {
                 correct.insert(fun_name, res);
             }
