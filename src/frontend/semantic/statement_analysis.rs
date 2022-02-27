@@ -2,9 +2,9 @@
 //! AST or the errors produced.
 
 use super::{
-    super::ast::{AssignLhs, AssignRhs, Expr, Stat, StatSpan, Type, WrapSpan},
+    super::ast::{AssignLhs, AssignRhs, Stat, StatSpan, Type, ASTWrapper},
     expression_analysis::analyse_expression,
-    semantic_errors::SemanticError,
+    semantic_errors::{SemanticError, StatementErrors},
     symbol_table::{FunctionSymbolTable, LocalSymbolTable, VariableSymbolTable},
     type_constraints::{can_coerce, de_index},
 };
@@ -23,24 +23,24 @@ use super::{
 /// If the block was well formed, returns the renamed block and a boolean
 /// determining if all paths through the block terminated.
 pub fn analyse_block<'a, 'b>(
-    stats: Vec<StatSpan<'a, &'a str>>,
+    stats: Vec<StatSpan<&'a str, &'a str>>,
     fun_symb: &FunctionSymbolTable<'a>,
     local_symb: &mut LocalSymbolTable<'a, 'b>,
     var_symb: &mut VariableSymbolTable,
     ret_type: &Option<Type>,
     must_ret: bool,
-    errors: &mut Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>,
-) -> Option<Vec<WrapSpan<'a, Stat<'a, usize>>>> {
+    errors: &mut Vec<StatementErrors<'a>>,
+) -> Option<Vec<StatSpan<Option<Type>, usize>>> {
     let mut any_errors = false;
-    let mut correct: Vec<StatSpan<'a, usize>> = Vec::new();
+    let mut correct: Vec<StatSpan<Option<Type>, usize>> = Vec::new();
 
     let mut stat_iter = stats.into_iter().peekable();
     while let Some(stat) = stat_iter.next() {
         if stat_iter.peek().is_none() && must_ret {
-            let WrapSpan(span, inner_stat) = stat;
+            let ASTWrapper(span, inner_stat) = stat;
             match inner_stat {
                 Stat::While(_, _) => {
-                    errors.push(WrapSpan(
+                    errors.push(ASTWrapper(
                         span,
                         vec![SemanticError::FunctionLastStatIsWhile(
                             span,
@@ -50,7 +50,7 @@ pub fn analyse_block<'a, 'b>(
                         )],
                     ));
                     analyse_statement(
-                        WrapSpan(span, inner_stat),
+                        ASTWrapper(span, inner_stat),
                         fun_symb,
                         local_symb,
                         var_symb,
@@ -62,7 +62,7 @@ pub fn analyse_block<'a, 'b>(
                 }
                 Stat::If(_, _, _) | Stat::Exit(_) | Stat::Return(_) | Stat::Block(_) => {
                     match analyse_statement(
-                        WrapSpan(span, inner_stat),
+                        ASTWrapper(span, inner_stat),
                         fun_symb,
                         local_symb,
                         var_symb,
@@ -76,7 +76,7 @@ pub fn analyse_block<'a, 'b>(
                 }
                 other => {
                     analyse_statement(
-                        WrapSpan(span, other),
+                        ASTWrapper(span, other),
                         fun_symb,
                         local_symb,
                         var_symb,
@@ -84,7 +84,7 @@ pub fn analyse_block<'a, 'b>(
                         true,
                         errors,
                     );
-                    errors.push(WrapSpan(
+                    errors.push(ASTWrapper(
                         span,
                         vec![SemanticError::FunctionNoReturnOrExit(
                             span,
@@ -116,25 +116,25 @@ pub fn analyse_block<'a, 'b>(
 /// Analyse a statement, resulting in either the errors for a statement or a
 /// correct renamed ast.
 fn analyse_statement<'a, 'b>(
-    WrapSpan(span, stat): StatSpan<'a, &'a str>,
+    ASTWrapper(span, stat): StatSpan<&'a str, &'a str>,
     fun_symb: &FunctionSymbolTable<'a>,
     local_symb: &mut LocalSymbolTable<'a, 'b>,
     var_symb: &mut VariableSymbolTable,
     ret_type: &Option<Type>,
     must_ret: bool,
-    errors: &mut Vec<WrapSpan<'a, Vec<SemanticError<'a>>>>,
-) -> Option<StatSpan<'a, usize>> {
+    errors: &mut Vec<StatementErrors<'a>>,
+) -> Option<StatSpan<Option<Type>, usize>> {
     let mut add_error = |err| {
         errors.push(err);
         None
     };
 
     match stat {
-        Stat::Skip => Some(WrapSpan(span, Stat::Skip)),
+        Stat::Skip => Some(ASTWrapper(None, Stat::Skip)),
         Stat::Def(var_type, name, rhs) => {
             match var_symb.def_var(name, &var_type, span, local_symb) {
                 Ok(rename) => {
-                    let mut rhs_errors = Vec::with_capacity(0);
+                    let mut rhs_errors = Vec::new();
                     match analyse_rhs(
                         &var_type,
                         rhs,
@@ -144,12 +144,12 @@ fn analyse_statement<'a, 'b>(
                         &mut rhs_errors,
                     ) {
                         Some(renamed_rhs) => {
-                            Some(WrapSpan(span, Stat::Def(var_type, rename, renamed_rhs)))
+                            Some(ASTWrapper(None, Stat::Def(var_type, rename, renamed_rhs)))
                         }
-                        None => add_error(WrapSpan(span, rhs_errors)),
+                        None => add_error(ASTWrapper(span, rhs_errors)),
                     }
                 }
-                Err(err) => add_error(WrapSpan(span, vec![err])),
+                Err(err) => add_error(ASTWrapper(span, vec![err])),
             }
         }
         Stat::Assign(lhs, rhs) => {
@@ -164,27 +164,27 @@ fn analyse_statement<'a, 'b>(
                         var_symb,
                         &mut stat_errors,
                     ) {
-                        Some(rhs_ast) => Some(WrapSpan(span, Stat::Assign(lhs_ast, rhs_ast))),
-                        None => add_error(WrapSpan(span, stat_errors)),
+                        Some(rhs_ast) => Some(ASTWrapper(None, Stat::Assign(lhs_ast, rhs_ast))),
+                        None => add_error(ASTWrapper(span, stat_errors)),
                     }
                 }
-                None => add_error(WrapSpan(span, stat_errors)),
+                None => add_error(ASTWrapper(span, stat_errors)),
             }
         }
         Stat::Read(lhs) => {
-            let mut stat_errors = Vec::with_capacity(0);
+            let mut stat_errors = Vec::new();
             match analyse_lhs(lhs, var_symb, local_symb, &mut stat_errors) {
                 Some((lhs_type, lhs_ast)) => {
                     if can_coerce(&Type::Int, &lhs_type) || can_coerce(&Type::Char, &lhs_type) {
-                        Some(WrapSpan(span, Stat::Read(lhs_ast)))
+                        Some(ASTWrapper(None, Stat::Read(lhs_ast)))
                     } else {
-                        add_error(WrapSpan(
+                        add_error(ASTWrapper(
                             span,
                             vec![SemanticError::ReadStatementMismatch(span, lhs_type)],
                         ))
                     }
                 }
-                None => add_error(WrapSpan(span, stat_errors)),
+                None => add_error(ASTWrapper(span, stat_errors)),
             }
         }
         // If the expression is valid, check the type can coerce to some
@@ -192,33 +192,34 @@ fn analyse_statement<'a, 'b>(
         //
         // If an invalid expression or wrong expression type, add to errors
         // for statement.
-        Stat::Free(expr) => {
-            let mut stat_errors = Vec::with_capacity(0);
+        Stat::Free(expr @ ASTWrapper(expr_span, _)) => {
+            let mut stat_errors = Vec::new();
             match analyse_expression(expr, local_symb, var_symb, &mut stat_errors) {
-                Some((expr_type, WrapSpan(expr_span, expr_ast))) => {
+                Some(ASTWrapper(Some(expr_type), expr_ast)) => {
                     if can_coerce(&Type::Pair(box Type::Any, box Type::Any), &expr_type)
                         || can_coerce(&Type::Array(box Type::Any, 1), &expr_type)
                     {
-                        Some(WrapSpan(span, Stat::Free(WrapSpan(expr_span, expr_ast))))
+                        Some(ASTWrapper(None, Stat::Free(ASTWrapper(Some(expr_type), expr_ast))))
                     } else {
-                        add_error(WrapSpan(
+                        add_error(ASTWrapper(
                             span,
                             vec![SemanticError::FreeStatementMismatch(expr_span, expr_type)],
                         ))
                     }
                 }
-                None => add_error(WrapSpan(span, stat_errors)),
+                Some(ASTWrapper(None, _)) => panic!("Correctly typed expressions must always have a type"),
+                None => add_error(ASTWrapper(span, stat_errors)),
             }
         }
-        Stat::Return(expr) => {
-            let mut stat_errors = Vec::with_capacity(0);
+        Stat::Return(expr @ ASTWrapper(expr_span, _)) => {
+            let mut stat_errors = Vec::new();
             match analyse_expression(expr, local_symb, var_symb, &mut stat_errors) {
-                Some((expr_type, WrapSpan(expr_span, expr_ast))) => match &ret_type {
+                Some(ASTWrapper(Some(expr_type), expr_ast)) => match &ret_type {
                     Some(return_type) => {
                         if can_coerce(return_type, &expr_type) {
-                            Some(WrapSpan(span, Stat::Return(WrapSpan(expr_span, expr_ast))))
+                            Some(ASTWrapper(None, Stat::Return(ASTWrapper(Some(expr_type), expr_ast))))
                         } else {
-                            add_error(WrapSpan(
+                            add_error(ASTWrapper(
                                 span,
                                 vec![SemanticError::InvalidFunctionReturn(
                                     expr_span,
@@ -228,67 +229,70 @@ fn analyse_statement<'a, 'b>(
                             ))
                         }
                     }
-                    None => add_error(WrapSpan(
+                    None => add_error(ASTWrapper(
                         span,
                         vec![SemanticError::ReturnStatementMisplaced(span)],
                     )),
                 },
-                None => add_error(WrapSpan(span, stat_errors)),
+                Some(ASTWrapper(None, _)) => panic!("Correctly typed expressions must always have a type"),
+                None => add_error(ASTWrapper(span, stat_errors)),
             }
         }
-        Stat::Exit(expr) => {
-            let mut stat_errors = Vec::with_capacity(0);
+        Stat::Exit(expr @ ASTWrapper(expr_span, _ )) => {
+            let mut stat_errors = Vec::new();
             match analyse_expression(expr, local_symb, var_symb, &mut stat_errors) {
-                Some((expr_type, WrapSpan(expr_span, expr_ast))) => {
+                Some(ASTWrapper(Some(expr_type), expr_ast)) => {
                     if can_coerce(&Type::Int, &expr_type) {
-                        Some(WrapSpan(span, Stat::Exit(WrapSpan(span, expr_ast))))
+                        Some(ASTWrapper(None, Stat::Exit(ASTWrapper(Some(expr_type), expr_ast))))
                     } else {
-                        add_error(WrapSpan(
+                        add_error(ASTWrapper(
                             span,
                             vec![SemanticError::ExitStatementMismatch(expr_span, expr_type)],
                         ))
                     }
                 }
-                None => add_error(WrapSpan(span, stat_errors)),
+                Some(ASTWrapper(None, _)) => panic!("Correctly typed expressions must always have a type"),
+                None => add_error(ASTWrapper(span, stat_errors)),
             }
         }
         Stat::Print(expr) => {
-            let mut stat_errors = Vec::with_capacity(0);
+            let mut stat_errors = Vec::new();
             match analyse_expression(expr, local_symb, var_symb, &mut stat_errors) {
-                Some((_, expr_renamed)) => {
+                Some(expr_renamed) => {
                     // any type can be printed, so no coercion check
-                    Some(WrapSpan(span, Stat::Print(expr_renamed)))
+                    Some(ASTWrapper(None, Stat::Print(expr_renamed)))
                 }
-                None => add_error(WrapSpan(span, stat_errors)),
+                None => add_error(ASTWrapper(span, stat_errors)),
             }
         }
         Stat::PrintLn(expr) => {
-            let mut stat_errors = Vec::with_capacity(0);
+            let mut stat_errors = Vec::new();
             match analyse_expression(expr, local_symb, var_symb, &mut stat_errors) {
-                Some((_, expr_renamed)) => {
+                Some(expr_renamed) => {
                     // any type can be printed, so no coercion check
-                    Some(WrapSpan(span, Stat::PrintLn(expr_renamed)))
+                    Some(ASTWrapper(None, Stat::PrintLn(expr_renamed)))
                 }
-                None => add_error(WrapSpan(span, stat_errors)),
+                None => add_error(ASTWrapper(span, stat_errors)),
             }
         }
-        Stat::If(cond, if_block, else_block) => {
-            let mut stat_errors = Vec::with_capacity(0);
+        Stat::If(cond @ ASTWrapper(cond_span, _), if_block, else_block) => {
+            let mut stat_errors = Vec::new();
             let cond_valid = match analyse_expression(cond, local_symb, var_symb, &mut stat_errors)
             {
-                Some((cond_type, WrapSpan(cond_span, cond_ast))) => {
+                Some(ASTWrapper(Some(cond_type), cond_ast)) => {
                     if can_coerce(&Type::Bool, &cond_type) {
-                        Some(WrapSpan(cond_span, cond_ast))
+                        Some(ASTWrapper(None, cond_ast))
                     } else {
-                        errors.push(WrapSpan(
+                        errors.push(ASTWrapper(
                             span,
                             vec![SemanticError::InvalidIfCondition(cond_span, cond_type)],
                         ));
                         None
                     }
                 }
+                Some(ASTWrapper(None, _)) => panic!("Correctly typed expressions must always have a type"),
                 None => {
-                    errors.push(WrapSpan(span, stat_errors));
+                    errors.push(ASTWrapper(span, stat_errors));
                     None
                 }
             };
@@ -316,31 +320,32 @@ fn analyse_statement<'a, 'b>(
             if let (Some(cond_ast), Some(if_block_ast), Some(else_block_ast)) =
                 (cond_valid, if_block, else_block)
             {
-                Some(WrapSpan(
-                    span,
+                Some(ASTWrapper(
+                    None,
                     Stat::If(cond_ast, if_block_ast, else_block_ast),
                 ))
             } else {
                 None
             }
         }
-        Stat::While(cond, loop_block) => {
-            let mut stat_errors = Vec::with_capacity(0);
+        Stat::While(cond @ ASTWrapper(cond_span, _), loop_block) => {
+            let mut stat_errors = Vec::new();
             let condition_valid =
                 match analyse_expression(cond, local_symb, var_symb, &mut stat_errors) {
-                    Some((cond_type, WrapSpan(cond_span, cond_ast))) => {
+                    Some(ASTWrapper(Some(cond_type), cond_ast)) => {
                         if can_coerce(&Type::Bool, &cond_type) {
-                            Some(WrapSpan(cond_span, cond_ast))
+                            Some(ASTWrapper(None, cond_ast))
                         } else {
-                            errors.push(WrapSpan(
+                            errors.push(ASTWrapper(
                                 span,
                                 vec![SemanticError::InvalidWhileCondition(cond_span, cond_type)],
                             ));
                             None
                         }
                     }
+                    Some(ASTWrapper(None, _)) => panic!("Correctly typed expressions must always have a type"),
                     None => {
-                        errors.push(WrapSpan(span, stat_errors));
+                        errors.push(ASTWrapper(span, stat_errors));
                         None
                     }
                 };
@@ -357,7 +362,7 @@ fn analyse_statement<'a, 'b>(
                     errors,
                 ),
             ) {
-                Some(WrapSpan(span, Stat::While(cond, block_ast)))
+                Some(ASTWrapper(None, Stat::While(cond, block_ast)))
             } else {
                 None
             }
@@ -371,7 +376,7 @@ fn analyse_statement<'a, 'b>(
             must_ret,
             errors,
         )
-        .map(|block_ast| WrapSpan(span, Stat::Block(block_ast))),
+        .map(|block_ast| ASTWrapper(None, Stat::Block(block_ast))),
     }
 }
 
@@ -387,17 +392,18 @@ fn analyse_statement<'a, 'b>(
 /// errors in a single statement).
 fn analyse_rhs<'a, 'b>(
     expected: &Type,
-    rhs: AssignRhs<'a, &'a str>,
+    rhs: AssignRhs<&'a str, &'a str>,
     fun_symb: &FunctionSymbolTable<'a>,
     local_symb: &LocalSymbolTable<'a, 'b>,
     var_symb: &VariableSymbolTable,
     errors: &mut Vec<SemanticError<'a>>,
-) -> Option<AssignRhs<'a, usize>> {
+) -> Option<AssignRhs<Option<Type>, usize>> {
     match rhs {
-        AssignRhs::Expr(expr) => match analyse_expression(expr, local_symb, var_symb, errors) {
-            Some((expr_t, WrapSpan(expr_span, expr_ast))) => {
+        AssignRhs::Expr(expr @ ASTWrapper(expr_span, _)) => match analyse_expression(expr, local_symb, var_symb, errors) {
+            Some(ASTWrapper(Some(expr_t), expr_ast)) => {
                 if can_coerce(expected, &expr_t) {
-                    Some(AssignRhs::Expr(WrapSpan(expr_span, expr_ast)))
+                    // if the type is coercible, the entire expression should go to this type
+                    Some(AssignRhs::Expr(ASTWrapper(Some(expected.clone()), expr_ast)))
                 } else {
                     errors.push(SemanticError::InvalidType(
                         expr_span,
@@ -407,17 +413,18 @@ fn analyse_rhs<'a, 'b>(
                     None
                 }
             }
+            Some(ASTWrapper(None,_ )) => panic!("Correctly typed expressions must always have a type"),
             None => None,
         },
-        AssignRhs::Array(WrapSpan(span, vals)) => {
+        AssignRhs::Array(ASTWrapper(span, vals)) => {
             // check if assignment is possible
             let vals_len = vals.len();
 
             // check the inner expressions
-            let renamed_vals: Vec<(Type, WrapSpan<'a, Expr<'a, usize>>)> = vals
+            let renamed_vals = vals
                 .into_iter()
                 .filter_map(|expr| analyse_expression(expr, local_symb, var_symb, errors))
-                .collect();
+                .collect::<Vec<_>>();
 
             if renamed_vals.len() == vals_len {
                 // all expressions are valid, get the type they can coerce to.
@@ -426,16 +433,17 @@ fn analyse_rhs<'a, 'b>(
                 // of the expressions in the literal.
                 let mut arr_lit_type = None;
 
-                for (expr_type, _) in renamed_vals.iter() {
+                for ASTWrapper(expr_type, _) in renamed_vals.iter() {
+                    let expr_type = expr_type.clone().expect("Correctly typed expressions must always have a type");
                     match &arr_lit_type {
                         Some(t) => {
-                            if can_coerce(t, expr_type) {
-                            } else if can_coerce(expr_type, t) {
+                            if can_coerce(t, &expr_type) {
+                            } else if can_coerce(&expr_type, t) {
                                 arr_lit_type = Some(expr_type.clone())
                             } else {
                                 errors.push(SemanticError::InvalidArrayLiteral(
                                     span,
-                                    renamed_vals.into_iter().map(|(expr_t, _)| expr_t).collect(),
+                                    renamed_vals.into_iter().map(|ASTWrapper(expr_t, _)| expr_t.expect("Correctly typed expressions must always have a type")).collect(),
                                 ));
                                 return None;
                             }
@@ -447,26 +455,25 @@ fn analyse_rhs<'a, 'b>(
                 // determine the array type, either an array of the common
                 // coerce type, or if the array is empty then any array
                 let array_lit_type = match arr_lit_type {
-                    Some(t) => Type::Array(box t, 1),
-                    None => Type::Array(box Type::Any, 1),
+                    Some(t) => t,
+                    None => Type::Any,
                 };
 
                 // check the type of the array literal can coerce to the type
                 // of the assignment.
-                if can_coerce(expected, &array_lit_type) {
-                    Some(AssignRhs::Array(WrapSpan(
-                        span,
-                        renamed_vals
-                            .into_iter()
-                            .map(|(_, renamed_ast)| renamed_ast)
-                            .collect(),
-                    )))
+
+                if let Some(expected_item_type) = de_index(expected, 1) {
+                    if can_coerce(&expected_item_type, &array_lit_type) {
+                        Some(AssignRhs::Array(ASTWrapper(Some(expected.clone()), renamed_vals.into_iter().map(|ASTWrapper(_, item_ast)| ASTWrapper(Some(expected_item_type.clone()), item_ast)).collect::<Vec<_>>())))
+                    } else {
+                        errors.push(SemanticError::InvalidType(
+                            span,
+                            expected.clone(),
+                            array_lit_type,
+                        ));
+                        None
+                    }
                 } else {
-                    errors.push(SemanticError::InvalidType(
-                        span,
-                        expected.clone(),
-                        array_lit_type,
-                    ));
                     None
                 }
             } else {
@@ -474,7 +481,7 @@ fn analyse_rhs<'a, 'b>(
                 None
             }
         }
-        AssignRhs::Call(fun_name, args) => {
+        AssignRhs::Call(ASTWrapper(fun_name, fun_name_string), args) => {
             match fun_symb.get_fun(fun_name) {
                 Some((ret_type, param_types)) => {
                     let mut correct = Vec::new();
@@ -495,14 +502,14 @@ fn analyse_rhs<'a, 'b>(
                             args_len,
                         ));
                     } else {
-                        for (expr, (param_name, param_type)) in
+                        for (expr @ ASTWrapper(param_span, _), (param_name, param_type)) in
                             args.into_iter().zip(param_types.into_iter())
                         {
-                            if let Some((expr_type, WrapSpan(param_span, param_ast))) =
+                            if let Some(ASTWrapper(Some(expr_type), param_ast)) =
                                 analyse_expression(expr, local_symb, var_symb, errors)
                             {
                                 if can_coerce(&param_type, &expr_type) {
-                                    correct.push(WrapSpan(param_span, param_ast))
+                                    correct.push(ASTWrapper(Some(param_type.clone()), param_ast))
                                 } else {
                                     errors.push(SemanticError::FunctionArgumentTypeInvalid(
                                         param_span, param_name, param_type, expr_type,
@@ -513,7 +520,7 @@ fn analyse_rhs<'a, 'b>(
                     }
 
                     if errors.is_empty() {
-                        Some(AssignRhs::Call(fun_name, correct))
+                        Some(AssignRhs::Call(ASTWrapper(Some(expected.clone()), fun_name_string), correct))
                     } else {
                         None
                     }
@@ -542,11 +549,11 @@ fn analyse_rhs<'a, 'b>(
 /// Adds any errors to the vector of semantic errors (representing the semantic
 /// errors in a single statement).
 fn analyse_lhs<'a, 'b>(
-    lhs: AssignLhs<'a, &'a str>,
+    lhs: AssignLhs<&'a str, &'a str>,
     var_symb: &mut VariableSymbolTable,
     local_symb: &LocalSymbolTable<'a, 'b>,
     errors: &mut Vec<SemanticError<'a>>,
-) -> Option<(Type, AssignLhs<'a, usize>)> {
+) -> Option<(Type, AssignLhs<Option<Type>, usize>)> {
     match lhs {
         AssignLhs::Var(var_name) => match var_symb.get_type(var_name, local_symb) {
             Some((rename, var_type)) => Some((var_type, AssignLhs::Var(rename))),
@@ -562,14 +569,14 @@ fn analyse_lhs<'a, 'b>(
 
             // check each expression in the indexes (adding expression errors
             // and checking type).
-            for expr in index_exprs.into_iter() {
-                if let Some((expr_type, WrapSpan(expr_span, expr_ast))) =
+            for expr @ ASTWrapper(expr_span, _) in index_exprs.into_iter() {
+                if let Some(ASTWrapper(Some(expr_type), expr_ast)) =
                     analyse_expression(expr, local_symb, var_symb, errors)
                 {
                     if can_coerce(&Type::Int, &expr_type) {
-                        correct.push(WrapSpan(expr_span, expr_ast));
+                        correct.push(ASTWrapper(Some(expr_type), expr_ast));
                     } else {
-                        errors.push(SemanticError::InvalidIndex(expr_span, expr_type))
+                        errors.push(SemanticError::InvalidIndex(expr_span, expr_type.clone()))
                     }
                 }
             }
@@ -601,28 +608,30 @@ fn analyse_lhs<'a, 'b>(
                 }
             }
         }
-        AssignLhs::PairFst(expr) => match analyse_expression(expr, local_symb, var_symb, errors) {
-            Some((Type::Pair(box t, _), renamed_ast)) => Some((t, AssignLhs::PairFst(renamed_ast))),
-            Some((t, WrapSpan(expr_span, _))) => {
+        AssignLhs::PairFst(expr @ ASTWrapper(expr_span, _ )) => match analyse_expression(expr, local_symb, var_symb, errors) {
+            Some( ASTWrapper(Some(Type::Pair(box t, t2)), renamed_ast)) => Some((t.clone(), AssignLhs::PairFst(ASTWrapper(Some(Type::Pair(box t, t2)), renamed_ast)))),
+            Some( ASTWrapper(Some(index_type), _)) => {
                 errors.push(SemanticError::InvalidType(
                     expr_span,
                     Type::Pair(box Type::Any, box Type::Any),
-                    t,
+                    index_type,
                 ));
                 None
             }
+            Some(ASTWrapper(None, _)) => panic!("Correctly typed expressions must always have a type"),
             None => None,
         },
-        AssignLhs::PairSnd(expr) => match analyse_expression(expr, local_symb, var_symb, errors) {
-            Some((Type::Pair(_, box t), renamed_ast)) => Some((t, AssignLhs::PairSnd(renamed_ast))),
-            Some((t, WrapSpan(expr_span, _))) => {
+        AssignLhs::PairSnd(expr @ ASTWrapper(expr_span, _), ) => match analyse_expression(expr, local_symb, var_symb, errors) {
+            Some(ASTWrapper(Some(Type::Pair(t2, box t)), renamed_ast)) => Some((t.clone(), AssignLhs::PairSnd(ASTWrapper(Some(Type::Pair(t2, box t)), renamed_ast)))),
+            Some(ASTWrapper(Some(index_type), _)) => {
                 errors.push(SemanticError::InvalidType(
                     expr_span,
                     Type::Pair(box Type::Any, box Type::Any),
-                    t,
+                    index_type,
                 ));
                 None
             }
+            Some(ASTWrapper(None, _)) => panic!("Correctly typed expressions must always have a type"),
             None => None,
         },
     }
@@ -659,8 +668,8 @@ mod tests {
             analyse_rhs(
                 &Type::Int,
                 AssignRhs::Call(
-                    "fun1",
-                    vec![WrapSpan("1", Expr::Int(3)), WrapSpan("4", Expr::Int(4))]
+                    ASTWrapper("fun1", String::from("fun1")),
+                    vec![ASTWrapper("1", Expr::Int(3)), ASTWrapper("4", Expr::Int(4))]
                 ),
                 &fun_symb,
                 &mut local_symb,
@@ -668,32 +677,32 @@ mod tests {
                 &mut Vec::new()
             ),
             Some(AssignRhs::Call(
-                "fun1",
-                vec![WrapSpan("1", Expr::Int(3)), WrapSpan("4", Expr::Int(4))]
+                ASTWrapper(Some(Type::Int), String::from("fun1")),
+                vec![ASTWrapper(Some(Type::Int), Expr::Int(3)), ASTWrapper(Some(Type::Int), Expr::Int(4))]
             ))
         );
         assert_eq!(
             analyse_rhs(
                 &Type::Int,
-                AssignRhs::Call("fun2", vec![]),
+                AssignRhs::Call(ASTWrapper("fun2", String::from("fun2")), vec![]),
                 &fun_symb,
                 &mut local_symb,
                 &mut var_symb,
                 &mut Vec::new()
             ),
-            Some(AssignRhs::Call("fun2", vec![]))
+            Some(AssignRhs::Call(ASTWrapper(Some(Type::Int), String::from("fun2")), vec![]))
         );
         assert_eq!(
             analyse_rhs(
                 &Type::Char,
                 AssignRhs::Call(
-                    "fun3",
-                    vec![WrapSpan(
+                    ASTWrapper("fun3", String::from("fun3")),
+                    vec![ASTWrapper(
                         "newpair(5,5)",
                         Expr::BinOp(
-                            box WrapSpan("5", Expr::Int(5)),
+                            box ASTWrapper("5", Expr::Int(5)),
                             BinOp::Newpair,
-                            box WrapSpan("5", Expr::Int(5))
+                            box ASTWrapper("5", Expr::Int(5))
                         )
                     )]
                 ),
@@ -703,13 +712,13 @@ mod tests {
                 &mut Vec::new()
             ),
             Some(AssignRhs::Call(
-                "fun3",
-                vec![WrapSpan(
-                    "newpair(5,5)",
+                ASTWrapper(Some(Type::Char), String::from("fun3")),
+                vec![ASTWrapper(
+                    Some(Type::Pair(box Type::Int, box Type::Int)),
                     Expr::BinOp(
-                        box WrapSpan("5", Expr::Int(5)),
+                        box ASTWrapper(Some(Type::Int), Expr::Int(5)),
                         BinOp::Newpair,
-                        box WrapSpan("5", Expr::Int(5))
+                        box ASTWrapper(Some(Type::Int), Expr::Int(5))
                     )
                 )]
             ))
@@ -728,22 +737,22 @@ mod tests {
         assert_eq!(
             analyse_rhs(
                 &Type::Char,
-                AssignRhs::Call("fun3", vec![WrapSpan("a", Expr::Var("a"))]),
+                AssignRhs::Call(ASTWrapper("fun3", String::from("fun3")), vec![ASTWrapper("a", Expr::Var("a"))]),
                 &fun_symb,
                 &mut local_symb,
                 &mut var_symb,
                 &mut Vec::new()
             ),
-            Some(AssignRhs::Call("fun3", vec![WrapSpan("a", Expr::Var(0))]))
+            Some(AssignRhs::Call(ASTWrapper(Some(Type::Char), String::from("fun3")), vec![ASTWrapper(Some(Type::Pair(box Type::Int, box Type::Int)), Expr::Var(0))]))
         );
         assert_eq!(
             analyse_rhs(
                 &Type::Int,
                 AssignRhs::Call(
-                    "fun4",
-                    vec![WrapSpan(
+                    ASTWrapper("fun4", String::from("fun4")),
+                    vec![ASTWrapper(
                         "fst a",
-                        Expr::UnOp(UnOp::Fst, box WrapSpan("a", Expr::Var("a")))
+                        Expr::UnOp(UnOp::Fst, box ASTWrapper("a", Expr::Var("a")))
                     )]
                 ),
                 &fun_symb,
@@ -752,10 +761,10 @@ mod tests {
                 &mut Vec::new()
             ),
             Some(AssignRhs::Call(
-                "fun4",
-                vec![WrapSpan(
-                    "fst a",
-                    Expr::UnOp(UnOp::Fst, box WrapSpan("a", Expr::Var(0)))
+                ASTWrapper(Some(Type::Int), String::from("fun4")),
+                vec![ASTWrapper(
+                    Some(Type::Int),
+                    Expr::UnOp(UnOp::Fst, box ASTWrapper(Some(Type::Pair(box Type::Int, box Type::Int)), Expr::Var(0)))
                 )]
             ))
         );
@@ -795,7 +804,7 @@ mod tests {
         let mut errors1 = Vec::new();
         match analyse_rhs(
             &Type::Char,
-            AssignRhs::Call("fun1", vec![WrapSpan("pair_a", Expr::Var("pair_a"))]),
+            AssignRhs::Call(ASTWrapper("fun1", String::from("fun1")), vec![ASTWrapper("pair_a", Expr::Var("pair_a"))]),
             &fun_symb,
             &mut local_symb,
             &mut var_symb,
@@ -823,10 +832,10 @@ mod tests {
         match analyse_rhs(
             &Type::Int,
             AssignRhs::Call(
-                "fun1",
+                ASTWrapper("fun1", String::from("fun1")),
                 vec![
-                    WrapSpan("pair_a", Expr::Var("pair_a")),
-                    WrapSpan("true", Expr::Bool(true)),
+                    ASTWrapper("pair_a", Expr::Var("pair_a")),
+                    ASTWrapper("true", Expr::Bool(true)),
                 ],
             ),
             &fun_symb,
@@ -863,10 +872,10 @@ mod tests {
         match analyse_rhs(
             &Type::Int,
             AssignRhs::Call(
-                "fun1",
+                ASTWrapper("fun1", String::from("fun1")),
                 vec![
-                    WrapSpan("pair_j", Expr::Var("pair_j")),
-                    WrapSpan("true", Expr::Bool(true)),
+                    ASTWrapper("pair_j", Expr::Var("pair_j")),
+                    ASTWrapper("true", Expr::Bool(true)),
                 ],
             ),
             &fun_symb,
@@ -904,13 +913,13 @@ mod tests {
         assert_eq!(
             analyse_rhs(
                 &Type::Array(box Type::Int, 1),
-                AssignRhs::Array(WrapSpan(
+                AssignRhs::Array(ASTWrapper(
                     "[3,3,3,3]",
                     vec![
-                        WrapSpan("3", Expr::Int(3)),
-                        WrapSpan("3", Expr::Int(3)),
-                        WrapSpan("3", Expr::Int(3)),
-                        WrapSpan("3", Expr::Int(3))
+                        ASTWrapper("3", Expr::Int(3)),
+                        ASTWrapper("3", Expr::Int(3)),
+                        ASTWrapper("3", Expr::Int(3)),
+                        ASTWrapper("3", Expr::Int(3))
                     ]
                 )),
                 &fun_symb,
@@ -918,26 +927,26 @@ mod tests {
                 &mut var_symb,
                 &mut Vec::new()
             ),
-            Some(AssignRhs::Array(WrapSpan(
-                "[3,3,3,3]",
+            Some(AssignRhs::Array(ASTWrapper(
+                Some(Type::Array(box Type::Int, 1)),
                 vec![
-                    WrapSpan("3", Expr::Int(3)),
-                    WrapSpan("3", Expr::Int(3)),
-                    WrapSpan("3", Expr::Int(3)),
-                    WrapSpan("3", Expr::Int(3))
+                    ASTWrapper(Some(Type::Int), Expr::Int(3)),
+                    ASTWrapper(Some(Type::Int), Expr::Int(3)),
+                    ASTWrapper(Some(Type::Int), Expr::Int(3)),
+                    ASTWrapper(Some(Type::Int), Expr::Int(3))
                 ]
             )))
         );
         assert_eq!(
             analyse_rhs(
                 &Type::Array(box Type::Int, 1),
-                AssignRhs::Array(WrapSpan(
+                AssignRhs::Array(ASTWrapper(
                     "[a,3,3,3]",
                     vec![
-                        WrapSpan("a", Expr::Var("a")),
-                        WrapSpan("3", Expr::Int(3)),
-                        WrapSpan("3", Expr::Int(3)),
-                        WrapSpan("3", Expr::Int(3))
+                        ASTWrapper("a", Expr::Var("a")),
+                        ASTWrapper("3", Expr::Int(3)),
+                        ASTWrapper("3", Expr::Int(3)),
+                        ASTWrapper("3", Expr::Int(3))
                     ]
                 )),
                 &fun_symb,
@@ -945,28 +954,28 @@ mod tests {
                 &mut var_symb,
                 &mut Vec::new()
             ),
-            Some(AssignRhs::Array(WrapSpan(
-                "[a,3,3,3]",
+            Some(AssignRhs::Array(ASTWrapper(
+                Some(Type::Array(box Type::Int, 1)),
                 vec![
-                    WrapSpan("a", Expr::Var(0)),
-                    WrapSpan("3", Expr::Int(3)),
-                    WrapSpan("3", Expr::Int(3)),
-                    WrapSpan("3", Expr::Int(3))
+                    ASTWrapper(Some(Type::Int), Expr::Var(0)),
+                    ASTWrapper(Some(Type::Int), Expr::Int(3)),
+                    ASTWrapper(Some(Type::Int), Expr::Int(3)),
+                    ASTWrapper(Some(Type::Int), Expr::Int(3))
                 ]
             )))
         );
         assert_eq!(
             analyse_rhs(
                 &Type::Array(box Type::Char, 1),
-                AssignRhs::Array(WrapSpan("[b]", vec![WrapSpan("b", Expr::Var("b"))])),
+                AssignRhs::Array(ASTWrapper("[b]", vec![ASTWrapper("b", Expr::Var("b"))])),
                 &fun_symb,
                 &mut local_symb,
                 &mut var_symb,
                 &mut Vec::new()
             ),
-            Some(AssignRhs::Array(WrapSpan(
-                "[b]",
-                vec![WrapSpan("b", Expr::Var(1))]
+            Some(AssignRhs::Array(ASTWrapper(
+                Some(Type::Array(box Type::Char, 1)),
+                vec![ASTWrapper(Some(Type::Char), Expr::Var(1))]
             )))
         );
     }
@@ -987,13 +996,13 @@ mod tests {
         let mut errors1 = Vec::new();
         match analyse_rhs(
             &Type::Int,
-            AssignRhs::Array(WrapSpan(
+            AssignRhs::Array(ASTWrapper(
                 "[3,3,3,3]",
                 vec![
-                    WrapSpan("3", Expr::Int(3)),
-                    WrapSpan("3", Expr::Int(3)),
-                    WrapSpan("3", Expr::Int(3)),
-                    WrapSpan("3", Expr::Int(3)),
+                    ASTWrapper("3", Expr::Int(3)),
+                    ASTWrapper("3", Expr::Int(3)),
+                    ASTWrapper("3", Expr::Int(3)),
+                    ASTWrapper("3", Expr::Int(3)),
                 ],
             )),
             &fun_symb,
@@ -1015,13 +1024,13 @@ mod tests {
         let mut errors2 = Vec::new();
         match analyse_rhs(
             &Type::Array(box Type::Int, 1),
-            AssignRhs::Array(WrapSpan(
+            AssignRhs::Array(ASTWrapper(
                 "[b,3,3,3]",
                 vec![
-                    WrapSpan("b", Expr::Var("b")),
-                    WrapSpan("3", Expr::Int(3)),
-                    WrapSpan("3", Expr::Int(3)),
-                    WrapSpan("3", Expr::Int(3)),
+                    ASTWrapper("b", Expr::Var("b")),
+                    ASTWrapper("3", Expr::Int(3)),
+                    ASTWrapper("3", Expr::Int(3)),
+                    ASTWrapper("3", Expr::Int(3)),
                 ],
             )),
             &fun_symb,

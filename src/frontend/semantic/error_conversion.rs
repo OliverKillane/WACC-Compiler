@@ -36,7 +36,7 @@
 
 use super::{
     super::{
-        ast::{BinOp, GenericId, Type, UnOp, WrapSpan},
+        ast::{BinOp, GenericId, Type, UnOp, ASTWrapper},
         error::{Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType},
     },
     semantic_errors::{SemanticError, StatementErrors},
@@ -98,7 +98,7 @@ fn create_cells<'a>(
     semantic_errs: &mut Summary<'a>,
     syntax_errs: &mut Summary<'a>,
 ) {
-    for WrapSpan(span, errs) in statements {
+    for ASTWrapper(span, errs) in statements {
         let (syn, sem): (Vec<SemanticError>, Vec<SemanticError>) =
             errs.into_iter().partition(|err| {
                 matches!(err, SemanticError::FunctionNoReturnOrExit(_, _))

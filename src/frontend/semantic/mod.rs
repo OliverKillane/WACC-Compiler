@@ -55,7 +55,7 @@ use self::{
 };
 
 use super::{
-    ast::{FunSpan, Program, StatSpan, WrapSpan},
+    ast::{FunSpan, Program, StatSpan, ASTWrapper, Type},
     error::Summary,
 };
 
@@ -72,13 +72,13 @@ use super::{
 /// - Vector of syntax error summary cells
 #[allow(clippy::type_complexity)]
 pub fn analyse_semantics<'a>(
-    Program(fn_defs, main_block): Program<'a, &'a str>,
+    Program(fn_defs, main_block): Program<&'a str, &'a str>,
     source_code: &'a str,
 ) -> Result<
     (
-        Vec<StatSpan<'a, usize>>,
+        Vec<StatSpan<Option<Type>, usize>>,
         VariableSymbolTable,
-        HashMap<&'a str, (FunSpan<'a, usize>, VariableSymbolTable)>,
+        HashMap<&'a str, (FunSpan<Option<Type>, usize>, VariableSymbolTable)>,
     ),
     Vec<Summary<'a>>,
 > {
@@ -89,8 +89,8 @@ pub fn analyse_semantics<'a>(
     let mut correct = HashMap::with_capacity(filtered_fn_defs.len());
 
     // traverse and analyse functions
-    for WrapSpan(fun_name, fun) in filtered_fn_defs {
-        match analyse_function(WrapSpan(fun_name, fun), &fun_symb) {
+    for ASTWrapper(fun_name, fun) in filtered_fn_defs {
+        match analyse_function(ASTWrapper(fun_name, fun), &fun_symb) {
             Ok(res) => {
                 correct.insert(fun_name, res);
             }
