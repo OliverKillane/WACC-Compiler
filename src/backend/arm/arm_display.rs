@@ -321,7 +321,6 @@ impl<T: Display> Display for ArmNode<T> {
                     .and_modify(|label_passed| label_passed.1 = true);
 
                 next_node = match current_node.get().deref() {
-                    ControlFlow::Start(next) => Some(next.clone()),
                     ControlFlow::Simple(_, stat, next) => {
                         writeln!(f, "{}", stat)?;
                         Some(next.clone())
@@ -406,7 +405,7 @@ impl Display for DataKind {
 
 impl Display for Data {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "\t{}:\n{}", self.0, self.1)
+        write!(f, "\td_ref_{}:\n{}", self.0, self.1)
     }
 }
 
@@ -427,7 +426,7 @@ impl<T: Display> Display for Program<T> {
 
         writeln!(f, ".text\n.global main\nmain:\n{}", main)?;
 
-        for (fun_name, Function { args, start_node }) in functions {
+        for (fun_name, Subroutine { args, start_node }) in functions {
             write!(f, "{}:\n{}", fun_name, start_node)?;
         }
 
