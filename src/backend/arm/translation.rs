@@ -1,12 +1,16 @@
 //! Translates the three code representation of a graph into an arm
 //! representation, with temporaries instead of registers.
+use lazy_static::__Deref;
+
 use crate::backend::arm::arm_repr::{CmpOp, MemOp, MemOperand, MulOp};
 
 use super::{
     super::{
         super::graph::Graph,
         super::intermediate::{DataRef, VarRepr},
-        three_code::{BinOp, Function, OpSrc, Size, StatCode, StatNode, ThreeCode},
+        three_code::{
+            BinOp, DataRefType, Function, OpSrc, Size, StatCode, StatNode, StatType, ThreeCode,
+        },
     },
     arm_repr::{
         ArmNode, Cond, ControlFlow, Data, DataIdent, DataKind, FlexOffset, FlexOperand, Ident,
@@ -34,14 +38,19 @@ impl TempMap {
     /// Given a three-code identifier, either get the current arm-temporary
     /// representing it, or generate a new one and return that.
     fn use_temp(&mut self, id: VarRepr) -> Ident {
-        Ident::Temp(match self.0.get(&id) {
+        Ident::Temp(self.use_id(id))
+    }
+
+    /// generate a new temporary Id.
+    fn use_id(&mut self, id: VarRepr) -> Temporary {
+        match self.0.get(&id) {
             Some(t) => *t,
             None => {
                 let newid = self.get_new_id();
                 self.0.insert(id, newid);
                 newid
             }
-        })
+        }
     }
 
     /// Generate a new temporary identifier as a [Temporary].
@@ -68,99 +77,232 @@ pub(super) fn translate_threecode(
         int_handler,
     }: ThreeCode,
 ) -> Program {
-    todo!()
+    let mut graph = Graph::new();
+    let int_handler = int_handler.as_ref();
+    Program {
+        data: translate_data(data_refs),
+        reserved_stack: if read_ref { 1 } else { 0 },
+        main: translate_routine(code, &mut TempMap::new(), int_handler, &mut graph),
+        functions: functions
+            .into_iter()
+            .map(|(name, fun)| (name, translate_function(fun, int_handler, &mut graph)))
+            .collect::<HashMap<_, _>>(),
+        cfg: graph,
+    }
 }
 
 /// Translate the data section from the threecode to the arm representation.
-fn translate_data(data_refs: HashMap<DataRef, Vec<u8>>) -> Vec<Data> {
+fn translate_data(data_refs: HashMap<DataRef, DataRefType>) -> Vec<Data> {
     data_refs
         .into_iter()
-        .map(|(data_ref, content)| {
-            Data(
-                convert_data_ref(data_ref),
-                DataKind::Ascii(
-                    String::from_utf8(content).expect("String must be composed of utf8"),
-                ),
-            )
+        .map(|(data_ref, data)| match data {
+            DataRefType::String(string) => {
+                (Data(
+                    convert_data_ref(data_ref),
+                    DataKind::Ascii(String::from_utf8(string).expect("Is always valid Ascii")),
+                ))
+            }
+            DataRefType::Struct(_) => {
+                todo!("This is to be implemented as part of the WACC Compiler extension")
+            }
         })
         .collect::<Vec<_>>()
 }
 
-/// Holds the state of a StatNode in the threecode.
-enum TransState {
-    /// Node has not been translated, the following arm nodes want to use it
-    /// as their successor.
-    Waiting(Vec<ArmNode>),
-    /// The translation has been created, this is the arm node.
-    Created(ArmNode),
+fn require_label(
+    node: StatNode,
+    translate_map: &mut HashMap<StatNode, ArmNode>,
+    graph: &mut Graph<ControlFlow>,
+    start: bool,
+) -> Option<ArmNode> {
+    match node.get().deref() {
+        StatType::Simple(precs, _, _)
+        | StatType::Final(precs, _)
+        | StatType::Branch(precs, _, _, _)
+        | StatType::Loop(precs)
+        | StatType::Return(precs, _) => {
+            // if more than one predecessor, we need a multi to allow many paths to enter.
+            if precs.len() > 1 || (!precs.is_empty() && start) {
+                // If more predecessors, create a label, place in the
+                // map to found and used.
+                let label = graph.new_node(ControlFlow::Multi(Vec::new(), None));
+                translate_map.insert(node.clone(), label.clone());
+                Some(label)
+            } else {
+                None
+            }
+        }
+        StatType::Dummy(_) => panic!("No dummy nodes should be in the final threecode"),
+    }
 }
 
-/// A hashmap of the state of StatNodes used as destinations in branches.
-/// It is used to determine which nodes to create.
-struct NodeTracker(HashMap<StatNode, TransState>);
+fn translate_node_inner(
+    node: StatNode,
+    int_handler: Option<&String>,
+    temp_map: &mut TempMap,
+    translate_map: &mut HashMap<StatNode, ArmNode>,
+    graph: &mut Graph<ControlFlow>,
+) -> (ArmNode, Option<(ArmNode, StatNode)>) {
+    match node.get().deref() {
+        StatType::Simple(_, stat, succ) => {
+            let (start, end) = translate_statcode(stat, int_handler, graph, temp_map);
+            (start, Some((end, succ.clone())))
+        }
+        StatType::Final(_, stat) => {
+            // Create statements, then add a return. Even if the stat is an exit, we still add the return.
+            let (start, mut end) = translate_statcode(stat, int_handler, graph, temp_map);
+            let ret_node = graph.new_node(ControlFlow::Return(Some(end.clone()), None));
+            end.set_successor(ret_node);
+            (start, None)
+        }
+        StatType::Branch(_, three_temp, true_branch, false_branch) => {
+            // Recur to get the true_branch
+            let mut true_branch = translate_from_node(
+                true_branch.clone(),
+                int_handler,
+                temp_map,
+                translate_map,
+                graph,
+            );
+            let (mut start, end) = simple_node(
+                Stat::Cmp(
+                    CmpOp::Cmp,
+                    Cond::Al,
+                    temp_map.use_temp(*three_temp),
+                    FlexOperand::Imm(1),
+                ),
+                graph,
+            );
+            let branch = graph.new_node(ControlFlow::Branch(
+                None,
+                true_branch.clone(),
+                Cond::Eq,
+                Some(start.clone()),
+            ));
+            true_branch.set_predecessor(branch.clone());
+            start.set_predecessor(branch.clone());
+            (branch, Some((end, false_branch.clone())))
+        }
+        StatType::Loop(_) => {
+            // Create a label, create an unconditional branch to the label, there is no end to chain to.
+            let mut label = graph.new_node(ControlFlow::Multi(Vec::new(), None));
+            let branch = graph.new_node(ControlFlow::Branch(
+                Some(label.clone()),
+                label.clone(),
+                Cond::Al,
+                None,
+            ));
+            label.set_successor(branch);
+            (label, None)
+        }
+        StatType::Return(_, three_var) => (
+            graph.new_node(ControlFlow::Return(
+                None,
+                Some(temp_map.use_temp(*three_var)),
+            )),
+            None,
+        ),
+        StatType::Dummy(_) => panic!("No dummy nodes should be in the final threecode"),
+    }
+}
 
-impl NodeTracker {
-    /// If the translation exists, get it. Else add to the waiting list for
-    /// successor to be added.
-    fn wait_for_translation(&mut self, from: ArmNode, to: StatNode) -> Option<ArmNode> {
-        match self.0.get_mut(&to) {
-            Some(TransState::Waiting(waiting_nodes)) => {
-                waiting_nodes.push(from);
-                None
-            }
-            Some(TransState::Created(node)) => Some(node.clone()),
-            None => {
-                self.0.insert(to, TransState::Waiting(vec![from]));
-                None
+/// Translate a single node, providing the start and end nodes.
+fn translate_node(
+    node: StatNode,
+    int_handler: Option<&String>,
+    temp_map: &mut TempMap,
+    translate_map: &mut HashMap<StatNode, ArmNode>,
+    graph: &mut Graph<ControlFlow>,
+) -> (ArmNode, Option<(ArmNode, StatNode)>) {
+    match translate_map.get(&node) {
+        Some(node) => (node.clone(), None),
+        None => {
+            // determine if a label is needed
+            let label = require_label(node.clone(), translate_map, graph, false);
+
+            // translate the statement to get the start, and (potentially) and end.
+            let (mut start, next) =
+                translate_node_inner(node, int_handler, temp_map, translate_map, graph);
+
+            if let Some(mut label_node) = label {
+                label_node.set_successor(start.clone());
+                start.set_predecessor(label_node.clone());
+                (label_node, next)
+            } else {
+                (start, next)
             }
         }
-    }
-
-    /// Check if a translation already exists. If one does, then return it, else
-    /// None.
-    fn check_translation(&self, to: StatNode) -> Option<ArmNode> {
-        match self.0.get(&to) {
-            Some(TransState::Created(node)) => Some(node.clone()),
-            _ => None,
-        }
-    }
-
-    /// Set the translation for a given node, updating any successors if they
-    /// are waiting. Panics if attempting to add a translation for a node
-    /// already created.
-    fn add_translation(&mut self, three: StatNode, arm: ArmNode) {
-        if let Some(entry) = self.0.get_mut(&three) {
-            match entry {
-                TransState::Waiting(waiting_nodes) => {
-                    for node in waiting_nodes {
-                        node.set_successor(arm.clone())
-                    }
-                }
-                TransState::Created(_) => {
-                    panic!("Cannot add a translation for a node that already exists")
-                }
-            }
-        }
-
-        self.0.insert(three, TransState::Created(arm));
-    }
-
-    /// Get the next node being waited on, to translate.
-    fn get_next_to_translate(&self) -> Option<StatNode> {
-        self.0
-            .iter()
-            .find(|(three, transstate)| matches!(transstate, TransState::Waiting(_)))
-            .map(|(three, _)| three.clone())
     }
 }
 
 /// Start building up an arm graph from a given node.
 fn translate_from_node(
     node: StatNode,
-    int_handler: Option<String>,
+    int_handler: Option<&String>,
+    temp_map: &mut TempMap,
+    translate_map: &mut HashMap<StatNode, ArmNode>,
     graph: &mut Graph<ControlFlow>,
 ) -> ArmNode {
-    todo!()
+    // Translate the first node, the continue translating until there are no nodes to go to.
+    let (first, next) = translate_node(node, int_handler, temp_map, translate_map, graph);
+    let mut prev = first.clone();
+    while let Some((arm_node, three_node)) = &next {
+        let (mut current, next) = translate_node(
+            three_node.clone(),
+            int_handler,
+            temp_map,
+            translate_map,
+            graph,
+        );
+        prev.set_successor(current.clone());
+        current.set_predecessor(prev);
+        prev = current;
+    }
+
+    first
+}
+
+/// Start building up a routine (subroutine or main code body) from a start node.
+fn translate_routine(
+    start: Option<StatNode>,
+    temp_map: &mut TempMap,
+    int_handler: Option<&String>,
+    graph: &mut Graph<ControlFlow>,
+) -> ArmNode {
+    // Normal nodes require labels for 1 or more predecessors, the first node
+    // of a function requires a label if it has any predecessors.
+    let mut translate_map = HashMap::new();
+
+    match start {
+        Some(node) => {
+            let label = require_label(node.clone(), &mut translate_map, graph, true);
+            let (mut start, next) =
+                translate_node_inner(node, int_handler, temp_map, &mut translate_map, graph);
+
+            let first = if let Some(mut label_node) = label {
+                start.set_predecessor(label_node.clone());
+                label_node.set_successor(start);
+                label_node
+            } else {
+                start
+            };
+
+            if let Some((mut next_node, next_three)) = next {
+                let mut node_to_rest = translate_from_node(
+                    next_three,
+                    int_handler,
+                    temp_map,
+                    &mut translate_map,
+                    graph,
+                );
+                node_to_rest.set_predecessor(next_node.clone());
+                next_node.set_successor(node_to_rest);
+            }
+
+            first
+        }
+        None => graph.new_node(ControlFlow::Return(None, None)),
+    }
 }
 
 /// Translate a three-code function.
@@ -170,9 +312,18 @@ fn translate_function(
         code,
         read_ref,
     }: Function,
+    int_handler: Option<&String>,
     graph: &mut Graph<ControlFlow>,
 ) -> Subroutine {
-    todo!()
+    let mut temp_map = TempMap::new();
+    Subroutine {
+        args: args
+            .into_iter()
+            .map(|t| temp_map.use_id(t))
+            .collect::<Vec<_>>(),
+        start_node: translate_routine(code, &mut temp_map, int_handler, graph),
+        reserved_stack: if read_ref { 1 } else { 0 },
+    }
 }
 
 /// Link two pairs of node chain starts and ends together.
@@ -181,7 +332,7 @@ fn translate_function(
 /// 2. start <-> leftmiddle <-> rightmiddle -> end
 /// 3. start <-> end
 /// ```
-fn chain_two_nodes(
+fn chain_two_chains(
     (start, mut leftmiddle): (ArmNode, ArmNode),
     (mut rightmiddle, end): (ArmNode, ArmNode),
 ) -> (ArmNode, ArmNode) {
@@ -196,15 +347,15 @@ fn chain_two_nodes(
 /// 2. 1 <-> 2 <-> 3 <-> 4 <-> ... <-> n-1 <-> n
 /// 3. (1 <-> n)
 /// ```
-fn chain_nodes(nodes: Vec<(ArmNode, ArmNode)>) -> Option<(ArmNode, ArmNode)> {
-    nodes.into_iter().reduce(chain_two_nodes)
+fn chain_chains(nodes: Vec<(ArmNode, ArmNode)>) -> Option<(ArmNode, ArmNode)> {
+    nodes.into_iter().reduce(chain_two_chains)
 }
 
 /// Given a vector of statements, connect them together in a simple chain within
 /// the graph. If no statements are provided returns a None, otherwise a some of
 /// the start and end node.
 fn link_stats(stats: Vec<Stat>, graph: &mut Graph<ControlFlow>) -> Option<(ArmNode, ArmNode)> {
-    chain_nodes(
+    chain_chains(
         stats
             .into_iter()
             .map(|stat| simple_node(stat, graph))
@@ -347,10 +498,9 @@ fn dataref_to_reg(
 /// statement's graph.
 fn translate_statcode(
     code: &StatCode,
-    int_handler: Option<String>,
+    int_handler: Option<&String>,
     graph: &mut Graph<ControlFlow>,
     temp_map: &mut TempMap,
-    overflow: Option<String>,
 ) -> (ArmNode, ArmNode) {
     match code {
         StatCode::Assign(three_temp, opsrc) => {
@@ -378,6 +528,7 @@ fn translate_statcode(
                         graph,
                     )
                 }
+                OpSrc::ReadRef => simple_node(Stat::AssignStackWord(arm_temp), graph),
             }
         }
         StatCode::AssignOp(three_temp_dst, first_op, binop, second_op) => {
@@ -404,6 +555,11 @@ fn translate_statcode(
                         new_temp
                     }
                     OpSrc::Var(var) => temp_map.use_temp(*var),
+                    OpSrc::ReadRef => {
+                        let new_temp = temp_map.get_new_temp();
+                        nodes.push(simple_node(Stat::AssignStackWord(new_temp), graph));
+                        new_temp
+                    }
                 }
             };
 
@@ -456,7 +612,7 @@ fn translate_statcode(
                     // Perform the addition operation, if there is an overflow
                     // handler, then if overflow occurs, branch to it
 
-                    match overflow {
+                    match int_handler {
                         Some(overflow_handler) => {
                             // ADDS arm_dst_reg, left_reg, right_reg
                             // BLVS overflow_handler
@@ -471,8 +627,9 @@ fn translate_statcode(
                                 ),
                                 graph,
                             );
-                            let check = simple_node(Stat::Link(Cond::Vs, overflow_handler), graph);
-                            chain_two_nodes(addition, check)
+                            let check =
+                                simple_node(Stat::Link(Cond::Vs, overflow_handler.clone()), graph);
+                            chain_two_chains(addition, check)
                         }
                         None => {
                             // ADD arm_dst_temp, left_reg, right_reg
@@ -491,7 +648,7 @@ fn translate_statcode(
                     }
                 }
                 BinOp::Sub => {
-                    match overflow {
+                    match int_handler {
                         Some(overflow_handler) => {
                             // SUBS arm_dst_temp, left_reg, right_reg
                             // BLVS overflow_handler
@@ -506,8 +663,9 @@ fn translate_statcode(
                                 ),
                                 graph,
                             );
-                            let check = simple_node(Stat::Link(Cond::Vs, overflow_handler), graph);
-                            chain_two_nodes(subtraction, check)
+                            let check =
+                                simple_node(Stat::Link(Cond::Vs, overflow_handler.clone()), graph);
+                            chain_two_chains(subtraction, check)
                         }
                         None => {
                             // SUB arm_dst_temp, left_reg, right_reg
@@ -526,7 +684,7 @@ fn translate_statcode(
                     }
                 }
                 BinOp::Mul => {
-                    match overflow {
+                    match int_handler {
                         Some(overflow_fun) => {
                             // SMULL holder_temp, arm_dst_temp, left_reg, right_reg
                             // CMP arm_dst_temp, holder_temp, ASR #31
@@ -552,7 +710,7 @@ fn translate_statcode(
                                             Some(Shift::Asr(31.into())),
                                         ),
                                     ),
-                                    Stat::Link(Cond::Ne, overflow_fun),
+                                    Stat::Link(Cond::Ne, overflow_fun.clone()),
                                 ],
                                 graph,
                             )
@@ -604,7 +762,7 @@ fn translate_statcode(
                 BinOp::Xor => basic_apply_op(RegOp::Eor, graph),
             });
 
-            chain_nodes(nodes).expect("Had more than one statement")
+            chain_chains(nodes).expect("Had more than one statement")
         }
         // LDR(size is bytes) three_temp, [temp_ptr]
         StatCode::Load(three_temp, temp_ptr, size) => simple_node(

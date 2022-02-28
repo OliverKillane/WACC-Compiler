@@ -119,7 +119,7 @@ pub(super) enum StatType {
 }
 
 /// A statement graph node.
-type StatNode = NodeRef<StatType>;
+pub(super) type StatNode = NodeRef<StatType>;
 
 #[derive(Debug, Clone)]
 /// Function representation.
