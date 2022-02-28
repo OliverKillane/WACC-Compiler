@@ -317,6 +317,9 @@ impl Display for Stat {
                     .collect::<Vec<_>>()
                     .join(",")
             ),
+            Stat::AssignStackWord(ident) => {
+                writeln!(f, "\tINTERNAL OPERATION: ASSIGN WORD OF STACK TO {}", ident)
+            }
         }
     }
 }
@@ -420,6 +423,7 @@ impl Display for Program {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let Program {
             data,
+            reserved_stack,
             main,
             functions,
             cfg,
@@ -433,7 +437,15 @@ impl Display for Program {
 
         writeln!(f, ".text\n.global main\nmain:\n{}", main)?;
 
-        for (fun_name, Subroutine { args, start_node }) in functions {
+        for (
+            fun_name,
+            Subroutine {
+                args,
+                start_node,
+                reserved_stack,
+            },
+        ) in functions
+        {
             write!(f, "{}:\n{}", fun_name, start_node)?;
         }
 

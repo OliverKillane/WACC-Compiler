@@ -273,6 +273,9 @@ pub enum Stat {
 
     /// A dummy node for calls, expanded by register allocation.
     Call(Cond, String, Option<Ident>, Vec<Ident>),
+
+    /// A dummy node for assigning a reserved stack space within a function.
+    AssignStackWord(Ident),
 }
 
 pub type ArmNode = NodeRef<ControlFlow>;
@@ -313,11 +316,13 @@ pub struct Data(pub DataIdent, pub DataKind);
 pub struct Subroutine {
     pub args: Vec<Temporary>,
     pub start_node: ArmNode,
+    pub reserved_stack: u32,
 }
 
 /// The main program containing text ([instructions](Stat)) and [data](Data).
 pub struct Program {
     pub data: Vec<Data>,
+    pub reserved_stack: u32,
     pub main: ArmNode,
     pub functions: HashMap<String, Subroutine>,
     pub cfg: Graph<ControlFlow>,
