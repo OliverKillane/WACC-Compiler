@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::{
-    super::ast::{Stat, StatSpan, WrapSpan},
+    super::ast::{ASTWrapper, Stat, StatWrap},
     trans_expr::translate_expr,
 };
 use crate::{
@@ -14,7 +14,7 @@ use super::super::super::intermediate::Stat as IRStat;
 use crate::intermediate::{Expr::*, NumSize::*, PtrExpr::Malloc, Stat::AssignVar};
 
 pub fn translate_stat<'a>(
-    WrapSpan(_, ast_stat): StatSpan<'a, usize>,
+    ASTWrapper(_, ast_stat): StatWrap<Option<ast::Type>, usize>,
     var_symb: &VariableSymbolTable,
     dataref_map: &mut HashMap<DataRef, Vec<IRExpr>>,
 ) -> Option<IRStat> {
@@ -25,7 +25,7 @@ pub fn translate_stat<'a>(
                 var,
                 translate_expr(expr_span, var_symb, dataref_map),
             )),
-            ast::AssignRhs::Array(WrapSpan(_, arr_elems)) => {
+            ast::AssignRhs::Array(ASTWrapper(_, arr_elems)) => {
                 let mut ir_expr_vec: Vec<IRExpr> = Vec::new();
                 for expr_span in arr_elems {
                     ir_expr_vec.push(translate_expr(expr_span, var_symb, dataref_map));
@@ -33,7 +33,7 @@ pub fn translate_stat<'a>(
                 ir_expr_vec.insert(0, Num(NumExpr::Const(DWord, ir_expr_vec.len() as i32)));
                 Some(AssignVar(var, Ptr(Malloc(ir_expr_vec))))
             }
-            ast::AssignRhs::Call(fname, args) => {
+            ast::AssignRhs::Call(ASTWrapper(_, fname), args) => {
                 let mut ir_expr_vec: Vec<IRExpr> = Vec::new();
 
                 for expr_span in args {
