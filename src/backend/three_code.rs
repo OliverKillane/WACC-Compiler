@@ -163,6 +163,10 @@ impl StatType {
         StatType::Loop(Vec::new())
     }
 
+    fn new_return(ret: VarRepr) -> Self {
+        StatType::Return(Vec::new(), ret)
+    }
+
     fn add_incoming(&mut self, node: StatNode) {
         match self {
             Self::Simple(incoming, _, _)
