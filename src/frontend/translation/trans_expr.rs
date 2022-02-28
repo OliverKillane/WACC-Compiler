@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use super::super::ast::{Expr, ExprSpan, UnOp, WrapSpan};
+use super::super::ast::{ASTWrapper, Expr, ExprWrap, UnOp};
 use crate::frontend::ast;
 use crate::frontend::semantic::symbol_table::VariableSymbolTable;
 
@@ -17,7 +17,7 @@ use crate::intermediate::{
 
 /// usize -> &'a str
 pub fn translate_expr<'a>(
-    WrapSpan(_, ast_expr): ExprSpan<'a, usize>,
+    ASTWrapper(_, ast_expr): ExprWrap<Option<ast::Type>, usize>,
     var_symb: &VariableSymbolTable,
     dataref_map: &mut HashMap<DataRef, Vec<IRExpr>>,
 ) -> IRExpr {
@@ -60,7 +60,7 @@ pub fn translate_expr<'a>(
             todo!()
         }
 
-        Expr::UnOp(un_op, box expr_span) => match (un_op, translate_expr(expr_span, var_symb, dataref_map)) {
+        Expr::UnOp(un_op, box expr_span) => match (un_op, translate_expr(expr_span.clone(), var_symb, dataref_map)) {
             (UnOp::Neg, Bool(bln)) => Bool(BoolExpr::Not(box bln)),
             (UnOp::Minus, Num(num)) => Num(NumExpr::ArithOp(
                 box NumExpr::Const(DWord, -1),
@@ -70,7 +70,28 @@ pub fn translate_expr<'a>(
             (UnOp::Chr, Num(num)) => Num(NumExpr::Cast(Byte, box num)),
             (UnOp::Ord, Num(num)) => Num(NumExpr::Cast(DWord, box num)),
             (UnOp::Len, Ptr(ptr)) => Num(NumExpr::Deref(NumSize::DWord, ptr)),
-            (_, Ptr(ptr)) => todo!(),
+            (UnOp::Fst, Ptr(ptr)) => match expr_span.0 {
+                Some(typ) => match typ {
+                    ast::Type::Int => Num(NumExpr::Deref(NumSize::DWord, ptr)),
+                    ast::Type::Char | ast::Type::String => Num(NumExpr::Deref(NumSize::Byte, ptr)),
+                    ast::Type::Bool => Bool(BoolExpr::Deref(ptr)),
+                    ast::Type::Array(_, _) | ast::Type::Pair(_, _) | ast::Type::Any => Ptr(PtrExpr::Deref(box ptr)),
+                    ast::Type::Generic(_) => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!")
+                },
+                None => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!")
+            },
+            (UnOp::Snd, Ptr(ptr)) => match expr_span.0 {
+                Some(typ) => {
+                    let offset_ptr = PtrExpr::Offset(box ptr, box NumExpr::SizeOfWideAlloc);
+                    match typ {
+                    ast::Type::Int => Num(NumExpr::Deref(NumSize::DWord, offset_ptr)),
+                    ast::Type::Char | ast::Type::String => Num(NumExpr::Deref(NumSize::Byte, offset_ptr)),
+                    ast::Type::Bool => Bool(BoolExpr::Deref(offset_ptr)),
+                    ast::Type::Array(_, _) | ast::Type::Pair(_, _) | ast::Type::Any => Ptr(PtrExpr::Deref(box offset_ptr)),
+                    ast::Type::Generic(_) => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!")
+                }},
+                None => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!")
+            },
             _ => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!")
         },
 
@@ -130,12 +151,11 @@ pub fn translate_expr<'a>(
                     Bool(BoolExpr::BoolOp(box bln_expr1, BoolOp::Xor, box bln_expr2))
                 }
                 (expr1, ast::BinOp::Newpair, expr2) => {
-                    todo!()
+                    Ptr(PtrExpr::WideMalloc(vec![expr1, expr2]))
                 }
                 _ => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!"),
             }
         }
-        _ => panic!("What are you even doing with your life by this point Oli? Semantic analyzer broken!"),
     }
 }
 
@@ -152,9 +172,12 @@ mod tests {
 
     #[test]
     fn check_boolean_expression() {
-        let expr: WrapSpan<Expr<usize>> = WrapSpan(
-            "!true",
-            Expr::UnOp(UnOp::Neg, box WrapSpan("true", Expr::Bool(true))),
+        let expr: ExprWrap<Option<ast::Type>, usize> = ASTWrapper(
+            Some(ast::Type::Bool),
+            Expr::UnOp(
+                UnOp::Neg,
+                box ASTWrapper(Some(ast::Type::Bool), Expr::Bool(true)),
+            ),
         );
 
         let translated: intermediate::Expr = Bool(BoolExpr::Not(box BoolExpr::Const(true)));
@@ -164,29 +187,35 @@ mod tests {
             translated
         );
 
-        let expr2: WrapSpan<Expr<usize>> = WrapSpan(
-            "(ord 'a' == 65) || (true && !false)",
+        let expr2: ExprWrap<Option<ast::Type>, usize> = ASTWrapper(
+            Some(ast::Type::Bool),
             Expr::BinOp(
-                box WrapSpan(
-                    "ord 'a' == 65",
+                box ASTWrapper(
+                    Some(ast::Type::Bool),
                     Expr::BinOp(
-                        box WrapSpan(
-                            "ord 'a'",
-                            Expr::UnOp(UnOp::Ord, box WrapSpan("'a'", Expr::Char('a'))),
+                        box ASTWrapper(
+                            Some(ast::Type::Int),
+                            Expr::UnOp(
+                                UnOp::Ord,
+                                box ASTWrapper(Some(ast::Type::Char), Expr::Char('a')),
+                            ),
                         ),
                         BinOp::Eq,
-                        box WrapSpan("65", Expr::Int(65)),
+                        box ASTWrapper(Some(ast::Type::Int), Expr::Int(65)),
                     ),
                 ),
                 BinOp::Or,
-                box WrapSpan(
-                    "true && !false",
+                box ASTWrapper(
+                    Some(ast::Type::Bool),
                     Expr::BinOp(
-                        box WrapSpan("true", Expr::Bool(true)),
+                        box ASTWrapper(Some(ast::Type::Bool), Expr::Bool(true)),
                         BinOp::And,
-                        box WrapSpan(
-                            "!false",
-                            Expr::UnOp(UnOp::Neg, box WrapSpan("false", Expr::Bool(false))),
+                        box ASTWrapper(
+                            Some(ast::Type::Bool),
+                            Expr::UnOp(
+                                UnOp::Neg,
+                                box ASTWrapper(Some(ast::Type::Bool), Expr::Bool(false)),
+                            ),
                         ),
                     ),
                 ),
@@ -215,12 +244,12 @@ mod tests {
 
     #[test]
     fn check_integer_expression() {
-        let expr: WrapSpan<Expr<usize>> = WrapSpan(
-            "3 + 7",
+        let expr: ExprWrap<Option<ast::Type>, usize> = ASTWrapper(
+            Some(ast::Type::Int),
             Expr::BinOp(
-                box WrapSpan("3", Expr::Int(3)),
+                box ASTWrapper(Some(ast::Type::Int), Expr::Int(3)),
                 BinOp::Add,
-                box WrapSpan("7", Expr::Int(7)),
+                box ASTWrapper(Some(ast::Type::Int), Expr::Int(7)),
             ),
         );
 
@@ -235,21 +264,24 @@ mod tests {
             translated
         );
 
-        let expr: WrapSpan<Expr<usize>> = WrapSpan(
-            "a % 7 * ord 'a'",
+        let expr: ExprWrap<Option<ast::Type>, usize> = ASTWrapper(
+            Some(ast::Type::Int),
             Expr::BinOp(
-                box WrapSpan(
-                    "a % 7",
+                box ASTWrapper(
+                    Some(ast::Type::Int),
                     Expr::BinOp(
-                        box WrapSpan("a", Expr::Var(0)),
+                        box ASTWrapper(Some(ast::Type::Int), Expr::Var(0)),
                         BinOp::Mod,
-                        box WrapSpan("7", Expr::Int(7)),
+                        box ASTWrapper(Some(ast::Type::Int), Expr::Int(7)),
                     ),
                 ),
                 BinOp::Mul,
-                box WrapSpan(
-                    "ord 'a'",
-                    Expr::UnOp(UnOp::Ord, box WrapSpan("'a'", Expr::Char('a'))),
+                box ASTWrapper(
+                    Some(ast::Type::Int),
+                    Expr::UnOp(
+                        UnOp::Ord,
+                        box ASTWrapper(Some(ast::Type::Char), Expr::Char('a')),
+                    ),
                 ),
             ),
         );
