@@ -10,7 +10,7 @@ use crate::{
     intermediate::{BlockEnding, BoolExpr, DataRef, NumExpr, NumSize, PtrExpr},
 };
 
-use super::super::super::intermediate::{Expr as IRExpr, Stat as IRStat, Type as IRType};
+use super::super::super::intermediate as ir;
 use crate::intermediate::{Expr::*, NumSize::*, PtrExpr::Malloc, Stat::AssignVar, Stat::*};
 
 #[inline]
@@ -29,7 +29,7 @@ fn get_ir_type_from_ast_type(ast_type: ASTType) -> IRType {
         ASTType::Int => IRType::Num(NumSize::DWord),
         ASTType::Bool => IRType::Bool,
         ASTType::Char => IRType::Num(NumSize::Byte),
-        ASTType::Generic(_) => panic!(
+        ASTType::Generic(_) => panic!(v
             "What are you even doing with your life by this point Oli? Semantic analyzer broken!"
         ),
         _ => IRType::Ptr,
