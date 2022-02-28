@@ -24,6 +24,8 @@ pub(super) enum OpSrc {
     DataRef(DataRef, i32),
     /// Variable with a given [id](VarRepr)
     Var(VarRepr),
+    /// A reference to a special field on the stack just for reading into variables
+    ReadRef,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -126,8 +128,8 @@ pub(super) struct Function {
     pub args: Vec<VarRepr>,
     /// First statement of the program
     pub code: Option<StatNode>,
-    /// Reference for usage when calling scanf
-    pub read_ref: Option<DataRef>,
+    /// Whether a [read ref operand source](OpSrc::ReadRef) is used in the function code
+    pub read_ref: bool,
 }
 
 /// Type of the data reference under a [data reference id](DataRef).
@@ -148,8 +150,8 @@ pub(super) struct ThreeCode {
     pub data_refs: HashMap<DataRef, DataRefType>,
     /// Graph of all statement nodes in the program
     pub graph: Graph<StatType>,
-    /// Reference for usage when calling scanf
-    pub read_ref: Option<DataRef>,
+    /// Whether a [read ref operand source](OpSrc::ReadRef) is used in the main program code
+    pub read_ref: bool,
     /// First statement of the program
     pub code: Option<StatNode>,
     /// Function to call as an int overflow/underflow handler for checking for
@@ -398,7 +400,7 @@ fn translate_block(
     free_var: VarRepr,
     free_data_ref: &mut DataRef,
     data_refs: &mut HashMap<DataRef, DataRefType>,
-    read_ref: &mut Option<DataRef>,
+    read_ref: &mut bool,
     fmt_flags: &mut FmtDataRefFlags,
     vars: &HashMap<VarRepr, ir::Type>,
     function_types: &HashMap<String, ir::Type>,
@@ -623,7 +625,7 @@ fn translate_block_graph(
     free_var: VarRepr,
     free_data_ref: &mut DataRef,
     data_refs: &mut HashMap<DataRef, DataRefType>,
-    read_ref: &mut Option<ir::DataRef>,
+    read_ref: &mut bool,
     fmt_flags: &mut FmtDataRefFlags,
     vars: &HashMap<VarRepr, ir::Type>,
     function_types: &HashMap<String, ir::Type>,
@@ -737,7 +739,7 @@ fn translate_function(
         .max()
         .map(|var| var + 1)
         .unwrap_or(0);
-    let mut read_ref = None;
+    let mut read_ref = false;
     let start_node = translate_block_graph(
         block_graph,
         stat_graph.clone(),
@@ -753,7 +755,7 @@ fn translate_function(
     Function {
         args: three_code_args,
         code: start_node,
-        read_ref: read_ref,
+        read_ref,
     }
 }
 
@@ -823,7 +825,7 @@ impl From<(ir::Program, &Options)> for ThreeCode {
                 )
             })
             .collect::<HashMap<_, _>>();
-        let mut read_ref = None;
+        let mut read_ref = false;
         let start_node = translate_block_graph(
             block_graph,
             stat_graph.clone(),
@@ -868,7 +870,7 @@ mod tests {
     fn translate_block_test() {
         let graph = Rc::new(RefCell::new(Graph::new()));
         let mut data_refs = HashMap::new();
-        let mut read_ref = None;
+        let mut read_ref = false;
         let (start_node, _, _) = translate_block(
             ir::Block(
                 vec![],
@@ -899,10 +901,10 @@ mod tests {
             },
         );
 
-        assert_eq!(read_ref, Some(0));
+        assert!(read_ref);
         assert_eq!(
             data_refs,
-            HashMap::from([(1, DataRefType::String("%d\0".as_bytes().to_vec()))])
+            HashMap::from([(0, DataRefType::String("%d\0".as_bytes().to_vec()))])
         );
 
         let mut graph = Rc::try_unwrap(graph)
@@ -921,7 +923,7 @@ mod tests {
             exit_set_node,
         ));
         let print_fmt_set_node = graph.new_node(StatType::new_simple(
-            StatCode::Assign(2, OpSrc::DataRef(1, 0)),
+            StatCode::Assign(2, OpSrc::DataRef(0, 0)),
             print_call_node,
         ));
         let print_val_set_node = graph.new_node(StatType::new_simple(
@@ -937,7 +939,7 @@ mod tests {
             scan_load_node,
         ));
         let scan_fmt_set_node = graph.new_node(StatType::new_simple(
-            StatCode::Assign(2, OpSrc::DataRef(1, 0)),
+            StatCode::Assign(2, OpSrc::DataRef(0, 0)),
             scan_call_node,
         ));
         let scan_store_node = graph.new_node(StatType::new_simple(
@@ -945,7 +947,7 @@ mod tests {
             scan_fmt_set_node,
         ));
         let scan_set_ref = graph.new_node(StatType::new_simple(
-            StatCode::Assign(1, OpSrc::DataRef(0, 0)),
+            StatCode::Assign(1, OpSrc::ReadRef),
             scan_store_node,
         ));
 
@@ -956,7 +958,6 @@ mod tests {
     fn translate_block_graph_test() {
         let graph = Rc::new(RefCell::new(Graph::new()));
         let mut data_refs = HashMap::new();
-        let mut read_ref = None;
         let start_node = translate_block_graph(
             vec![
                 ir::Block(
@@ -987,7 +988,7 @@ mod tests {
             1,
             &mut 0,
             &mut data_refs,
-            &mut read_ref,
+            &mut false,
             &mut FmtDataRefFlags::default(),
             &HashMap::from([(0, ir::Type::Bool)]),
             &HashMap::new(),
@@ -1077,7 +1078,7 @@ mod tests {
             },
         );
         assert_eq!(args, vec![0]);
-        assert_eq!(read_ref, None);
+        assert!(!read_ref);
 
         let mut graph = Rc::try_unwrap(graph)
             .expect("Multiple references to the graph")
@@ -1126,7 +1127,7 @@ mod tests {
             .into();
         assert_eq!(data_refs, HashMap::new());
         assert_eq!(int_handler, Some("malloc".to_string()));
-        assert_eq!(read_ref, None);
+        assert!(!read_ref);
 
         let mut graph = Graph::new();
         let exit_node = graph.new_node(StatType::new_final(StatCode::VoidCall(

@@ -97,7 +97,7 @@ pub(super) fn translate_statement(
     stat_line: &mut StatLine,
     free_data_ref: &mut DataRef,
     data_refs: &mut HashMap<DataRef, DataRefType>,
-    read_ref: &mut Option<DataRef>,
+    read_ref: &mut bool,
     fmt_flags: &mut FmtDataRefFlags,
     vars: &HashMap<VarRepr, ir::Type>,
     function_types: &HashMap<String, ir::Type>,
@@ -132,15 +132,11 @@ pub(super) fn translate_statement(
             stat_line.add_stat(StatCode::VoidCall("free".to_string(), vec![free_var]));
         }
         ir::Stat::ReadIntVar(var) => {
-            let read_ref = *read_ref.get_or_insert_with(|| {
-                let data_ref = *free_data_ref;
-                *free_data_ref += 1;
-                data_ref
-            });
+            *read_ref = true;
             let integer_format =
                 ensure_format(free_data_ref, data_refs, "%d", &mut fmt_flags.integer);
 
-            stat_line.add_stat(StatCode::Assign(free_var, OpSrc::DataRef(read_ref, 0)));
+            stat_line.add_stat(StatCode::Assign(free_var, OpSrc::ReadRef));
             stat_line.add_stat(StatCode::Store(free_var, var, Size::DWord));
             stat_line.add_stat(StatCode::Assign(
                 free_var + 1,
@@ -166,13 +162,9 @@ pub(super) fn translate_statement(
             ));
         }
         ir::Stat::ReadCharVar(var) => {
-            let read_ref = *read_ref.get_or_insert_with(|| {
-                let data_ref = *free_data_ref;
-                *free_data_ref += 1;
-                data_ref
-            });
+            *read_ref = true;
             let char_format = ensure_format(free_data_ref, data_refs, "%c", &mut fmt_flags.char);
-            stat_line.add_stat(StatCode::Assign(free_var, OpSrc::DataRef(read_ref, 0)));
+            stat_line.add_stat(StatCode::Assign(free_var, OpSrc::ReadRef));
             stat_line.add_stat(StatCode::Store(free_var, var, Size::Byte));
             stat_line.add_stat(StatCode::Assign(
                 free_var + 1,
@@ -405,7 +397,7 @@ pub(super) mod tests {
         let graph = Rc::new(RefCell::new(Graph::new()));
         let mut stat_line = StatLine::new(graph.clone());
         let mut free_data_ref = initial_data_refs.keys().max().map(|x| *x).unwrap_or(0);
-        let mut read_ref = None;
+        let mut read_ref = false;
         let mut fmt_flags = FmtDataRefFlags::default();
         translate_statement(
             stat,
@@ -430,7 +422,7 @@ pub(super) mod tests {
             },
         );
 
-        assert_eq!(read_ref.map(|_| true).unwrap_or(false), has_read_ref);
+        assert_eq!(read_ref, has_read_ref);
         assert_eq!(initial_data_refs, final_data_refs);
 
         let mut node = stat_line.start_node().expect("No start node");
@@ -499,16 +491,16 @@ pub(super) mod tests {
             ir::Stat::ReadIntVar(0),
             1,
             vec![
-                StatCode::Assign(1, OpSrc::DataRef(0, 0)),
+                StatCode::Assign(1, OpSrc::ReadRef),
                 StatCode::Store(1, 0, Size::DWord),
-                StatCode::Assign(2, OpSrc::DataRef(1, 0)),
+                StatCode::Assign(2, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("scanf".to_string(), vec![2, 1]),
                 StatCode::Load(0, 1, Size::DWord),
             ],
             HashMap::from([(0, ir::Type::Num(ir::NumSize::DWord))]),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(1, DataRefType::String("%d\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%d\0".as_bytes().to_vec()))]),
             true,
         )
     }
@@ -519,16 +511,16 @@ pub(super) mod tests {
             ir::Stat::ReadCharVar(0),
             1,
             vec![
-                StatCode::Assign(1, OpSrc::DataRef(0, 0)),
+                StatCode::Assign(1, OpSrc::ReadRef),
                 StatCode::Store(1, 0, Size::Byte),
-                StatCode::Assign(2, OpSrc::DataRef(1, 0)),
+                StatCode::Assign(2, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("scanf".to_string(), vec![2, 1]),
                 StatCode::Load(0, 1, Size::Byte),
             ],
             HashMap::from([(0, ir::Type::Num(ir::NumSize::Byte))]),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(1, DataRefType::String("%c\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%c\0".as_bytes().to_vec()))]),
             true,
         )
     }
@@ -615,7 +607,7 @@ pub(super) mod tests {
             &mut stat_line,
             &mut 0,
             &mut data_refs,
-            &mut None,
+            &mut false,
             &mut FmtDataRefFlags::default(),
             &HashMap::new(),
             &HashMap::new(),
