@@ -4,7 +4,7 @@
 
 /// L is the lower bound, U is the upper bound. Tuple struct contains the
 /// represented value.
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConstrainedInt<const L: i32, const U: i32>(i32);
 
 impl<const L: i32, const U: i32> From<i32> for ConstrainedInt<L, U> {
