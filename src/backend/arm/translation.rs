@@ -26,6 +26,11 @@ use std::{
 struct TempMap(HashMap<VarRepr, Temporary>, HashSet<Temporary>);
 
 impl TempMap {
+    /// Create a new map for threecode->arm temporary translation.
+    fn new() -> Self {
+        Self(HashMap::new(), HashSet::new())
+    }
+
     /// Given a three-code identifier, either get the current arm-temporary
     /// representing it, or generate a new one and return that.
     fn use_temp(&mut self, id: VarRepr) -> Ident {
@@ -79,6 +84,74 @@ fn translate_data(data_refs: HashMap<DataRef, Vec<u8>>) -> Vec<Data> {
             )
         })
         .collect::<Vec<_>>()
+}
+
+/// Holds the state of a StatNode in the threecode.
+enum TransState {
+    /// Node has not been translated, the following arm nodes want to use it
+    /// as their successor.
+    Waiting(Vec<ArmNode>),
+    /// The translation has been created, this is the arm node.
+    Created(ArmNode),
+}
+
+/// A hashmap of the state of StatNodes used as destinations in branches.
+/// It is used to determine which nodes to create.
+struct NodeTracker(HashMap<StatNode, TransState>);
+
+impl NodeTracker {
+    /// If the translation exists, get it. Else add to the waiting list for
+    /// successor to be added.
+    fn wait_for_translation(&mut self, from: ArmNode, to: StatNode) -> Option<ArmNode> {
+        match self.0.get_mut(&to) {
+            Some(TransState::Waiting(waiting_nodes)) => {
+                waiting_nodes.push(from);
+                None
+            }
+            Some(TransState::Created(node)) => Some(node.clone()),
+            None => {
+                self.0.insert(to, TransState::Waiting(vec![from]));
+                None
+            }
+        }
+    }
+
+    /// Check if a translation already exists. If one does, then return it, else
+    /// None.
+    fn check_translation(&self, to: StatNode) -> Option<ArmNode> {
+        match self.0.get(&to) {
+            Some(TransState::Created(node)) => Some(node.clone()),
+            _ => None,
+        }
+    }
+
+    /// Set the translation for a given node, updating any successors if they
+    /// are waiting. Panics if attempting to add a translation for a node
+    /// already created.
+    fn add_translation(&mut self, three: StatNode, arm: ArmNode) {
+        if let Some(entry) = self.0.get_mut(&three) {
+            match entry {
+                TransState::Waiting(waiting_nodes) => {
+                    for node in waiting_nodes {
+                        node.set_successor(arm.clone())
+                    }
+                }
+                TransState::Created(_) => {
+                    panic!("Cannot add a translation for a node that already exists")
+                }
+            }
+        }
+
+        self.0.insert(three, TransState::Created(arm));
+    }
+
+    /// Get the next node being waited on, to translate.
+    fn get_next_to_translate(&self) -> Option<StatNode> {
+        self.0
+            .iter()
+            .find(|(three, transstate)| matches!(transstate, TransState::Waiting(_)))
+            .map(|(three, _)| three.clone())
+    }
 }
 
 /// Start building up an arm graph from a given node.
@@ -579,14 +652,6 @@ fn translate_statcode(
             ),
             graph,
         ),
-
-        StatCode::Return(three_temp) => {
-            let return_node = graph.new_node(ControlFlow::Return(
-                None,
-                Some(temp_map.use_temp(*three_temp)),
-            ));
-            (return_node.clone(), return_node)
-        }
     }
 }
 
