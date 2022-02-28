@@ -13,7 +13,7 @@ use super::super::super::intermediate::Expr as IRExpr;
 use super::super::super::intermediate::Stat as IRStat;
 use crate::intermediate::{Expr::*, NumSize::*, PtrExpr::Malloc, Stat::AssignVar};
 
-pub fn translate_stat<'a>(
+pub fn translate_stat(
     ASTWrapper(_, ast_stat): StatWrap<Option<ast::Type>, usize>,
     var_symb: &VariableSymbolTable,
     dataref_map: &mut HashMap<DataRef, Vec<IRExpr>>,
@@ -41,21 +41,18 @@ pub fn translate_stat<'a>(
                 }
 
                 match typ {
-                    ast::Type::Int | ast::Type::Char => Some(AssignVar(
-                        var,
-                        Num(NumExpr::Call(String::from(fname), ir_expr_vec)),
-                    )),
-                    ast::Type::Bool => Some(AssignVar(
-                        var,
-                        Bool(BoolExpr::Call(String::from(fname), ir_expr_vec)),
-                    )),
+                    ast::Type::Int | ast::Type::Char => {
+                        Some(AssignVar(var, Num(NumExpr::Call(fname, ir_expr_vec))))
+                    }
+                    ast::Type::Bool => {
+                        Some(AssignVar(var, Bool(BoolExpr::Call(fname, ir_expr_vec))))
+                    }
                     ast::Type::String
                     | ast::Type::Any
                     | ast::Type::Pair(_, _)
-                    | ast::Type::Array(_, _) => Some(AssignVar(
-                        var,
-                        Ptr(PtrExpr::Call(String::from(fname), ir_expr_vec)),
-                    )),
+                    | ast::Type::Array(_, _) => {
+                        Some(AssignVar(var, Ptr(PtrExpr::Call(fname, ir_expr_vec))))
+                    }
                     _ => panic!("Why send me a Generic dumb Oli?"),
                 }
             }

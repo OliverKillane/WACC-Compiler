@@ -16,7 +16,7 @@ use crate::intermediate::{
 };
 
 /// usize -> &'a str
-pub fn translate_expr<'a>(
+pub fn translate_expr(
     ASTWrapper(_, ast_expr): ExprWrap<Option<ast::Type>, usize>,
     var_symb: &VariableSymbolTable,
     dataref_map: &mut HashMap<DataRef, Vec<IRExpr>>,
