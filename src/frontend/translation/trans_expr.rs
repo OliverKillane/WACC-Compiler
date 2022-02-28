@@ -12,7 +12,7 @@ use crate::intermediate::{
     Expr::*,
     NumExpr,
     NumSize::{self, *},
-    PtrExpr, Type,
+    PtrExpr,
 };
 
 /// usize -> &'a str
@@ -161,10 +161,8 @@ pub fn translate_expr<'a>(
 
 #[cfg(test)]
 mod tests {
-    use std::env::VarError;
-
     use crate::{
-        frontend::{ast::BinOp, translation::trans_expr},
+        frontend::{ast::BinOp},
         intermediate,
     };
 
