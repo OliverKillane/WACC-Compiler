@@ -161,10 +161,7 @@ pub fn translate_expr<'a>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        frontend::{ast::BinOp},
-        intermediate,
-    };
+    use crate::{frontend::ast::BinOp, intermediate};
 
     use super::*;
 
