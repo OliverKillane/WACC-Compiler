@@ -59,7 +59,7 @@ impl From<ir::ArithOp> for BinOp {
     }
 }
 
-/// Translates a numerical expression into a series of statements. The result of the
+/// Translates a [numerical expression](ir::NumExpr) into a [series of statements](StatLine). The result of the
 /// expression tree is placed in the result field. Returns the size of the resulting
 /// numerical expression, i.e. the size of the variable placed in result.
 /// It is assumed that no variables after the result variable are used.
@@ -165,7 +165,7 @@ impl From<ir::BoolOp> for BinOp {
     }
 }
 
-/// Translates a boolean expression into a series of statements. The result of the
+/// Translates a [boolean expression](ir::BoolExpr) into a [series of statements](StatLine). The result of the
 /// expression tree is placed in the result field. It is assumed that no variables
 /// after the result variable are used.
 pub(super) fn translate_bool_expr(
@@ -261,7 +261,7 @@ pub(super) fn translate_bool_expr(
     }
 }
 
-/// Translates a pointer expression into a series of statements. The result of the
+/// Translates a [pointer expression](ir::PtrExpr) into a [series of statements](StatLine). The result of the
 /// expression tree is placed in the result field. It is assumed that no variables
 /// after the result variable are used.
 pub(super) fn translate_ptr_expr(
@@ -378,7 +378,7 @@ pub(super) fn translate_ptr_expr(
     }
 }
 
-/// Translates a single general expression. The result of the expression is placed
+/// Translates a single [general expression](ir::Expr). The result of the expression is placed
 /// in the result variable. Returns the type of the expression. It is assumed that
 /// no variables after the result variable are used.
 pub(super) fn translate_expr(

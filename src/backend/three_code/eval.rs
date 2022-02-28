@@ -27,7 +27,7 @@ fn eval_bool_expr(bool_expr: ir::BoolExpr) -> bool {
             }
         }
         ir::BoolExpr::Not(box bool_expr) => !eval_bool_expr(bool_expr),
-        _ => todo!("Not a constant eval expression"),
+        _ => panic!("Not a constant eval expression"),
     }
 }
 
@@ -68,7 +68,7 @@ fn eval_num_expr(num_expr: ir::NumExpr) -> (ir::NumSize, i32) {
             let (_, num_const) = eval_num_expr(num_expr);
             (size, trim_num_const(size, num_const))
         }
-        _ => todo!("Not a constant eval expression"),
+        _ => panic!("Not a constant eval expression"),
     }
 }
 
@@ -83,7 +83,7 @@ fn eval_ptr_expr(ptr_expr: ir::PtrExpr) -> i32 {
             let (_, num_const) = eval_num_expr(num_expr);
             ptr_const + num_const
         }
-        _ => todo!("Not a constant eval expression"),
+        _ => panic!("Not a constant eval expression"),
     }
 }
 

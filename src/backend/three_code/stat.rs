@@ -6,6 +6,8 @@ use super::{
 use crate::intermediate::{self as ir, DataRef, VarRepr};
 use std::collections::HashMap;
 
+/// Converts the [intermediate representation type](ir::Type) to a
+/// [three code size](Size).
 pub(super) fn get_type_width(expr_type: ir::Type) -> Size {
     match expr_type {
         ir::Type::Num(ir::NumSize::DWord) => Size::DWord,
@@ -26,17 +28,28 @@ impl Into<i32> for Size {
     }
 }
 
+/// Stores the information about static strings for printf and scanf already
+/// present in the dataref map.
 #[derive(Default)]
 pub(super) struct FmtDataRefFlags {
+    /// "%d" null-terminated string
     integer: Option<DataRef>,
+    /// "%p" null-terminated string
     ptr: Option<DataRef>,
+    /// "true" null-terminated string
     bool_true: Option<DataRef>,
+    /// "false" null-terminated string
     bool_false: Option<DataRef>,
+    /// "%.*s" null-terminated string
     string: Option<DataRef>,
+    /// "%c" null-terminated string
     char: Option<DataRef>,
+    /// "\n" null-terminated string
     eol: Option<DataRef>,
 }
 
+/// If a format string  is not present in the static data references then adds
+/// it and returns its [reference](DataRef)
 fn ensure_format(
     free_data_ref: &mut DataRef,
     data_refs: &mut HashMap<DataRef, DataRefType>,
@@ -58,6 +71,25 @@ fn ensure_format(
     }
 }
 
+/// Translates a single [statement](ir::Stat) into a
+/// [statement graph with a single start and end node](StatLine). The arguments
+/// are as follows:
+///  - The statement to be translated.
+///  - Some variable not used in the program. It is assumed that all
+///    variables superceding are not used either.
+///  - The graph to which the put the statements to.
+///  - Some data reference not used in the program. It is assumed that all data
+///    references superceding are not used either. Will be automatically updated
+///    if a data reference is placed under it.
+///  - An optional data reference to a read field. The field is supposed to be
+///    4 bytes long. The initial value of that field should be set to Null.
+///    Updated if a data reference is needed.
+///  - [Format flags](FmtDataRefFlags). See the type comment for more detail.
+///    Updated if necessary
+///  - Types of variables used within the intermediate representation.
+///  - Types of return values of functions used within the intermediate
+///    representation.
+///  - [Compilation options](Options).
 pub(super) fn translate_statement(
     stat: ir::Stat,
     free_var: VarRepr,
@@ -285,7 +317,7 @@ pub(super) fn translate_statement(
 mod tests {
     use super::super::{
         super::{Options, PropagationOpt},
-        DataRefType, OpSrc, Size, StatCode, StatType,
+        DataRefType, OpSrc, Size, StatCode, StatNode, StatType,
     };
     use super::translate_statement;
     use crate::{
@@ -294,6 +326,67 @@ mod tests {
         intermediate::{self as ir, DataRef, VarRepr},
     };
     use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
+    fn match_graph_dfs(
+        exec_node: StatNode,
+        template_node: StatNode,
+        visited_map: &mut HashMap<StatNode, StatNode>,
+    ) {
+        if let Some(other_template_node) = visited_map.get(&exec_node) {
+            assert_eq!(other_template_node, &template_node);
+            return;
+        }
+        visited_map.insert(exec_node.clone(), template_node.clone());
+        match (&*exec_node.get(), &*template_node.get()) {
+            (StatType::Dummy(_), StatType::Dummy(_)) => {}
+            (
+                StatType::Simple(_, exec_stat_code, next_exec_node),
+                StatType::Simple(_, template_stat_code, next_template_node),
+            ) => {
+                assert_eq!(exec_stat_code, template_stat_code);
+                match_graph_dfs(
+                    next_exec_node.clone(),
+                    next_template_node.clone(),
+                    visited_map,
+                )
+            }
+            (StatType::Final(_, exec_stat_code), StatType::Final(_, template_stat_code)) => {
+                assert_eq!(exec_stat_code, template_stat_code);
+            }
+            (
+                StatType::Branch(_, exec_branch_var, next_true_exec_node, next_false_exec_node),
+                StatType::Branch(
+                    _,
+                    template_branch_var,
+                    next_true_template_node,
+                    next_false_template_node,
+                ),
+            ) => {
+                assert_eq!(exec_branch_var, template_branch_var);
+                match_graph_dfs(
+                    next_true_exec_node.clone(),
+                    next_true_template_node.clone(),
+                    visited_map,
+                );
+                match_graph_dfs(
+                    next_false_exec_node.clone(),
+                    next_false_template_node.clone(),
+                    visited_map,
+                );
+            }
+            (StatType::Loop(_), StatType::Loop(_)) => {}
+            _ => panic!(
+                "Stat type mismatch: expected {:?}, but got {:?}",
+                &*template_node.get(),
+                &*exec_node.get()
+            ),
+        }
+    }
+
+    fn match_graph(exec_start: StatNode, template_start: StatNode) {
+        let mut visited_map = HashMap::new();
+        match_graph_dfs(exec_start, template_start, &mut visited_map);
+    }
 
     fn match_line_stat_vec(
         stat: ir::Stat,
@@ -543,38 +636,28 @@ mod tests {
             ])
         );
 
-        let node = stat_line.start_node().expect("No start node");
-        let node =
-            if let StatType::Simple(_, StatCode::Assign(0, OpSrc::Const(1)), node) = &*node.get() {
-                node.clone()
-            } else {
-                panic!("Node type mismatch")
-            };
-        let (node1, node2) = if let StatType::Branch(_, 0, node1, node2) = &*node.get() {
-            (node1.clone(), node2.clone())
-        } else {
-            panic!("Node type mismatch")
-        };
-        let node = if let StatType::Simple(_, StatCode::Assign(0, OpSrc::DataRef(0, 0)), node) =
-            &*node1.get()
-        {
-            node.clone()
-        } else {
-            panic!("Node type mismatch")
-        };
-        if let StatType::Simple(_, StatCode::Assign(0, OpSrc::DataRef(1, 0)), other_node) =
-            &*node2.get()
-        {
-            assert_eq!(&node, other_node);
-        } else {
-            panic!("Node type mismatch")
-        }
-        if let StatType::Final(_, StatCode::VoidCall(fname, args)) = &*node.get() {
-            assert_eq!(fname, "printf");
-            assert_eq!(args, &vec![0]);
-        } else {
-            panic!("Node type mismatch")
-        };
+        let mut template_graph = Graph::new();
+        let call_node = template_graph.new_node(StatType::new_final(StatCode::VoidCall(
+            "printf".to_string(),
+            vec![0],
+        )));
+
+        let true_branch_node = template_graph.new_node(StatType::new_simple(
+            StatCode::Assign(0, OpSrc::DataRef(0, 0)),
+            call_node.clone(),
+        ));
+        let false_branch_node = template_graph.new_node(StatType::new_simple(
+            StatCode::Assign(0, OpSrc::DataRef(1, 0)),
+            call_node,
+        ));
+        let branch_node =
+            template_graph.new_node(StatType::new_branch(0, true_branch_node, false_branch_node));
+        let calc_node = template_graph.new_node(StatType::new_simple(
+            StatCode::Assign(0, OpSrc::Const(1)),
+            branch_node,
+        ));
+
+        match_graph(stat_line.start_node().expect("No start node"), calc_node);
     }
 
     #[test]
