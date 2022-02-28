@@ -5,6 +5,7 @@ mod stat;
 use super::Options;
 use crate::graph::{Deleted, Graph, NodeRef};
 use crate::intermediate::{self as ir, DataRef, VarRepr};
+use core::fmt;
 use eval::eval_expr;
 use expr::{translate_bool_expr, translate_expr, translate_num_expr};
 use stat::{translate_statement, FmtDataRefFlags};
@@ -158,22 +159,27 @@ pub(super) struct ThreeCode {
 }
 
 impl StatType {
+    /// Creates a new final statement with an empty list of incoming nodes.
     fn new_final(stat_code: StatCode) -> Self {
         StatType::Final(Vec::new(), stat_code)
     }
 
+    /// Creates a new simple statement with an empty list of incoming nodes.
     fn new_simple(stat_code: StatCode, next: StatNode) -> Self {
         StatType::Simple(Vec::new(), stat_code, next)
     }
 
+    /// Creates a new branch statement with an empty list of incoming nodes.
     fn new_branch(cond: VarRepr, if_true: StatNode, if_false: StatNode) -> Self {
         StatType::Branch(Vec::new(), cond, if_true, if_false)
     }
 
+    /// Creates a new loop statement with an empty list of incoming nodes.
     fn new_loop() -> Self {
         StatType::Loop(Vec::new())
     }
 
+    /// Adds an incoming node to the list of incoming nodes.
     fn add_incoming(&mut self, node: StatNode) {
         match self {
             Self::Simple(incoming, _, _)
@@ -184,6 +190,7 @@ impl StatType {
         }
     }
 
+    /// Sets the list of incoming nodes.
     fn set_incoming(&mut self, incoming: Vec<StatNode>) {
         match self {
             Self::Simple(old_incoming, _, _)
@@ -194,6 +201,7 @@ impl StatType {
         }
     }
 
+    /// Retreives the list of incoming nodes.
     fn incoming(&self) -> Vec<StatNode> {
         match self {
             Self::Simple(incoming, _, _)
@@ -204,6 +212,8 @@ impl StatType {
         }
     }
 
+    /// If a node is final, converts it to a simple node with the next node as
+    /// the given node.
     fn append(&mut self, node: StatNode) {
         let mut tmp_node = Self::deleted();
         mem::swap(self, &mut tmp_node);
@@ -233,6 +243,7 @@ impl Deleted for StatType {
     }
 }
 
+/// A line-like graph with a single start and end node.
 #[derive(Clone)]
 pub(self) enum StatLine {
     Empty(Rc<RefCell<Graph<StatType>>>),
@@ -244,10 +255,12 @@ pub(self) enum StatLine {
 }
 
 impl StatLine {
+    /// Creates a new statement line.
     fn new(graph: Rc<RefCell<Graph<StatType>>>) -> Self {
         StatLine::Empty(graph)
     }
 
+    /// Appends the given statement into the statement line.
     fn add_stat(&mut self, stat_code: StatCode) {
         self.add_node(
             self.graph()
@@ -256,6 +269,8 @@ impl StatLine {
         );
     }
 
+    /// Appends the given node into the statement line. Assumes that it is a
+    /// final node.
     fn add_node(&mut self, new_node: StatNode) {
         *self = match self.clone() {
             Self::Empty(graph) => Self::Line {
@@ -279,6 +294,7 @@ impl StatLine {
         };
     }
 
+    /// Sets a new end node for the statement line.
     fn set_end(&mut self, new_node: StatNode) {
         *self = match self.clone() {
             Self::Empty(graph) => Self::Line {
@@ -298,11 +314,15 @@ impl StatLine {
         };
     }
 
+    /// Appends a graph starting and ending with given nodes. The nodes
+    /// are assumed to be connected. The new end node is assumed to be a final
+    /// node.
     fn splice(&mut self, start_node: StatNode, end_node: StatNode) {
         self.add_node(start_node);
         self.set_end(end_node);
     }
 
+    /// Returns the underlying graph.
     fn graph(&self) -> Rc<RefCell<Graph<StatType>>> {
         match self {
             Self::Empty(graph) => graph.clone(),
@@ -314,6 +334,7 @@ impl StatLine {
         }
     }
 
+    /// Returns the start node, if there are any nodes in the graph.
     fn start_node(&self) -> Option<StatNode> {
         match self {
             Self::Empty(_) => None,
@@ -325,6 +346,7 @@ impl StatLine {
         }
     }
 
+    /// Returns the end node, if there are any nodes in the graph.
     fn end_node(&self) -> Option<StatNode> {
         match self {
             Self::Empty(_) => None,
@@ -337,10 +359,35 @@ impl StatLine {
     }
 }
 
+/// Translates a single statement block. Returns the start node of the statement,
+/// the endpoints corresponding to the conditional branches from the block and
+/// the node corresponding to the unconditional branch, if one exists. The endpoint
+/// nodes are branch nodes and have dummy nodes installed at their ends, which
+/// should be removed when attaching actual nodes. The nodes corresponding to
+/// the conditional branches should have nodes attached to the true branch, and
+/// the one corresponding to the unconditional branch should have a node attached
+/// to the false branch. The arguments are as follows:
+///  - The block of statements to translate.
+///  - The graph in which to allocate new nodes.
+///  - Some variable not used in the program. It is assumed that all
+///    variables superceding are not used either.
+///  - Some data reference not used in the program. It is assumed that all data
+///    references superceding are not used either. Will be automatically updated
+///    if a data reference is placed under it.
+///  - All static data references used in the program.
+///  - An optional data reference to a read field. The field is supposed to be
+///    4 bytes long. The initial value of that field should be set to Null.
+///    Updated if a data reference is needed.
+///  - [Format flags](FmtDataRefFlags). See the type comment for more detail.
+///    Updated if necessary.
+///  - Types of variables used within the intermediate representation.
+///  - Types of return values of functions used within the intermediate
+///    representation.
+///  - [Compilation options](Options).
 fn translate_block(
     ir::Block(_, stats, block_ending): ir::Block,
-    free_var: VarRepr,
     stat_graph: Rc<RefCell<Graph<StatType>>>,
+    free_var: VarRepr,
     free_data_ref: &mut DataRef,
     data_refs: &mut HashMap<DataRef, DataRefType>,
     read_ref: &mut Option<DataRef>,
@@ -453,6 +500,7 @@ fn translate_block(
     (stat_line.start_node().unwrap(), cond_outputs, else_output)
 }
 
+/// Helper recursion function for the [block graph cleanup](clean_up_block_graph).
 fn clean_up_block_graph_dfs(
     block_graph: &mut ir::BlockGraph,
     block_id: ir::BlockId,
@@ -478,8 +526,9 @@ fn clean_up_block_graph_dfs(
     mapping_id
 }
 
-// Make sure that there isn't an obsolete condition and that there is no
-// empty conditionless block
+/// Gets rid of conditional branches that lead to the same block as the unconditional branch
+/// and directly precede it in terms of execution, as well as blocks with just
+/// unconditional branches and no statements, unless they point to themselves.
 fn clean_up_block_graph(block_graph: &mut ir::BlockGraph) {
     for ir::Block(_, _, block_ending) in block_graph.iter_mut() {
         if let ir::BlockEnding::CondJumps(conds, else_id) = block_ending {
@@ -530,6 +579,25 @@ fn clean_up_block_graph(block_graph: &mut ir::BlockGraph) {
     }
 }
 
+/// Translates an entire [block graph](ir::BlockGraph). Returns the node corresponding to the
+/// first statement to execute, provided there is any. The arguments are as follows:
+///  - The [block graph](ir::BlockGraph) to translate.
+///  - The graph in which to allocate new nodes.
+///  - Some variable not used in the program. It is assumed that all
+///    variables superceding are not used either.
+///  - Some data reference not used in the program. It is assumed that all data
+///    references superceding are not used either. Will be automatically updated
+///    if a data reference is placed under it.
+///  - All static data references used in the program.
+///  - An optional data reference to a read field. The field is supposed to be
+///    4 bytes long. The initial value of that field should be set to Null.
+///    Updated if a data reference is needed.
+///  - [Format flags](FmtDataRefFlags). See the type comment for more detail.
+///    Updated if necessary.
+///  - Types of variables used within the intermediate representation.
+///  - Types of return values of functions used within the intermediate
+///    representation.
+///  - [Compilation options](Options).
 fn translate_block_graph(
     mut block_graph: ir::BlockGraph,
     stat_graph: Rc<RefCell<Graph<StatType>>>,
@@ -537,13 +605,13 @@ fn translate_block_graph(
     free_data_ref: &mut DataRef,
     data_refs: &mut HashMap<DataRef, DataRefType>,
     read_ref: &mut Option<ir::DataRef>,
+    fmt_flags: &mut FmtDataRefFlags,
     vars: &HashMap<VarRepr, ir::Type>,
     function_types: &HashMap<String, ir::Type>,
     options: &Options,
 ) -> Option<StatNode> {
     clean_up_block_graph(&mut block_graph);
 
-    let mut fmt_flags = FmtDataRefFlags::default();
     let (start_nodes, block_cond_nodes): (Vec<_>, Vec<_>) = block_graph
         .into_iter()
         .map(|block| {
@@ -559,12 +627,12 @@ fn translate_block_graph(
             };
             let (start_node, cond_nodes, else_node) = translate_block(
                 block,
-                free_var,
                 stat_graph.clone(),
+                free_var,
                 free_data_ref,
                 data_refs,
                 read_ref,
-                &mut fmt_flags,
+                fmt_flags,
                 vars,
                 function_types,
                 options,
@@ -611,11 +679,25 @@ fn translate_block_graph(
     start_nodes.into_iter().next()
 }
 
+/// Translates a function. Returns the function in a three-code representation.
+/// The arguments are as follows:
+///  - The function to translate
+///  - The graph in which to allocate new nodes.
+///  - Some data reference not used in the program. It is assumed that all data
+///    references superceding are not used either. Will be automatically updated
+///    if a data reference is placed under it.
+///  - All static data references used in the program.
+///  - [Format flags](FmtDataRefFlags). See the type comment for more detail.
+///    Updated if necessary.
+///  - Types of return values of functions used within the intermediate
+///    representation.
+///  - [Compilation options](Options).
 fn translate_function(
     ir::Function(_, args, mut local_vars, block_graph): ir::Function,
     stat_graph: Rc<RefCell<Graph<StatType>>>,
     free_data_ref: &mut DataRef,
     data_refs: &mut HashMap<DataRef, DataRefType>,
+    fmt_flags: &mut FmtDataRefFlags,
     function_types: &HashMap<String, ir::Type>,
     options: &Options,
 ) -> Function {
@@ -638,6 +720,7 @@ fn translate_function(
         free_data_ref,
         data_refs,
         &mut read_ref,
+        fmt_flags,
         &mut local_vars,
         function_types,
         options,
@@ -697,6 +780,7 @@ impl From<(ir::Program, &Options)> for ThreeCode {
             .max()
             .map(|data_ref| data_ref + 1)
             .unwrap_or(0);
+        let mut fmt_flags = FmtDataRefFlags::default();
         let functions = functions
             .into_iter()
             .map(|(name, function)| {
@@ -707,6 +791,7 @@ impl From<(ir::Program, &Options)> for ThreeCode {
                         stat_graph.clone(),
                         &mut free_data_ref,
                         &mut data_refs,
+                        &mut fmt_flags,
                         &function_types,
                         options,
                     ),
@@ -721,6 +806,7 @@ impl From<(ir::Program, &Options)> for ThreeCode {
             &mut free_data_ref,
             &mut data_refs,
             &mut read_ref,
+            &mut fmt_flags,
             &local_vars,
             &function_types,
             options,

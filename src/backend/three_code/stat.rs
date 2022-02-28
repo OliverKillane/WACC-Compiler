@@ -81,11 +81,12 @@ fn ensure_format(
 ///  - Some data reference not used in the program. It is assumed that all data
 ///    references superceding are not used either. Will be automatically updated
 ///    if a data reference is placed under it.
+///  - All static data references used in the program.
 ///  - An optional data reference to a read field. The field is supposed to be
 ///    4 bytes long. The initial value of that field should be set to Null.
 ///    Updated if a data reference is needed.
 ///  - [Format flags](FmtDataRefFlags). See the type comment for more detail.
-///    Updated if necessary
+///    Updated if necessary.
 ///  - Types of variables used within the intermediate representation.
 ///  - Types of return values of functions used within the intermediate
 ///    representation.
