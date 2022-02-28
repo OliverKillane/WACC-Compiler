@@ -5,7 +5,6 @@ mod stat;
 use super::Options;
 use crate::graph::{Deleted, Graph, NodeRef};
 use crate::intermediate::{self as ir, DataRef, VarRepr};
-use core::fmt;
 use eval::eval_expr;
 use expr::{translate_bool_expr, translate_expr, translate_num_expr};
 use stat::{translate_statement, FmtDataRefFlags};
@@ -96,8 +95,6 @@ pub(super) enum StatCode {
     /// is not in the list of the [program](ThreeCode) functions then it is assumed
     /// to be external and linked to by the linker.
     VoidCall(String, Vec<VarRepr>),
-    /// Returns from the function.
-    Return(VarRepr),
 }
 
 /// General type of the statement. Used in the dataflow graph.
@@ -115,6 +112,8 @@ pub(super) enum StatType {
     Branch(Vec<StatNode>, VarRepr, StatNode, StatNode),
     /// A self-looping infinite loop, which might occur as a user program.
     Loop(Vec<StatNode>),
+    /// A return from a function. The variable contains the return value.
+    Return(Vec<StatNode>, VarRepr),
 }
 
 /// A statement graph node.
@@ -179,6 +178,11 @@ impl StatType {
         StatType::Loop(Vec::new())
     }
 
+    /// Creates a new return statement with an empty list of incoming nodes.
+    fn new_return(ret: VarRepr) -> Self {
+        StatType::Return(Vec::new(), ret)
+    }
+
     /// Adds an incoming node to the list of incoming nodes.
     fn add_incoming(&mut self, node: StatNode) {
         match self {
@@ -186,6 +190,7 @@ impl StatType {
             | Self::Final(incoming, _)
             | Self::Branch(incoming, _, _, _)
             | Self::Loop(incoming)
+            | Self::Return(incoming, _)
             | Self::Dummy(incoming) => incoming.push(node),
         }
     }
@@ -197,6 +202,7 @@ impl StatType {
             | Self::Final(old_incoming, _)
             | Self::Branch(old_incoming, _, _, _)
             | Self::Loop(old_incoming)
+            | Self::Return(old_incoming, _)
             | Self::Dummy(old_incoming) => *old_incoming = incoming,
         }
     }
@@ -208,6 +214,7 @@ impl StatType {
             | Self::Final(incoming, _)
             | Self::Branch(incoming, _, _, _)
             | Self::Loop(incoming)
+            | Self::Return(incoming, _)
             | Self::Dummy(incoming) => incoming.clone(),
         }
     }
@@ -233,6 +240,7 @@ impl Debug for StatType {
             Self::Final(_, stat_code) => f.debug_tuple("Final").field(stat_code).finish(),
             Self::Branch(_, var, _, _) => f.debug_tuple("Branch").field(var).finish(),
             Self::Loop(_) => f.debug_tuple("Loop").finish(),
+            Self::Return(_, var) => f.debug_tuple("Return").field(var).finish(),
         }
     }
 }
@@ -433,7 +441,11 @@ fn translate_block(
                 function_types,
                 options,
             );
-            stat_line.add_stat(StatCode::Return(free_var));
+            stat_line.add_node(
+                stat_graph
+                    .borrow_mut()
+                    .new_node(StatType::new_return(free_var)),
+            );
             (Vec::new(), None)
         }
         ir::BlockEnding::CondJumps(conds, last) => {
@@ -468,10 +480,12 @@ fn translate_block(
                         stat_line = bool_stat_line;
                     }
                     [last_cond] => {
-                        if let StatType::Branch(_, _, _, false_node) = &mut *last_cond.get_mut() {
-                            *false_node = bool_stat_line.start_node().unwrap();
+                        if let StatType::Simple(_, _, end_node_ref)
+                        | StatType::Branch(_, _, _, end_node_ref) = &mut *last_cond.get_mut()
+                        {
+                            *end_node_ref = bool_stat_line.start_node().unwrap();
                         } else {
-                            panic!("Expected a condition node")
+                            panic!("Expected a simple node or a condition node")
                         }
                         stat_line.set_end(bool_stat_line.end_node().unwrap());
                     }
@@ -510,18 +524,22 @@ fn clean_up_block_graph_dfs(
     if visited.contains(&block_id) {
         return block_id;
     }
+
     visited.insert(block_id);
     let next_block_id = match &mut block_graph[block_id] {
-        ir::Block(_, _, ir::BlockEnding::Exit(_) | ir::BlockEnding::Return(_)) => return block_id,
+        ir::Block(_, _, ir::BlockEnding::Exit(_) | ir::BlockEnding::Return(_)) => {
+            mappings.insert(block_id, block_id);
+            return block_id;
+        }
         ir::Block(_, stats, ir::BlockEnding::CondJumps(conds, else_id)) => {
             if conds.len() > 0 || stats.len() > 0 {
                 mappings.insert(block_id, block_id);
                 return block_id;
             }
-            else_id
+            *else_id
         }
     };
-    let mapping_id = clean_up_block_graph_dfs(block_graph, block_id, mappings, visited);
+    let mapping_id = clean_up_block_graph_dfs(block_graph, next_block_id, mappings, visited);
     mappings.insert(block_id, mapping_id);
     mapping_id
 }
@@ -546,7 +564,7 @@ fn clean_up_block_graph(block_graph: &mut ir::BlockGraph) {
 
     let mut new_block_graph_mappings = HashMap::new();
     for (new_block_id, old_block_id) in (0..block_graph.len())
-        .filter(|block_id| edge_mappings[block_id] != *block_id)
+        .filter(|block_id| edge_mappings[block_id] == *block_id)
         .enumerate()
     {
         new_block_graph_mappings.insert(old_block_id, new_block_id);
@@ -566,6 +584,7 @@ fn clean_up_block_graph(block_graph: &mut ir::BlockGraph) {
             }
         })
         .collect();
+
     for ir::Block(incoming, _, ending) in block_graph {
         for incoming_id in incoming {
             *incoming_id = new_block_graph_mappings[&edge_mappings[incoming_id]];
@@ -573,7 +592,7 @@ fn clean_up_block_graph(block_graph: &mut ir::BlockGraph) {
         if let ir::BlockEnding::CondJumps(conds, else_id) = ending {
             *else_id = new_block_graph_mappings[&edge_mappings[else_id]];
             for (_, cond_id) in conds {
-                *cond_id = new_block_graph_mappings[&edge_mappings[else_id]];
+                *cond_id = new_block_graph_mappings[&edge_mappings[cond_id]];
             }
         }
     }
@@ -616,13 +635,19 @@ fn translate_block_graph(
         .into_iter()
         .map(|block| {
             let cond_ids = match &block {
-                ir::Block(_, _, ir::BlockEnding::CondJumps(conds, else_id)) => Some((
-                    conds
-                        .iter()
-                        .map(|(_, cond_id)| *cond_id)
-                        .collect::<Vec<_>>(),
-                    *else_id,
-                )),
+                ir::Block(_, _, ir::BlockEnding::CondJumps(conds, else_id)) => {
+                    if conds.len() > 0 {
+                        Some((
+                            conds
+                                .iter()
+                                .map(|(_, cond_id)| *cond_id)
+                                .collect::<Vec<_>>(),
+                            *else_id,
+                        ))
+                    } else {
+                        None
+                    }
+                }
                 _ => None,
             };
             let (start_node, cond_nodes, else_node) = translate_block(
@@ -821,5 +846,297 @@ impl From<(ir::Program, &Options)> for ThreeCode {
             code: start_node,
             int_handler: int_handler,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::stat::tests::match_graph;
+    use super::{
+        super::{Options, PropagationOpt},
+        translate_block, translate_block_graph, translate_function, DataRefType, Function, OpSrc,
+        Size, StatCode, StatType, ThreeCode,
+    };
+    use crate::{
+        backend::three_code::stat::FmtDataRefFlags,
+        graph::{Deleted, Graph},
+        intermediate as ir,
+    };
+    use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
+    #[test]
+    fn translate_block_test() {
+        let graph = Rc::new(RefCell::new(Graph::new()));
+        let mut data_refs = HashMap::new();
+        let mut read_ref = None;
+        let (start_node, _, _) = translate_block(
+            ir::Block(
+                vec![],
+                vec![
+                    ir::Stat::ReadIntVar(0),
+                    ir::Stat::PrintExpr(ir::Expr::Num(ir::NumExpr::Var(0))),
+                ],
+                ir::BlockEnding::Exit(ir::NumExpr::Const(ir::NumSize::DWord, 0)),
+            ),
+            graph.clone(),
+            1,
+            &mut 0,
+            &mut data_refs,
+            &mut read_ref,
+            &mut FmtDataRefFlags::default(),
+            &HashMap::from([(0, ir::Type::Num(ir::NumSize::DWord))]),
+            &HashMap::new(),
+            &Options {
+                sethi_ullman_weights: false,
+                dead_code_removal: false,
+                propagation: PropagationOpt::None,
+                inlining: false,
+                tail_call: false,
+                hoisting: false,
+                strength_reduction: false,
+                loop_unrolling: false,
+                common_expressions: false,
+            },
+        );
+
+        assert_eq!(read_ref, Some(0));
+        assert_eq!(
+            data_refs,
+            HashMap::from([(1, DataRefType::String("%d\0".as_bytes().to_vec()))])
+        );
+
+        let mut graph = Rc::try_unwrap(graph)
+            .expect("Multiple references to the graph")
+            .into_inner();
+        let exit_node = graph.new_node(StatType::new_final(StatCode::VoidCall(
+            "exit".to_string(),
+            vec![1],
+        )));
+        let exit_set_node = graph.new_node(StatType::new_simple(
+            StatCode::Assign(1, OpSrc::Const(0)),
+            exit_node,
+        ));
+        let print_call_node = graph.new_node(StatType::new_simple(
+            StatCode::VoidCall("printf".to_string(), vec![2, 1]),
+            exit_set_node,
+        ));
+        let print_fmt_set_node = graph.new_node(StatType::new_simple(
+            StatCode::Assign(2, OpSrc::DataRef(1, 0)),
+            print_call_node,
+        ));
+        let print_val_set_node = graph.new_node(StatType::new_simple(
+            StatCode::Assign(1, OpSrc::Var(0)),
+            print_fmt_set_node,
+        ));
+        let scan_load_node = graph.new_node(StatType::new_simple(
+            StatCode::Load(0, 1, Size::DWord),
+            print_val_set_node,
+        ));
+        let scan_call_node = graph.new_node(StatType::new_simple(
+            StatCode::VoidCall("scanf".to_string(), vec![2, 1]),
+            scan_load_node,
+        ));
+        let scan_fmt_set_node = graph.new_node(StatType::new_simple(
+            StatCode::Assign(2, OpSrc::DataRef(1, 0)),
+            scan_call_node,
+        ));
+        let scan_store_node = graph.new_node(StatType::new_simple(
+            StatCode::Store(1, 0, Size::DWord),
+            scan_fmt_set_node,
+        ));
+        let scan_set_ref = graph.new_node(StatType::new_simple(
+            StatCode::Assign(1, OpSrc::DataRef(0, 0)),
+            scan_store_node,
+        ));
+
+        match_graph(start_node, scan_set_ref);
+    }
+
+    #[test]
+    fn translate_block_graph_test() {
+        let graph = Rc::new(RefCell::new(Graph::new()));
+        let mut data_refs = HashMap::new();
+        let mut read_ref = None;
+        let start_node = translate_block_graph(
+            vec![
+                ir::Block(
+                    vec![0],
+                    vec![ir::Stat::AssignVar(
+                        0,
+                        ir::Expr::Bool(ir::BoolExpr::Const(true)),
+                    )],
+                    ir::BlockEnding::CondJumps(
+                        vec![
+                            (ir::BoolExpr::Const(true), 0),
+                            (ir::BoolExpr::Var(0), 1),
+                            (ir::BoolExpr::Const(true), 2),
+                        ],
+                        2,
+                    ),
+                ),
+                ir::Block(
+                    vec![0],
+                    vec![],
+                    ir::BlockEnding::Return(ir::Expr::Bool(ir::BoolExpr::Var(0))),
+                ),
+                ir::Block(vec![0, 4], vec![], ir::BlockEnding::CondJumps(vec![], 3)),
+                ir::Block(vec![2], vec![], ir::BlockEnding::CondJumps(vec![], 4)),
+                ir::Block(vec![3], vec![], ir::BlockEnding::CondJumps(vec![], 2)),
+            ],
+            graph.clone(),
+            1,
+            &mut 0,
+            &mut data_refs,
+            &mut read_ref,
+            &mut FmtDataRefFlags::default(),
+            &HashMap::from([(0, ir::Type::Bool)]),
+            &HashMap::new(),
+            &Options {
+                sethi_ullman_weights: false,
+                dead_code_removal: false,
+                propagation: PropagationOpt::None,
+                inlining: false,
+                tail_call: false,
+                hoisting: false,
+                strength_reduction: false,
+                loop_unrolling: false,
+                common_expressions: false,
+            },
+        );
+
+        let mut graph = Rc::try_unwrap(graph)
+            .expect("Multiple references to the graph")
+            .into_inner();
+        let loop_node = graph.new_node(StatType::new_loop());
+        let return_node = graph.new_node(StatType::new_return(1));
+        let return_assign_node = graph.new_node(StatType::new_simple(
+            StatCode::Assign(1, OpSrc::Var(0)),
+            return_node,
+        ));
+        let branch2_node = graph.new_node(StatType::new_branch(1, return_assign_node, loop_node));
+        let branch2_cond_set_node = graph.new_node(StatType::new_simple(
+            StatCode::Assign(1, OpSrc::Var(0)),
+            branch2_node,
+        ));
+        let branch1_node = graph.new_node(StatType::deleted());
+        let branch1_cond_set_node = graph.new_node(StatType::new_simple(
+            StatCode::Assign(1, OpSrc::Const(1)),
+            branch1_node.clone(),
+        ));
+        let var_set_node = graph.new_node(StatType::new_simple(
+            StatCode::Assign(0, OpSrc::Var(1)),
+            branch1_cond_set_node,
+        ));
+        let tmp_var_set_node = graph.new_node(StatType::new_simple(
+            StatCode::Assign(1, OpSrc::Const(1)),
+            var_set_node,
+        ));
+        branch1_node.set(StatType::new_branch(
+            1,
+            tmp_var_set_node.clone(),
+            branch2_cond_set_node,
+        ));
+
+        match_graph(start_node.expect("No start node"), tmp_var_set_node);
+    }
+
+    #[test]
+    fn translate_function_test() {
+        let graph = Rc::new(RefCell::new(Graph::new()));
+        let mut data_refs = HashMap::new();
+        let Function {
+            args,
+            code,
+            read_ref,
+        } = translate_function(
+            ir::Function(
+                ir::Type::Bool,
+                vec![(ir::Type::Num(ir::NumSize::DWord), 0)],
+                HashMap::from([(1, ir::Type::Num(ir::NumSize::Byte))]),
+                vec![ir::Block(
+                    vec![],
+                    vec![],
+                    ir::BlockEnding::Return(ir::Expr::Bool(ir::BoolExpr::Const(false))),
+                )],
+            ),
+            graph.clone(),
+            &mut 0,
+            &mut data_refs,
+            &mut FmtDataRefFlags::default(),
+            &HashMap::from([("function".to_string(), ir::Type::Bool)]),
+            &Options {
+                sethi_ullman_weights: false,
+                dead_code_removal: false,
+                propagation: PropagationOpt::None,
+                inlining: false,
+                tail_call: false,
+                hoisting: false,
+                strength_reduction: false,
+                loop_unrolling: false,
+                common_expressions: false,
+            },
+        );
+        assert_eq!(args, vec![0]);
+        assert_eq!(read_ref, None);
+
+        let mut graph = Rc::try_unwrap(graph)
+            .expect("Multiple references to the graph")
+            .into_inner();
+        let return_node = graph.new_node(StatType::new_return(2));
+        let return_assign_node = graph.new_node(StatType::new_simple(
+            StatCode::Assign(2, OpSrc::Const(0)),
+            return_node,
+        ));
+        match_graph(code.expect("No code"), return_assign_node);
+    }
+
+    #[test]
+    fn translate_program_test() {
+        let ThreeCode {
+            functions,
+            data_refs,
+            graph: program_graph,
+            read_ref,
+            code,
+            int_handler,
+        } = (
+            ir::Program(
+                HashMap::new(),
+                HashMap::new(),
+                vec![ir::Block(
+                    vec![],
+                    vec![],
+                    ir::BlockEnding::Exit(ir::NumExpr::Const(ir::NumSize::DWord, 0)),
+                )],
+                HashMap::new(),
+                Some("malloc".to_string()),
+            ),
+            &Options {
+                sethi_ullman_weights: false,
+                dead_code_removal: false,
+                propagation: PropagationOpt::None,
+                inlining: false,
+                tail_call: false,
+                hoisting: false,
+                strength_reduction: false,
+                loop_unrolling: false,
+                common_expressions: false,
+            },
+        )
+            .into();
+        assert_eq!(data_refs, HashMap::new());
+        assert_eq!(int_handler, Some("malloc".to_string()));
+        assert_eq!(read_ref, None);
+
+        let mut graph = Graph::new();
+        let exit_node = graph.new_node(StatType::new_final(StatCode::VoidCall(
+            "exit".to_string(),
+            vec![0],
+        )));
+        let exit_assign_node = graph.new_node(StatType::new_simple(
+            StatCode::Assign(0, OpSrc::Const(0)),
+            exit_node,
+        ));
+        match_graph(code.expect("No code"), exit_assign_node);
     }
 }

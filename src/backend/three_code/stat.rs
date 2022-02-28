@@ -315,7 +315,7 @@ pub(super) fn translate_statement(
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::super::{
         super::{Options, PropagationOpt},
         DataRefType, OpSrc, Size, StatCode, StatNode, StatType,
@@ -376,6 +376,9 @@ mod tests {
                 );
             }
             (StatType::Loop(_), StatType::Loop(_)) => {}
+            (StatType::Return(_, exec_ret_val), StatType::Return(_, template_ret_val)) => {
+                assert_eq!(exec_ret_val, template_ret_val);
+            }
             _ => panic!(
                 "Stat type mismatch: expected {:?}, but got {:?}",
                 &*template_node.get(),
@@ -384,7 +387,7 @@ mod tests {
         }
     }
 
-    fn match_graph(exec_start: StatNode, template_start: StatNode) {
+    pub(in super::super) fn match_graph(exec_start: StatNode, template_start: StatNode) {
         let mut visited_map = HashMap::new();
         match_graph_dfs(exec_start, template_start, &mut visited_map);
     }
