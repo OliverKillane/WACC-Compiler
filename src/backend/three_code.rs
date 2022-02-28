@@ -84,8 +84,6 @@ pub(super) enum StatCode {
     /// is not in the list of the [program](ThreeCode) functions then it is assumed
     /// to be external and linked to by the linker.
     VoidCall(String, Vec<VarRepr>),
-    /// Returns from the function.
-    Return(VarRepr),
 }
 
 /// General type of the statement. Used in the dataflow graph.
@@ -103,6 +101,8 @@ pub(super) enum StatType {
     Branch(Vec<StatNode>, VarRepr, StatNode, StatNode),
     /// A self-looping infinite loop, which might occur as a user program.
     Loop(Vec<StatNode>),
+    /// A return from a function. The variable contains the return value.
+    Return(Vec<StatNode>, VarRepr),
 }
 
 /// A statement graph node.
