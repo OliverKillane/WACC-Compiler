@@ -84,8 +84,6 @@ pub(super) enum StatCode {
     /// is not in the list of the [program](ThreeCode) functions then it is assumed
     /// to be external and linked to by the linker.
     VoidCall(String, Vec<VarRepr>),
-    /// Returns from the function.
-    Return(VarRepr),
 }
 
 /// General type of the statement. Used in the dataflow graph.
@@ -103,6 +101,8 @@ pub(super) enum StatType {
     Branch(Vec<StatNode>, VarRepr, StatNode, StatNode),
     /// A self-looping infinite loop, which might occur as a user program.
     Loop(Vec<StatNode>),
+    /// A return from a function. The variable contains the return value.
+    Return(Vec<StatNode>, VarRepr),
 }
 
 /// A statement graph node.
@@ -163,12 +163,17 @@ impl StatType {
         StatType::Loop(Vec::new())
     }
 
+    fn new_return(ret: VarRepr) -> Self {
+        StatType::Return(Vec::new(), ret)
+    }
+
     fn add_incoming(&mut self, node: StatNode) {
         match self {
             Self::Simple(incoming, _, _)
             | Self::Final(incoming, _)
             | Self::Branch(incoming, _, _, _)
             | Self::Loop(incoming)
+            | Self::Return(incoming, _)
             | Self::Dummy(incoming) => incoming.push(node),
         }
     }
@@ -179,6 +184,7 @@ impl StatType {
             | Self::Final(old_incoming, _)
             | Self::Branch(old_incoming, _, _, _)
             | Self::Loop(old_incoming)
+            | Self::Return(old_incoming, _)
             | Self::Dummy(old_incoming) => *old_incoming = incoming,
         }
     }
@@ -189,6 +195,7 @@ impl StatType {
             | Self::Final(incoming, _)
             | Self::Branch(incoming, _, _, _)
             | Self::Loop(incoming)
+            | Self::Return(incoming, _)
             | Self::Dummy(incoming) => incoming.clone(),
         }
     }
