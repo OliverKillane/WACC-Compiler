@@ -3,6 +3,7 @@
 #![feature(box_syntax)]
 #![feature(box_patterns)]
 #![feature(let_chains)]
+#![feature(let_else)]
 #![feature(map_try_insert)]
 #![feature(iter_intersperse)]
 #![allow(dead_code)]

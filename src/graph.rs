@@ -15,6 +15,8 @@ pub struct Graph<T: Deleted>(HashSet<NodeRef<T>>);
 /// A node reference. Represents a node in the graph.
 pub struct NodeRef<T: Deleted>(Rc<RefCell<T>>);
 
+pub struct EdgeRef<T: Deleted>(NodeRef<T>, NodeRef<T>);
+
 /// A trait used in the [graph](Graph) to delete nodes whenever they become obsolete.
 pub trait Deleted {
     fn deleted() -> Self;
