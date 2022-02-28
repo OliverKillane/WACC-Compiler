@@ -169,6 +169,7 @@ impl StatType {
             | Self::Final(incoming, _)
             | Self::Branch(incoming, _, _, _)
             | Self::Loop(incoming)
+            | Self::Return(incoming, _)
             | Self::Dummy(incoming) => incoming.push(node),
         }
     }
@@ -179,6 +180,7 @@ impl StatType {
             | Self::Final(old_incoming, _)
             | Self::Branch(old_incoming, _, _, _)
             | Self::Loop(old_incoming)
+            | Self::Return(old_incoming, _)
             | Self::Dummy(old_incoming) => *old_incoming = incoming,
         }
     }
@@ -189,6 +191,7 @@ impl StatType {
             | Self::Final(incoming, _)
             | Self::Branch(incoming, _, _, _)
             | Self::Loop(incoming)
+            | Self::Return(incoming, _)
             | Self::Dummy(incoming) => incoming.clone(),
         }
     }
