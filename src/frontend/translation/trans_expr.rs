@@ -5,7 +5,7 @@ use crate::frontend::ast;
 use crate::frontend::semantic::symbol_table::VariableSymbolTable;
 use crate::intermediate::{self as ir, DataRef};
 
-pub fn translate_expr(
+pub(super) fn translate_expr(
     ast_expr: Expr<Option<Type>, usize>,
     ast_expr_type: &Type,
     var_symb: &VariableSymbolTable,
@@ -42,7 +42,7 @@ pub fn translate_expr(
             ast::Type::Generic(_) | ast::Type::Any => panic!("Expected a concrete type"),
         },
 
-        Expr::ArrayElem(var, indices) => {
+        Expr::ArrayElem(var, mut indices) => {
             let (fields_type, &num_indices) =
                 if let ast::Type::Array(box fields_type, num_indices) = ast_expr_type {
                     (fields_type, num_indices)
