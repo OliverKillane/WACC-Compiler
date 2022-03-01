@@ -137,7 +137,7 @@ pub(super) fn translate_statement(
             );
             stat_line.add_stat(StatCode::Store(free_var + 1, free_var, store_width));
         }
-        ir::Stat::Free(ptr_expr, _) => {
+        ir::Stat::Free(ptr_expr) => {
             translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
             stat_line.add_stat(StatCode::VoidCall("free".to_string(), vec![free_var]));
         }
@@ -581,7 +581,7 @@ pub(super) mod tests {
     #[test]
     fn translate_free_stat() {
         match_line_stat_vec(
-            ir::Stat::Free(ir::PtrExpr::Null, ir::NumExpr::Const(ir::NumSize::DWord, 0)),
+            ir::Stat::Free(ir::PtrExpr::Null),
             0,
             vec![
                 StatCode::Assign(0, OpSrc::Const(0)),
