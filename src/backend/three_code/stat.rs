@@ -74,6 +74,12 @@ fn ensure_format(
     }
 }
 
+/// Adds a call to a flush function
+fn add_flush(free_var: VarRepr, stat_line: &mut StatLine) {
+    stat_line.add_stat(StatCode::Assign(free_var, OpSrc::Const(1)));
+    stat_line.add_stat(StatCode::VoidCall("fflush".to_string(), vec![free_var]));
+}
+
 /// Translates a single [statement](ir::Stat) into a
 /// [statement graph with a single start and end node](StatLine). The arguments
 /// are as follows:
@@ -204,6 +210,7 @@ pub(super) fn translate_statement(
                 "printf".to_string(),
                 vec![free_var + 1, free_var],
             ));
+            add_flush(free_var, stat_line);
         }
         ir::Stat::PrintExpr(ir::Expr::Bool(bool_expr)) => {
             translate_bool_expr(
@@ -256,6 +263,7 @@ pub(super) fn translate_statement(
             false_set.get_mut().add_incoming(branch_node.clone());
 
             stat_line.splice(branch_node, print_node);
+            add_flush(free_var, stat_line);
         }
         ir::Stat::PrintExpr(ir::Expr::Ptr(ptr_expr)) => {
             translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
@@ -268,6 +276,7 @@ pub(super) fn translate_statement(
                 "printf".to_string(),
                 vec![free_var + 1, free_var],
             ));
+            add_flush(free_var, stat_line);
         }
         ir::Stat::PrintChar(num_expr) => {
             translate_num_expr(num_expr, free_var, stat_line, vars, function_types, options);
@@ -280,6 +289,7 @@ pub(super) fn translate_statement(
                 "printf".to_string(),
                 vec![free_var + 1, free_var],
             ));
+            add_flush(free_var, stat_line);
         }
         ir::Stat::PrintStr(ptr_expr, num_expr) => {
             translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
@@ -301,11 +311,13 @@ pub(super) fn translate_statement(
                 "printf".to_string(),
                 vec![free_var + 2, free_var + 1, free_var],
             ));
+            add_flush(free_var, stat_line);
         }
         ir::Stat::PrintEol() => {
             let eol_format = ensure_format(free_data_ref, data_refs, "\n", &mut fmt_flags.eol);
             stat_line.add_stat(StatCode::Assign(free_var, OpSrc::DataRef(eol_format, 0)));
             stat_line.add_stat(StatCode::VoidCall("printf".to_string(), vec![free_var]));
+            add_flush(free_var, stat_line);
         }
     }
 }
@@ -592,6 +604,8 @@ pub(super) mod tests {
                 StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::Assign(1, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("printf".to_string(), vec![1, 0]),
+                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::VoidCall("fflush".to_string(), vec![0]),
             ],
             HashMap::new(),
             HashMap::new(),
@@ -638,10 +652,18 @@ pub(super) mod tests {
         );
 
         let mut template_graph = Graph::new();
-        let call_node = template_graph.new_node(StatType::new_final(StatCode::VoidCall(
-            "printf".to_string(),
+        let flush_node = template_graph.new_node(StatType::new_final(StatCode::VoidCall(
+            "fflush".to_string(),
             vec![0],
         )));
+        let stdout_set_node = template_graph.new_node(StatType::new_simple(
+            StatCode::Assign(0, OpSrc::Const(1)),
+            flush_node,
+        ));
+        let call_node = template_graph.new_node(StatType::new_simple(
+            StatCode::VoidCall("printf".to_string(), vec![0]),
+            stdout_set_node,
+        ));
 
         let true_branch_node = template_graph.new_node(StatType::new_simple(
             StatCode::Assign(0, OpSrc::DataRef(0, 0)),
@@ -670,6 +692,8 @@ pub(super) mod tests {
                 StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::Assign(1, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("printf".to_string(), vec![1, 0]),
+                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::VoidCall("fflush".to_string(), vec![0]),
             ],
             HashMap::new(),
             HashMap::new(),
@@ -688,6 +712,8 @@ pub(super) mod tests {
                 StatCode::Assign(0, OpSrc::Const(1)),
                 StatCode::Assign(1, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("printf".to_string(), vec![1, 0]),
+                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::VoidCall("fflush".to_string(), vec![0]),
             ],
             HashMap::new(),
             HashMap::new(),
@@ -707,6 +733,8 @@ pub(super) mod tests {
                 StatCode::Assign(1, OpSrc::Const(4)),
                 StatCode::Assign(2, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("printf".to_string(), vec![2, 1, 0]),
+                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::VoidCall("fflush".to_string(), vec![0]),
             ],
             HashMap::new(),
             HashMap::new(),
@@ -724,6 +752,8 @@ pub(super) mod tests {
             vec![
                 StatCode::Assign(0, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("printf".to_string(), vec![0]),
+                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::VoidCall("fflush".to_string(), vec![0]),
             ],
             HashMap::new(),
             HashMap::new(),
