@@ -34,7 +34,7 @@ pub struct LiveRanges {
 
 impl LiveRanges {
     /// Create a new empty Live Ranges struct
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             live_set_map: HashMap::new(),
             arm_node_map: HashMap::new(),
@@ -255,6 +255,39 @@ impl LiveRanges {
             changes
         } else {
             false
+        }
+    }
+
+    /// Sort a set into a vector such temporary identifiers are sorted by
+    /// (closest use -> furthest use).
+    fn sort_set(&self, set_id: &SetId) -> Vec<Temporary> {
+        match self.live_set_map.get(set_id) {
+            Some(map) => {
+                let mut live_in = map.iter().map(|(t, u)| (*t, *u)).collect::<Vec<_>>();
+                live_in.sort_by(|(_, uses1), (_, uses2)| uses1.cmp(uses2));
+                live_in.into_iter().map(|p| p.0).collect::<Vec<_>>()
+            }
+            None => Vec::new(),
+        }
+    }
+
+    /// For a given node provides a tuple of:
+    /// (live-in temporaries - first has furthest away use, temporaries used by this statement)
+    pub fn get_livein(&self, node: &ArmNode) -> (Vec<Temporary>, Option<&Vec<Temporary>>) {
+        if let Some((livein, _, _, uses, _)) = self.arm_node_map.get(node) {
+            (self.sort_set(livein), Some(uses))
+        } else {
+            (Vec::new(), None)
+        }
+    }
+
+    /// For a given node provides a tuple of:
+    /// (live-out temporaries - first is furthest away use, temporaries defined by this statement)
+    pub fn get_out(&self, node: &ArmNode) -> (Vec<Temporary>, Option<&Vec<Temporary>>) {
+        if let Some((_, liveout, defs, _, _)) = self.arm_node_map.get(node) {
+            (self.sort_set(liveout), Some(defs))
+        } else {
+            (Vec::new(), None)
         }
     }
 }
