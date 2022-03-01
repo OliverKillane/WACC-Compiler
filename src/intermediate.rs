@@ -200,7 +200,7 @@ pub enum Stat {
     ReadCharPtr(PtrExpr),
 
     /// Frees a malloced structure with a size given by the number expression.
-    Free(PtrExpr, NumExpr),
+    Free(PtrExpr),
 
     /// Prints a raw value of an expression according to that expression's string format.
     PrintExpr(Expr),
@@ -494,7 +494,8 @@ impl Stat {
             Stat::ReadIntPtr(ptr_expr) | Stat::ReadCharPtr(ptr_expr) => {
                 ptr_expr.validate(functions, vars, data_refs, false)
             }
-            Stat::Free(ptr_expr, num_expr) | Stat::PrintStr(ptr_expr, num_expr) => {
+            Stat::Free(ptr_expr) => ptr_expr.validate(functions, vars, data_refs, false),
+            Stat::PrintStr(ptr_expr, num_expr) => {
                 num_expr.validate(functions, vars, data_refs, false)?;
                 ptr_expr.validate(functions, vars, data_refs, false)
             }
