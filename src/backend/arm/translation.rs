@@ -12,6 +12,7 @@ use super::{
             BinOp, DataRefType, Function, OpSrc, Size, StatCode, StatNode, StatType, ThreeCode,
         },
     },
+    arm_graph_utils::{chain_chains, chain_two_chains, is_shifted_8_bit, link_stats, simple_node},
     arm_repr::{
         ArmNode, Cond, ControlFlow, Data, DataIdent, DataKind, FlexOffset, FlexOperand, Ident,
         MovOp, Program, RegOp, Shift, Stat, Subroutine, Temporary,
@@ -20,7 +21,6 @@ use super::{
 };
 use std::{
     collections::{HashMap, HashSet},
-    ops::DerefMut,
     panic,
 };
 
@@ -355,59 +355,10 @@ fn translate_function(
     }
 }
 
-/// Link two pairs of node chain starts and ends together.
-/// ```text
-/// 1. (start <-> leftmiddle) (rightmiddle <-> end)
-/// 2. start <-> leftmiddle <-> rightmiddle -> end
-/// 3. start <-> end
-/// ```
-fn chain_two_chains(
-    (start, mut leftmiddle): (ArmNode, ArmNode),
-    (mut rightmiddle, end): (ArmNode, ArmNode),
-) -> (ArmNode, ArmNode) {
-    leftmiddle.set_successor(rightmiddle.clone());
-    rightmiddle.set_predecessor(leftmiddle);
-    (start, end)
-}
-
-/// Given tuples of start and end nodes, chain them together.
-/// ```text
-/// 1. [(1 <-> 2), (3 <-> 4), ..., (n-1 <-> n)]
-/// 2. 1 <-> 2 <-> 3 <-> 4 <-> ... <-> n-1 <-> n
-/// 3. (1 <-> n)
-/// ```
-fn chain_chains(nodes: Vec<(ArmNode, ArmNode)>) -> Option<(ArmNode, ArmNode)> {
-    nodes.into_iter().reduce(chain_two_chains)
-}
-
-/// Given a vector of statements, connect them together in a simple chain within
-/// the graph. If no statements are provided returns a None, otherwise a some of
-/// the start and end node.
-fn link_stats(stats: Vec<Stat>, graph: &mut Graph<ControlFlow>) -> Option<(ArmNode, ArmNode)> {
-    chain_chains(
-        stats
-            .into_iter()
-            .map(|stat| simple_node(stat, graph))
-            .collect::<Vec<_>>(),
-    )
-}
-
-/// Create a single simple node from a statement, returning the node as a pair
-/// of node references.
-fn simple_node(stat: Stat, graph: &mut Graph<ControlFlow>) -> (ArmNode, ArmNode) {
-    let node = graph.new_node(ControlFlow::Simple(None, stat, None));
-    (node.clone(), node)
-}
-
 /// Convert a [DataRef] from the threecode, to a Data Identifier for the Arm
 /// Representation (Keeps the three-code and arm representations independent).
 fn convert_data_ref(i: DataRef) -> DataIdent {
     i as DataIdent
-}
-
-/// Determines if an integer is a left logical shifted 8 bit pattern.
-fn is_shifted_8_bit(i: i32) -> bool {
-    ((32 - i.leading_zeros()) - i.trailing_zeros()) <= 8
 }
 
 /// place a constant in a temporary
@@ -839,146 +790,5 @@ fn translate_statcode(
             ),
             graph,
         ),
-    }
-}
-
-impl ArmNode {
-    /// Set the predecessor arm node, for Simple, Branch and Return the start
-    /// node is set, for Multi the predecessor is added to the predecessors list.
-    fn set_predecessor(&mut self, predecessor: ArmNode) {
-        match self.get_mut().deref_mut() {
-            ControlFlow::Simple(pre, _, _)
-            | ControlFlow::Branch(pre, _, _, _)
-            | ControlFlow::Ltorg(pre)
-            | ControlFlow::Return(pre, _) => {
-                let _ = pre.insert(predecessor);
-            }
-            ControlFlow::Multi(pres, _) => pres.push(predecessor),
-            ControlFlow::Removed => panic!("Cannot add a predecessor to a deleted node"),
-        }
-    }
-
-    /// Set the successor node to an arm node.
-    fn set_successor(&mut self, successor: ArmNode) {
-        match self.get_mut().deref_mut() {
-            ControlFlow::Simple(_, _, succ)
-            | ControlFlow::Branch(_, _, _, succ)
-            | ControlFlow::Multi(_, succ) => {
-                let _ = succ.insert(successor);
-            }
-            ControlFlow::Return(_, _) => panic!("There are no nodes after a return"),
-            ControlFlow::Ltorg(_) => panic!("There are no nodes after a literal pool"),
-            ControlFlow::Removed => panic!("There are no nodes connected to a removed node"),
-        }
-    }
-}
-
-mod tests {
-    use super::*;
-    use lazy_static::__Deref;
-
-    fn check_simple_chain(stats: Vec<Stat>, start: ArmNode, end: ArmNode) {
-        let mut prev_node: Option<ArmNode> = None;
-        let mut current_node = Some(start);
-
-        for stat in stats.into_iter() {
-            match current_node {
-                Some(node) => match node.get().deref() {
-                    ControlFlow::Simple(prev, curr, next) => {
-                        assert_eq!(prev, &prev_node);
-                        prev_node = Some(node.clone());
-                        assert_eq!(curr, &stat);
-                        current_node = next.clone();
-                    }
-                    _ => panic!("Was not a simple node"),
-                },
-                None => panic!("Expected a node but there was none"),
-            }
-        }
-    }
-
-    #[test]
-    fn can_link_simple_statements() {
-        let example_stat = Stat::ApplyOp(
-            RegOp::Add,
-            Cond::Al,
-            false,
-            Ident::Temp(0),
-            Ident::Temp(0),
-            FlexOperand::Imm(7),
-        );
-        let stats = vec![
-            Stat::ApplyOp(
-                RegOp::Add,
-                Cond::Al,
-                false,
-                Ident::Temp(0),
-                Ident::Temp(0),
-                FlexOperand::Imm(7),
-            ),
-            Stat::ApplyOp(
-                RegOp::Sub,
-                Cond::Ge,
-                false,
-                Ident::Temp(1),
-                Ident::Temp(1),
-                FlexOperand::Imm(8),
-            ),
-            Stat::ApplyOp(
-                RegOp::Sub,
-                Cond::Lt,
-                false,
-                Ident::Temp(7),
-                Ident::Temp(8),
-                FlexOperand::ShiftReg(Ident::Temp(1), Some(Shift::Lsl(3.into()))),
-            ),
-            Stat::ApplyOp(
-                RegOp::Adc,
-                Cond::Lt,
-                true,
-                Ident::Temp(7),
-                Ident::Temp(8),
-                FlexOperand::ShiftReg(Ident::Temp(2), Some(Shift::Lsl(3.into()))),
-            ),
-        ];
-
-        let mut graph = Graph::new();
-
-        let (start, end) =
-            link_stats(stats.clone(), &mut graph).expect("unexpectedly failed to link statements");
-        check_simple_chain(stats, start, end)
-    }
-
-    #[test]
-    #[should_panic]
-    fn can_check_for_linked_chains() {
-        let mut graph = Graph::new();
-
-        let false_start = graph.new_node(ControlFlow::Simple(
-            None,
-            Stat::Call(Cond::Al, String::from("hello"), None, vec![]),
-            None,
-        ));
-        let false_end = graph.new_node(ControlFlow::Simple(
-            None,
-            Stat::Call(Cond::Al, String::from("world"), None, vec![]),
-            None,
-        ));
-
-        check_simple_chain(
-            vec![
-                Stat::Call(Cond::Al, String::from("hello"), None, vec![]),
-                Stat::Call(Cond::Al, String::from("world"), None, vec![]),
-            ],
-            false_start,
-            false_end,
-        )
-    }
-
-    #[test]
-    fn detects_left_shifted_8_bits() {
-        assert!(is_shifted_8_bit(0b10000001 as i32));
-        assert!(is_shifted_8_bit(0b10111 as i32));
-        assert!(!is_shifted_8_bit(0b1000000111 as i32));
     }
 }
