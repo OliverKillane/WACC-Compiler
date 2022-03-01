@@ -1,17 +1,39 @@
 use std::collections::HashMap;
 
-use super::super::ast::{ASTWrapper, Expr, Type, UnOp};
-use crate::frontend::ast;
+use super::super::ast::{self, ASTWrapper, Expr, Type, UnOp};
+use super::helper_funcs::*;
 use crate::frontend::semantic::symbol_table::VariableSymbolTable;
 use crate::intermediate::{self as ir, DataRef};
 
-pub(super) const ARRAY_INDEX_FNAME: &str = "a_index";
+pub(super) fn add_string(
+    data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
+    string: String,
+) -> DataRef {
+    let data_ref: u64 = data_ref_map.len() as u64;
+    data_ref_map.insert(
+        data_ref,
+        vec![ir::Expr::Num(ir::NumExpr::Const(
+            ir::NumSize::DWord,
+            string.len() as i32,
+        ))]
+        .into_iter()
+        .chain(
+            string
+                .into_bytes()
+                .into_iter()
+                .map(|c| ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::Byte, c as i32))),
+        )
+        .collect(),
+    );
+    data_ref
+}
 
 pub(super) fn translate_expr(
     ast_expr: Expr<Option<Type>, usize>,
     ast_expr_type: &Type,
     var_symb: &VariableSymbolTable,
     data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
+    helper_function_flags: &mut HelperFunctionFlags,
 ) -> ir::Expr {
     match ast_expr {
         Expr::Null => ir::Expr::Ptr(ir::PtrExpr::Null),
@@ -21,23 +43,7 @@ pub(super) fn translate_expr(
             ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::Byte, char_const as i32))
         }
         Expr::String(str_const) => {
-            let data_ref: u64 = data_ref_map.len() as u64;
-            data_ref_map.insert(
-                data_ref,
-                vec![ir::Expr::Num(ir::NumExpr::Const(
-                    ir::NumSize::DWord,
-                    str_const.len() as i32,
-                ))]
-                .into_iter()
-                .chain(
-                    str_const
-                        .into_bytes()
-                        .into_iter()
-                        .map(|c| ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::Byte, c as i32))),
-                )
-                .collect(),
-            );
-            ir::Expr::Ptr(ir::PtrExpr::DataRef(data_ref))
+            ir::Expr::Ptr(ir::PtrExpr::DataRef(add_string(data_ref_map, str_const)))
         }
         Expr::Var(var) => match var_symb
             .get_type_from_id(var)
@@ -52,6 +58,7 @@ pub(super) fn translate_expr(
         },
 
         Expr::ArrayElem(var, mut indices) => {
+            helper_function_flags.array_indexing = true;
             let (fields_type, &num_indices) =
                 if let ast::Type::Array(box fields_type, num_indices) = ast_expr_type {
                     (fields_type, num_indices)
@@ -65,6 +72,7 @@ pub(super) fn translate_expr(
                 &last_index_type.expect("Expected a type for an expression"),
                 var_symb,
                 data_ref_map,
+                helper_function_flags,
             );
 
             let single_dim_ptr = indices
@@ -75,6 +83,7 @@ pub(super) fn translate_expr(
                         &sub_expr_type.expect("Expected a type for an expression"),
                         var_symb,
                         data_ref_map,
+                        helper_function_flags,
                     )
                 })
                 .fold(
@@ -139,15 +148,21 @@ pub(super) fn translate_expr(
             let sub_expr_type = sub_expr_type.expect("Expected a type for an expression");
             match (
                 un_op,
-                translate_expr(sub_expr, &sub_expr_type, var_symb, data_ref_map),
+                translate_expr(
+                    sub_expr,
+                    &sub_expr_type,
+                    var_symb,
+                    data_ref_map,
+                    helper_function_flags,
+                ),
             ) {
                 (UnOp::Neg, ir::Expr::Bool(bool_expr)) => {
                     ir::Expr::Bool(ir::BoolExpr::Not(box bool_expr))
                 }
                 (UnOp::Minus, ir::Expr::Num(num)) => ir::Expr::Num(ir::NumExpr::ArithOp(
+                    box ir::NumExpr::Const(ir::NumSize::DWord, 0),
+                    ir::ArithOp::Sub,
                     box num,
-                    ir::ArithOp::Mul,
-                    box ir::NumExpr::Const(ir::NumSize::DWord, -1),
                 )),
                 (UnOp::Chr, ir::Expr::Num(num)) => {
                     ir::Expr::Num(ir::NumExpr::Cast(ir::NumSize::Byte, box num))
@@ -158,19 +173,31 @@ pub(super) fn translate_expr(
                 (UnOp::Len, ir::Expr::Ptr(ptr)) => {
                     ir::Expr::Num(ir::NumExpr::Deref(ir::NumSize::DWord, ptr))
                 }
-                (UnOp::Fst, ir::Expr::Ptr(ptr)) => match sub_expr_type {
-                    ast::Type::Int => ir::Expr::Num(ir::NumExpr::Deref(ir::NumSize::DWord, ptr)),
-                    ast::Type::Char => ir::Expr::Num(ir::NumExpr::Deref(ir::NumSize::Byte, ptr)),
-                    ast::Type::Bool => ir::Expr::Bool(ir::BoolExpr::Deref(ptr)),
-                    ast::Type::Array(_, _) | ast::Type::Pair(_, _) | ast::Type::String => {
-                        ir::Expr::Ptr(ir::PtrExpr::Deref(box ptr))
+                (UnOp::Fst, expr @ ir::Expr::Ptr(_)) => {
+                    helper_function_flags.check_null = true;
+                    let ptr = ir::PtrExpr::Call(CHECK_NULL_FNAME.to_string(), vec![expr]);
+                    match sub_expr_type {
+                        ast::Type::Int => {
+                            ir::Expr::Num(ir::NumExpr::Deref(ir::NumSize::DWord, ptr))
+                        }
+                        ast::Type::Char => {
+                            ir::Expr::Num(ir::NumExpr::Deref(ir::NumSize::Byte, ptr))
+                        }
+                        ast::Type::Bool => ir::Expr::Bool(ir::BoolExpr::Deref(ptr)),
+                        ast::Type::Array(_, _) | ast::Type::Pair(_, _) | ast::Type::String => {
+                            ir::Expr::Ptr(ir::PtrExpr::Deref(box ptr))
+                        }
+                        ast::Type::Generic(_) | ast::Type::Any => {
+                            panic!("Expected a concrete type")
+                        }
                     }
-                    ast::Type::Generic(_) | ast::Type::Any => {
-                        panic!("Expected a concrete type")
-                    }
-                },
-                (UnOp::Snd, ir::Expr::Ptr(ptr)) => {
-                    let offset_ptr = ir::PtrExpr::Offset(box ptr, box ir::NumExpr::SizeOfWideAlloc);
+                }
+                (UnOp::Snd, expr @ ir::Expr::Ptr(_)) => {
+                    helper_function_flags.check_null = true;
+                    let offset_ptr = ir::PtrExpr::Offset(
+                        box ir::PtrExpr::Call(CHECK_NULL_FNAME.to_string(), vec![expr]),
+                        box ir::NumExpr::SizeOfWideAlloc,
+                    );
                     match sub_expr_type {
                         ast::Type::Int => {
                             ir::Expr::Num(ir::NumExpr::Deref(ir::NumSize::DWord, offset_ptr))
@@ -199,9 +226,21 @@ pub(super) fn translate_expr(
             let sub_expr_type1 = sub_expr_type1.expect("Expected a type for an expression");
             let sub_expr_type2 = sub_expr_type2.expect("Expected a type for an expression");
             match (
-                translate_expr(sub_expr1, &sub_expr_type1, var_symb, data_ref_map),
+                translate_expr(
+                    sub_expr1,
+                    &sub_expr_type1,
+                    var_symb,
+                    data_ref_map,
+                    helper_function_flags,
+                ),
                 bin_op,
-                translate_expr(sub_expr2, &sub_expr_type2, var_symb, data_ref_map),
+                translate_expr(
+                    sub_expr2,
+                    &sub_expr_type2,
+                    var_symb,
+                    data_ref_map,
+                    helper_function_flags,
+                ),
             ) {
                 (ir::Expr::Num(num_expr1), ast::BinOp::Add, ir::Expr::Num(num_expr2)) => {
                     ir::Expr::Num(ir::NumExpr::ArithOp(
@@ -225,17 +264,25 @@ pub(super) fn translate_expr(
                     ))
                 }
                 (ir::Expr::Num(num_expr1), ast::BinOp::Div, ir::Expr::Num(num_expr2)) => {
+                    helper_function_flags.check_null = true;
                     ir::Expr::Num(ir::NumExpr::ArithOp(
                         box num_expr1,
                         ir::ArithOp::Div,
-                        box num_expr2,
+                        box ir::NumExpr::Call(
+                            ZERO_CHECK_FNAME.to_string(),
+                            vec![ir::Expr::Num(num_expr2)],
+                        ),
                     ))
                 }
                 (ir::Expr::Num(num_expr1), ast::BinOp::Mod, ir::Expr::Num(num_expr2)) => {
+                    helper_function_flags.check_null = true;
                     ir::Expr::Num(ir::NumExpr::ArithOp(
                         box num_expr1,
                         ir::ArithOp::Mod,
-                        box num_expr2,
+                        box ir::NumExpr::Call(
+                            ZERO_CHECK_FNAME.to_string(),
+                            vec![ir::Expr::Num(num_expr2)],
+                        ),
                     ))
                 }
                 (ir::Expr::Num(num_expr1), ast::BinOp::Gt, ir::Expr::Num(num_expr2)) => {
@@ -330,7 +377,8 @@ mod tests {
                 ),
                 &Type::Bool,
                 &VariableSymbolTable::new(),
-                &mut HashMap::new()
+                &mut HashMap::new(),
+                &mut HelperFunctionFlags::default()
             ),
             translated
         );
@@ -387,7 +435,8 @@ mod tests {
                 ),
                 &Type::Bool,
                 &VariableSymbolTable::new(),
-                &mut HashMap::new()
+                &mut HashMap::new(),
+                &mut HelperFunctionFlags::default()
             ),
             translated2
         );
@@ -410,7 +459,8 @@ mod tests {
                 ),
                 &Type::Int,
                 &VariableSymbolTable::new(),
-                &mut HashMap::new()
+                &mut HashMap::new(),
+                &mut HelperFunctionFlags::default()
             ),
             translated
         );
@@ -453,7 +503,8 @@ mod tests {
                 ),
                 &Type::Int,
                 &var_table,
-                &mut HashMap::new()
+                &mut HashMap::new(),
+                &mut HelperFunctionFlags::default()
             ),
             translated
         );
