@@ -328,7 +328,7 @@ pub struct Subroutine {
 /// The main program containing text ([instructions](Stat)) and [data](Data).
 pub struct Program {
     pub data: Vec<Data>,
-    pub reserved_stack: u32,
+    pub reserved_stack: u8,
     pub main: ArmNode,
     pub functions: HashMap<String, Subroutine>,
     pub cfg: Graph<ControlFlow>,
