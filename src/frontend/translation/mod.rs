@@ -29,6 +29,15 @@ impl From<&Type> for ir::Type {
     }
 }
 
+/// Translation for the [assign rhs node](AssignRhs). The arguments are as follows:
+///  - The assign rhs node to be translated.
+///  - Symbol table for this particular node.
+///  - The return types of all the functions.
+///  - The map of all static data references in the program. The data references
+///    are assumed to be consecutive, i.e. the smallest data reference not already
+///    in the map is equal to the length of the map.
+///  - The flags for helper functions. For more information see
+///    [the documenation for the struct](HelperFunctionFlags).
 fn translate_rhs(
     assign_rhs: AssignRhs<Option<Type>, usize>,
     var_symb: &VariableSymbolTable,
@@ -91,6 +100,14 @@ fn translate_rhs(
     }
 }
 
+/// Translation for [assign lhs node](AssignLhs). The arguments are as follows:
+///  - The assign lhs node to be translated.
+///  - Symbol table for this particular node.
+///  - The map of all static data references in the program. The data references
+///    are assumed to be consecutive, i.e. the smallest data reference not already
+///    in the map is equal to the length of the map.
+///  - The flags for helper functions. For more information see
+///    [the documenation for the struct](HelperFunctionFlags).
 fn translate_lhs<'l>(
     assign_lhs: AssignLhs<Option<Type>, usize>,
     var_symb: &'l VariableSymbolTable,
@@ -195,6 +212,25 @@ fn translate_lhs<'l>(
     }
 }
 
+/// Translation of a single code statement. The arguments are as follows:
+///  - The statement to be translated.
+///  - The statements to be included in the next intermediate representation block.
+///  - The compound block graph for the function/main program code.
+///  - The first free variable representation such that all variable representations
+///    after it are not used.
+///  - The map of all variables used for that block of code. It is not to be actually
+///    indexed; rather, it should have items put into it in conjunction with incrementing
+///    the free variable argument.
+///  - Symbol table for this particular statement.
+///  - The return types of all the functions.
+///  - The map of all static data references in the program. The data references
+///    are assumed to be consecutive, i.e. the smallest data reference not already
+///    in the map is equal to the length of the map.
+///  - The flags for helper functions. For more information see
+///    [the documenation for the struct](HelperFunctionFlags).
+/// If a statement translation ended with a final statement, for example an exit
+/// or a return, then this is signified by the previous blocks and the new statements
+/// vectors being empty.
 fn translate_stat(
     ASTWrapper(_, stat): StatWrap<Option<ast::Type>, usize>,
     block_stats: &mut Vec<ir::Stat>,
@@ -550,6 +586,22 @@ fn translate_block_jumping(
     }
 }
 
+/// Translation of a code block. The arguments are as follows:
+///  - The code block to be translated.
+///  - The statements to be included in the next intermediate representation block.
+///  - The compound block graph for the function/main program code.
+///  - The first free variable representation such that all variable representations
+///    after it are not used.
+///  - The map of all variables used for that block of code. It is not to be actually
+///    indexed; rather, it should have items put into it in conjunction with incrementing
+///    the free variable argument.
+///  - Symbol table for this particular block of code.
+///  - The return types of all the functions.
+///  - The map of all static data references in the program. The data references
+///    are assumed to be consecutive, i.e. the smallest data reference not already
+///    in the map is equal to the length of the map.
+///  - The flags for helper functions. For more information see
+///    [the documenation for the struct](HelperFunctionFlags).
 fn translate_block(
     block: Vec<StatWrap<Option<ast::Type>, usize>>,
     block_stats: &mut Vec<ir::Stat>,
@@ -581,6 +633,17 @@ fn translate_block(
     }
 }
 
+/// Translation of a single function. The arguments are as follows:
+///  - Specification of the return type of the function.
+///  - Specification of the arguments to the function.
+///  - Main code block of the function.
+///  - Symbol table for this particular function.
+///  - The return types of all the functions.
+///  - The map of all static data references in the program. The data references
+///    are assumed to be consecutive, i.e. the smallest data reference not already
+///    in the map is equal to the length of the map.
+///  - The flags for helper functions. For more information see
+///    [the documenation for the struct](HelperFunctionFlags).
 fn translate_function(
     ret_type: &Type,
     args: Vec<ASTWrapper<Option<Type>, Param<usize>>>,
@@ -617,7 +680,11 @@ fn translate_function(
     )
 }
 
-fn translate_ast(
+/// Translation of the whole AST. The arguments are as follows:
+///  - The whole AST.
+///  - The symbol tables for separate functions.
+///  - The main program symbol table.
+pub(super) fn translate_ast(
     Program(functions, block): Program<Option<Type>, usize>,
     function_symbol_tables: HashMap<String, VariableSymbolTable>,
     program_symbol_table: VariableSymbolTable,

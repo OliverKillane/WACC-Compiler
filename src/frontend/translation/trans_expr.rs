@@ -5,6 +5,8 @@ use super::helper_funcs::*;
 use crate::frontend::semantic::symbol_table::VariableSymbolTable;
 use crate::intermediate::{self as ir, DataRef};
 
+/// Adds a string [data reference](DataRef) to the data reference map.
+/// Returns the data reference to the newly added string.
 pub(super) fn add_string(
     data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
     string: String,
@@ -28,6 +30,16 @@ pub(super) fn add_string(
     data_ref
 }
 
+/// Translates a single expression. The arguments are as follows:
+///  - The expression to be translated.
+///  - The cached type of the expression to be translated.
+///  - Symbol table for this particular expression.
+///  - The return types of all the functions.
+///  - The map of all static data references in the program. The data references
+///    are assumed to be consecutive, i.e. the smallest data reference not already
+///    in the map is equal to the length of the map.
+///  - The flags for helper functions. For more information see
+///    [the documenation for the struct](HelperFunctionFlags).
 pub(super) fn translate_expr(
     ast_expr: Expr<Option<Type>, usize>,
     ast_expr_type: &Type,

@@ -13,14 +13,23 @@ pub(super) const OVERFLOW_HANDLER_FNAME: &str = "overflow_handler";
 const OVERFLOW_HANDLER_ERR: &str =
     "OverflowError: the result is to small/large to store in a 4-byte signed-integer";
 
+/// Flags for generation of helper functions.
 #[derive(Default)]
 pub(super) struct HelperFunctionFlags {
+    /// A flag for a helper function for safe array indexing. The function takes
+    /// the pointer to the array, the index in the array and the width in bytes
+    /// of the array fields.
     pub array_indexing: bool,
+    /// A flag for a function that checks if a pointer is null. The function
+    /// takes a pass-through pointer and returns it if it is not a null pointer.
     pub check_null: bool,
+    /// A flag for a function that checks if an integer is zero. The function
+    /// takes a pass-through integer and checks if it is equal to zero.
     pub divide_modulo_check: bool,
 }
 
 impl HelperFunctionFlags {
+    /// Based on the flags, generates the necessary helper functions.
     pub(super) fn generate_functions(
         self,
         functions_map: &mut HashMap<String, ir::Function>,
@@ -59,6 +68,7 @@ impl HelperFunctionFlags {
     }
 }
 
+/// Generates a print statement based on a string to be printed.
 fn print_static_string(
     string: &str,
     data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
@@ -69,13 +79,13 @@ fn print_static_string(
     )
 }
 
+/// Generates an exit block ending with an exit code of 255.
 fn err_exit() -> ir::BlockEnding {
     ir::BlockEnding::Exit(ir::NumExpr::Const(ir::NumSize::DWord, 255))
 }
 
-pub(super) fn array_indexing_function(
-    data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
-) -> ir::Function {
+/// Generates an array indexing helper function.
+fn array_indexing_function(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir::Function {
     ir::Function(
         ir::Type::Ptr,
         vec![
@@ -142,9 +152,8 @@ pub(super) fn array_indexing_function(
     )
 }
 
-pub(super) fn null_check_function(
-    data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
-) -> ir::Function {
+/// Generates a null pointer checking helper function.
+fn null_check_function(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir::Function {
     ir::Function(
         ir::Type::Ptr,
         vec![(ir::Type::Ptr, 0)],
@@ -175,9 +184,8 @@ pub(super) fn null_check_function(
     )
 }
 
-pub(super) fn divide_modulo_check(
-    data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
-) -> ir::Function {
+/// Generates a division by zero checking helper function.
+fn divide_modulo_check(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir::Function {
     ir::Function(
         ir::Type::Num(ir::NumSize::DWord),
         vec![(ir::Type::Num(ir::NumSize::DWord), 0)],
@@ -205,7 +213,8 @@ pub(super) fn divide_modulo_check(
     )
 }
 
-pub(super) fn overflow_handler(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir::Function {
+/// Generates an integer overflow handler.
+fn overflow_handler(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir::Function {
     ir::Function(
         ir::Type::Num(ir::NumSize::DWord),
         vec![],
