@@ -384,7 +384,10 @@ impl Display for ArmNode {
                         writeln!(f)?;
                         None
                     }
-                    ControlFlow::Ltorg(_) => {writeln!(f, "\t.ltorg")?; None},
+                    ControlFlow::Ltorg(_) => {
+                        writeln!(f, "\t.ltorg")?;
+                        None
+                    }
                 };
             }
 
@@ -396,7 +399,6 @@ impl Display for ArmNode {
     }
 }
 
-
 /// Converts a data reference into its string representation
 fn display_data_ref(ident: DataIdent) -> String {
     format!("d_ref_{}", ident)
@@ -404,18 +406,31 @@ fn display_data_ref(ident: DataIdent) -> String {
 
 impl Display for DataKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "\t{}", match self {
-            DataKind::Ascii(s) => format!(".ascii \"{}\"", s),
-            DataKind::Word(w) => format!(".word {}", w),
-            DataKind::HalfWord(h) => format!(".hword {}", h),
-            DataKind::Byte(b) => format!(".byte {}", b),
-        })
+        writeln!(
+            f,
+            "\t{}",
+            match self {
+                DataKind::Ascii(s) => format!(".ascii \"{}\"", s),
+                DataKind::Word(w) => format!(".word {}", w),
+                DataKind::HalfWord(h) => format!(".hword {}", h),
+                DataKind::Byte(b) => format!(".byte {}", b),
+            }
+        )
     }
 }
 
 impl Display for Data {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "\t{}:\n{}", display_data_ref(self.0), self.1.iter().map(|d| format!("{}", d)).collect::<Vec<_>>().join("\n"))
+        write!(
+            f,
+            "\t{}:\n{}",
+            display_data_ref(self.0),
+            self.1
+                .iter()
+                .map(|d| format!("{}", d))
+                .collect::<Vec<_>>()
+                .join("\n")
+        )
     }
 }
 
