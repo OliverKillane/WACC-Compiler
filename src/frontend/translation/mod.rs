@@ -1,8 +1,7 @@
 mod trans_expr;
-mod trans_stat;
 
 use super::ast::{ASTWrapper, AssignLhs, AssignRhs, Stat, StatWrap, Type};
-use crate::intermediate::{self as ir, BlockId, DataRef};
+use crate::intermediate::{self as ir, BlockId, DataRef, VarRepr};
 use crate::{
     frontend::{ast, semantic::symbol_table::VariableSymbolTable},
     intermediate::BlockEnding,
@@ -29,12 +28,15 @@ fn translate_lhs(
 
 fn translate_stat(
     ASTWrapper(_, stat): StatWrap<Option<ast::Type>, usize>,
-    var_symb: &VariableSymbolTable,
-    data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
     block_stats: &mut Vec<ir::Stat>,
     block_graph: &mut Vec<ir::Block>,
     prev_blocks: &mut Vec<BlockId>,
+    free_var: &mut VarRepr,
+    ir_vars: &mut HashMap<VarRepr, ir::Type>,
+    var_symb: &VariableSymbolTable,
+    data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
 ) {
+    assert!(prev_blocks.len() > 0);
     match stat {
         Stat::Skip => {}
         Stat::Def(_, var, assign_rhs) => {
@@ -73,7 +75,19 @@ fn translate_stat(
                 _ => panic!("Reads only supported on ints or characters"),
             });
         }
-        Stat::Free(ASTWrapper(expr_type, expr)) => todo!(),
+        Stat::Free(ASTWrapper(expr_type, expr)) => {
+            let ptr_expr = if let ir::Expr::Ptr(ptr_expr) = translate_expr(
+                expr,
+                &expr_type.expect("Expected a type for an expression"),
+                var_symb,
+                data_ref_map,
+            ) {
+                ptr_expr
+            } else {
+                panic!("Expected a pointer expression")
+            };
+            block_stats.push(ir::Stat::Free(ptr_expr));
+        }
         Stat::Return(ASTWrapper(expr_type, expr)) => {
             let mut tmp_block_stats = Vec::new();
             mem::swap(block_stats, &mut tmp_block_stats);
@@ -119,15 +133,28 @@ fn translate_stat(
             };
             let expr_type = expr_type.expect("Expected a type for an expression");
             let expr = translate_expr(expr, &expr_type, var_symb, data_ref_map);
-            block_stats.push(match (expr_type, expr) {
+            match (expr_type, expr) {
                 (Type::Int | Type::Bool | Type::Pair(_, _) | Type::Array(_, _), expr) => {
-                    ir::Stat::PrintExpr(expr)
+                    block_stats.push(ir::Stat::PrintExpr(expr));
                 }
-                (Type::Char, ir::Expr::Num(num_expr)) => ir::Stat::PrintChar(num_expr),
-                (Type::String, ir::Expr::Ptr(ptr_expr)) => todo!(),
+                (Type::Char, ir::Expr::Num(num_expr)) => {
+                    block_stats.push(ir::Stat::PrintChar(num_expr))
+                }
+                (Type::String, expr @ ir::Expr::Ptr(_)) => {
+                    ir_vars.insert(*free_var, ir::Type::Ptr);
+                    block_stats.push(ir::Stat::AssignVar(*free_var, expr));
+                    block_stats.push(ir::Stat::PrintStr(
+                        ir::PtrExpr::Offset(
+                            box ir::PtrExpr::Var(*free_var),
+                            box ir::NumExpr::SizeOf(ir::Type::Num(ir::NumSize::DWord)),
+                        ),
+                        ir::NumExpr::Deref(ir::NumSize::DWord, ir::PtrExpr::Var(*free_var)),
+                    ));
+                    *free_var += 1;
+                }
                 (Type::Generic(_) | Type::Any, _) => panic!("Expected a concrete type"),
                 _ => panic!("Type does not match the expression"),
-            });
+            }
             if new_line {
                 block_stats.push(ir::Stat::PrintEol());
             }
@@ -202,21 +229,18 @@ fn translate_stat(
                 block_graph,
                 &mut false_prev_blocks,
             );
-            let after_jump_id;
             if false_prev_blocks.len() > 0 {
                 let false_block_id = block_graph.len();
-                after_jump_id = false_block_id + 1;
                 prev_blocks.push(false_block_id);
                 block_graph.push(ir::Block(
                     false_prev_blocks,
                     false_block_stats,
                     ir::BlockEnding::CondJumps(Vec::new(), false_block_id + 1),
                 ));
-            } else {
-                after_jump_id = block_graph.len();
             }
 
             // Filling in true branch
+            let after_jump_id = block_graph.len();
             if let Some(true_block_id) = true_block_id {
                 if let ir::Block(_, _, ir::BlockEnding::CondJumps(_, else_jump)) =
                     block_graph.get_mut(true_block_id).unwrap()
@@ -255,10 +279,41 @@ fn translate_stat(
             block_graph.push(ir::Block(
                 vec![pre_block_id],
                 Vec::new(),
-                ir::BlockEnding::CondJumps(vec![(bool_expr, cond_block_id + 1)], cond_block_id + 1),
+                ir::BlockEnding::CondJumps(
+                    vec![(bool_expr, cond_block_id + 1)],
+                    0, // Dummy to fill later
+                ),
             ));
 
             // While loop block
+            let mut while_block_stats = Vec::new();
+            let mut while_prev_blocks = vec![cond_block_id];
+            translate_block(
+                block,
+                var_symb,
+                data_ref_map,
+                &mut while_block_stats,
+                block_graph,
+                &mut while_prev_blocks,
+            );
+            if while_prev_blocks.len() > 0 {
+                let while_block_id = block_graph.len();
+                block_graph.push(ir::Block(
+                    while_prev_blocks,
+                    while_block_stats,
+                    ir::BlockEnding::CondJumps(vec![], cond_block_id),
+                ));
+                let ir::Block(cond_prev_blocks, _, _) = block_graph.get_mut(cond_block_id).unwrap();
+                cond_prev_blocks.push(while_block_id);
+            }
+            let after_jump_id = block_graph.len();
+            if let ir::Block(_, _, ir::BlockEnding::CondJumps(_, else_jump)) =
+                block_graph.get_mut(cond_block_id).unwrap()
+            {
+                *else_jump = after_jump_id;
+            } else {
+                panic!("Expected a conditional jump ending");
+            }
         }
         Stat::Block(block) => translate_block(
             block,
