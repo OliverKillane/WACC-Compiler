@@ -919,9 +919,17 @@ mod tests {
             StatCode::Assign(1, OpSrc::Const(0)),
             exit_node,
         ));
+        let flush_call_node = graph.new_node(StatType::new_simple(
+            StatCode::VoidCall("fflush".to_string(), vec![1]),
+            exit_set_node,
+        ));
+        let stdout_set_node = graph.new_node(StatType::new_simple(
+            StatCode::Assign(1, OpSrc::Const(1)),
+            flush_call_node,
+        ));
         let print_call_node = graph.new_node(StatType::new_simple(
             StatCode::VoidCall("printf".to_string(), vec![2, 1]),
-            exit_set_node,
+            stdout_set_node,
         ));
         let print_fmt_set_node = graph.new_node(StatType::new_simple(
             StatCode::Assign(2, OpSrc::DataRef(0, 0)),
