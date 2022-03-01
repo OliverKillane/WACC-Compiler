@@ -20,7 +20,7 @@ use super::{
 };
 use std::{
     collections::{HashMap, HashSet},
-    ops::{DerefMut, Add},
+    ops::DerefMut,
     panic,
 };
 
@@ -95,44 +95,46 @@ pub(super) fn translate_threecode(
 fn translate_data(data_refs: HashMap<DataRef, DataRefType>) -> Vec<Data> {
     data_refs
         .into_iter()
-        .map(|(data_ref, data)| -> Data {match data {
-            DataRefType::String(string) => {
-                Data(
+        .map(|(data_ref, data)| -> Data {
+            match data {
+                DataRefType::String(string) => Data(
                     convert_data_ref(data_ref),
-                    vec![DataKind::Ascii(String::from_utf8(string).expect("Is always valid Ascii"))],
-                )
-            }
-            DataRefType::Struct(types) => {
-                // change struct into types
-                let mut datas = Vec::new();
-                let mut byte_data = Vec::new();
+                    vec![DataKind::Ascii(
+                        String::from_utf8(string).expect("Is always valid Ascii"),
+                    )],
+                ),
+                DataRefType::Struct(types) => {
+                    // change struct into types, note that all Bytes are collected into strings.
+                    let datas = types
+                        .into_iter()
+                        .map(|data| match data {
+                            (Size::Byte, val) => DataKind::Byte(val as u8),
+                            (Size::Word, val) => DataKind::HalfWord(val as i16),
+                            (Size::DWord, val) => DataKind::Word(val),
+                        })
+                        .rfold(
+                            (Vec::new(), Vec::new()),
+                            |(mut datas, mut chars): (Vec<DataKind>, Vec<u8>), next| {
+                                if let DataKind::Byte(char_val) = next {
+                                    chars.push(char_val);
+                                    (datas, chars)
+                                } else if chars.is_empty() {
+                                    datas.push(next);
+                                    (datas, chars)
+                                } else {
+                                    datas.push(DataKind::Ascii(
+                                        String::from_utf8(chars).expect("Always valid utf8"),
+                                    ));
+                                    (datas, Vec::new())
+                                }
+                            },
+                        )
+                        .0;
 
-                let push_bytes = || {
-                    if !byte_data.is_empty() {
-                        datas.push(DataKind::Ascii(String::from_utf8(byte_data).expect("Only valid ascii characters in the u8s")));
-                        byte_data.clear()
-                    }
-                };
-
-                for data in types {
-                    match data {
-                        (Size::Byte, val) => byte_data.push(val as u8),
-                        (Size::DWord, val) => {
-                            push_bytes();
-                            datas.push(DataKind::Word(val))
-                        },
-                        (Size::Word, val) => {
-                            push_bytes();
-                            datas.push(DataKind::HalfWord(val as i16))
-                        }
-                    }
+                    Data(convert_data_ref(data_ref), datas)
                 }
-
-
-
-                todo!()
             }
-        }})
+        })
         .collect::<Vec<_>>()
 }
 
