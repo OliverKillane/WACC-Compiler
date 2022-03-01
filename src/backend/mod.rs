@@ -1,6 +1,7 @@
 #![allow(unused_variables)]
 
 mod assembly_gen;
+mod ast_translator;
 mod graph_coloring;
 mod ssa;
 mod ssa_opt;

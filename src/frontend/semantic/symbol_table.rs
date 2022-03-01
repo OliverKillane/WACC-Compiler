@@ -41,7 +41,7 @@ impl<'a> FunctionSymbolTable<'a> {
 /// A flat variable symbol table with all variables renamed to integers,
 /// and associated with types identifiable through usize integers (same as in
 /// the renamed AST).
-pub struct VariableSymbolTable(HashMap<usize, Type>);
+pub struct VariableSymbolTable(pub HashMap<usize, Type>);
 
 impl VariableSymbolTable {
     /// Create a new flat variable symbol table

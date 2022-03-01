@@ -1,7 +1,7 @@
-mod ast;
+pub mod ast;
 mod error;
-mod parser;
-mod semantic;
+pub mod parser;
+pub(crate) mod semantic;
 mod tests;
 
 pub use error::Summary;
