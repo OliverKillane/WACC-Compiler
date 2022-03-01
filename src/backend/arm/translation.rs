@@ -20,7 +20,7 @@ use super::{
 };
 use std::{
     collections::{HashMap, HashSet},
-    ops::DerefMut,
+    ops::{DerefMut, Add},
     panic,
 };
 
@@ -95,17 +95,44 @@ pub(super) fn translate_threecode(
 fn translate_data(data_refs: HashMap<DataRef, DataRefType>) -> Vec<Data> {
     data_refs
         .into_iter()
-        .map(|(data_ref, data)| match data {
+        .map(|(data_ref, data)| -> Data {match data {
             DataRefType::String(string) => {
-                (Data(
+                Data(
                     convert_data_ref(data_ref),
-                    DataKind::Ascii(String::from_utf8(string).expect("Is always valid Ascii")),
-                ))
+                    vec![DataKind::Ascii(String::from_utf8(string).expect("Is always valid Ascii"))],
+                )
             }
-            DataRefType::Struct(_) => {
-                todo!("This is to be implemented as part of the WACC Compiler extension")
+            DataRefType::Struct(types) => {
+                // change struct into types
+                let mut datas = Vec::new();
+                let mut byte_data = Vec::new();
+
+                let push_bytes = || {
+                    if !byte_data.is_empty() {
+                        datas.push(DataKind::Ascii(String::from_utf8(byte_data).expect("Only valid ascii characters in the u8s")));
+                        byte_data.clear()
+                    }
+                };
+
+                for data in types {
+                    match data {
+                        (Size::Byte, val) => byte_data.push(val as u8),
+                        (Size::DWord, val) => {
+                            push_bytes();
+                            datas.push(DataKind::Word(val))
+                        },
+                        (Size::Word, val) => {
+                            push_bytes();
+                            datas.push(DataKind::HalfWord(val as i16))
+                        }
+                    }
+                }
+
+
+
+                todo!()
             }
-        })
+        }})
         .collect::<Vec<_>>()
 }
 
@@ -820,6 +847,7 @@ impl ArmNode {
         match self.get_mut().deref_mut() {
             ControlFlow::Simple(pre, _, _)
             | ControlFlow::Branch(pre, _, _, _)
+            | ControlFlow::Ltorg(pre)
             | ControlFlow::Return(pre, _) => {
                 let _ = pre.insert(predecessor);
             }
@@ -837,6 +865,7 @@ impl ArmNode {
                 let _ = succ.insert(successor);
             }
             ControlFlow::Return(_, _) => panic!("There are no nodes after a return"),
+            ControlFlow::Ltorg(_) => panic!("There are no nodes after a literal pool"),
             ControlFlow::Removed => panic!("There are no nodes connected to a removed node"),
         }
     }
