@@ -22,11 +22,18 @@ pub(super) fn translate_expr(
             let data_ref: u64 = data_ref_map.len() as u64;
             data_ref_map.insert(
                 data_ref,
-                str_const
-                    .into_bytes()
-                    .into_iter()
-                    .map(|c| ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::Byte, c as i32)))
-                    .collect(),
+                vec![ir::Expr::Num(ir::NumExpr::Const(
+                    ir::NumSize::DWord,
+                    str_const.len() as i32,
+                ))]
+                .into_iter()
+                .chain(
+                    str_const
+                        .into_bytes()
+                        .into_iter()
+                        .map(|c| ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::Byte, c as i32))),
+                )
+                .collect(),
             );
             ir::Expr::Ptr(ir::PtrExpr::DataRef(data_ref))
         }
