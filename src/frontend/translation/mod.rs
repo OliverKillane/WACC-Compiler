@@ -1,14 +1,16 @@
 mod trans_expr;
 
-use super::ast::{ASTWrapper, AssignLhs, AssignRhs, ExprWrap, Stat, StatWrap, Type};
+use super::ast::{
+    ASTWrapper, AssignLhs, AssignRhs, Function, Param, Program, Stat, StatWrap, Type,
+};
 use crate::intermediate::{self as ir, BlockId, DataRef, VarRepr};
 use crate::{
     frontend::{ast, semantic::symbol_table::VariableSymbolTable},
     intermediate::BlockEnding,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, LinkedList};
 use std::mem;
-use trans_expr::{array_index_fname, translate_expr};
+use trans_expr::{translate_expr, ARRAY_INDEX_FNAME};
 
 impl From<&Type> for ir::Type {
     fn from(ast_type: &Type) -> Self {
@@ -120,7 +122,7 @@ fn translate_lhs<'l>(
                     ir::Expr::Ptr(ir::PtrExpr::Var(var)),
                     |data_ptr, sub_index| {
                         ir::Expr::Ptr(ir::PtrExpr::Deref(box ir::PtrExpr::Call(
-                            array_index_fname.to_string(),
+                            ARRAY_INDEX_FNAME.to_string(),
                             vec![
                                 data_ptr,
                                 sub_index,
@@ -131,7 +133,7 @@ fn translate_lhs<'l>(
                 );
             return (
                 ir::PtrExpr::Call(
-                    array_index_fname.to_string(),
+                    ARRAY_INDEX_FNAME.to_string(),
                     vec![
                         single_dim_ptr,
                         last_index,
@@ -182,7 +184,6 @@ fn translate_stat(
     function_types: &HashMap<String, Type>,
     data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
 ) {
-    assert!(prev_blocks.len() > 0);
     match stat {
         Stat::Skip => {}
         Stat::Def(_, var, assign_rhs) => {
@@ -306,7 +307,6 @@ fn translate_stat(
             }
         }
         Stat::If(ASTWrapper(expr_type, expr), true_block, false_block) => {
-            // Conditional block
             let cond_block_id = block_graph.len();
             let mut tmp_prev_blocks = Vec::new();
             mem::swap(prev_blocks, &mut tmp_prev_blocks);
@@ -332,32 +332,24 @@ fn translate_stat(
             ));
 
             // True branch
-            let mut true_block_stats = Vec::new();
-            let mut true_prev_blocks = vec![cond_block_id];
-            translate_block(
+            let true_block_id = if translate_block_jumping(
                 true_block,
-                &mut true_block_stats,
+                vec![cond_block_id],
+                None,
                 block_graph,
-                &mut true_prev_blocks,
                 free_var,
                 ir_vars,
                 var_symb,
                 function_types,
                 data_ref_map,
-            );
-            let true_block_id = if true_prev_blocks.len() > 0 {
-                prev_blocks.push(block_graph.len());
-                block_graph.push(ir::Block(
-                    true_prev_blocks,
-                    true_block_stats,
-                    ir::BlockEnding::CondJumps(Vec::new(), 0), // Dummy to fill later
-                ));
-                Some(block_graph.len())
+            ) {
+                let true_block_id = block_graph.len() - 1;
+                prev_blocks.push(true_block_id);
+                Some(true_block_id)
             } else {
                 None
             };
 
-            // Filling in conditional block
             let false_branch_id = block_graph.len();
             if let ir::Block(_, _, ir::BlockEnding::CondJumps(_, else_jump)) =
                 block_graph.get_mut(cond_block_id).unwrap()
@@ -367,31 +359,20 @@ fn translate_stat(
                 panic!("Expected a conditional jump ending");
             }
 
-            // False branch
-            let mut false_block_stats = Vec::new();
-            let mut false_prev_blocks = vec![cond_block_id];
-            translate_block(
+            if translate_block_jumping(
                 false_block,
-                &mut false_block_stats,
+                vec![cond_block_id],
+                None,
                 block_graph,
-                &mut false_prev_blocks,
                 free_var,
                 ir_vars,
                 var_symb,
                 function_types,
                 data_ref_map,
-            );
-            if false_prev_blocks.len() > 0 {
-                let false_block_id = block_graph.len();
-                prev_blocks.push(false_block_id);
-                block_graph.push(ir::Block(
-                    false_prev_blocks,
-                    false_block_stats,
-                    ir::BlockEnding::CondJumps(Vec::new(), false_block_id + 1),
-                ));
+            ) {
+                prev_blocks.push(block_graph.len());
             }
 
-            // Filling in true branch
             let after_jump_id = block_graph.len();
             if let Some(true_block_id) = true_block_id {
                 if let ir::Block(_, _, ir::BlockEnding::CondJumps(_, else_jump)) =
@@ -404,7 +385,6 @@ fn translate_stat(
             }
         }
         Stat::While(ASTWrapper(expr_type, expr), block) => {
-            // Preceding block
             let mut tmp_prev_blocks = Vec::new();
             mem::swap(prev_blocks, &mut tmp_prev_blocks);
             let mut tmp_block_stats = Vec::new();
@@ -417,7 +397,6 @@ fn translate_stat(
                 ir::BlockEnding::CondJumps(vec![], cond_block_id),
             ));
 
-            // Conditional block
             let bool_expr = if let ir::Expr::Bool(bool_expr) = translate_expr(
                 expr,
                 &expr_type.expect("Expected a type for an expression"),
@@ -437,27 +416,18 @@ fn translate_stat(
                 ),
             ));
 
-            // While loop block
-            let mut while_block_stats = Vec::new();
-            let mut while_prev_blocks = vec![cond_block_id];
-            translate_block(
+            if translate_block_jumping(
                 block,
-                &mut while_block_stats,
+                vec![cond_block_id],
+                Some(cond_block_id),
                 block_graph,
-                &mut while_prev_blocks,
                 free_var,
                 ir_vars,
                 var_symb,
                 function_types,
                 data_ref_map,
-            );
-            if while_prev_blocks.len() > 0 {
-                let while_block_id = block_graph.len();
-                block_graph.push(ir::Block(
-                    while_prev_blocks,
-                    while_block_stats,
-                    ir::BlockEnding::CondJumps(vec![], cond_block_id),
-                ));
+            ) {
+                let while_block_id = block_graph.len() - 1;
                 let ir::Block(cond_prev_blocks, _, _) = block_graph.get_mut(cond_block_id).unwrap();
                 cond_prev_blocks.push(while_block_id);
             }
@@ -484,6 +454,42 @@ fn translate_stat(
     }
 }
 
+fn translate_block_jumping(
+    block: Vec<StatWrap<Option<ast::Type>, usize>>,
+    mut prev_blocks: Vec<BlockId>,
+    next_jump: Option<BlockId>,
+    block_graph: &mut Vec<ir::Block>,
+    free_var: &mut VarRepr,
+    ir_vars: &mut HashMap<VarRepr, ir::Type>,
+    var_symb: &VariableSymbolTable,
+    function_types: &HashMap<String, Type>,
+    data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
+) -> bool {
+    let mut block_stats = Vec::new();
+    translate_block(
+        block,
+        &mut block_stats,
+        block_graph,
+        &mut prev_blocks,
+        free_var,
+        ir_vars,
+        var_symb,
+        function_types,
+        data_ref_map,
+    );
+    if prev_blocks.len() > 0 {
+        let next_block_id = block_graph.len() + 1;
+        block_graph.push(ir::Block(
+            prev_blocks,
+            block_stats,
+            BlockEnding::CondJumps(Vec::new(), next_jump.unwrap_or(next_block_id)),
+        ));
+        true
+    } else {
+        false
+    }
+}
+
 fn translate_block(
     block: Vec<StatWrap<Option<ast::Type>, usize>>,
     block_stats: &mut Vec<ir::Stat>,
@@ -507,8 +513,97 @@ fn translate_block(
             function_types,
             data_ref_map,
         );
-        if prev_blocks.len() == 0 {
+        if prev_blocks.len() == 0 && block_stats.len() == 0 {
             break;
         }
     }
+}
+
+fn translate_function(
+    ret_type: &Type,
+    args: Vec<ASTWrapper<Option<Type>, Param<usize>>>,
+    block: Vec<StatWrap<Option<Type>, usize>>,
+    var_symb @ VariableSymbolTable(var_map): &VariableSymbolTable,
+    function_types: &HashMap<String, Type>,
+    data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
+) -> ir::Function {
+    let mut ir_vars = var_map
+        .iter()
+        .map(|(&var, var_type)| (var, var_type.into()))
+        .collect();
+    let mut block_graph = Vec::new();
+    assert!(!translate_block_jumping(
+        block,
+        vec![],
+        None,
+        &mut block_graph,
+        &mut var_map.keys().max().map(|x| *x).unwrap_or(0),
+        &mut ir_vars,
+        var_symb,
+        function_types,
+        data_ref_map
+    ));
+    ir::Function(
+        ret_type.into(),
+        args.iter()
+            .map(|ASTWrapper(_, Param(arg_type, arg))| (arg_type.into(), *arg))
+            .collect(),
+        ir_vars,
+        block_graph,
+    )
+}
+
+fn translate_ast(
+    Program(functions, block): Program<Option<Type>, usize>,
+    function_symbol_tables: HashMap<String, VariableSymbolTable>,
+    program_symbol_table: VariableSymbolTable,
+) -> ir::Program {
+    let (functions, function_types): (LinkedList<_>, HashMap<_, _>) = functions
+        .into_iter()
+        .map(
+            |ASTWrapper(_, Function(ret_type, ASTWrapper(_, fname), args, block))| {
+                ((fname.clone(), args, block), (fname, ret_type))
+            },
+        )
+        .unzip();
+    let mut data_ref_map = HashMap::new();
+    let functions_map: HashMap<_, _> = functions
+        .into_iter()
+        .map(|(fname, args, block)| {
+            let ret_type = function_types.get(&fname).unwrap();
+            let var_symb = function_symbol_tables
+                .get(&fname)
+                .expect("No symbol table for a function");
+            (
+                fname,
+                translate_function(
+                    ret_type,
+                    args,
+                    block,
+                    var_symb,
+                    &function_types,
+                    &mut data_ref_map,
+                ),
+            )
+        })
+        .collect();
+    let VariableSymbolTable(var_map) = &program_symbol_table;
+    let mut free_var = &mut var_map.keys().max().map(|x| *x).unwrap_or(0);
+    let mut ir_vars = var_map
+        .iter()
+        .map(|(&var, var_type)| (var, var_type.into()))
+        .collect();
+    let mut block_graph = Vec::new();
+    assert!(!translate_block_jumping(
+        block,
+        vec![],
+        None,
+        &mut block_graph,
+        &mut free_var,
+        &mut ir_vars,
+        &program_symbol_table,
+        &function_types,
+        &mut data_ref_map
+    ));
+    ir::Program(functions_map, ir_vars, block_graph, data_ref_map, None)
 }

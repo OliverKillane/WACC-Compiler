@@ -5,7 +5,7 @@ use crate::frontend::ast;
 use crate::frontend::semantic::symbol_table::VariableSymbolTable;
 use crate::intermediate::{self as ir, DataRef};
 
-pub(super) const array_index_fname: &str = "a_index";
+pub(super) const ARRAY_INDEX_FNAME: &str = "a_index";
 
 pub(super) fn translate_expr(
     ast_expr: Expr<Option<Type>, usize>,
@@ -81,7 +81,7 @@ pub(super) fn translate_expr(
                     ir::Expr::Ptr(ir::PtrExpr::Var(var)),
                     |data_ptr, sub_index| {
                         ir::Expr::Ptr(ir::PtrExpr::Deref(box ir::PtrExpr::Call(
-                            array_index_fname.to_string(),
+                            ARRAY_INDEX_FNAME.to_string(),
                             vec![
                                 data_ptr,
                                 sub_index,
@@ -94,7 +94,7 @@ pub(super) fn translate_expr(
                 ast::Type::Int => ir::Expr::Num(ir::NumExpr::Deref(
                     ir::NumSize::DWord,
                     ir::PtrExpr::Call(
-                        array_index_fname.to_string(),
+                        ARRAY_INDEX_FNAME.to_string(),
                         vec![
                             single_dim_ptr,
                             last_index,
@@ -105,7 +105,7 @@ pub(super) fn translate_expr(
                 ast::Type::Char => ir::Expr::Num(ir::NumExpr::Deref(
                     ir::NumSize::Byte,
                     ir::PtrExpr::Call(
-                        array_index_fname.to_string(),
+                        ARRAY_INDEX_FNAME.to_string(),
                         vec![
                             single_dim_ptr,
                             last_index,
@@ -114,7 +114,7 @@ pub(super) fn translate_expr(
                     ),
                 )),
                 ast::Type::Bool => ir::Expr::Bool(ir::BoolExpr::Deref(ir::PtrExpr::Call(
-                    array_index_fname.to_string(),
+                    ARRAY_INDEX_FNAME.to_string(),
                     vec![
                         single_dim_ptr,
                         last_index,
@@ -123,7 +123,7 @@ pub(super) fn translate_expr(
                 ))),
                 ast::Type::String | ast::Type::Pair(_, _) | ast::Type::Array(_, _) => {
                     ir::Expr::Ptr(ir::PtrExpr::Deref(box ir::PtrExpr::Call(
-                        array_index_fname.to_string(),
+                        ARRAY_INDEX_FNAME.to_string(),
                         vec![
                             single_dim_ptr,
                             last_index,
