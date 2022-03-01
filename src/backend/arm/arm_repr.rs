@@ -293,6 +293,9 @@ pub enum ControlFlow {
     /// ```
     Branch(Option<ArmNode>, ArmNode, Cond, Option<ArmNode>),
 
+    /// A literal field
+    Ltorg(Option<ArmNode>),
+
     /// Return statement, returning a temporary. This is a dummy node, which is
     /// replaced by the relevant register/stack management when allocating registers
     Return(Option<ArmNode>, Option<Ident>),
@@ -308,10 +311,13 @@ pub enum ControlFlow {
 pub enum DataKind {
     /// An ascii value
     Ascii(String),
+    Word(i32),
+    HalfWord(i16),
+    Byte(u8),
 }
 
 /// All types of data that can be kept in the binary.
-pub struct Data(pub DataIdent, pub DataKind);
+pub struct Data(pub DataIdent, pub Vec<DataKind>);
 
 pub struct Subroutine {
     pub args: Vec<Temporary>,
