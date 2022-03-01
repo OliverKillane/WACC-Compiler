@@ -259,12 +259,12 @@ impl LiveRanges {
     }
 
     /// Sort a set into a vector such temporary identifiers are sorted by
-    /// (closest use -> furthest use).
+    /// (furthest use -> closest use).
     fn sort_set(&self, set_id: &SetId) -> Vec<Temporary> {
         match self.live_set_map.get(set_id) {
             Some(map) => {
                 let mut live_in = map.iter().map(|(t, u)| (*t, *u)).collect::<Vec<_>>();
-                live_in.sort_by(|(_, uses1), (_, uses2)| uses1.cmp(uses2));
+                live_in.sort_by(|(_, uses1), (_, uses2)| uses2.cmp(uses1));
                 live_in.into_iter().map(|p| p.0).collect::<Vec<_>>()
             }
             None => Vec::new(),
