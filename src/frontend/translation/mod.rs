@@ -1,6 +1,6 @@
 mod trans_expr;
 
-use super::ast::{ASTWrapper, AssignLhs, AssignRhs, Stat, StatWrap, Type};
+use super::ast::{ASTWrapper, AssignLhs, AssignRhs, ExprWrap, Stat, StatWrap, Type};
 use crate::intermediate::{self as ir, BlockId, DataRef, VarRepr};
 use crate::{
     frontend::{ast, semantic::symbol_table::VariableSymbolTable},
@@ -8,22 +8,167 @@ use crate::{
 };
 use std::collections::HashMap;
 use std::mem;
-use trans_expr::translate_expr;
+use trans_expr::{array_index_fname, translate_expr};
+
+impl From<&Type> for ir::Type {
+    fn from(ast_type: &Type) -> Self {
+        match ast_type {
+            ast::Type::Int => ir::Type::Num(ir::NumSize::DWord),
+            ast::Type::Char => ir::Type::Num(ir::NumSize::Byte),
+            ast::Type::Bool => ir::Type::Bool,
+            ast::Type::String | ast::Type::Pair(_, _) => ir::Type::Ptr,
+            ast::Type::Array(_, _) => panic!("Nested array type"),
+            ast::Type::Generic(_) | ast::Type::Any => {
+                panic!("Expected a concrete type")
+            }
+        }
+    }
+}
 
 fn translate_rhs(
     assign_rhs: AssignRhs<Option<Type>, usize>,
     var_symb: &VariableSymbolTable,
+    function_types: &HashMap<String, Type>,
     data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
 ) -> ir::Expr {
-    todo!()
+    match assign_rhs {
+        AssignRhs::Expr(ASTWrapper(expr_type, expr)) => translate_expr(
+            expr,
+            &expr_type.expect("Expected a type for an expression"),
+            var_symb,
+            data_ref_map,
+        ),
+        AssignRhs::Call(ASTWrapper(_, name), args) => {
+            let args = args
+                .into_iter()
+                .map(|ASTWrapper(arg_type, arg_expr)| {
+                    translate_expr(
+                        arg_expr,
+                        &arg_type.expect("Expected a type for an expression"),
+                        var_symb,
+                        data_ref_map,
+                    )
+                })
+                .collect();
+            match function_types[&name] {
+                Type::Int | Type::Char => ir::Expr::Num(ir::NumExpr::Call(name, args)),
+                Type::Bool => ir::Expr::Bool(ir::BoolExpr::Call(name, args)),
+                Type::String | Type::Pair(_, _) | Type::Array(_, _) => {
+                    ir::Expr::Ptr(ir::PtrExpr::Call(name, args))
+                }
+                Type::Generic(_) | Type::Any => panic!("Expected a concrete type"),
+            }
+        }
+        AssignRhs::Array(ASTWrapper(_, fields)) => ir::Expr::Ptr(ir::PtrExpr::Malloc(
+            vec![ir::Expr::Num(ir::NumExpr::Const(
+                ir::NumSize::DWord,
+                fields.len() as i32,
+            ))]
+            .into_iter()
+            .chain(
+                fields
+                    .into_iter()
+                    .map(|ASTWrapper(sub_expr_type, sub_expr)| {
+                        translate_expr(
+                            sub_expr,
+                            &sub_expr_type.expect("Expected a type for an expression"),
+                            var_symb,
+                            data_ref_map,
+                        )
+                    }),
+            )
+            .collect(),
+        )),
+    }
 }
 
-fn translate_lhs(
+fn translate_lhs<'l>(
     assign_lhs: AssignLhs<Option<Type>, usize>,
-    var_symb: &VariableSymbolTable,
+    var_symb: &'l VariableSymbolTable,
     data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
-) -> (ir::PtrExpr, Type) {
-    todo!()
+) -> (ir::PtrExpr, ir::Type) {
+    match assign_lhs {
+        AssignLhs::ArrayElem(var, mut indices) => {
+            let (fields_type, &num_indices) =
+                if let ast::Type::Array(box fields_type, num_indices) =
+                    var_symb.get_type_from_id(var).expect("Variable not found")
+                {
+                    (fields_type, num_indices)
+                } else {
+                    panic!("Expected an array expression");
+                };
+            assert_eq!(num_indices, indices.len());
+            let ASTWrapper(last_index_type, last_index) = indices.remove(num_indices - 1);
+            let last_index = translate_expr(
+                last_index,
+                &last_index_type.expect("Expected a type for an expression"),
+                var_symb,
+                data_ref_map,
+            );
+
+            let single_dim_ptr = indices
+                .into_iter()
+                .map(|ASTWrapper(sub_expr_type, sub_expr)| {
+                    translate_expr(
+                        sub_expr,
+                        &sub_expr_type.expect("Expected a type for an expression"),
+                        var_symb,
+                        data_ref_map,
+                    )
+                })
+                .fold(
+                    ir::Expr::Ptr(ir::PtrExpr::Var(var)),
+                    |data_ptr, sub_index| {
+                        ir::Expr::Ptr(ir::PtrExpr::Deref(box ir::PtrExpr::Call(
+                            array_index_fname.to_string(),
+                            vec![
+                                data_ptr,
+                                sub_index,
+                                ir::Expr::Num(ir::NumExpr::SizeOf(ir::Type::Ptr)),
+                            ],
+                        )))
+                    },
+                );
+            return (
+                ir::PtrExpr::Call(
+                    array_index_fname.to_string(),
+                    vec![
+                        single_dim_ptr,
+                        last_index,
+                        ir::Expr::Num(ir::NumExpr::SizeOf(fields_type.into())),
+                    ],
+                ),
+                fields_type.into(),
+            );
+        }
+        AssignLhs::PairFst(ASTWrapper(expr_type, expr)) => {
+            let expr_type = expr_type.expect("Expected a type for an expression");
+            (
+                if let ir::Expr::Ptr(ptr_expr) =
+                    translate_expr(expr, &expr_type, var_symb, data_ref_map)
+                {
+                    ptr_expr
+                } else {
+                    panic!("Expected a pointer expression")
+                },
+                (&expr_type).into(),
+            )
+        }
+        AssignLhs::PairSnd(ASTWrapper(expr_type, expr)) => {
+            let expr_type = expr_type.expect("Expected a type for an expression");
+            (
+                if let ir::Expr::Ptr(ptr_expr) =
+                    translate_expr(expr, &expr_type, var_symb, data_ref_map)
+                {
+                    ir::PtrExpr::Offset(box ptr_expr, box ir::NumExpr::SizeOfWideAlloc)
+                } else {
+                    panic!("Expected a pointer expression")
+                },
+                (&expr_type).into(),
+            )
+        }
+        AssignLhs::Var(_) => panic!("Expected an AssignLhs that can be translated into a pointer"),
+    }
 }
 
 fn translate_stat(
@@ -34,6 +179,7 @@ fn translate_stat(
     free_var: &mut VarRepr,
     ir_vars: &mut HashMap<VarRepr, ir::Type>,
     var_symb: &VariableSymbolTable,
+    function_types: &HashMap<String, Type>,
     data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
 ) {
     assert!(prev_blocks.len() > 0);
@@ -42,20 +188,20 @@ fn translate_stat(
         Stat::Def(_, var, assign_rhs) => {
             block_stats.push(ir::Stat::AssignVar(
                 var,
-                translate_rhs(assign_rhs, var_symb, data_ref_map),
+                translate_rhs(assign_rhs, var_symb, function_types, data_ref_map),
             ));
         }
         Stat::Assign(AssignLhs::Var(var), assign_rhs) => {
             block_stats.push(ir::Stat::AssignVar(
                 var,
-                translate_rhs(assign_rhs, var_symb, data_ref_map),
+                translate_rhs(assign_rhs, var_symb, function_types, data_ref_map),
             ));
         }
         Stat::Assign(assign_lhs, assign_rhs) => {
             let (ptr_expr, _) = translate_lhs(assign_lhs, var_symb, data_ref_map);
             block_stats.push(ir::Stat::AssignPtr(
                 ptr_expr,
-                translate_rhs(assign_rhs, var_symb, data_ref_map),
+                translate_rhs(assign_rhs, var_symb, function_types, data_ref_map),
             ));
         }
         Stat::Read(AssignLhs::Var(var)) => {
@@ -70,8 +216,8 @@ fn translate_stat(
         Stat::Read(assign_lhs) => {
             let (ptr_expr, expr_type) = translate_lhs(assign_lhs, var_symb, data_ref_map);
             block_stats.push(match expr_type {
-                Type::Int => ir::Stat::ReadIntPtr(ptr_expr),
-                Type::Char => ir::Stat::ReadCharPtr(ptr_expr),
+                ir::Type::Num(ir::NumSize::DWord) => ir::Stat::ReadIntPtr(ptr_expr),
+                ir::Type::Num(ir::NumSize::Byte) => ir::Stat::ReadCharPtr(ptr_expr),
                 _ => panic!("Reads only supported on ints or characters"),
             });
         }
@@ -190,11 +336,14 @@ fn translate_stat(
             let mut true_prev_blocks = vec![cond_block_id];
             translate_block(
                 true_block,
-                var_symb,
-                data_ref_map,
                 &mut true_block_stats,
                 block_graph,
                 &mut true_prev_blocks,
+                free_var,
+                ir_vars,
+                var_symb,
+                function_types,
+                data_ref_map,
             );
             let true_block_id = if true_prev_blocks.len() > 0 {
                 prev_blocks.push(block_graph.len());
@@ -223,11 +372,14 @@ fn translate_stat(
             let mut false_prev_blocks = vec![cond_block_id];
             translate_block(
                 false_block,
-                var_symb,
-                data_ref_map,
                 &mut false_block_stats,
                 block_graph,
                 &mut false_prev_blocks,
+                free_var,
+                ir_vars,
+                var_symb,
+                function_types,
+                data_ref_map,
             );
             if false_prev_blocks.len() > 0 {
                 let false_block_id = block_graph.len();
@@ -290,11 +442,14 @@ fn translate_stat(
             let mut while_prev_blocks = vec![cond_block_id];
             translate_block(
                 block,
-                var_symb,
-                data_ref_map,
                 &mut while_block_stats,
                 block_graph,
                 &mut while_prev_blocks,
+                free_var,
+                ir_vars,
+                var_symb,
+                function_types,
+                data_ref_map,
             );
             if while_prev_blocks.len() > 0 {
                 let while_block_id = block_graph.len();
@@ -317,22 +472,43 @@ fn translate_stat(
         }
         Stat::Block(block) => translate_block(
             block,
-            var_symb,
-            data_ref_map,
             block_stats,
             block_graph,
             prev_blocks,
+            free_var,
+            ir_vars,
+            var_symb,
+            function_types,
+            data_ref_map,
         ),
     }
 }
 
 fn translate_block(
     block: Vec<StatWrap<Option<ast::Type>, usize>>,
-    var_symb: &VariableSymbolTable,
-    data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
     block_stats: &mut Vec<ir::Stat>,
     block_graph: &mut Vec<ir::Block>,
     prev_blocks: &mut Vec<BlockId>,
+    free_var: &mut VarRepr,
+    ir_vars: &mut HashMap<VarRepr, ir::Type>,
+    var_symb: &VariableSymbolTable,
+    function_types: &HashMap<String, Type>,
+    data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
 ) {
-    todo!()
+    for stat in block {
+        translate_stat(
+            stat,
+            block_stats,
+            block_graph,
+            prev_blocks,
+            free_var,
+            ir_vars,
+            var_symb,
+            function_types,
+            data_ref_map,
+        );
+        if prev_blocks.len() == 0 {
+            break;
+        }
+    }
 }
