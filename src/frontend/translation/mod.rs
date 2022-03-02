@@ -20,8 +20,7 @@ impl From<&Type> for ir::Type {
             ast::Type::Int => ir::Type::Num(ir::NumSize::DWord),
             ast::Type::Char => ir::Type::Num(ir::NumSize::Byte),
             ast::Type::Bool => ir::Type::Bool,
-            ast::Type::String | ast::Type::Pair(_, _) => ir::Type::Ptr,
-            ast::Type::Array(_, _) => panic!("Nested array type"),
+            ast::Type::String | ast::Type::Pair(_, _) | ast::Type::Array(_, _) => ir::Type::Ptr,
             ast::Type::Generic(_) | ast::Type::Any => {
                 panic!("Expected a concrete type")
             }
@@ -130,6 +129,9 @@ fn translate_lhs<'l>(
                 } else {
                     panic!("Expected an array expression");
                 };
+            if let ast::Type::Array(_, _) = fields_type {
+                panic!("Nested array type");
+            }
             assert_eq!(num_indices, indices.len());
             let ASTWrapper(last_index_type, last_index) = indices.remove(num_indices - 1);
             let last_index = translate_expr(
