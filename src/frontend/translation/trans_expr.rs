@@ -71,14 +71,7 @@ pub(super) fn translate_expr(
 
         Expr::ArrayElem(var, mut indices) => {
             helper_function_flags.array_indexing = true;
-            let (fields_type, &num_indices) =
-                if let ast::Type::Array(box fields_type, num_indices) = ast_expr_type {
-                    (fields_type, num_indices)
-                } else {
-                    panic!("Expected an array expression");
-                };
-            assert_eq!(num_indices, indices.len());
-            let ASTWrapper(last_index_type, last_index) = indices.remove(num_indices - 1);
+            let ASTWrapper(last_index_type, last_index) = indices.remove(indices.len() - 1);
             let last_index = translate_expr(
                 last_index,
                 &last_index_type.expect("Expected a type for an expression"),
@@ -111,7 +104,7 @@ pub(super) fn translate_expr(
                         )))
                     },
                 );
-            match fields_type {
+            match ast_expr_type {
                 ast::Type::Int => ir::Expr::Num(ir::NumExpr::Deref(
                     ir::NumSize::DWord,
                     ir::PtrExpr::Call(
