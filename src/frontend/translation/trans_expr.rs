@@ -373,30 +373,42 @@ pub(super) fn translate_expr(
 
 #[cfg(test)]
 mod tests {
+
     use crate::{frontend::ast::BinOp, intermediate};
 
     use super::*;
 
     #[test]
-    fn check_boolean_expression() {
+    fn check_simple_boolean_unop_expression() {
+        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
+        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let var_symb = VariableSymbolTable::new();
+
         let translated: intermediate::Expr =
             ir::Expr::Bool(ir::BoolExpr::Not(box ir::BoolExpr::Const(true)));
 
         assert_eq!(
+            translated,
             translate_expr(
                 Expr::UnOp(
                     UnOp::Neg,
                     box ASTWrapper(Some(ast::Type::Bool), Expr::Bool(true)),
                 ),
                 &Type::Bool,
-                &VariableSymbolTable::new(),
-                &mut HashMap::new(),
-                &mut HelperFunctionFlags::default()
-            ),
-            translated
+                &var_symb,
+                &mut data_ref_map,
+                &mut helper_function_flags
+            )
         );
+    }
 
-        let translated2: intermediate::Expr = ir::Expr::Bool(ir::BoolExpr::BoolOp(
+    #[test]
+    fn check_complex_boolean_binop_expression() {
+        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
+        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let var_symb = VariableSymbolTable::new();
+
+        let translated: intermediate::Expr = ir::Expr::Bool(ir::BoolExpr::BoolOp(
             box ir::BoolExpr::TestZero(ir::NumExpr::ArithOp(
                 box ir::NumExpr::Cast(
                     ir::NumSize::DWord,
@@ -414,6 +426,7 @@ mod tests {
         ));
 
         assert_eq!(
+            translated,
             translate_expr(
                 Expr::BinOp(
                     box ASTWrapper(
@@ -447,16 +460,19 @@ mod tests {
                     ),
                 ),
                 &Type::Bool,
-                &VariableSymbolTable::new(),
-                &mut HashMap::new(),
-                &mut HelperFunctionFlags::default()
-            ),
-            translated2
+                &var_symb,
+                &mut data_ref_map,
+                &mut helper_function_flags
+            )
         );
     }
 
     #[test]
-    fn check_integer_expression() {
+    fn check_simple_integer_binop_expression() {
+        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
+        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let var_symb = VariableSymbolTable::new();
+
         let translated: intermediate::Expr = intermediate::Expr::Num(ir::NumExpr::ArithOp(
             box ir::NumExpr::Const(ir::NumSize::DWord, 3),
             ir::ArithOp::Add,
@@ -464,6 +480,7 @@ mod tests {
         ));
 
         assert_eq!(
+            translated,
             translate_expr(
                 Expr::BinOp(
                     box ASTWrapper(Some(ast::Type::Int), Expr::Int(3)),
@@ -471,21 +488,29 @@ mod tests {
                     box ASTWrapper(Some(ast::Type::Int), Expr::Int(7)),
                 ),
                 &Type::Int,
-                &VariableSymbolTable::new(),
-                &mut HashMap::new(),
-                &mut HelperFunctionFlags::default()
-            ),
-            translated
+                &var_symb,
+                &mut data_ref_map,
+                &mut helper_function_flags
+            )
         );
+    }
 
-        let mut var_table = VariableSymbolTable::new();
-        var_table.0.insert(0, ast::Type::Int);
+    #[test]
+    fn check_complex_integer_binop_expression() {
+        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
+        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let mut var_symb = VariableSymbolTable::new();
+
+        var_symb.0.insert(0, ast::Type::Int);
 
         let translated: intermediate::Expr = intermediate::Expr::Num(ir::NumExpr::ArithOp(
             box ir::NumExpr::ArithOp(
                 box ir::NumExpr::Var(0),
                 ir::ArithOp::Mod,
-                box ir::NumExpr::Const(ir::NumSize::DWord, 7),
+                box ir::NumExpr::Call(
+                    ZERO_CHECK_FNAME.to_string(),
+                    vec![ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::DWord, 7))],
+                ),
             ),
             ir::ArithOp::Mul,
             box ir::NumExpr::Cast(
@@ -495,6 +520,7 @@ mod tests {
         ));
 
         assert_eq!(
+            translated,
             translate_expr(
                 Expr::BinOp(
                     box ASTWrapper(
@@ -515,11 +541,12 @@ mod tests {
                     ),
                 ),
                 &Type::Int,
-                &var_table,
-                &mut HashMap::new(),
-                &mut HelperFunctionFlags::default()
-            ),
-            translated
+                &var_symb,
+                &mut data_ref_map,
+                &mut helper_function_flags
+            )
         );
+
+        assert_eq!(true, helper_function_flags.check_null);
     }
 }
