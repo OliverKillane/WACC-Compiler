@@ -439,6 +439,7 @@ impl Display for Program {
         let Program {
             data,
             reserved_stack,
+            temps,
             main,
             functions,
             cfg,
@@ -457,6 +458,7 @@ impl Display for Program {
             Subroutine {
                 args,
                 start_node,
+                temps,
                 reserved_stack,
             },
         ) in functions

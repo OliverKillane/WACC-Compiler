@@ -1,25 +1,24 @@
 //! Register allocation for the arm representation, using live ranges and
 //! 'time-till-use'.
 
-use std::{cmp::min, collections::HashMap, ops::DerefMut};
+use std::collections::{HashMap, HashSet};
 
-use lazy_static::__Deref;
-
-use crate::backend::arm::arm_repr::{MemOperand, FlexOffset, MemOp};
+use crate::backend::arm::{
+    arm_graph_utils::chain_two_chains,
+    arm_repr::{FlexOffset, MemOp, MemOperand},
+};
 
 use super::{
     super::super::graph::Graph,
-    arm_graph_utils::{simple_node, Chain, link_stats},
-    arm_repr::{
-        Cond, ControlFlow, FlexOperand, Ident, RegOp, Register, Stat, Temporary, ArmNode,
-    },
+    arm_graph_utils::{is_shifted_8_bit, link_stats, simple_node, Chain},
+    arm_repr::{Cond, ControlFlow, FlexOperand, Ident, RegOp, Register, Stat, Temporary},
 };
 
 type Preserved = u128;
 type Reserved = i128;
 
 /// A type for each part of the registers and stack,
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum Alloc {
     /// A temporary variable (in register/stack)
     Temp(Temporary),
@@ -33,7 +32,27 @@ enum Alloc {
     Protected,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Tracks the state of the registers, and the stack frame.
+/// Stack frame is composed of:
+///
+/// |            | Stack Contents         |
+/// |------------|------------------------|
+/// |            | (Temp) Arg 4           |
+/// |            | (Temp) Arg 5           |
+/// |            | (Temp) Arg 6           |
+/// |            | (Temp) Arg 7           |
+/// |            | ...                    |
+/// | SP at Call | Temps                  |
+/// |            | ...                    |
+/// |            | preserved register R4  |
+/// |            | preserved register R5  |
+/// |            | ...                    |
+/// |            | preserved register R14 |
+/// |            | reserved stack space   |
+/// |            | reserved stack space   |
+/// |            | ...                    |
+/// |------------|------------------------|
+#[derive(Debug, Clone)]
 struct AllocationState {
     /// Represents the usable registers:
     /// ```text
@@ -44,26 +63,32 @@ struct AllocationState {
     /// - R15 is the program counter
     registers: [Alloc; 16],
 
-    /// Represents the stack, the end of the vector is the current position of
-    /// the stack pointer.
-    stack: Vec<Alloc>,
+    /// Position in words from the end of the frame, to the allocated space for
+    /// the identifier.
+    alloc_map: HashMap<Alloc, i32>,
 
-    /// Represents the displacement of the stack pointer from when the function
-    /// was called in words (1 word = 4 bytes)
+    /// The displacement of the stack pointer from the the start of the call.
     sp_displacement: i32,
-
-
 }
 
 impl AllocationState {
-    fn new(
-        args: Vec<Temporary>,
+    /// Creates a stack frame and initial state
+    fn create_stack_frame(
+        args: &[Temporary],
         reserved_stack: u8,
+        temps_set: &HashSet<Temporary>,
         graph: &mut Graph<ControlFlow>,
     ) -> (Self, Option<Chain>) {
         // allocate arguments on the registers r0-r3, then the stack. Reserved
         // space goes after the arguments, and immediately generates an
         // instruction to move the stack pointer offset accordingly
+
+        // First we can calculate the frame size in words (4 bytes) as:
+        // Number of temporaries (need a space on stack)
+        // Number of protected registers (need a space if pushed)
+        // Reserved stack space
+
+        let mut alloc_map = HashMap::new();
 
         // Calling convention is encoded within the start state
         let mut registers: [Alloc; 16] = [
@@ -85,26 +110,41 @@ impl AllocationState {
             Alloc::Protected,   // R15 - PC
         ];
 
-        // allocate arguments to registers
-        for reg in 0..min(args.len(), 4) {
-            registers[reg] = Alloc::Temp(args[reg]);
+        // place the first 3 arguments in registers.
+        for reg in 0..(args.len().min(4)) {
+            registers[reg] = Alloc::Temp(args[reg])
         }
 
-        // allocate remaining arguments on the stack
-        let mut stack = Vec::new();
-        if args.len() > 4 {
-            for arg in args.iter().skip(4) {
-                stack.push(Alloc::Temp(*arg))
+        // now put all other arguments onto the stack. These will be just
+        // before the stack pointer in reverse order (were pushed and popped)
+        for (arg_ind, temp) in args.iter().enumerate().skip(4) {
+            alloc_map.insert(Alloc::Temp(*temp), (args.len() - arg_ind) as i32);
+        }
+
+        // Now push all temporaries to the map to fill the frame. If it is
+        // already in the map (it is a stack argument) we ignore.
+        let mut sp_displacement = 0;
+        for temp in temps_set {
+            let temp_alloc = Alloc::Temp(*temp);
+            if alloc_map.try_insert(temp_alloc, sp_displacement).is_ok() {
+                sp_displacement += 1;
             }
         }
 
-        let (start_instruction, sp_displacement) = if reserved_stack > 0 {
-            for reserved in 0..reserved_stack {
-                stack.push(Alloc::StackReserve)
-            }
+        // setup space for preserves
+        for p in 0..9 {
+            alloc_map.insert(Alloc::Preserve(p), sp_displacement);
+            sp_displacement += 1;
+        }
 
-            (
-                // reserve reserved_stack number of words (4 bytes each) on the stack
+        // setup reserved stack space
+        alloc_map.insert(Alloc::StackReserve, sp_displacement);
+        sp_displacement += reserved_stack as i32;
+
+        // generate stack pointer move:
+        let nodes = if sp_displacement != 0 {
+            let byte_displacement = sp_displacement * 4;
+            if is_shifted_8_bit(byte_displacement) {
                 Some(simple_node(
                     Stat::ApplyOp(
                         RegOp::Sub,
@@ -112,176 +152,296 @@ impl AllocationState {
                         false,
                         Ident::Register(Register::Sp),
                         Ident::Register(Register::Sp),
-                        FlexOperand::Imm((reserved_stack * 4) as u32),
+                        FlexOperand::Imm(byte_displacement as u32),
                     ),
                     graph,
-                )),
-                reserved_stack as i32,
-            )
+                ))
+            } else {
+                Some(link_stats(
+                    vec![
+                        Stat::Push(Cond::Al, vec![Ident::Register(Register::R4)]),
+                        Stat::MemOp(
+                            MemOp::Ldr,
+                            Cond::Al,
+                            false,
+                            Ident::Register(Register::R4),
+                            MemOperand::Expression(byte_displacement),
+                        ),
+                        Stat::ApplyOp(
+                            RegOp::Sub,
+                            Cond::Al,
+                            false,
+                            Ident::Register(Register::Sp),
+                            Ident::Register(Register::Sp),
+                            FlexOperand::ShiftReg(Ident::Register(Register::Sp), None),
+                        ),
+                    ],
+                    graph,
+                ))
+                .expect("More than one statement")
+            }
         } else {
-            (None, 0)
+            None
         };
 
         (
-            AllocationState {
+            Self {
                 registers,
-                stack,
+                alloc_map,
                 sp_displacement,
             },
-            start_instruction,
+            nodes,
         )
     }
 
-    /// Mark the space used for any variable not used as free, place all use 
+    /// Mark the space used for any variable not used as free, place all use
     /// temporaries in registers.
     /// Note: temps is sorted for 'wait longest till use' and the end.
-    fn update_live(&mut self, temps: &Vec<Temporary>, graph: &mut Graph<ControlFlow>) -> Option<Chain> {
-
-        // First mark all dead temporaries as free in registers. Build a map of 
-        // temporaries to registers & all free registers.
-        for (ind, allocation) in self.registers.iter_mut().enumerate() {
-            if let Alloc::Temp(temp) = &allocation {
-                if !temps.contains(&temp) {
-                    *allocation = Alloc::Free
+    fn update_live(&mut self, temps: &[Temporary]) {
+        for reg in self.registers.iter_mut() {
+            if let Alloc::Temp(t) = reg {
+                if !temps.contains(t) {
+                    *reg = Alloc::Free
                 }
             }
         }
+    }
 
-        // Mark all dead temporaries as free in the stack
-        for allocation in self.stack.iter_mut() {
-            if let Alloc::Temp(temp) = &allocation {
-                if !temps.contains(&temp) {
-                    *allocation = Alloc::Free
-                }
-            }
-        }
+    /// Use the allocation map to get the displacement of the stack space for a
+    /// given allocation.
+    fn get_temporary_sp_offset(&self, alloc: &Alloc) -> i32 {
+        (self.sp_displacement
+            - self
+                .alloc_map
+                .get(alloc)
+                .expect("all valid allocs are in the allocation map"))
+            * 4
+    }
 
-        let mut stats = Vec::new();
+    /// A utility function from moving data to and from the stack (offsets may
+    /// be too large for immediate operand use)
+    fn move_reg_stack(
+        &self,
+        dst_register: Register,
+        alloc: &Alloc,
+        memop: MemOp,
+        mut free_registers: Vec<usize>,
+        graph: &mut Graph<ControlFlow>,
+    ) -> Chain {
+        let sp_offset = self.get_temporary_sp_offset(alloc);
+        if -4095 <= sp_offset && sp_offset <= 4095 {
+            // we can use a stack pointer offset to get the temporary
 
-        // clean up stack by removing free at the end
+            // LDR reg_ind, [Sp, #offset]
 
-        while self.stack.last() == Some(&Alloc::Free) {
-            stats.push(Stat::ApplyOp(RegOp::Add, Cond::Al, false, Ident::Register(Register::Sp), Ident::Register(Register::Sp), FlexOperand::Imm(4)));
-            self.sp_displacement -= 1;
-            self.stack.pop();
-        }
+            simple_node(
+                Stat::MemOp(
+                    memop,
+                    Cond::Al,
+                    false,
+                    Ident::Register(dst_register),
+                    MemOperand::PreIndex(
+                        Ident::Register(Register::Sp),
+                        FlexOffset::Expr((sp_offset as i32).into()),
+                        false,
+                    ),
+                ),
+                graph,
+            )
+        } else if !free_registers.is_empty() {
+            // the offset is too large, so we can load as a label into another (free) register, then use that to address
+            let tmp_register = Ident::Register(Register::from_ind(
+                free_registers
+                    .pop()
+                    .expect("vector of free registers is not empty"),
+            ));
 
-        if !stats.is_empty() {
-            link_stats(stats, graph)
+            // LDR tmp_reg, =offset
+            // ADD tmp_reg, tmp_reg, SP
+            // LDR reg_ind, [tmp_reg]
+
+            link_stats(
+                vec![
+                    Stat::MemOp(
+                        MemOp::Ldr,
+                        Cond::Al,
+                        false,
+                        tmp_register,
+                        MemOperand::Expression(sp_offset as i32),
+                    ),
+                    Stat::ApplyOp(
+                        RegOp::Add,
+                        Cond::Al,
+                        false,
+                        tmp_register,
+                        tmp_register,
+                        FlexOperand::ShiftReg(Ident::Register(Register::Sp), None),
+                    ),
+                    Stat::MemOp(
+                        memop,
+                        Cond::Al,
+                        false,
+                        Ident::Register(dst_register),
+                        MemOperand::Zero(tmp_register),
+                    ),
+                ],
+                graph,
+            )
+            .expect("More than one statement")
         } else {
-            None
+            // choose a low usage register R12 to push and pop, we store the offset here
+            let tmp_register = Ident::Register(Register::R12);
+
+            // PUSH {tmp_reg}
+            // LDR tmp_reg, =offset
+            // ADD tmp_reg, tmp_reg, SP
+            // LDR reg_ind, [tmp_reg]
+            // POP {tmp_reg}
+
+            link_stats(
+                vec![
+                    Stat::Push(Cond::Al, vec![tmp_register]),
+                    Stat::MemOp(
+                        MemOp::Ldr,
+                        Cond::Al,
+                        false,
+                        tmp_register,
+                        MemOperand::Expression(sp_offset as i32),
+                    ),
+                    Stat::ApplyOp(
+                        RegOp::Add,
+                        Cond::Al,
+                        false,
+                        tmp_register,
+                        tmp_register,
+                        FlexOperand::ShiftReg(Ident::Register(Register::Sp), None),
+                    ),
+                    Stat::MemOp(
+                        memop,
+                        Cond::Al,
+                        false,
+                        Ident::Register(dst_register),
+                        MemOperand::Zero(tmp_register),
+                    ),
+                    Stat::Pop(Cond::Al, vec![tmp_register]),
+                ],
+                graph,
+            )
+            .expect("More than one statement")
         }
     }
 
-    /// Move a temporary into a register, if it is on the stack, set that space 
-    /// to free, accordingly. Accounts for very large (>4095 byte) offsets from 
-    /// SP to temp stack position.
-    fn move_from_stack_to_reg(&mut self, temp: Temporary, reg_ind: usize, graph: &mut Graph<ControlFlow>) -> (Register, Option<Chain>) {
-        let stack_len = self.stack.len();
-        self.registers[reg_ind] = Alloc::Temp(temp);
-            for (stack_ind, stack_alloc) in self.stack.iter_mut().enumerate() {
-                if &Alloc::Temp(temp) == stack_alloc {
-                    *stack_alloc = Alloc::Free;
-                    let offset = (stack_len - stack_ind) * 4;
-                    let instrs_chain = if offset <= 4096 {
-                        // LDR reg_ind, [Sp, #offset]
-                        simple_node(Stat::MemOp(MemOp::Ldr, Cond::Al, false, Ident::Register(Register::from_ind(reg_ind)), MemOperand::PreIndex(Ident::Register(Register::Sp), FlexOffset::Expr((offset as i32).into()), false)), graph)
-                    } else {
-                        // PUSH {R12}
-                        // LDR R12, =offset
-                        // ADD R12, R12, SP
-                        // LDR reg_ind, [R12]
-                        // PUSH R12
-                        link_stats(vec![
-                            Stat::Push(Cond::Al, vec![Ident::Register(Register::R12)]),
-                            Stat::MemOp(MemOp::Ldr, Cond::Al, false, Ident::Register(Register::R12), MemOperand::Expression(offset as i32)),
-                            Stat::ApplyOp(RegOp::Add, Cond::Al, false, Ident::Register(Register::R12), Ident::Register(Register::R12), FlexOperand::ShiftReg(Ident::Register(Register::Sp), None)),
-                            Stat::MemOp(MemOp::Ldr, Cond::Al, false, Ident::Register(Register::from_ind(reg_ind)), MemOperand::Zero(Ident::Register(Register::R12))),
-                            Stat::Pop(Cond::Al, vec![Ident::Register(Register::R12)]),
-                        ], graph).expect("More than one statement")
-                    };
-                    return (Register::from_ind(reg_ind), Some(instrs_chain))
-                }
-            }
-            return (Register::from_ind(reg_ind), None)
-    }
+    /// Move a temporary value into a register, without affecting the
+    /// leave_alone temporaries, and considering the order of next uses for each
+    /// live temporary.
+    fn move_into_reg(
+        &mut self,
+        temp: Temporary,
+        leave_alone: &[Temporary],
+        used: &[Temporary],
+        graph: &mut Graph<ControlFlow>,
+    ) -> (Register, Option<Chain>) {
+        let mut free_registers = Vec::new();
+        let mut preserve_registers = Vec::new();
+        let mut temp_registers = HashMap::new();
 
-    fn move_from_reg_to_stack(&mut self, register_ind: usize, graph: &mut Graph<ControlFlow>) -> Chain {
-        // set register as free
-        let alloc = self.registers[register_ind];
-        self.registers[register_ind] = Alloc::Free;
-
-        // find a space on the stack, we try to keep stack size small by 
-
-    }
-
-    /// Move a temporary to a register. If it is already in a register, no 
-    /// changes are made.
-    fn move_to_reg(&mut self, temp: Temporary, leave_alone: &Vec<Temporary>, usefulness: &Vec<Temporary>, graph: &mut Graph<ControlFlow>) -> (Register, Option<Chain>) {
-
-        let mut reg_temps = HashMap::new();
-        let mut free_reg = None;
-        let mut reg_pres = None;
-
-        for (ind, alloc) in self.registers.iter().enumerate() {
+        // iterate through all registers to get the free, preserved and the temporary registers
+        for (reg_ind, alloc) in self.registers.iter_mut().enumerate() {
             match alloc {
                 Alloc::Temp(t) => {
-                    if t == &temp {
-                        return (Register::from_ind(ind), None)
+                    if *t == temp {
+                        return (Register::from_ind(reg_ind), None);
                     } else if !leave_alone.contains(t) {
-                        reg_temps.insert(*t, ind);
+                        temp_registers.insert(*t, reg_ind);
                     }
-                },
-                Alloc::Preserve(p) => reg_pres = Some((*p, ind)),
-                Alloc::Free => free_reg = Some(ind),
-                Alloc::StackReserve | 
+                }
+                Alloc::Preserve(p) => preserve_registers.push((*p, reg_ind)),
+                Alloc::Free => free_registers.push(reg_ind),
                 Alloc::Protected => (),
+                Alloc::StackReserve => {
+                    panic!("Should never have stack reserved space in registers")
+                }
             }
         }
 
-        let stack_len = self.stack.len();
+        // we define the allocation of the temporary variable
+        let alloc = Alloc::Temp(temp);
 
-        if let Some(reg_ind) = free_reg {
-            // move from stack to the register
-            return self.move_from_stack_to_reg(temp, reg_ind, graph);
+        // Attempt to use free registers, registers with preserved values, and
+        // registers containing temporaries to place the alloc in a register.
+        if !free_registers.is_empty() {
+            // Use a free register to store the temporary
+            let dst_register = Register::from_ind(
+                free_registers
+                    .pop()
+                    .expect("vector of free registers is not empty"),
+            );
+            (
+                dst_register,
+                Some(self.move_reg_stack(dst_register, &alloc, MemOp::Ldr, free_registers, graph)),
+            )
+        } else if !preserve_registers.is_empty() {
+            // There are no free registers, however we can use one of the registers
+            // containing a value which must be preserved. (place it on stack)
+            let (pres, reg_ind) = preserve_registers
+                .pop()
+                .expect("vector of preserve registers is not empty");
+
+            // create the destination register from the register's index
+            let dst_register = Register::from_ind(reg_ind);
+
+            // place the preserved value to the stack, and pull the temporary from the stack.
+            let pres_to_stack = self.move_reg_stack(
+                dst_register,
+                &Alloc::Preserve(pres),
+                MemOp::Str,
+                free_registers,
+                graph,
+            );
+            let temp_to_reg =
+                self.move_reg_stack(dst_register, &alloc, MemOp::Ldr, Vec::new(), graph);
+
+            // Set the register to contain the temporary we want in a register
+            self.registers[reg_ind] = alloc;
+
+            (
+                dst_register,
+                Some(chain_two_chains(pres_to_stack, temp_to_reg)),
+            )
+        } else {
+            // Use current temporary (attempting to use one with the longest time till use)
+            for old_temp in used {
+                if let Some(reg_ind) = temp_registers.get(old_temp) {
+                    let dst_register = Register::from_ind(*reg_ind);
+
+                    let old_temp_to_stack = self.move_reg_stack(
+                        dst_register,
+                        &Alloc::Temp(*old_temp),
+                        MemOp::Str,
+                        Vec::new(),
+                        graph,
+                    );
+                    let new_temp_to_reg = self.move_reg_stack(
+                        dst_register,
+                        &alloc,
+                        MemOp::Ldr,
+                        free_registers,
+                        graph,
+                    );
+
+                    self.registers[*reg_ind] = alloc;
+
+                    return (
+                        dst_register,
+                        Some(chain_two_chains(old_temp_to_stack, new_temp_to_reg)),
+                    );
+                }
+            }
+
+            panic!("There are no free registers, no preserve registers and no registers with temporaries, this means every register is in the leave_alone list.")
         }
-
-        if let Some((pres_id, reg_ind)) = reg_pres {
-            // move the preserve to the stack
-
-
-
-        }
-
-
-
-
-        todo!()
-
-    }
-
-    fn translate_node(&mut self, node: ArmNode, livein: Vec<Temporary>, liveout: Vec<Temporary>,  graph: &mut Graph<ControlFlow>) {
-        self.update_live(&livein, graph);
-
-
-
-
-        match node.get_mut().deref_mut() {
-            ControlFlow::Simple(_, stat, _) => todo!(),
-            ControlFlow::Branch(_, _, _, _) => todo!(),
-            ControlFlow::Return(_, _) => todo!(),
-            ControlFlow::Multi(_, _) => todo!(),
-            ControlFlow::Ltorg(_) |
-            ControlFlow::Removed => (),
-        };
-
-
-
-
-        self.update_live(&liveout, graph);
     }
 }
-
 
 impl Register {
     /// get a register from the index in an AllocationState's register array.
@@ -303,7 +463,7 @@ impl Register {
             13 => Register::Sp,
             14 => Register::Lr,
             15 => Register::Pc,
-            _ => panic!("Not a valid register index")
+            _ => panic!("Not a valid register index"),
         }
     }
 
