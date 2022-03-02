@@ -23,6 +23,7 @@
 
 use std::{
     collections::{HashMap, HashSet, LinkedList},
+    fmt::Display,
     iter::zip,
 };
 
@@ -278,6 +279,258 @@ pub struct Program(
     pub HashMap<DataRef, Vec<Expr>>,
     pub Option<String>,
 );
+
+impl Display for ArithOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Add => "+",
+                Self::Sub => "-",
+                Self::Mul => "*",
+                Self::Div => "/",
+                Self::Mod => "%",
+            }
+        )
+    }
+}
+
+impl Display for BoolOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::And => "&",
+                Self::Or => "|",
+                Self::Xor => "^",
+            }
+        )
+    }
+}
+
+impl Display for NumSize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::DWord => "dword",
+                Self::Word => "word",
+                Self::Byte => "byte",
+            }
+        )
+    }
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Num(num_size) => write!(f, "num({})", num_size),
+            Self::Bool => write!(f, "bool"),
+            Self::Ptr => write!(f, "void*"),
+        }
+    }
+}
+
+fn format_args<T: ToString, C: IntoIterator<Item = T>>(args: C) -> String {
+    args.into_iter()
+        .map(|expr| expr.to_string())
+        .intersperse(", ".to_string())
+        .collect::<String>()
+}
+
+impl Display for NumExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ArithOp(box num_expr1, op, box num_expr2) => {
+                write!(f, "({}){}({})", num_expr1, op, num_expr2)
+            }
+            Self::Call(fname, args) => write!(f, "{}({})", fname, format_args(args),),
+            Self::Cast(num_size, box num_expr) => write!(f, "{}({})", num_size, num_expr),
+            Self::Const(num_size, num_const) => {
+                let num_size = num_size.to_string();
+                write!(f, "{}{}", num_const, &num_size[..num_size.len() - 3])
+            }
+            Self::Deref(num_size, ptr_expr) => {
+                write!(f, "*[{}]({})", Type::Num(*num_size), ptr_expr)
+            }
+            Self::SizeOf(expr_type) => write!(f, "sizeof({})", expr_type),
+            Self::SizeOfWideAlloc => write!(f, "sizeof(wide_alloc)"),
+            Self::Var(var_name) => write!(f, "v_{}", var_name),
+        }
+    }
+}
+
+impl Display for BoolExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::BoolOp(box bool_expr1, op, box bool_expr2) => {
+                write!(f, "({}){}({})", bool_expr1, op, bool_expr2)
+            }
+            Self::Call(fname, args) => write!(f, "{}({})", fname, format_args(args),),
+            Self::Const(bool_const) => write!(f, "{}", if *bool_const { "true" } else { "false" }),
+            Self::Deref(ptr_expr) => write!(f, "*[{}]({})", Type::Bool, ptr_expr),
+            Self::Not(box bool_expr) => write!(f, "!({})", bool_expr),
+            Self::PtrEq(ptr_expr1, ptr_expr2) => {
+                write!(f, "({})==({})", ptr_expr1, ptr_expr2)
+            }
+            Self::TestPositive(num_expr) => write!(f, "({}) > 0", num_expr),
+            Self::TestZero(num_expr) => write!(f, "({}) == 0", num_expr),
+            Self::Var(var_name) => write!(f, "v_{}", var_name),
+        }
+    }
+}
+
+impl Display for PtrExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Call(fname, args) => write!(f, "{}({})", fname, format_args(args),),
+            Self::DataRef(data_ref) => write!(f, "addr(ref_{})", data_ref),
+            Self::Deref(ptr_expr) => write!(f, "*[{}]({})", Type::Ptr, ptr_expr),
+            Self::Malloc(exprs) => write!(f, "alloc({})", format_args(exprs)),
+            Self::WideMalloc(exprs) => write!(f, "wide_alloc({})", format_args(exprs)),
+            Self::Null => write!(f, "null"),
+            Self::Offset(box ptr_expr, box num_expr) => write!(f, "({})+({})", ptr_expr, num_expr),
+            Self::Var(var_name) => write!(f, "v_{}", var_name),
+        }
+    }
+}
+
+impl Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Num(num_expr) => write!(f, "{}", num_expr),
+            Self::Bool(bool_expr) => write!(f, "{}", bool_expr),
+            Self::Ptr(ptr_expr) => write!(f, "{}", ptr_expr),
+        }
+    }
+}
+
+impl Display for Stat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AssignPtr(ptr_expr, expr) => write!(f, "{} = {};", ptr_expr, expr),
+            Self::AssignVar(var, expr) => write!(f, "v_{} = {};", var, expr),
+            Self::Free(ptr_expr) => write!(f, "free({});", ptr_expr),
+            Self::PrintChar(num_expr) => write!(f, "printf(\"%c\", {});", num_expr),
+            Self::PrintExpr(expr) => write!(f, "printf(\"%d\", {});", expr),
+            Self::PrintEol() => write!(f, "printf(\"\\n\");"),
+            Self::PrintStr(ptr_expr, num_expr) => {
+                write!(f, "printf(\"%.*s\", {}, {})", num_expr, ptr_expr)
+            }
+            Self::ReadCharPtr(ptr_expr) => write!(f, "scanf(\"%c\", {})", ptr_expr),
+            Self::ReadCharVar(var) => write!(f, "scanf(\"%c\", &v_{})", var),
+            Self::ReadIntPtr(ptr_expr) => write!(f, "scanf(\"%d\", {})", ptr_expr),
+            Self::ReadIntVar(var) => write!(f, "scanf(\"%d\", &v_{})", var),
+        }
+    }
+}
+
+fn format_local_vars(local_vars: &HashMap<VarRepr, Type>) -> LinkedList<String> {
+    local_vars
+        .iter()
+        .map(|(var, var_type)| format!("{} v_{};", var_type, var))
+        .collect()
+}
+
+const INDENT: &str = "    ";
+fn format_block_helper(
+    block_graph: &Vec<Block>,
+    current_block: BlockId,
+    visited: &mut HashSet<BlockId>,
+) -> LinkedList<String> {
+    visited.insert(current_block);
+    let Block(incoming, stats, ending) = &block_graph[current_block];
+    let mut output: LinkedList<_> = stats.iter().map(|stat| format!("{}", stat)).collect();
+    if incoming.len() > 0 {
+        output.push_front(format!("b_{}:", current_block));
+    }
+    match ending {
+        BlockEnding::Exit(num_expr) => output.push_back(format!("exit({});", num_expr.to_string())),
+        BlockEnding::Return(expr) => output.push_back(format!("return {};", expr.to_string())),
+        BlockEnding::CondJumps(cond_jumps, else_jump) => {
+            for (bool_expr, cond_jump) in cond_jumps {
+                output.push_back(format!("if {} goto b_{}", bool_expr, cond_jump));
+            }
+            if !visited.contains(else_jump) {
+                output.append(&mut format_block_helper(block_graph, *else_jump, visited));
+            } else {
+                output.push_back(format!("goto b_{}", else_jump));
+            }
+        }
+    }
+    output
+}
+
+fn format_block_graph(block_graph: &Vec<Block>) -> LinkedList<String> {
+    let mut visited = HashSet::new();
+    let mut output = LinkedList::new();
+    for block_id in 0..block_graph.len() {
+        if !visited.contains(&block_id) {
+            output.append(&mut format_block_helper(
+                block_graph,
+                block_id,
+                &mut visited,
+            ));
+        }
+    }
+    output
+}
+
+fn format_function(
+    Function(ret_type, args, local_vars, block_graph): &Function,
+    fname: &str,
+    is_int_handler: bool,
+) -> String {
+    format!(
+        "{} {}({}){} {{\n{}}}\n",
+        ret_type,
+        fname,
+        format_args(
+            args.iter()
+                .map(|(arg_type, arg)| format!("{} v_{}", arg_type, arg))
+        ),
+        if is_int_handler { " : int_handler" } else { "" },
+        format_local_vars(local_vars)
+            .into_iter()
+            .chain(format_block_graph(block_graph).into_iter())
+            .map(|line| format!("{}{}\n", INDENT, line))
+            .collect::<String>(),
+    )
+}
+
+impl Display for Program {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Program(functions, local_vars, block_graph, data_refs, int_handler) = self;
+        write!(
+            f,
+            "{}{}{}",
+            data_refs
+                .iter()
+                .map(|(data_ref, definition)| format!(
+                    "ref_{}: {{{}}}",
+                    data_ref,
+                    format_args(definition)
+                ))
+                .collect::<String>(),
+            functions
+                .iter()
+                .map(|(fname, function)| format_function(
+                    function,
+                    fname,
+                    Some(fname) == int_handler.as_ref()
+                ))
+                .collect::<String>(),
+            format_local_vars(local_vars)
+                .into_iter()
+                .chain(format_block_graph(block_graph).into_iter())
+                .map(|line| line + "\n")
+                .collect::<String>(),
+        )
+    }
+}
 
 /// Returns an Ok or an Err based on the value of the boolean
 fn cond_result(b: bool) -> Result<(), ()> {
@@ -667,7 +920,7 @@ mod test {
         vars: HashMap<VarRepr, Type>,
         data_refs: HashMap<DataRef, Vec<Expr>>,
     ) -> Result<(), ()> {
-        Program(
+        let program = Program(
             HashMap::new(),
             vars,
             vec![Block(
@@ -677,8 +930,9 @@ mod test {
             )],
             data_refs,
             None,
-        )
-        .validate()
+        );
+        println!("{}", program);
+        program.validate()
     }
 
     fn validate_call(
@@ -687,7 +941,7 @@ mod test {
         args: Vec<(Type, VarRepr)>,
         ret_type: Type,
     ) -> Result<(), ()> {
-        Program(
+        let program = Program(
             HashMap::from([(
                 fname,
                 Function(
@@ -713,12 +967,15 @@ mod test {
             )],
             HashMap::new(),
             None,
-        )
-        .validate()
+        );
+        println!("{}", program);
+        program.validate()
     }
 
     fn validate_block_graph(graph: Vec<Block>) -> Result<(), ()> {
-        Program(HashMap::new(), HashMap::new(), graph, HashMap::new(), None).validate()
+        let program = Program(HashMap::new(), HashMap::new(), graph, HashMap::new(), None);
+        println!("{}", program);
+        program.validate()
     }
 
     #[test]
