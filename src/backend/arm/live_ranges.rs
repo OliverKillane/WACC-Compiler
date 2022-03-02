@@ -273,21 +273,21 @@ impl LiveRanges {
 
     /// For a given node provides a tuple of:
     /// (live-in temporaries - first has furthest away use, temporaries used by this statement)
-    pub fn get_livein(&self, node: &ArmNode) -> (Vec<Temporary>, Option<&Vec<Temporary>>) {
+    pub fn get_livein(&self, node: &ArmNode) -> Vec<Temporary> {
         if let Some((livein, _, _, uses, _)) = self.arm_node_map.get(node) {
-            (self.sort_set(livein), Some(uses))
+            self.sort_set(livein)
         } else {
-            (Vec::new(), None)
+            Vec::new()
         }
     }
 
     /// For a given node provides a tuple of:
     /// (live-out temporaries - first is furthest away use, temporaries defined by this statement)
-    pub fn get_out(&self, node: &ArmNode) -> (Vec<Temporary>, Option<&Vec<Temporary>>) {
+    pub fn get_liveout(&self, node: &ArmNode) -> Vec<Temporary> {
         if let Some((_, liveout, defs, _, _)) = self.arm_node_map.get(node) {
-            (self.sort_set(liveout), Some(defs))
+            self.sort_set(liveout)
         } else {
-            (Vec::new(), None)
+            Vec::new()
         }
     }
 }

@@ -1,7 +1,12 @@
 //! Register allocation for the arm representation, using live ranges and
 //! 'time-till-use'.
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::DerefMut,
+};
+
+use lazy_static::__Deref;
 
 use crate::backend::arm::{
     arm_graph_utils::chain_two_chains,
@@ -11,7 +16,8 @@ use crate::backend::arm::{
 use super::{
     super::super::graph::Graph,
     arm_graph_utils::{is_shifted_8_bit, link_stats, simple_node, Chain},
-    arm_repr::{Cond, ControlFlow, FlexOperand, Ident, RegOp, Register, Stat, Temporary},
+    arm_repr::{ArmNode, Cond, ControlFlow, FlexOperand, Ident, RegOp, Register, Stat, Temporary},
+    live_ranges::LiveRanges,
 };
 
 type Preserved = u128;
@@ -334,7 +340,7 @@ impl AllocationState {
     /// Move a temporary value into a register, without affecting the
     /// leave_alone temporaries, and considering the order of next uses for each
     /// live temporary.
-    fn move_into_reg(
+    fn move_temp_into_reg(
         &mut self,
         temp: Temporary,
         leave_alone: &[Temporary],
@@ -440,6 +446,69 @@ impl AllocationState {
 
             panic!("There are no free registers, no preserve registers and no registers with temporaries, this means every register is in the leave_alone list.")
         }
+    }
+
+    /// Given another state, create the instructions required to conform
+    fn match_state(&mut self, other_state: &Self) -> Option<Chain> {
+        todo!()
+    }
+}
+
+/// Starting from a given node, translate all temporaries to registers.
+/// - Traverses from 'node', this must not have already been translated.
+/// - state_map contains labels where a state already exists, and must be conformed to.
+/// - alloc_state holds the current state of the stack and registers
+/// - graph contains all arm nodes
+fn translate_from_node(
+    mut node: ArmNode,
+    mut alloc_state: AllocationState,
+    state_map: &mut HashMap<ArmNode, AllocationState>,
+    live_ranges: &LiveRanges,
+    graph: Graph<ControlFlow>,
+) -> ArmNode {
+    loop {
+        // get the live in and live out
+        let livein = live_ranges.get_livein(&node);
+        let liveout = live_ranges.get_liveout(&node);
+
+        // update the registers for current live_in
+        alloc_state.update_live(&livein);
+
+        let (next, chain_before, chain_after) = match node.clone().get_mut().deref_mut() {
+            ControlFlow::Simple(_, stat, next) => {
+                match stat {
+                    Stat::ApplyOp(_, _, _, _, _, _) => todo!(),
+                    Stat::Mul(_, _, _, _, _) => todo!(),
+                    Stat::MulA(_, _, _, _, _, _) => todo!(),
+                    Stat::MulOp(_, _, _, _, _, _, _) => todo!(),
+                    Stat::Move(_, _, _, _, _) => todo!(),
+                    Stat::Cmp(_, _, _, _) => todo!(),
+                    Stat::SatOp(_, _, _, _, _) => todo!(),
+                    Stat::ReadCPSR(_) => todo!(),
+                    Stat::MemOp(_, _, _, _, _) => todo!(),
+                    Stat::Push(_, _) => todo!(),
+                    Stat::Pop(_, _) => todo!(),
+                    Stat::Link(_, _) => todo!(),
+                    Stat::Call(_, _, _, _) => todo!(),
+                    Stat::AssignStackWord(_) => todo!(),
+                };
+            }
+            ControlFlow::Branch(_, _, _, _) => todo!(),
+            ControlFlow::Ltorg(_) => todo!(),
+            ControlFlow::Return(_, _) => todo!(),
+            ControlFlow::Multi(_, next) => {
+                // this instruction has no temporaries, however we must keep
+                // track that we have translated this (other nodes go here)
+                state_map.insert(node, alloc_state.clone());
+
+                // no other instructions are needed, so we simpy move to the next node.
+                (next.clone(), None, None)
+            }
+            ControlFlow::Removed => todo!(),
+        };
+
+        alloc_state.update_live(&liveout);
+        todo!()
     }
 }
 
