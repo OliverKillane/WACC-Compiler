@@ -748,3 +748,460 @@ pub(super) fn translate_ast(
         Some(OVERFLOW_HANDLER_FNAME.to_string()),
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use std::hash::Hash;
+
+    use crate::intermediate::{self as ir, NumExpr, NumSize};
+
+    use super::*;
+
+    #[test]
+    fn test_exit() {
+        let mut block_stats: Vec<ir::Stat> = Vec::new();
+        let mut block_graph: Vec<ir::Block> = Vec::new();
+        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut free_var: VarRepr = 0;
+        let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
+        let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
+        let mut function_types: HashMap<String, Type> = HashMap::new();
+        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
+
+        let ast_expr = ast::Expr::Int(0);
+        let ast_expr_type = ast::Type::Int;
+        let ast_expr_wrap = ASTWrapper(Some(ast_expr_type.clone()), ast_expr.clone());
+
+        let ir_expr = translate_expr(
+            ast_expr,
+            &ast_expr_type,
+            &var_symb,
+            &mut data_ref_map,
+            &mut helper_function_flags,
+        );
+
+        if let ir::Expr::Num(inner_expr) = ir_expr {
+            let ast_stat = ast::Stat::Exit(ast_expr_wrap);
+
+            translate_stat(
+                ASTWrapper(None, ast_stat),
+                &mut block_stats,
+                &mut block_graph,
+                &mut prev_blocks,
+                &mut free_var,
+                &mut ir_vars,
+                &mut var_symb,
+                &mut function_types,
+                &mut data_ref_map,
+                &mut helper_function_flags,
+            );
+
+            let ref_block_stats: Vec<ir::Stat> = Vec::new();
+            let mut ref_block_graph: Vec<ir::Block> = Vec::new();
+            let ref_prev_blocks: Vec<BlockId> = Vec::new();
+
+            ref_block_graph.push(ir::Block(
+                ref_prev_blocks,
+                ref_block_stats,
+                BlockEnding::Exit(inner_expr),
+            ));
+
+            assert_eq!(ref_block_graph, block_graph);
+        } else {
+            panic!("Test expression is not a numerical expression");
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "Expected a type for an expression")]
+    fn test_exit_no_type() {
+        let mut block_stats: Vec<ir::Stat> = Vec::new();
+        let mut block_graph: Vec<ir::Block> = Vec::new();
+        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut free_var: VarRepr = 0;
+        let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
+        let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
+        let mut function_types: HashMap<String, Type> = HashMap::new();
+        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
+
+        let ast_expr = ast::Expr::Int(0);
+        let ast_expr_type = ast::Type::Int;
+        let ast_expr_wrap = ASTWrapper(None, ast_expr.clone());
+
+        let ir_expr = translate_expr(
+            ast_expr,
+            &ast_expr_type,
+            &var_symb,
+            &mut data_ref_map,
+            &mut helper_function_flags,
+        );
+
+        if let ir::Expr::Num(inner_expr) = ir_expr {
+            let ast_stat = ast::Stat::Exit(ast_expr_wrap);
+
+            translate_stat(
+                ASTWrapper(None, ast_stat),
+                &mut block_stats,
+                &mut block_graph,
+                &mut prev_blocks,
+                &mut free_var,
+                &mut ir_vars,
+                &mut var_symb,
+                &mut function_types,
+                &mut data_ref_map,
+                &mut helper_function_flags,
+            );
+
+            let ref_block_stats: Vec<ir::Stat> = Vec::new();
+            let mut ref_block_graph: Vec<ir::Block> = Vec::new();
+            let ref_prev_blocks: Vec<BlockId> = Vec::new();
+
+            ref_block_graph.push(ir::Block(
+                ref_prev_blocks,
+                ref_block_stats,
+                BlockEnding::Exit(inner_expr),
+            ));
+
+            assert_eq!(ref_block_graph, block_graph);
+        } else {
+            panic!("Test expression is not a numerical expression");
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "Expected a numeric expression")]
+    fn test_exit_non_num_expr() {
+        let mut block_stats: Vec<ir::Stat> = Vec::new();
+        let mut block_graph: Vec<ir::Block> = Vec::new();
+        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut free_var: VarRepr = 0;
+        let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
+        let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
+        let mut function_types: HashMap<String, Type> = HashMap::new();
+        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
+
+        let ast_expr = ast::Expr::Bool(true);
+        let ast_expr_type = ast::Type::Int;
+        let ast_expr_wrap = ASTWrapper(Some(ast_expr_type.clone()), ast_expr.clone());
+
+        let ast_stat = ast::Stat::Exit(ast_expr_wrap);
+
+        translate_stat(
+            ASTWrapper(None, ast_stat),
+            &mut block_stats,
+            &mut block_graph,
+            &mut prev_blocks,
+            &mut free_var,
+            &mut ir_vars,
+            &mut var_symb,
+            &mut function_types,
+            &mut data_ref_map,
+            &mut helper_function_flags,
+        );
+    }
+
+    #[test]
+    fn test_return() {
+        let mut block_stats: Vec<ir::Stat> = Vec::new();
+        let mut block_graph: Vec<ir::Block> = Vec::new();
+        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut free_var: VarRepr = 0;
+        let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
+        let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
+        let mut function_types: HashMap<String, Type> = HashMap::new();
+        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
+
+        let ast_expr = ast::Expr::Int(0);
+        let ast_expr_type = ast::Type::Int;
+        let ast_expr_wrap = ASTWrapper(Some(ast_expr_type.clone()), ast_expr.clone());
+
+        let ir_expr = translate_expr(
+            ast_expr,
+            &ast_expr_type,
+            &var_symb,
+            &mut data_ref_map,
+            &mut helper_function_flags,
+        );
+
+        let ast_stat = ast::Stat::Return(ast_expr_wrap);
+
+        translate_stat(
+            ASTWrapper(None, ast_stat),
+            &mut block_stats,
+            &mut block_graph,
+            &mut prev_blocks,
+            &mut free_var,
+            &mut ir_vars,
+            &mut var_symb,
+            &mut function_types,
+            &mut data_ref_map,
+            &mut helper_function_flags,
+        );
+
+        let ref_block_stats: Vec<ir::Stat> = Vec::new();
+        let mut ref_block_graph: Vec<ir::Block> = Vec::new();
+        let ref_block_graph_len = ref_block_graph.len();
+
+        ref_block_graph.push(ir::Block(
+            vec![ref_block_graph_len],
+            ref_block_stats,
+            BlockEnding::Return(ir_expr),
+        ));
+
+        assert_eq!(ref_block_graph, block_graph);
+    }
+
+    #[test]
+    #[should_panic(expected = "Expected a type for an expression")]
+    fn test_return_no_type() {
+        let mut block_stats: Vec<ir::Stat> = Vec::new();
+        let mut block_graph: Vec<ir::Block> = Vec::new();
+        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut free_var: VarRepr = 0;
+        let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
+        let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
+        let mut function_types: HashMap<String, Type> = HashMap::new();
+        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
+
+        let ast_expr = ast::Expr::Int(0);
+        let ast_expr_type = ast::Type::Int;
+        let ast_expr_wrap = ASTWrapper(None, ast_expr.clone());
+
+        let ir_expr = translate_expr(
+            ast_expr,
+            &ast_expr_type,
+            &var_symb,
+            &mut data_ref_map,
+            &mut helper_function_flags,
+        );
+
+        let ast_stat = ast::Stat::Return(ast_expr_wrap);
+
+        translate_stat(
+            ASTWrapper(None, ast_stat),
+            &mut block_stats,
+            &mut block_graph,
+            &mut prev_blocks,
+            &mut free_var,
+            &mut ir_vars,
+            &mut var_symb,
+            &mut function_types,
+            &mut data_ref_map,
+            &mut helper_function_flags,
+        );
+
+        let ref_block_stats: Vec<ir::Stat> = Vec::new();
+        let mut ref_block_graph: Vec<ir::Block> = Vec::new();
+        let ref_block_graph_len = ref_block_graph.len();
+
+        ref_block_graph.push(ir::Block(
+            vec![ref_block_graph_len],
+            ref_block_stats,
+            BlockEnding::Return(ir_expr),
+        ));
+
+        assert_eq!(ref_block_graph, block_graph);
+    }
+
+    #[test]
+    fn test_print_int() {
+        let mut block_stats: Vec<ir::Stat> = Vec::new();
+        let mut block_graph: Vec<ir::Block> = Vec::new();
+        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut free_var: VarRepr = 0;
+        let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
+        let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
+        let mut function_types: HashMap<String, Type> = HashMap::new();
+        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
+
+        let ast_expr = ast::Expr::Int(0);
+        let ast_expr_type = ast::Type::Int;
+        let ast_expr_wrap = ASTWrapper(Some(ast_expr_type.clone()), ast_expr.clone());
+
+        let ir_expr = translate_expr(
+            ast_expr,
+            &ast_expr_type,
+            &var_symb,
+            &mut data_ref_map,
+            &mut helper_function_flags,
+        );
+
+        let ast_stat = ast::Stat::Print(ast_expr_wrap);
+
+        translate_stat(
+            ASTWrapper(None, ast_stat),
+            &mut block_stats,
+            &mut block_graph,
+            &mut prev_blocks,
+            &mut free_var,
+            &mut ir_vars,
+            &mut var_symb,
+            &mut function_types,
+            &mut data_ref_map,
+            &mut helper_function_flags,
+        );
+
+        let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+
+        ref_block_stats.push(ir::Stat::PrintExpr(ir_expr));
+
+        assert_eq!(ref_block_stats, block_stats);
+    }
+
+    #[test]
+    fn test_print_char() {
+        let mut block_stats: Vec<ir::Stat> = Vec::new();
+        let mut block_graph: Vec<ir::Block> = Vec::new();
+        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut free_var: VarRepr = 0;
+        let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
+        let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
+        let mut function_types: HashMap<String, Type> = HashMap::new();
+        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
+
+        let ast_expr = ast::Expr::Char('a');
+        let ast_expr_type = ast::Type::Char;
+        let ast_expr_wrap = ASTWrapper(Some(ast_expr_type.clone()), ast_expr.clone());
+
+        let ir_expr = translate_expr(
+            ast_expr,
+            &ast_expr_type,
+            &var_symb,
+            &mut data_ref_map,
+            &mut helper_function_flags,
+        );
+
+        if let ir::Expr::Num(inner_expr) = ir_expr {
+            let ast_stat = ast::Stat::Print(ast_expr_wrap);
+
+            translate_stat(
+                ASTWrapper(None, ast_stat),
+                &mut block_stats,
+                &mut block_graph,
+                &mut prev_blocks,
+                &mut free_var,
+                &mut ir_vars,
+                &mut var_symb,
+                &mut function_types,
+                &mut data_ref_map,
+                &mut helper_function_flags,
+            );
+
+            let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+
+            ref_block_stats.push(ir::Stat::PrintChar(inner_expr));
+
+            assert_eq!(ref_block_stats, block_stats);
+        } else {
+            panic!("Test expression is not a numerical expression");
+        }
+    }
+
+    #[test]
+    fn test_print_bool() {
+        let mut block_stats: Vec<ir::Stat> = Vec::new();
+        let mut block_graph: Vec<ir::Block> = Vec::new();
+        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut free_var: VarRepr = 0;
+        let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
+        let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
+        let mut function_types: HashMap<String, Type> = HashMap::new();
+        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
+
+        let ast_expr = ast::Expr::Bool(true);
+        let ast_expr_type = ast::Type::Bool;
+        let ast_expr_wrap = ASTWrapper(Some(ast_expr_type.clone()), ast_expr.clone());
+
+        let ir_expr = translate_expr(
+            ast_expr,
+            &ast_expr_type,
+            &var_symb,
+            &mut data_ref_map,
+            &mut helper_function_flags,
+        );
+
+        let ast_stat = ast::Stat::Print(ast_expr_wrap);
+
+        translate_stat(
+            ASTWrapper(None, ast_stat),
+            &mut block_stats,
+            &mut block_graph,
+            &mut prev_blocks,
+            &mut free_var,
+            &mut ir_vars,
+            &mut var_symb,
+            &mut function_types,
+            &mut data_ref_map,
+            &mut helper_function_flags,
+        );
+
+        let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+
+        ref_block_stats.push(ir::Stat::PrintExpr(ir_expr));
+
+        assert_eq!(ref_block_stats, block_stats);
+    }
+
+    #[test]
+    fn test_print_string() {
+        let mut block_stats: Vec<ir::Stat> = Vec::new();
+        let mut block_graph: Vec<ir::Block> = Vec::new();
+        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut free_var: VarRepr = 0;
+        let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
+        let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
+        let mut function_types: HashMap<String, Type> = HashMap::new();
+        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
+
+        let test_str = "test".to_string();
+
+        let ast_expr = ast::Expr::String(test_str.clone());
+        let ast_expr_type = ast::Type::String;
+        let ast_expr_wrap = ASTWrapper(Some(ast_expr_type.clone()), ast_expr.clone());
+
+        let ir_expr = translate_expr(
+            ast_expr,
+            &ast_expr_type,
+            &var_symb,
+            &mut data_ref_map,
+            &mut helper_function_flags,
+        );
+
+        if let ir::Expr::Ptr(inner_expr) = ir_expr {
+            let ast_stat = ast::Stat::Print(ast_expr_wrap);
+
+            translate_stat(
+                ASTWrapper(None, ast_stat),
+                &mut block_stats,
+                &mut block_graph,
+                &mut prev_blocks,
+                &mut free_var,
+                &mut ir_vars,
+                &mut var_symb,
+                &mut function_types,
+                &mut data_ref_map,
+                &mut helper_function_flags,
+            );
+
+            let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+
+            ref_block_stats.push(ir::Stat::PrintStr(
+                inner_expr,
+                NumExpr::Const(NumSize::DWord, test_str.len() as i32),
+            ));
+
+            assert_eq!(ref_block_stats, block_stats);
+        } else {
+            panic!("Test expression is not a numerical expression");
+        }
+    }
+}
