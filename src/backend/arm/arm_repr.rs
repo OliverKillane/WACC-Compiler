@@ -183,14 +183,11 @@ pub enum MemOperand {
     /// Indirect memory location stored in an identifier with offset [FlexOffset].
     /// If [bool] is true then we update the value in the register with offset
     /// before accessing the memory location.
-    PreIndex(Ident, FlexOffset, bool),
+    PreIndex(Ident, FlexOffset),
     /// Direct from the label in the data section indicated by [String].
     Label(DataIdent),
     /// Immediate 32-bit integer value.
     Expression(i32),
-    /// Indirect memory location stored in the identifier, updated by
-    /// [FlexOffset] after the memory access has taken place.
-    PostIndex(Ident, FlexOffset),
 }
 
 /// Offset for LDR/STR instructions.
@@ -263,20 +260,23 @@ pub enum Stat {
     MemOp(MemOp, Cond, bool, Ident, MemOperand),
 
     /// Push thumb instruction.
-    Push(Cond, Vec<Ident>),
+    Push(Cond, Ident),
 
     /// Pop thumb instruction, R15/PC can only be used as the last register to
     /// pop (prevent jump before popping other registers).
-    Pop(Cond, Vec<Ident>),
+    Pop(Cond, Ident),
 
     /// Branch link to a string identifier (calls are converted into these)
     Link(Cond, String),
 
     /// A dummy node for calls, expanded by register allocation.
-    Call(Cond, String, Option<Ident>, Vec<Ident>),
+    Call(String, Option<Temporary>, Vec<Temporary>),
 
     /// A dummy node for assigning a reserved stack space within a function.
     AssignStackWord(Ident),
+
+    /// No operation
+    Nop,
 }
 
 pub type ArmNode = NodeRef<ControlFlow>;
@@ -299,7 +299,7 @@ pub enum ControlFlow {
 
     /// Return statement, returning a temporary. This is a dummy node, which is
     /// replaced by the relevant register/stack management when allocating registers
-    Return(Option<ArmNode>, Option<Ident>),
+    Return(Option<ArmNode>, Option<Temporary>),
 
     /// A position that can be jumped to from multiple locations/can have multiple predecessors.
     Multi(Vec<ArmNode>, Option<ArmNode>),
@@ -324,15 +324,15 @@ pub struct Subroutine {
     pub args: Vec<Temporary>,
     pub start_node: ArmNode,
     pub temps: HashSet<Temporary>,
-    pub reserved_stack: u32,
+    pub reserved_stack: u8,
 }
 
 /// The main program containing text ([instructions](Stat)) and [data](Data).
 pub struct Program {
     pub data: Vec<Data>,
     pub reserved_stack: u8,
-    pub temps: HashSet<Temporary>,
     pub main: ArmNode,
+    pub temps: HashSet<Temporary>,
     pub functions: HashMap<String, Subroutine>,
     pub cfg: Graph<ControlFlow>,
 }

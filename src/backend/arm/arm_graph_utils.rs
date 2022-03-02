@@ -14,10 +14,21 @@ pub type Chain = (ArmNode, ArmNode);
 /// 2. start <-> leftmiddle <-> rightmiddle -> end
 /// 3. start <-> end
 /// ```
-pub fn chain_two_chains((start, mut leftmiddle): Chain, (mut rightmiddle, end): Chain) -> Chain {
+pub fn link_two_chains((start, mut leftmiddle): Chain, (mut rightmiddle, end): Chain) -> Chain {
     leftmiddle.set_successor(rightmiddle.clone());
     rightmiddle.set_predecessor(leftmiddle);
     (start, end)
+}
+
+/// Given a vector of optional chains, link the present chains in order.
+/// ```text
+/// [Some(A <-> B), Some(C <-> D), None, Some(E <-> F), None]
+/// [A <-> B, C <-> D, E <-> F]
+/// A <-> B <-> C <-> D <-> E <-> F
+/// Some(A <-> F)
+/// ```
+pub fn link_optional_chains(opt_chains: Vec<Option<Chain>>) -> Option<Chain> {
+    opt_chains.into_iter().flatten().reduce(link_two_chains)
 }
 
 /// Given tuples of start and end nodes, chain them together.
@@ -26,15 +37,15 @@ pub fn chain_two_chains((start, mut leftmiddle): Chain, (mut rightmiddle, end): 
 /// 2. 1 <-> 2 <-> 3 <-> 4 <-> ... <-> n-1 <-> n
 /// 3. (1 <-> n)
 /// ```
-pub fn chain_chains(nodes: Vec<Chain>) -> Option<Chain> {
-    nodes.into_iter().reduce(chain_two_chains)
+pub fn link_chains(nodes: Vec<Chain>) -> Option<Chain> {
+    nodes.into_iter().reduce(link_two_chains)
 }
 
 /// Given a vector of statements, connect them together in a simple chain within
 /// the graph. If no statements are provided returns a None, otherwise a some of
 /// the start and end node.
 pub fn link_stats(stats: Vec<Stat>, graph: &mut Graph<ControlFlow>) -> Option<Chain> {
-    chain_chains(
+    link_chains(
         stats
             .into_iter()
             .map(|stat| simple_node(stat, graph))
@@ -57,7 +68,7 @@ pub fn is_shifted_8_bit(i: i32) -> bool {
 impl ArmNode {
     /// Set the predecessor arm node, for Simple, Branch and Return the start
     /// node is set, for Multi the predecessor is added to the predecessors list.
-    pub fn set_predecessor(&mut self, predecessor: ArmNode) {
+    pub fn set_predecessor(&mut self, predecessor: Self) {
         match self.get_mut().deref_mut() {
             ControlFlow::Simple(pre, _, _)
             | ControlFlow::Branch(pre, _, _, _)
@@ -71,7 +82,7 @@ impl ArmNode {
     }
 
     /// Set the successor node to an arm node.
-    pub fn set_successor(&mut self, successor: ArmNode) {
+    pub fn set_successor(&mut self, successor: Self) {
         match self.get_mut().deref_mut() {
             ControlFlow::Simple(_, _, succ)
             | ControlFlow::Branch(_, _, _, succ)
@@ -81,6 +92,49 @@ impl ArmNode {
             ControlFlow::Return(_, _) => panic!("There are no nodes after a return"),
             ControlFlow::Ltorg(_) => panic!("There are no nodes after a literal pool"),
             ControlFlow::Removed => panic!("There are no nodes connected to a removed node"),
+        }
+    }
+
+    pub fn replace_successor(&mut self, successor: Self, new_successor: Self) {
+        match self.get_mut().deref_mut() {
+            ControlFlow::Simple(_, _, succ) | ControlFlow::Multi(_, succ) => {
+                if &Some(successor) == succ {
+                    let _ = succ.insert(new_successor);
+                }
+            }
+            ControlFlow::Branch(_, succ1, _, succ2) => {
+                if succ1 == &successor {
+                    *succ1 = new_successor
+                } else if &Some(successor) == succ2 {
+                    let _ = succ2.insert(new_successor);
+                }
+            }
+            ControlFlow::Ltorg(_) => panic!("There are no nodes after a return"),
+            ControlFlow::Return(_, _) => panic!("There are no nodes after a literal pool"),
+            ControlFlow::Removed => panic!("There are no nodes connected to a removed node"),
+        }
+    }
+
+    pub fn replace_predecessor(&mut self, predecessor: Self, new_predecessor: Self) {
+        match self.get_mut().deref_mut() {
+            ControlFlow::Simple(pre, _, _)
+            | ControlFlow::Ltorg(pre)
+            | ControlFlow::Branch(pre, _, _, _)
+            | ControlFlow::Return(pre, _) => {
+                if &Some(predecessor) == pre {
+                    let _ = pre.insert(new_predecessor);
+                }
+            }
+            ControlFlow::Multi(pres, _) => {
+                for pre in pres.iter_mut() {
+                    if pre == &predecessor {
+                        *pre = new_predecessor;
+                        return;
+                    }
+                }
+                panic!("Attempted replace a predecessor that was not there")
+            }
+            ControlFlow::Removed => panic!("Cannot replace a predecessor to a removed node."),
         }
     }
 }
@@ -172,19 +226,19 @@ mod tests {
 
         let false_start = graph.new_node(ControlFlow::Simple(
             None,
-            Stat::Call(Cond::Al, String::from("hello"), None, vec![]),
+            Stat::Call(String::from("hello"), None, vec![]),
             None,
         ));
         let false_end = graph.new_node(ControlFlow::Simple(
             None,
-            Stat::Call(Cond::Al, String::from("world"), None, vec![]),
+            Stat::Call(String::from("world"), None, vec![]),
             None,
         ));
 
         check_simple_chain(
             vec![
-                Stat::Call(Cond::Al, String::from("hello"), None, vec![]),
-                Stat::Call(Cond::Al, String::from("world"), None, vec![]),
+                Stat::Call(String::from("hello"), None, vec![]),
+                Stat::Call(String::from("world"), None, vec![]),
             ],
             false_start,
             false_end,

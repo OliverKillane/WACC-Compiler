@@ -379,9 +379,9 @@ impl DefsUses for FlexOperand {
 impl DefsUses for MemOperand {
     fn get_defs_and_uses(&self, defs: &mut Vec<Temporary>, uses: &mut Vec<Temporary>) {
         match self {
-            MemOperand::Zero(Ident::Temp(t))
-            | MemOperand::PreIndex(Ident::Temp(t), _, _)
-            | MemOperand::PostIndex(Ident::Temp(t), _) => uses.push(*t),
+            MemOperand::Zero(Ident::Temp(t)) | MemOperand::PreIndex(Ident::Temp(t), _) => {
+                uses.push(*t)
+            }
             _ => (),
         }
     }
@@ -446,14 +446,15 @@ impl DefsUses for Stat {
                     MemOp::Str => uses,
                 },
             ),
-            Stat::Push(_, idents) => idents.iter().for_each(|arg| add_temps(arg, uses)),
-            Stat::Pop(_, idents) => idents.iter().for_each(|arg| add_temps(arg, defs)),
+            Stat::Push(_, arg) => add_temps(arg, uses),
+            Stat::Pop(_, arg) => add_temps(arg, defs),
             Stat::Link(_, _) => todo!(),
-            Stat::Call(_, _, dst, args) => {
-                if let Some(Ident::Temp(dst)) = dst {
+            Stat::Call(_, dst, args) => {
+                if let Some(dst) = dst {
                     defs.push(*dst)
                 }
-                args.iter().for_each(|arg| add_temps(arg, uses))
+                args.iter()
+                    .for_each(|arg| add_temps(&Ident::Temp(*arg), uses))
             }
             Stat::AssignStackWord(Ident::Temp(dst)) => defs.push(*dst),
             _ => (),
@@ -465,7 +466,7 @@ impl DefsUses for ControlFlow {
     fn get_defs_and_uses(&self, defs: &mut Vec<Temporary>, uses: &mut Vec<Temporary>) {
         match self {
             ControlFlow::Simple(_, stat, _) => stat.get_defs_and_uses(defs, uses),
-            ControlFlow::Return(_, Some(Ident::Temp(arg))) => uses.push(*arg),
+            ControlFlow::Return(_, Some(arg)) => uses.push(*arg),
             _ => (),
         }
     }

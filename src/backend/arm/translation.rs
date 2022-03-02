@@ -12,7 +12,7 @@ use super::{
             BinOp, DataRefType, Function, OpSrc, Size, StatCode, StatNode, StatType, ThreeCode,
         },
     },
-    arm_graph_utils::{chain_chains, chain_two_chains, is_shifted_8_bit, link_stats, simple_node},
+    arm_graph_utils::{is_shifted_8_bit, link_chains, link_stats, link_two_chains, simple_node},
     arm_repr::{
         ArmNode, Cond, ControlFlow, Data, DataIdent, DataKind, FlexOffset, FlexOperand, Ident,
         MovOp, Program, RegOp, Shift, Stat, Subroutine, Temporary,
@@ -232,10 +232,7 @@ fn translate_node_inner(
             (label, None)
         }
         StatType::Return(_, three_var) => (
-            graph.new_node(ControlFlow::Return(
-                None,
-                Some(temp_map.use_temp(*three_var)),
-            )),
+            graph.new_node(ControlFlow::Return(None, Some(temp_map.use_id(*three_var)))),
             None,
         ),
         StatType::Dummy(_) => panic!("No dummy nodes should be in the final threecode"),
@@ -436,11 +433,7 @@ fn dataref_to_reg(
                     Cond::Al,
                     false,
                     dst_ident,
-                    MemOperand::PreIndex(
-                        dst_ident,
-                        FlexOffset::Expr(ConstrainedInt::from(offset)),
-                        false,
-                    ),
+                    MemOperand::PreIndex(dst_ident, FlexOffset::Expr(ConstrainedInt::from(offset))),
                 ),
             ],
             graph,
@@ -618,7 +611,7 @@ fn translate_statcode(
                             );
                             let check =
                                 simple_node(Stat::Link(Cond::Vs, overflow_handler.clone()), graph);
-                            chain_two_chains(addition, check)
+                            link_two_chains(addition, check)
                         }
                         None => {
                             // ADD arm_dst_temp, left_reg, right_reg
@@ -654,7 +647,7 @@ fn translate_statcode(
                             );
                             let check =
                                 simple_node(Stat::Link(Cond::Vs, overflow_handler.clone()), graph);
-                            chain_two_chains(subtraction, check)
+                            link_two_chains(subtraction, check)
                         }
                         None => {
                             // SUB arm_dst_temp, left_reg, right_reg
@@ -719,10 +712,9 @@ fn translate_statcode(
                 {
                     simple_node(
                         Stat::Call(
-                            Cond::Al,
                             String::from("__aeabi_idiv"),
-                            Some(arm_dst_temp),
-                            vec![left_reg, right_reg],
+                            Some(arm_dst_temp.get_temp()),
+                            vec![left_reg.get_temp(), right_reg.get_temp()],
                         ),
                         graph,
                     )
@@ -732,10 +724,9 @@ fn translate_statcode(
                 {
                     simple_node(
                         Stat::Call(
-                            Cond::Al,
                             String::from("__aeabi_idivmod"),
-                            Some(arm_dst_temp),
-                            vec![left_reg, right_reg],
+                            Some(arm_dst_temp.get_temp()),
+                            vec![left_reg.get_temp(), right_reg.get_temp()],
                         ),
                         graph,
                     )
@@ -751,7 +742,7 @@ fn translate_statcode(
                 BinOp::Xor => basic_apply_op(RegOp::Eor, graph),
             });
 
-            chain_chains(nodes).expect("Had more than one statement")
+            link_chains(nodes).expect("Had more than one statement")
         }
         // LDR(size is bytes) three_temp, [temp_ptr]
         StatCode::Load(three_temp, temp_ptr, size) => simple_node(
@@ -778,24 +769,18 @@ fn translate_statcode(
         // Creates a dummy call node for use when allocating registers
         StatCode::Call(ret_temp, fun_name, args) => simple_node(
             Stat::Call(
-                Cond::Al,
                 fun_name.clone(),
-                Some(temp_map.use_temp(*ret_temp)),
-                args.iter()
-                    .map(|t| temp_map.use_temp(*t))
-                    .collect::<Vec<_>>(),
+                Some(temp_map.use_id(*ret_temp)),
+                args.iter().map(|t| temp_map.use_id(*t)).collect::<Vec<_>>(),
             ),
             graph,
         ),
         // Creates a dummy call for a void function
         StatCode::VoidCall(fun_name, args) => simple_node(
             Stat::Call(
-                Cond::Al,
                 fun_name.clone(),
                 None,
-                args.iter()
-                    .map(|t| temp_map.use_temp(*t))
-                    .collect::<Vec<_>>(),
+                args.iter().map(|t| temp_map.use_id(*t)).collect::<Vec<_>>(),
             ),
             graph,
         ),
