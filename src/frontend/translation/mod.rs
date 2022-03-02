@@ -968,10 +968,9 @@ mod tests {
 
         let ref_block_stats: Vec<ir::Stat> = Vec::new();
         let mut ref_block_graph: Vec<ir::Block> = Vec::new();
-        let ref_block_graph_len = ref_block_graph.len();
 
         ref_block_graph.push(ir::Block(
-            vec![ref_block_graph_len],
+            Vec::new(),
             ref_block_stats,
             BlockEnding::Return(ir_expr),
         ));
