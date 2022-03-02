@@ -196,11 +196,9 @@ impl Display for MemOperand {
             "{}",
             match self {
                 MemOperand::Zero(reg) => format!("[{}]", reg),
-                MemOperand::PreIndex(reg, flex, bang) =>
-                    format!("[{}, {}]{}", reg, flex, if *bang { "!" } else { "" }),
+                MemOperand::PreIndex(reg, flex) => format!("[{}, {}]", reg, flex),
                 MemOperand::Label(label) => format!("={}", display_data_ref(*label)),
                 MemOperand::Expression(expr) => format!("={}", expr),
-                MemOperand::PostIndex(reg, flex) => format!("[{}], {}", reg, flex),
             }
         )
     }
@@ -281,31 +279,12 @@ impl Display for Stat {
             Stat::MemOp(op, cond, s, ident, operand) => {
                 writeln!(f, "\t{}{}{}\t{},\t{}", op, cond, conv(s), ident, operand)
             }
-            Stat::Push(cond, identlist) => writeln!(
-                f,
-                "\tPUSH{}\t{{{}}}",
-                cond,
-                identlist
-                    .iter()
-                    .map(|t| format!("{}", t))
-                    .collect::<Vec<_>>()
-                    .join(",")
-            ),
-            Stat::Pop(cond, identlist) => writeln!(
-                f,
-                "\tPOP{}\t{{{}}}",
-                cond,
-                identlist
-                    .iter()
-                    .map(|t| format!("{}", t))
-                    .collect::<Vec<_>>()
-                    .join(",")
-            ),
+            Stat::Push(cond, ident) => writeln!(f, "\tPUSH{}\t{{{}}}", cond, ident,),
+            Stat::Pop(cond, ident) => writeln!(f, "\tPOP{}\t{{{}}}", cond, ident,),
             Stat::Link(cond, link_to) => writeln!(f, "BL{}\t{}", cond, link_to),
-            Stat::Call(cond, fun_name, ret_temp, arg_temps) => write!(
+            Stat::Call(fun_name, ret_temp, arg_temps) => write!(
                 f,
-                "\tINTERNAL OPERATION: CALL{}\t{}\t{}, ARGS({})",
-                cond,
+                "\tINTERNAL OPERATION: CALL\t{}\t{}, ARGS({})",
                 fun_name,
                 match ret_temp {
                     Some(t) => format!("{}", t),
@@ -320,6 +299,7 @@ impl Display for Stat {
             Stat::AssignStackWord(ident) => {
                 writeln!(f, "\tINTERNAL OPERATION: ASSIGN WORD OF STACK TO {}", ident)
             }
+            Stat::Nop => writeln!(f, "\tNOP"),
         }
     }
 }
