@@ -254,6 +254,14 @@ pub fn can_coerce(main_type: &Type, into_type: &Type) -> bool {
     }
 }
 
+pub fn flatten_type(t: Type) -> Type {
+    if let Type::Array(box Type::Array(inner_t, d1), d2) = t {
+        flatten_type(Type::Array(inner_t, d1 + d2))
+    } else {
+        t
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

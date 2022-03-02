@@ -10,7 +10,7 @@ use super::{
     super::ast::{ASTWrapper, Expr, ExprWrap, Type, UnOp},
     semantic_errors::SemanticError,
     symbol_table::{LocalSymbolTable, VariableSymbolTable},
-    type_constraints::{binop_match, de_index, unop_match},
+    type_constraints::{binop_match, de_index, unop_match, flatten_type},
 };
 
 /// Recursively analyse a given expression:
@@ -38,7 +38,7 @@ pub fn analyse_expression<'a, 'b>(
         // If variable defined, rename and return type, otherwise return undefined
         // error
         Expr::Var(name) => match var_symb.get_type(name, local_symb) {
-            Some((rename, t)) => Some(ASTWrapper(Some(t), Expr::Var(rename))),
+            Some((rename, t)) => Some(ASTWrapper(Some(flatten_type(t)), Expr::Var(rename))),
             None => {
                 errors.push(SemanticError::UndefinedVariableUse(name));
                 None
@@ -88,7 +88,7 @@ pub fn analyse_expression<'a, 'b>(
 
             if let (false, Some((rename, t))) = (any_errors, symb) {
                 Some(ASTWrapper(
-                    Some(t),
+                    Some(flatten_type(t)),
                     Expr::ArrayElem(rename, correct_indexes),
                 ))
             } else {
@@ -110,7 +110,7 @@ pub fn analyse_expression<'a, 'b>(
             match analyse_expression(inner_expr, local_symb, var_symb, errors) {
                 Some(ASTWrapper(Some(inner_t), ast)) => match unop_match(&op, &inner_t) {
                     Ok(unop_t) => Some(ASTWrapper(
-                        Some(unop_t),
+                        Some(flatten_type(unop_t)),
                         Expr::UnOp(op, box ASTWrapper(Some(inner_t), ast)),
                     )),
                     Err((pot_types, pot_ops)) => {
@@ -140,7 +140,7 @@ pub fn analyse_expression<'a, 'b>(
                     Some(ASTWrapper(Some(right_type), right_ast)),
                 ) => match binop_match(&op, &left_type, &right_type) {
                     Ok(t) => Some(ASTWrapper(
-                        Some(t),
+                        Some(flatten_type(t)),
                         Expr::BinOp(
                             box ASTWrapper(Some(left_type), left_ast),
                             op,
@@ -171,6 +171,18 @@ pub fn analyse_expression<'a, 'b>(
 mod tests {
     use super::super::super::ast::{BinOp, UnOp};
     use super::*;
+
+    #[test]
+    fn test_type_wrapping() {
+        let local_symb = LocalSymbolTable::new_root();
+        let var_symb = VariableSymbolTable::new();
+
+
+        assert_eq!(analyse_expression(ASTWrapper("true", Expr::Bool(false)), &local_symb, &var_symb, &mut Vec::new()), Some(ASTWrapper(Some(Type::Bool), Expr::Bool(false))));
+
+
+
+    }
 
     #[test]
     fn analyse_expression_matches_primitive_expressions() {

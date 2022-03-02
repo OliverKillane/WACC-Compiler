@@ -20,7 +20,9 @@ impl From<&Type> for ir::Type {
             ast::Type::Int => ir::Type::Num(ir::NumSize::DWord),
             ast::Type::Char => ir::Type::Num(ir::NumSize::Byte),
             ast::Type::Bool => ir::Type::Bool,
-            ast::Type::String | ast::Type::Pair(_, _) | ast::Type::Array(_, _) => ir::Type::Ptr,
+            ast::Type::String | ast::Type::Pair(_, _) => ir::Type::Ptr,
+            ast::Type::Array(box Type::Array(_,_), _) => panic!("Nested Array Type"),
+            ast::Type::Array(_, _) => ir::Type::Ptr,
             ast::Type::Generic(_) | ast::Type::Any => {
                 panic!("Expected a concrete type")
             }
