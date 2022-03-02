@@ -38,6 +38,7 @@ impl<'a> FunctionSymbolTable<'a> {
     }
 }
 
+#[derive(Debug)]
 /// A flat variable symbol table with all variables renamed to integers,
 /// and associated with types identifiable through usize integers (same as in
 /// the renamed AST).

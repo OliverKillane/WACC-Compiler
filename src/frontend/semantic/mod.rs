@@ -61,7 +61,7 @@ use self::{
 };
 
 use super::{
-    ast::{ASTWrapper, Program, Type},
+    ast::{ASTWrapper, Function, Program, Type},
     error::Summary,
 };
 
@@ -99,8 +99,9 @@ pub fn analyse_semantics<'a>(
     for ASTWrapper(fun_name, fun) in filtered_fn_defs {
         match analyse_function(ASTWrapper(fun_name, fun), &fun_symb) {
             Ok((function, var_symb)) => {
+                let ASTWrapper(_, Function(_, ASTWrapper(_, fun_name), _, _)) = &function;
+                fun_symbol_tables.insert(fun_name.clone(), var_symb);
                 functions.push(function);
-                fun_symbol_tables.insert(fun_name.to_string(), var_symb);
             }
             Err(fun_err) => errors.push(fun_err),
         }
