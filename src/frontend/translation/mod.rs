@@ -751,7 +751,7 @@ pub(super) fn translate_ast(
 
 #[cfg(test)]
 mod tests {
-    use crate::intermediate as ir;
+    use crate::intermediate::{self as ir, NumExpr, NumSize};
 
     use super::*;
 
@@ -1003,6 +1003,79 @@ mod tests {
             let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
 
             ref_block_stats.push(ir::Stat::PrintChar(inner_expr));
+
+            assert_eq!(ref_block_stats, block_stats);
+        } else {
+            panic!("Test expression is not a numerical expression");
+        }
+    }
+
+    #[test]
+    fn test_print_bool() {
+        let var_symb: VariableSymbolTable = VariableSymbolTable::new();
+        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let mut block_stats: Vec<ir::Stat> = Vec::new();
+        let mut block_graph: Vec<ir::Block> = Vec::new();
+        let mut prev_blocks: Vec<BlockId> = Vec::new();
+
+        let ast_expr = ast::Expr::Bool(true);
+        let ast_expr_type = ast::Type::Bool;
+        let ast_expr_wrap = ASTWrapper(Some(ast_expr_type.clone()), ast_expr.clone());
+
+        let ir_expr = translate_expr(ast_expr, &ast_expr_type, &var_symb, &mut data_ref_map);
+
+        let ast_stat = ast::Stat::Print(ast_expr_wrap);
+
+        translate_stat(
+            ASTWrapper(None, ast_stat),
+            &var_symb,
+            &mut data_ref_map,
+            &mut block_stats,
+            &mut block_graph,
+            &mut prev_blocks,
+        );
+
+        let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+
+        ref_block_stats.push(ir::Stat::PrintExpr(ir_expr));
+
+        assert_eq!(ref_block_stats, block_stats);
+    }
+
+    #[test]
+    fn test_print_string() {
+        let var_symb: VariableSymbolTable = VariableSymbolTable::new();
+        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let mut block_stats: Vec<ir::Stat> = Vec::new();
+        let mut block_graph: Vec<ir::Block> = Vec::new();
+        let mut prev_blocks: Vec<BlockId> = Vec::new();
+
+        let test_str = "test".to_string();
+
+        let ast_expr = ast::Expr::String(test_str.clone());
+        let ast_expr_type = ast::Type::String;
+        let ast_expr_wrap = ASTWrapper(Some(ast_expr_type.clone()), ast_expr.clone());
+
+        let ir_expr = translate_expr(ast_expr, &ast_expr_type, &var_symb, &mut data_ref_map);
+
+        if let ir::Expr::Ptr(inner_expr) = ir_expr {
+            let ast_stat = ast::Stat::Print(ast_expr_wrap);
+
+            translate_stat(
+                ASTWrapper(None, ast_stat),
+                &var_symb,
+                &mut data_ref_map,
+                &mut block_stats,
+                &mut block_graph,
+                &mut prev_blocks,
+            );
+
+            let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+
+            ref_block_stats.push(ir::Stat::PrintStr(
+                inner_expr,
+                NumExpr::Const(NumSize::DWord, test_str.len() as i32),
+            ));
 
             assert_eq!(ref_block_stats, block_stats);
         } else {
