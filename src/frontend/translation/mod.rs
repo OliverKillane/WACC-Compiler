@@ -29,6 +29,11 @@ impl From<&Type> for ir::Type {
     }
 }
 
+const FUNCTION_NAME_PREFIX: &str = "f_";
+fn prefix_function_name(fname: &str) -> String {
+    return FUNCTION_NAME_PREFIX.to_string() + fname;
+}
+
 /// Translation for the [assign rhs node](AssignRhs). The arguments are as follows:
 ///  - The assign rhs node to be translated.
 ///  - Symbol table for this particular node.
@@ -54,7 +59,7 @@ fn translate_rhs(
             helper_function_flags,
         ),
         AssignRhs::Call(ASTWrapper(_, name), args) => {
-            let name = "f_".to_string() + &name;
+            let prefixed_name = prefix_function_name(&name);
             let args = args
                 .into_iter()
                 .map(|ASTWrapper(arg_type, arg_expr)| {
@@ -68,10 +73,10 @@ fn translate_rhs(
                 })
                 .collect();
             match function_types[&name] {
-                Type::Int | Type::Char => ir::Expr::Num(ir::NumExpr::Call(name, args)),
-                Type::Bool => ir::Expr::Bool(ir::BoolExpr::Call(name, args)),
+                Type::Int | Type::Char => ir::Expr::Num(ir::NumExpr::Call(prefixed_name, args)),
+                Type::Bool => ir::Expr::Bool(ir::BoolExpr::Call(prefixed_name, args)),
                 Type::String | Type::Pair(_, _) | Type::Array(_, _) => {
-                    ir::Expr::Ptr(ir::PtrExpr::Call(name, args))
+                    ir::Expr::Ptr(ir::PtrExpr::Call(prefixed_name, args))
                 }
                 Type::Generic(_) | Type::Any => panic!("Expected a concrete type"),
             }
@@ -717,7 +722,7 @@ pub(super) fn translate_ast(
                 .get(&fname)
                 .expect("No symbol table for a function");
             (
-                fname,
+                prefix_function_name(&fname),
                 translate_function(
                     ret_type,
                     args,
@@ -761,11 +766,8 @@ pub(super) fn translate_ast(
 
 #[cfg(test)]
 mod tests {
-    use std::hash::Hash;
-
-    use crate::intermediate::{self as ir, NumExpr, NumSize};
-
     use super::*;
+    use crate::intermediate::{self as ir, NumExpr, NumSize};
 
     #[test]
     fn test_exit() {
