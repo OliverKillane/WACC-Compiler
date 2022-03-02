@@ -1199,32 +1199,36 @@ mod tests {
             &mut helper_function_flags,
         );
 
-        if let ir::Expr::Ptr(inner_expr) = ir_expr {
-            let ast_stat = ast::Stat::Print(ast_expr_wrap);
+        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
 
-            translate_stat(
-                ASTWrapper(None, ast_stat),
-                &mut block_stats,
-                &mut block_graph,
-                &mut prev_blocks,
-                &mut free_var,
-                &mut ir_vars,
-                &mut var_symb,
-                &mut function_types,
-                &mut data_ref_map,
-                &mut helper_function_flags,
-            );
+        let ast_stat = ast::Stat::Print(ast_expr_wrap);
 
-            let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+        translate_stat(
+            ASTWrapper(None, ast_stat),
+            &mut block_stats,
+            &mut block_graph,
+            &mut prev_blocks,
+            &mut free_var,
+            &mut ir_vars,
+            &mut var_symb,
+            &mut function_types,
+            &mut data_ref_map,
+            &mut helper_function_flags,
+        );
 
-            ref_block_stats.push(ir::Stat::PrintStr(
-                inner_expr,
-                NumExpr::Const(NumSize::DWord, test_str.len() as i32),
-            ));
+        let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+        let ref_free_var: VarRepr = 0;
 
-            assert_eq!(ref_block_stats, block_stats);
-        } else {
-            panic!("Test expression is not a numerical expression");
-        }
+        ref_block_stats.push(ir::Stat::AssignVar(ref_free_var, ir_expr));
+
+        ref_block_stats.push(ir::Stat::PrintStr(
+            ir::PtrExpr::Offset(
+                box ir::PtrExpr::Var(ref_free_var),
+                box ir::NumExpr::SizeOf(ir::Type::Num(ir::NumSize::DWord)),
+            ),
+            ir::NumExpr::Deref(ir::NumSize::DWord, ir::PtrExpr::Var(ref_free_var)),
+        ));
+
+        assert_eq!(ref_block_stats, block_stats);
     }
 }
