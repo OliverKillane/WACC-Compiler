@@ -4,7 +4,7 @@ use super::{
     super::super::graph::{Deleted, Graph, NodeRef},
     int_constraints::ConstrainedInt,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// The temporary type (used before register allocation)
 pub type Temporary = u32;
@@ -226,6 +226,7 @@ pub enum Stat {
     /// ```text
     /// (Multiply Operation, Condition, Set Condition Bits?, Result Hight, Result Low, Register Operand, Second Register Operand)
     /// ```
+    /// The high, low and first argument registers must be different
     MulOp(MulOp, Cond, bool, Ident, Ident, Ident, Ident),
 
     /// A move instruction from register to register of form:
@@ -322,6 +323,7 @@ pub struct Data(pub DataIdent, pub Vec<DataKind>);
 pub struct Subroutine {
     pub args: Vec<Temporary>,
     pub start_node: ArmNode,
+    pub temps: HashSet<Temporary>,
     pub reserved_stack: u32,
 }
 
@@ -329,6 +331,7 @@ pub struct Subroutine {
 pub struct Program {
     pub data: Vec<Data>,
     pub reserved_stack: u8,
+    pub temps: HashSet<Temporary>,
     pub main: ArmNode,
     pub functions: HashMap<String, Subroutine>,
     pub cfg: Graph<ControlFlow>,

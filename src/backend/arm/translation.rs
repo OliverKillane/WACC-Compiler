@@ -64,6 +64,11 @@ impl TempMap {
     fn get_new_temp(&mut self) -> Ident {
         Ident::Temp(self.get_new_id())
     }
+
+    /// Get the hashset of temporaries
+    fn get_hashset(self) -> HashSet<Temporary> {
+        self.1
+    }
 }
 
 /// Translate a threecode representation into a program.
@@ -79,10 +84,12 @@ pub(super) fn translate_threecode(
 ) -> Program {
     let mut graph = Graph::new();
     let int_handler = int_handler.as_ref();
+    let mut temp_map = TempMap::new();
     Program {
         data: translate_data(data_refs),
         reserved_stack: if read_ref { 1 } else { 0 },
-        main: translate_routine(code, &mut TempMap::new(), int_handler, &mut graph),
+        main: translate_routine(code, int_handler, &mut temp_map, &mut graph),
+        temps: temp_map.get_hashset(),
         functions: functions
             .into_iter()
             .map(|(name, fun)| (name, translate_function(fun, int_handler, &mut graph)))
@@ -294,8 +301,8 @@ fn translate_from_node(
 /// Start building up a routine (subroutine or main code body) from a start node.
 fn translate_routine(
     start: Option<StatNode>,
-    temp_map: &mut TempMap,
     int_handler: Option<&String>,
+    temp_map: &mut TempMap,
     graph: &mut Graph<ControlFlow>,
 ) -> ArmNode {
     // Normal nodes require labels for 1 or more predecessors, the first node
@@ -345,12 +352,14 @@ fn translate_function(
     graph: &mut Graph<ControlFlow>,
 ) -> Subroutine {
     let mut temp_map = TempMap::new();
+
     Subroutine {
         args: args
             .into_iter()
             .map(|t| temp_map.use_id(t))
             .collect::<Vec<_>>(),
-        start_node: translate_routine(code, &mut temp_map, int_handler, graph),
+        start_node: translate_routine(code, int_handler, &mut temp_map, graph),
+        temps: temp_map.get_hashset(),
         reserved_stack: if read_ref { 1 } else { 0 },
     }
 }

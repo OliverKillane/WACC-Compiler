@@ -320,6 +320,7 @@ pub fn get_live_ranges(
     Program {
         data,
         reserved_stack,
+        temps,
         main,
         functions,
         cfg,
@@ -330,6 +331,7 @@ pub fn get_live_ranges(
     for Subroutine {
         args,
         start_node,
+        temps,
         reserved_stack,
     } in functions.values()
     {
