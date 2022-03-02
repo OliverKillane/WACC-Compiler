@@ -444,12 +444,12 @@ fn format_block_helper(
     visited.insert(current_block);
     let Block(incoming, stats, ending) = &block_graph[current_block];
     let mut output: LinkedList<_> = stats.iter().map(|stat| format!("{}", stat)).collect();
-    if incoming.len() > 0 {
+    if !incoming.is_empty() {
         output.push_front(format!("b_{}:", current_block));
     }
     match ending {
-        BlockEnding::Exit(num_expr) => output.push_back(format!("exit({});", num_expr.to_string())),
-        BlockEnding::Return(expr) => output.push_back(format!("return {};", expr.to_string())),
+        BlockEnding::Exit(num_expr) => output.push_back(format!("exit({});", num_expr)),
+        BlockEnding::Return(expr) => output.push_back(format!("return {};", expr)),
         BlockEnding::CondJumps(cond_jumps, else_jump) => {
             for (bool_expr, cond_jump) in cond_jumps {
                 output.push_back(format!("if {} goto b_{}", bool_expr, cond_jump));
