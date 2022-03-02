@@ -21,7 +21,7 @@ impl From<&Type> for ir::Type {
             ast::Type::Char => ir::Type::Num(ir::NumSize::Byte),
             ast::Type::Bool => ir::Type::Bool,
             ast::Type::String | ast::Type::Pair(_, _) => ir::Type::Ptr,
-            ast::Type::Array(box Type::Array(_,_), _) => panic!("Nested Array Type"),
+            ast::Type::Array(box Type::Array(_, _), _) => panic!("Nested Array Type"),
             ast::Type::Array(_, _) => ir::Type::Ptr,
             ast::Type::Generic(_) | ast::Type::Any => {
                 panic!("Expected a concrete type")
@@ -337,9 +337,10 @@ fn translate_stat(
         Stat::Return(ASTWrapper(expr_type, expr)) => {
             let mut tmp_block_stats = Vec::new();
             mem::swap(block_stats, &mut tmp_block_stats);
-            let block_graph_len = block_graph.len();
+            let mut tmp_prev_blocks = Vec::new();
+            mem::swap(prev_blocks, &mut tmp_prev_blocks);
             block_graph.push(ir::Block(
-                vec![block_graph_len],
+                tmp_prev_blocks,
                 tmp_block_stats,
                 BlockEnding::Return(translate_expr(
                     expr,
@@ -746,9 +747,9 @@ pub(super) fn translate_ast(
         .map(|(&var, var_type)| (var, var_type.into()))
         .collect();
     let mut block_graph = Vec::new();
-    assert!(!translate_block_jumping(
+    if translate_block_jumping(
         block,
-        vec![],
+        Vec::new(),
         None,
         &mut block_graph,
         &mut free_var,
@@ -756,8 +757,15 @@ pub(super) fn translate_ast(
         &program_symbol_table,
         &function_types,
         &mut data_ref_map,
-        &mut helper_function_flags
-    ));
+        &mut helper_function_flags,
+    ) {
+        let last_block_id = block_graph.len();
+        block_graph.push(ir::Block(
+            vec![last_block_id],
+            Vec::new(),
+            ir::BlockEnding::Exit(ir::NumExpr::Const(ir::NumSize::DWord, 0)),
+        ));
+    }
     helper_function_flags.generate_functions(&mut functions_map, &mut data_ref_map);
     ir::Program(
         functions_map,
