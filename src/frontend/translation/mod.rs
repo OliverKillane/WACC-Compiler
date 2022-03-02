@@ -159,7 +159,7 @@ fn translate_lhs<'l>(
                         )))
                     },
                 );
-            return (
+            (
                 ir::PtrExpr::Call(
                     ARRAY_INDEX_FNAME.to_string(),
                     vec![
@@ -169,11 +169,16 @@ fn translate_lhs<'l>(
                     ],
                 ),
                 fields_type.into(),
-            );
+            )
         }
         AssignLhs::PairFst(ASTWrapper(expr_type, expr)) => {
             helper_function_flags.check_null = true;
             let expr_type = expr_type.expect("Expected a type for an expression");
+            let fst_type = if let Type::Pair(box ref fst_type, _) = expr_type {
+                fst_type
+            } else {
+                panic!("Expected a pair type annotation")
+            };
             (
                 ir::PtrExpr::Call(
                     CHECK_NULL_FNAME.to_string(),
@@ -185,12 +190,17 @@ fn translate_lhs<'l>(
                         helper_function_flags,
                     )],
                 ),
-                (&expr_type).into(),
+                fst_type.into(),
             )
         }
         AssignLhs::PairSnd(ASTWrapper(expr_type, expr)) => {
             helper_function_flags.check_null = true;
             let expr_type = expr_type.expect("Expected a type for an expression");
+            let snd_type = if let Type::Pair(_, box ref snd_type) = expr_type {
+                snd_type
+            } else {
+                panic!("Expected a pair type annotation")
+            };
             (
                 ir::PtrExpr::Offset(
                     box ir::PtrExpr::Call(
@@ -205,7 +215,7 @@ fn translate_lhs<'l>(
                     ),
                     box ir::NumExpr::SizeOfWideAlloc,
                 ),
-                (&expr_type).into(),
+                snd_type.into(),
             )
         }
         AssignLhs::Var(_) => panic!("Expected an AssignLhs that can be translated into a pointer"),
