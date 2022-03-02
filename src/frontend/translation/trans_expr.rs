@@ -361,6 +361,14 @@ pub(super) fn translate_expr(
                         box bool_expr2,
                     ))
                 }
+                (ir::Expr::Ptr(ptr_expr1), ast::BinOp::Eq, ir::Expr::Ptr(ptr_expr2)) => {
+                    ir::Expr::Bool(ir::BoolExpr::PtrEq(ptr_expr1, ptr_expr2))
+                }
+                (ir::Expr::Ptr(ptr_expr1), ast::BinOp::Ne, ir::Expr::Ptr(ptr_expr2)) => {
+                    ir::Expr::Bool(ir::BoolExpr::Not(box ir::BoolExpr::PtrEq(
+                        ptr_expr1, ptr_expr2,
+                    )))
+                }
                 (expr1, ast::BinOp::Newpair, expr2) => {
                     ir::Expr::Ptr(ir::PtrExpr::WideMalloc(vec![expr1, expr2]))
                 }
