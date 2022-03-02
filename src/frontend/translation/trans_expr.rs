@@ -382,6 +382,7 @@ mod tests {
             ir::Expr::Bool(ir::BoolExpr::Not(box ir::BoolExpr::Const(true)));
 
         assert_eq!(
+            translated,
             translate_expr(
                 Expr::UnOp(
                     UnOp::Neg,
@@ -391,8 +392,7 @@ mod tests {
                 &VariableSymbolTable::new(),
                 &mut HashMap::new(),
                 &mut HelperFunctionFlags::default()
-            ),
-            translated
+            )
         );
 
         let translated2: intermediate::Expr = ir::Expr::Bool(ir::BoolExpr::BoolOp(
@@ -413,6 +413,7 @@ mod tests {
         ));
 
         assert_eq!(
+            translated2,
             translate_expr(
                 Expr::BinOp(
                     box ASTWrapper(
@@ -449,8 +450,7 @@ mod tests {
                 &VariableSymbolTable::new(),
                 &mut HashMap::new(),
                 &mut HelperFunctionFlags::default()
-            ),
-            translated2
+            )
         );
     }
 
@@ -463,6 +463,7 @@ mod tests {
         ));
 
         assert_eq!(
+            translated,
             translate_expr(
                 Expr::BinOp(
                     box ASTWrapper(Some(ast::Type::Int), Expr::Int(3)),
@@ -473,14 +474,13 @@ mod tests {
                 &VariableSymbolTable::new(),
                 &mut HashMap::new(),
                 &mut HelperFunctionFlags::default()
-            ),
-            translated
+            )
         );
 
         let mut var_table = VariableSymbolTable::new();
         var_table.0.insert(0, ast::Type::Int);
 
-        let translated: intermediate::Expr = intermediate::Expr::Num(ir::NumExpr::ArithOp(
+        let translated2: intermediate::Expr = intermediate::Expr::Num(ir::NumExpr::ArithOp(
             box ir::NumExpr::ArithOp(
                 box ir::NumExpr::Var(0),
                 ir::ArithOp::Mod,
@@ -494,6 +494,7 @@ mod tests {
         ));
 
         assert_eq!(
+            translated2,
             translate_expr(
                 Expr::BinOp(
                     box ASTWrapper(
@@ -517,8 +518,7 @@ mod tests {
                 &var_table,
                 &mut HashMap::new(),
                 &mut HelperFunctionFlags::default()
-            ),
-            translated
+            )
         );
     }
 }
