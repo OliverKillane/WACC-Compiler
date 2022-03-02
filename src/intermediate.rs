@@ -329,7 +329,7 @@ impl Display for Type {
         match self {
             Self::Num(num_size) => write!(f, "num({})", num_size),
             Self::Bool => write!(f, "bool"),
-            Self::Ptr => write!(f, "void*"),
+            Self::Ptr => write!(f, "ptr"),
         }
     }
 }
@@ -414,16 +414,16 @@ impl Display for Stat {
             Self::AssignPtr(ptr_expr, expr) => write!(f, "{} = {};", ptr_expr, expr),
             Self::AssignVar(var, expr) => write!(f, "v_{} = {};", var, expr),
             Self::Free(ptr_expr) => write!(f, "free({});", ptr_expr),
-            Self::PrintChar(num_expr) => write!(f, "printf(\"%c\", {});", num_expr),
-            Self::PrintExpr(expr) => write!(f, "printf(\"%d\", {});", expr),
-            Self::PrintEol() => write!(f, "printf(\"\\n\");"),
+            Self::PrintChar(num_expr) => write!(f, "print_char({});", num_expr),
+            Self::PrintExpr(expr) => write!(f, "print_expr({});", expr),
+            Self::PrintEol() => write!(f, "print_eol();"),
             Self::PrintStr(ptr_expr, num_expr) => {
-                write!(f, "printf(\"%.*s\", {}, {})", num_expr, ptr_expr)
+                write!(f, "print_string({}, {})", ptr_expr, num_expr)
             }
-            Self::ReadCharPtr(ptr_expr) => write!(f, "scanf(\"%c\", {})", ptr_expr),
-            Self::ReadCharVar(var) => write!(f, "scanf(\"%c\", &v_{})", var),
-            Self::ReadIntPtr(ptr_expr) => write!(f, "scanf(\"%d\", {})", ptr_expr),
-            Self::ReadIntVar(var) => write!(f, "scanf(\"%d\", &v_{})", var),
+            Self::ReadCharPtr(ptr_expr) => write!(f, "read_char({})", ptr_expr),
+            Self::ReadCharVar(var) => write!(f, "read_char(&v_{})", var),
+            Self::ReadIntPtr(ptr_expr) => write!(f, "print_int({})", ptr_expr),
+            Self::ReadIntVar(var) => write!(f, "print_int(&v_{})", var),
         }
     }
 }
