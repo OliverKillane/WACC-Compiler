@@ -76,8 +76,8 @@ fn ensure_format(
 
 /// Adds a call to a flush function
 fn add_flush(free_var: VarRepr, stat_line: &mut StatLine) {
-    stat_line.add_stat(StatCode::Assign(free_var, OpSrc::Const(1)));
-    stat_line.add_stat(StatCode::VoidCall("fflush".to_string(), vec![free_var]));
+    stat_line.add_stat(StatCode::Assign(free_var, OpSrc::Const(0)));
+    stat_line.add_stat(StatCode::VoidCall("fflush\0".to_string(), vec![free_var]));
 }
 
 /// Translates a single [statement](ir::Stat) into a
@@ -436,7 +436,7 @@ pub(super) mod tests {
                 strength_reduction: false,
                 loop_unrolling: false,
                 common_expressions: false,
-                show_arm_temp_rep: false
+                show_arm_temp_rep: false,
             },
         );
 
@@ -641,7 +641,7 @@ pub(super) mod tests {
                 strength_reduction: false,
                 loop_unrolling: false,
                 common_expressions: false,
-                show_arm_temp_rep: false
+                show_arm_temp_rep: false,
             },
         );
 
