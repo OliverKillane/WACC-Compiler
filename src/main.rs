@@ -50,13 +50,13 @@ mod frontend;
 mod graph;
 mod intermediate;
 
-use backend::{Options, PropagationOpt, compile};
+use backend::{compile, Options, PropagationOpt};
 use clap::Parser;
 use colored::Colorize;
 use frontend::analyse;
-use std::{cmp::min, fs::read_to_string, path::PathBuf, process};
 use std::fs::File;
 use std::io::prelude::*;
+use std::{cmp::min, fs::read_to_string, path::PathBuf, process};
 
 /// Command line interface
 #[derive(Parser, Debug)]
@@ -101,9 +101,25 @@ fn main() -> std::io::Result<()> {
     match read_to_string(filestring.clone()) {
         Ok(source_code) => match analyse(&source_code) {
             Ok(ir) => {
-
-                if ir_print {
-                    println!("THE INTERMEDIATE REPRESENTATION:\n{}", ir)
+                match ir.validate() {
+                    Ok(_) => println!("THE INTERMEDIATE REPRESENTATION:\n{}", ir),
+                    Err(_) => {
+                        let intermediate::Program(
+                            functions,
+                            local_vars,
+                            graph,
+                            data_refs,
+                            int_handler,
+                        ) = ir;
+                        panic!(
+                            "INVALID INTERMEDIATE REPRESENTATION:\nProgram{{\n\t[\n{}\t],\n\t{:?},\n\t[\n{}\t],\n\t[\n{}\t],\n\t{:?}\n}}",
+                            functions.iter().map(|f| format!("\t\t{:?}\n", f)).collect::<String>(),
+                            local_vars,
+                            graph.iter().map(|b| format!("\t\t{:?}\n", b)).collect::<String>(),
+                            data_refs.iter().map(|rf| format!("\t\t{:?}\n", rf)).collect::<String>(),
+                            int_handler
+                        )
+                    }
                 }
 
                 let options = Options {
@@ -116,7 +132,7 @@ fn main() -> std::io::Result<()> {
                     strength_reduction: false,
                     loop_unrolling: false,
                     common_expressions: false,
-                    show_arm_temp_rep: temp_arm
+                    show_arm_temp_rep: temp_arm,
                 };
 
                 let result = compile(ir, options);
@@ -124,7 +140,7 @@ fn main() -> std::io::Result<()> {
                 for res in result.intermediates {
                     println!("{}", res)
                 }
-                
+
                 let mut file = if let Some(outpath) = outputpath {
                     File::create(outpath)?
                 } else {
@@ -135,7 +151,7 @@ fn main() -> std::io::Result<()> {
                 file.write_all(result.assembly.as_bytes())?;
 
                 process::exit(COMPILE_SUCCESS)
-            },
+            }
             Err(errs) => {
                 let mut exit_code = i32::MAX;
                 for mut err in errs {

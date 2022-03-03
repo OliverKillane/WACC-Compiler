@@ -595,7 +595,7 @@ fn translate_block_jumping(
         data_ref_map,
         helper_function_flags,
     );
-    if !prev_blocks.is_empty() {
+    if !block_stats.is_empty() || !prev_blocks.is_empty() {
         let next_block_id = block_graph.len() + 1;
         block_graph.push(ir::Block(
             prev_blocks,
@@ -762,7 +762,7 @@ pub(super) fn translate_ast(
         &mut data_ref_map,
         &mut helper_function_flags,
     ) {
-        let last_block_id = block_graph.len();
+        let last_block_id = block_graph.len() - 1;
         block_graph.push(ir::Block(
             vec![last_block_id],
             Vec::new(),
