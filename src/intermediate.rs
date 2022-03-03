@@ -510,7 +510,7 @@ impl Display for Program {
             data_refs
                 .iter()
                 .map(|(data_ref, definition)| format!(
-                    "ref_{}: {{{}}}",
+                    "ref_{}: {{{}}}\n",
                     data_ref,
                     format_args(definition)
                 ))
