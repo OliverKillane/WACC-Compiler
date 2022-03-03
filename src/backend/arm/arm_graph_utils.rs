@@ -42,15 +42,15 @@ pub fn link_chains(nodes: Vec<Chain>) -> Option<Chain> {
 }
 
 /// Given a vector of statements, connect them together in a simple chain within
-/// the graph. If no statements are provided returns a None, otherwise a some of
-/// the start and end node.
-pub fn link_stats(stats: Vec<Stat>, graph: &mut Graph<ControlFlow>) -> Option<Chain> {
+/// the graph. There must be at least one [stat](Stat).
+pub fn link_stats(stats: Vec<Stat>, graph: &mut Graph<ControlFlow>) -> Chain {
     link_chains(
         stats
             .into_iter()
             .map(|stat| simple_node(stat, graph))
             .collect::<Vec<_>>(),
     )
+    .expect("Must have at least one statement when linking")
 }
 
 /// Create a single simple node from a statement, returning the node as a pair
@@ -214,8 +214,7 @@ mod tests {
 
         let mut graph = Graph::new();
 
-        let (start, end) =
-            link_stats(stats.clone(), &mut graph).expect("unexpectedly failed to link statements");
+        let (start, end) = link_stats(stats.clone(), &mut graph);
         check_simple_chain(stats, start, end)
     }
 

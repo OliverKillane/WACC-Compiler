@@ -1,5 +1,15 @@
-//! A structure representing a subset of arm assembly, to be generated as the
-//! final stage of the compiler, and written to a file (formatted)
+//! # The arm assembly representation
+//! The program is represented as a graph of nodes, containing arm instructions.
+//!
+//! - The [control flow](ControlFlow) struct determines how nodes are connected
+//!   together.
+//! - A subset of arm [Statements](Stat) are contained in simple (1/0 in, 1/0
+//!   out) nodes. While many instruction options are not used by the current
+//!   implementation, it allows for extension.
+//! - Labels are used for nodes jumped to by more than one other node.
+//!
+//!
+
 use super::{
     super::super::graph::{Deleted, Graph, NodeRef},
     int_constraints::ConstrainedInt,
@@ -320,6 +330,7 @@ pub enum DataKind {
 /// All types of data that can be kept in the binary.
 pub struct Data(pub DataIdent, pub Vec<DataKind>);
 
+/// An arm subroutine, associated with a set of
 pub struct Subroutine {
     pub args: Vec<Temporary>,
     pub start_node: ArmNode,
@@ -328,12 +339,18 @@ pub struct Subroutine {
 }
 
 /// The main program containing text ([instructions](Stat)) and [data](Data).
-pub struct Program {
+pub struct ArmCode {
+    /// The data Section of the program
     pub data: Vec<Data>,
+    /// The size of reserved stack space used for the main function.
     pub reserved_stack: u8,
+    /// The node for the start of the main function.
     pub main: ArmNode,
+    /// The set of temporary variables used in the main function.
     pub temps: HashSet<Temporary>,
-    pub functions: HashMap<String, Subroutine>,
+    /// A map of all subroutines contained in the program.
+    pub subroutines: HashMap<String, Subroutine>,
+    /// The control flow graph containing all nodes in the program.
     pub cfg: Graph<ControlFlow>,
 }
 

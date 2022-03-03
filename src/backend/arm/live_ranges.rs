@@ -7,7 +7,7 @@ use lazy_static::__Deref;
 use linked_hash_set::LinkedHashSet;
 
 use super::arm_repr::{
-    ArmNode, ControlFlow, FlexOffset, FlexOperand, Ident, MemOp, MemOperand, Program, Stat,
+    ArmCode, ArmNode, ControlFlow, FlexOffset, FlexOperand, Ident, MemOp, MemOperand, Stat,
     Subroutine, Temporary,
 };
 
@@ -274,7 +274,7 @@ impl LiveRanges {
     /// For a given node provides a tuple of:
     /// (live-in temporaries - first has furthest away use, temporaries used by this statement)
     pub fn get_livein(&self, node: &ArmNode) -> Vec<Temporary> {
-        if let Some((livein, _, _, uses, _)) = self.arm_node_map.get(node) {
+        if let Some((livein, _, _, _, _)) = self.arm_node_map.get(node) {
             self.sort_set(livein)
         } else {
             Vec::new()
@@ -284,7 +284,7 @@ impl LiveRanges {
     /// For a given node provides a tuple of:
     /// (live-out temporaries - first is furthest away use, temporaries defined by this statement)
     pub fn get_liveout(&self, node: &ArmNode) -> Vec<Temporary> {
-        if let Some((_, liveout, defs, _, _)) = self.arm_node_map.get(node) {
+        if let Some((_, liveout, _, _, _)) = self.arm_node_map.get(node) {
             self.sort_set(liveout)
         } else {
             Vec::new()
@@ -317,22 +317,22 @@ fn get_ordered_node_set(start_node: ArmNode, nodes: &mut LinkedHashSet<ArmNode>)
 /// Generate the live ranges for the main, and all arm nodes in all functions of
 /// a program.
 pub fn get_live_ranges(
-    Program {
-        data,
-        reserved_stack,
-        temps,
+    ArmCode {
+        data: _,
+        reserved_stack: _,
+        temps: _,
         main,
-        functions,
-        cfg,
-    }: &Program,
+        subroutines: functions,
+        cfg: _,
+    }: &ArmCode,
 ) -> LiveRanges {
     let mut live_ranges = LiveRanges::new();
     traverse_live_ranges(main.clone(), &mut live_ranges);
     for Subroutine {
-        args,
+        args: _,
         start_node,
-        temps,
-        reserved_stack,
+        temps: _,
+        reserved_stack: _,
     } in functions.values()
     {
         traverse_live_ranges(start_node.clone(), &mut live_ranges);
@@ -369,7 +369,7 @@ trait DefsUses {
 }
 
 impl DefsUses for FlexOperand {
-    fn get_defs_and_uses(&self, defs: &mut Vec<Temporary>, uses: &mut Vec<Temporary>) {
+    fn get_defs_and_uses(&self, _: &mut Vec<Temporary>, uses: &mut Vec<Temporary>) {
         if let FlexOperand::ShiftReg(Ident::Temp(t), _) = self {
             uses.push(*t)
         }
@@ -377,7 +377,7 @@ impl DefsUses for FlexOperand {
 }
 
 impl DefsUses for MemOperand {
-    fn get_defs_and_uses(&self, defs: &mut Vec<Temporary>, uses: &mut Vec<Temporary>) {
+    fn get_defs_and_uses(&self, _: &mut Vec<Temporary>, uses: &mut Vec<Temporary>) {
         match self {
             MemOperand::Zero(Ident::Temp(t)) | MemOperand::PreIndex(Ident::Temp(t), _) => {
                 uses.push(*t)
@@ -388,7 +388,7 @@ impl DefsUses for MemOperand {
 }
 
 impl DefsUses for FlexOffset {
-    fn get_defs_and_uses(&self, defs: &mut Vec<Temporary>, uses: &mut Vec<Temporary>) {
+    fn get_defs_and_uses(&self, _: &mut Vec<Temporary>, uses: &mut Vec<Temporary>) {
         if let FlexOffset::ShiftReg(_, Ident::Temp(t), _) = self {
             uses.push(*t)
         }
