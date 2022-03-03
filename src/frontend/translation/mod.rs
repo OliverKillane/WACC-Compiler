@@ -251,6 +251,7 @@ fn translate_lhs<'l>(
 /// or a return, then this is signified by the previous blocks and the new statements
 /// vectors being empty.
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::ptr_arg)]
 fn translate_stat(
     ASTWrapper(_, stat): StatWrap<Option<ast::Type>, usize>,
     block_stats: &mut Vec<ir::Stat>,
