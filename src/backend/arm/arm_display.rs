@@ -371,10 +371,10 @@ impl Display for ArmNode {
                 };
             }
 
-            let next_node = label_map
+            next_node = label_map
                 .iter()
-                .find(|(node, (_, passed))| !passed)
-                .map(|res| res.0);
+                .find(|(_, (_, passed))| !passed)
+                .map(|res| res.0.clone());
         }
     }
 }
@@ -414,15 +414,15 @@ impl Display for Data {
     }
 }
 
-impl Display for Program {
+impl Display for ArmCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Program {
+        let ArmCode {
             data,
-            reserved_stack,
-            temps,
+            reserved_stack: _,
+            temps: _,
             main,
-            functions,
-            cfg,
+            subroutines: functions,
+            cfg: _,
         } = self;
         if !data.is_empty() {
             writeln!(f, ".data")?;
@@ -436,10 +436,10 @@ impl Display for Program {
         for (
             fun_name,
             Subroutine {
-                args,
+                args: _,
                 start_node,
-                temps,
-                reserved_stack,
+                temps: _,
+                reserved_stack: _,
             },
         ) in functions
         {

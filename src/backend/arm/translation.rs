@@ -14,8 +14,8 @@ use super::{
     },
     arm_graph_utils::{is_shifted_8_bit, link_chains, link_stats, link_two_chains, simple_node},
     arm_repr::{
-        ArmNode, Cond, ControlFlow, Data, DataIdent, DataKind, FlexOffset, FlexOperand, Ident,
-        MovOp, Program, RegOp, Shift, Stat, Subroutine, Temporary,
+        ArmCode, ArmNode, Cond, ControlFlow, Data, DataIdent, DataKind, FlexOffset, FlexOperand,
+        Ident, MovOp, RegOp, Shift, Stat, Subroutine, Temporary,
     },
     int_constraints::ConstrainedInt,
 };
@@ -76,21 +76,21 @@ pub(super) fn translate_threecode(
     ThreeCode {
         functions,
         data_refs,
-        graph,
+        graph: _,
         read_ref,
         code,
         int_handler,
     }: ThreeCode,
-) -> Program {
+) -> ArmCode {
     let mut graph = Graph::new();
     let int_handler = int_handler.as_ref();
     let mut temp_map = TempMap::new();
-    Program {
+    ArmCode {
         data: translate_data(data_refs),
         reserved_stack: if read_ref { 1 } else { 0 },
         main: translate_routine(code, int_handler, &mut temp_map, &mut graph),
         temps: temp_map.get_hashset(),
-        functions: functions
+        subroutines: functions
             .into_iter()
             .map(|(name, fun)| (name, translate_function(fun, int_handler, &mut graph)))
             .collect::<HashMap<_, _>>(),
@@ -278,18 +278,26 @@ fn translate_from_node(
 ) -> ArmNode {
     // Translate the first node, the continue translating until there are no nodes to go to.
     let (first, next) = translate_node(node, int_handler, temp_map, translate_map, graph);
-    let mut prev = first.clone();
-    while let Some((arm_node, three_node)) = &next {
-        let (mut current, next) = translate_node(
-            three_node.clone(),
-            int_handler,
-            temp_map,
-            translate_map,
-            graph,
-        );
-        prev.set_successor(current.clone());
-        current.set_predecessor(prev);
-        prev = current;
+
+    if let Some((mut prev, mut next_stat_node)) = next {
+        loop {
+            let (mut trans_start, next_nodes) =
+                translate_node(next_stat_node, int_handler, temp_map, translate_map, graph);
+
+            // connect the end of the previous arm node, to the start of this translation
+            trans_start.set_predecessor(prev.clone());
+            prev.set_successor(trans_start.clone());
+
+            // if there is an end, and next node. Then set prev to be the end,
+            // and translate the next node. (who's start will be linkled with
+            // this end).
+            if let Some((trans_end, next)) = next_nodes {
+                prev = trans_end;
+                next_stat_node = next
+            } else {
+                break;
+            }
+        }
     }
 
     first
@@ -438,7 +446,6 @@ fn dataref_to_reg(
             ],
             graph,
         )
-        .expect("More that one statement")
     } else {
         // LDR arm_temp, =dataref
         // LDR other_temp, =offset
@@ -472,7 +479,6 @@ fn dataref_to_reg(
             ],
             graph,
         )
-        .expect("More that one statement")
     }
 }
 
@@ -572,7 +578,6 @@ fn translate_statcode(
                     ],
                     graph,
                 )
-                .expect("Multiple Statements Used")
             };
 
             let basic_apply_op = |op: RegOp, graph| {
@@ -696,7 +701,6 @@ fn translate_statcode(
                                 ],
                                 graph,
                             )
-                            .expect("Multiple statements used")
                         }
                         None => {
                             // MUL arm_dst_temp, left_reg, right_reg
