@@ -296,7 +296,7 @@ fn analyse_statement<'a, 'b>(
             {
                 Some(ASTWrapper(Some(cond_type), cond_ast)) => {
                     if can_coerce(&Type::Bool, &cond_type) {
-                        Some(ASTWrapper(None, cond_ast))
+                        Some(ASTWrapper(Some(Type::Bool), cond_ast))
                     } else {
                         errors.push(ASTWrapper(
                             span,
@@ -351,7 +351,7 @@ fn analyse_statement<'a, 'b>(
                 match analyse_expression(cond, local_symb, var_symb, &mut stat_errors) {
                     Some(ASTWrapper(Some(cond_type), cond_ast)) => {
                         if can_coerce(&Type::Bool, &cond_type) {
-                            Some(ASTWrapper(None, cond_ast))
+                            Some(ASTWrapper(Some(Type::Bool), cond_ast))
                         } else {
                             errors.push(ASTWrapper(
                                 span,
