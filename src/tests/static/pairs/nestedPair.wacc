@@ -1,0 +1,11 @@
+# create a pair (int, pair (int, int) )
+
+# Output:
+# #empty#
+
+# Program:
+
+begin
+  pair(int, int) p = newpair(2, 3) ;
+  pair(int, pair) q = newpair(1, p)
+end

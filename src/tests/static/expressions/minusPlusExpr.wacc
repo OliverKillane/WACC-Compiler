@@ -1,0 +1,10 @@
+# -+ should be recognised as two separate symbols
+
+# Output:
+# -1
+
+# Program:
+
+begin
+  println 1-+2
+end

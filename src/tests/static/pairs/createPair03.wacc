@@ -1,0 +1,10 @@
+# create a pair (int, char)
+
+# Output:
+# #empty#
+
+# Program:
+
+begin
+  pair(int, char) p = newpair(10, 'a')
+end

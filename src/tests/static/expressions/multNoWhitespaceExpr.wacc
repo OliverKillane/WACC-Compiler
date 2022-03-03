@@ -1,0 +1,10 @@
+# multiplication expressions should not be whitespace sensitive
+
+# Output:
+# 2
+
+# Program:
+
+begin
+  println 1*2
+end
