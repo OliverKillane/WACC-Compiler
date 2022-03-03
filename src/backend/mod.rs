@@ -6,33 +6,33 @@ use three_code::ThreeCode;
 use arm::ArmResult;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-enum PropagationOpt {
+pub enum PropagationOpt {
     Symbolic,
     Constant,
     None,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-struct Options {
-    sethi_ullman_weights: bool,
-    dead_code_removal: bool,
-    propagation: PropagationOpt,
-    inlining: bool,
-    tail_call: bool,
-    hoisting: bool,
-    strength_reduction: bool,
-    loop_unrolling: bool,
-    common_expressions: bool,
-    show_arm_temp_rep: bool
+pub struct Options {
+    pub sethi_ullman_weights: bool,
+    pub dead_code_removal: bool,
+    pub propagation: PropagationOpt,
+    pub inlining: bool,
+    pub tail_call: bool,
+    pub hoisting: bool,
+    pub strength_reduction: bool,
+    pub loop_unrolling: bool,
+    pub common_expressions: bool,
+    pub show_arm_temp_rep: bool
 }
 
 pub struct BackendOutput {
-    assembly: String,
-    intermediates: Vec<String>
+    pub assembly: String,
+    pub intermediates: Vec<String>
 }
 
 /// Compiles the given program into an arm32 assembly
-fn compile(program: Program, options: Options) -> BackendOutput {
+pub fn compile(program: Program, options: Options) -> BackendOutput {
     let three_code = ThreeCode::from((program, &options));
 
     // the arm result can return a printable intermediate representation.

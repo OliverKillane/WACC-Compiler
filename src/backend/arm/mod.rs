@@ -29,8 +29,10 @@ impl From<(ThreeCode, &Options)> for ArmResult {
     fn from((three_code, options): (ThreeCode, &Options)) -> Self {
         if options.show_arm_temp_rep {
             let arm_temp = translate_threecode(three_code);
-            let temp_string = arm_temp.to_string();
-            ArmResult(allocate_registers(arm_temp), Some(temp_string))
+            println!("{}", arm_temp);
+            panic!("stop here");
+            // let regs = allocate_registers(arm_temp);
+            // ArmResult(allocate_registers(arm_temp), Some(temp_string))
 
         } else {
             ArmResult(allocate_registers(translate_threecode(three_code)), None)
