@@ -74,7 +74,10 @@ fn print_static_string(
     data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
 ) -> ir::Stat {
     ir::Stat::PrintStr(
-        ir::PtrExpr::DataRef(add_string(data_ref_map, string.to_string())),
+        ir::PtrExpr::Offset(
+            box ir::PtrExpr::DataRef(add_string(data_ref_map, string.to_string())),
+            box ir::NumExpr::SizeOf(ir::Type::Num(ir::NumSize::DWord)),
+        ),
         ir::NumExpr::Const(ir::NumSize::DWord, string.len() as i32),
     )
 }
