@@ -6,7 +6,7 @@ use crate::graph::Graph;
 use std::ops::DerefMut;
 
 /// A chain from one start armnode to and end armnode.
-pub type Chain = (ArmNode, ArmNode);
+pub struct Chain(pub ArmNode, pub ArmNode);
 
 /// Link two pairs of node chain starts and ends together.
 /// ```text
@@ -14,10 +14,10 @@ pub type Chain = (ArmNode, ArmNode);
 /// 2. start <-> leftmiddle <-> rightmiddle -> end
 /// 3. start <-> end
 /// ```
-pub fn link_two_chains((start, mut leftmiddle): Chain, (mut rightmiddle, end): Chain) -> Chain {
+pub fn link_two_chains(Chain(start, mut leftmiddle): Chain, Chain(mut rightmiddle, end): Chain) -> Chain {
     leftmiddle.set_successor(rightmiddle.clone());
     rightmiddle.set_predecessor(leftmiddle);
-    (start, end)
+    Chain(start, end)
 }
 
 /// Given a vector of optional chains, link the present chains in order.
@@ -57,7 +57,7 @@ pub fn link_stats(stats: Vec<Stat>, graph: &mut Graph<ControlFlow>) -> Chain {
 /// of node references.
 pub fn simple_node(stat: Stat, graph: &mut Graph<ControlFlow>) -> Chain {
     let node = graph.new_node(ControlFlow::Simple(None, stat, None));
-    (node.clone(), node)
+    Chain(node.clone(), node)
 }
 
 /// Determines if an integer is a left logical shifted 8 bit pattern.
@@ -124,6 +124,7 @@ impl ArmNode {
                 if &Some(predecessor) == pre {
                     let _ = pre.insert(new_predecessor);
                 }
+                panic!("Attempted replace a predecessor that was not there")
             }
             ControlFlow::Multi(pres, _) => {
                 for pre in pres.iter_mut() {
@@ -147,7 +148,7 @@ mod tests {
     };
     use lazy_static::__Deref;
 
-    fn check_simple_chain(stats: Vec<Stat>, start: ArmNode, end: ArmNode) {
+    fn check_simple_chain(stats: Vec<Stat>, start: ArmNode) {
         let mut prev_node: Option<ArmNode> = None;
         let mut current_node = Some(start);
 
@@ -169,14 +170,6 @@ mod tests {
 
     #[test]
     fn can_link_simple_statements() {
-        let example_stat = Stat::ApplyOp(
-            RegOp::Add,
-            Cond::Al,
-            false,
-            Ident::Temp(0),
-            Ident::Temp(0),
-            FlexOperand::Imm(7),
-        );
         let stats = vec![
             Stat::ApplyOp(
                 RegOp::Add,
@@ -214,8 +207,8 @@ mod tests {
 
         let mut graph = Graph::new();
 
-        let (start, end) = link_stats(stats.clone(), &mut graph);
-        check_simple_chain(stats, start, end)
+        let Chain(start, _) = link_stats(stats.clone(), &mut graph);
+        check_simple_chain(stats, start)
     }
 
     #[test]
@@ -228,11 +221,6 @@ mod tests {
             Stat::Call(String::from("hello"), None, vec![]),
             None,
         ));
-        let false_end = graph.new_node(ControlFlow::Simple(
-            None,
-            Stat::Call(String::from("world"), None, vec![]),
-            None,
-        ));
 
         check_simple_chain(
             vec![
@@ -240,7 +228,6 @@ mod tests {
                 Stat::Call(String::from("world"), None, vec![]),
             ],
             false_start,
-            false_end,
         )
     }
 

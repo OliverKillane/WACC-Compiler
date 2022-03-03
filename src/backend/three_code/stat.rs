@@ -436,6 +436,7 @@ pub(super) mod tests {
                 strength_reduction: false,
                 loop_unrolling: false,
                 common_expressions: false,
+                show_arm_temp_rep: false
             },
         );
 
@@ -640,6 +641,7 @@ pub(super) mod tests {
                 strength_reduction: false,
                 loop_unrolling: false,
                 common_expressions: false,
+                show_arm_temp_rep: false
             },
         );
 

@@ -1,3 +1,4 @@
+#![allow(unused_variables)]
 mod eval;
 mod expr;
 mod stat;
@@ -899,6 +900,7 @@ mod tests {
                 strength_reduction: false,
                 loop_unrolling: false,
                 common_expressions: false,
+                show_arm_temp_rep: false,
             },
         );
 
@@ -1011,6 +1013,7 @@ mod tests {
                 strength_reduction: false,
                 loop_unrolling: false,
                 common_expressions: false,
+                show_arm_temp_rep: false,
             },
         );
 
@@ -1084,6 +1087,7 @@ mod tests {
                 strength_reduction: false,
                 loop_unrolling: false,
                 common_expressions: false,
+                show_arm_temp_rep: false,
             },
         );
         assert_eq!(args, vec![0]);
@@ -1131,6 +1135,7 @@ mod tests {
                 strength_reduction: false,
                 loop_unrolling: false,
                 common_expressions: false,
+                show_arm_temp_rep: false,
             },
         )
             .into();

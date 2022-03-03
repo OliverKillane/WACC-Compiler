@@ -9,11 +9,8 @@
 //! - Labels are used for nodes jumped to by more than one other node.
 //!
 //!
-
-use super::{
-    super::super::graph::{Deleted, Graph, NodeRef},
-    int_constraints::ConstrainedInt,
-};
+use crate::graph::{Deleted, Graph, NodeRef};
+use super::int_constraints::ConstrainedInt;
 use std::collections::{HashMap, HashSet};
 
 /// The temporary type (used before register allocation)
@@ -23,7 +20,7 @@ pub type DataIdent = i64;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Ident {
     Temp(Temporary),
-    Register(Register),
+    Reg(Register),
 }
 
 /// All general purpose register accessible in user mode (registers are
@@ -51,20 +48,35 @@ pub enum Register {
 /// Condition suffixes to be used in conditionally executing instructions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cond {
+    /// Equal (Z set)
     Eq,
+    /// Not Equal (Z clear)
     Ne,
+    /// Higher or Same (unsigned >=) (C set)
     Hs,
+    /// Lower (unsigned <) (C clear)
     Lo,
+    /// Negative (N set)
     Mi,
+    /// Positive or Zero (N clear)
     Pl,
+    /// Overflow (V set)
     Vs,
+    /// No overflow (V clear)
     Vc,
+    /// Higher (unsigned >) (C set and Z clear)
     Hi,
+    /// Lower or Same (unsigned <=) (C clear or Z set)
     Ls,
+    /// Signed >= (C clear Z set)
     Ge,
+    /// Signed < (N == V)
     Lt,
+    /// Signed > (Z clear, N == V)
     Gt,
+    /// Signed <= (Z Set, N != V)
     Le,
+    /// No condition/Always
     Al,
 }
 
@@ -80,8 +92,8 @@ pub enum Shift {
     Lsr(ConstrainedInt<1, 32>),
     /// Rotate right shift. Must shift `1 <= n <= 31`
     Ror(ConstrainedInt<1, 31>),
-    /// Rotate right by one bit, with extension.
-    Rxx,
+    /// Rotate right by one bit, with extension of the MSB (sign).
+    Rrx,
 }
 
 /// The allowed flexible second operands for arm.
@@ -319,7 +331,7 @@ pub enum ControlFlow {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DataKind {
+pub enum DataType {
     /// An ascii value
     Ascii(String),
     Word(i32),
@@ -328,7 +340,7 @@ pub enum DataKind {
 }
 
 /// All types of data that can be kept in the binary.
-pub struct Data(pub DataIdent, pub Vec<DataKind>);
+pub struct Data(pub DataIdent, pub Vec<DataType>);
 
 /// An arm subroutine, associated with a set of
 pub struct Subroutine {

@@ -1,3 +1,14 @@
+//! Defines the [allocation state](AllocationState) struct which keeps track of 
+//! all register usage, stack position, subroutine stack frame and the reserved 
+//! stack section.
+//! 
+//! Generates instructions for moving allocations (temporary variables, or 
+//! values to preserve) between their stack frame locations and registers.
+//! 
+//! Generates register mappings for temporaries on a per-instruction basis
+//! 
+//! Uses live ranges to determine when to spill values from registers.
+
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
@@ -178,8 +189,8 @@ impl AllocationState {
                     op,
                     Cond::Al,
                     false,
-                    Ident::Register(Register::Sp),
-                    Ident::Register(Register::Sp),
+                    Ident::Reg(Register::Sp),
+                    Ident::Reg(Register::Sp),
                     FlexOperand::Imm(byte_displacement as u32),
                 ),
                 graph,
@@ -196,16 +207,16 @@ impl AllocationState {
                             MemOp::Ldr,
                             Cond::Al,
                             false,
-                            Ident::Register(temp_reg),
+                            Ident::Reg(temp_reg),
                             MemOperand::Expression(byte_displacement),
                         ),
                         Stat::ApplyOp(
                             op,
                             Cond::Al,
                             false,
-                            Ident::Register(Register::Sp),
-                            Ident::Register(Register::Sp),
-                            FlexOperand::ShiftReg(Ident::Register(temp_reg), None),
+                            Ident::Reg(Register::Sp),
+                            Ident::Reg(Register::Sp),
+                            FlexOperand::ShiftReg(Ident::Reg(temp_reg), None),
                         ),
                     ],
                     graph,
@@ -214,23 +225,23 @@ impl AllocationState {
                 // Otherwise we just use R4 (most likely to be unused)
                 link_stats(
                     vec![
-                        Stat::Push(Cond::Al, Ident::Register(Register::R4)),
+                        Stat::Push(Cond::Al, Ident::Reg(Register::R4)),
                         Stat::MemOp(
                             MemOp::Ldr,
                             Cond::Al,
                             false,
-                            Ident::Register(Register::R4),
+                            Ident::Reg(Register::R4),
                             MemOperand::Expression(byte_displacement),
                         ),
                         Stat::ApplyOp(
                             op,
                             Cond::Al,
                             false,
-                            Ident::Register(Register::Sp),
-                            Ident::Register(Register::Sp),
-                            FlexOperand::ShiftReg(Ident::Register(Register::Sp), None),
+                            Ident::Reg(Register::Sp),
+                            Ident::Reg(Register::Sp),
+                            FlexOperand::ShiftReg(Ident::Reg(Register::Sp), None),
                         ),
-                        Stat::Pop(Cond::Al, Ident::Register(Register::R4)),
+                        Stat::Pop(Cond::Al, Ident::Reg(Register::R4)),
                     ],
                     graph,
                 )
@@ -283,9 +294,9 @@ impl AllocationState {
                     memop,
                     Cond::Al,
                     false,
-                    Ident::Register(dst_register),
+                    Ident::Reg(dst_register),
                     MemOperand::PreIndex(
-                        Ident::Register(Register::Sp),
+                        Ident::Reg(Register::Sp),
                         FlexOffset::Expr((sp_offset as i32).into()),
                     ),
                 ),
@@ -293,7 +304,7 @@ impl AllocationState {
             )
         } else if !free_registers.is_empty() {
             // the offset is too large, so we can load as a label into another (free) register, then use that to address
-            let tmp_register = Ident::Register(Register::from(
+            let tmp_register = Ident::Reg(Register::from(
                 free_registers
                     .pop()
                     .expect("vector of free registers is not empty"),
@@ -318,13 +329,13 @@ impl AllocationState {
                         false,
                         tmp_register,
                         tmp_register,
-                        FlexOperand::ShiftReg(Ident::Register(Register::Sp), None),
+                        FlexOperand::ShiftReg(Ident::Reg(Register::Sp), None),
                     ),
                     Stat::MemOp(
                         memop,
                         Cond::Al,
                         false,
-                        Ident::Register(dst_register),
+                        Ident::Reg(dst_register),
                         MemOperand::Zero(tmp_register),
                     ),
                 ],
@@ -332,7 +343,7 @@ impl AllocationState {
             )
         } else {
             // choose a low usage register R12 to push and pop, we store the offset here
-            let tmp_register = Ident::Register(Register::R12);
+            let tmp_register = Ident::Reg(Register::R12);
 
             // PUSH {tmp_reg}
             // LDR tmp_reg, =offset
@@ -356,13 +367,13 @@ impl AllocationState {
                         false,
                         tmp_register,
                         tmp_register,
-                        FlexOperand::ShiftReg(Ident::Register(Register::Sp), None),
+                        FlexOperand::ShiftReg(Ident::Reg(Register::Sp), None),
                     ),
                     Stat::MemOp(
                         memop,
                         Cond::Al,
                         false,
-                        Ident::Register(dst_register),
+                        Ident::Reg(dst_register),
                         MemOperand::Zero(tmp_register),
                     ),
                     Stat::Pop(Cond::Al, tmp_register),
@@ -611,8 +622,8 @@ impl AllocationState {
                         MovOp::Mov,
                         Cond::Al,
                         false,
-                        Ident::Register(dst_register),
-                        FlexOperand::ShiftReg(Ident::Register(Register::from(other_reg_ind)), None),
+                        Ident::Reg(dst_register),
+                        FlexOperand::ShiftReg(Ident::Reg(Register::from(other_reg_ind)), None),
                     ),
                     graph,
                 );
@@ -701,7 +712,7 @@ impl AllocationState {
                     self.move_temp_into_reg(*arg, true, &args[0..4], &[], graph);
                 chains.push(move_chain);
                 chains.push(Some(simple_node(
-                    Stat::Push(Cond::Al, Ident::Register(reg)),
+                    Stat::Push(Cond::Al, Ident::Reg(reg)),
                     graph,
                 )));
             }
@@ -756,8 +767,8 @@ impl AllocationState {
                     RegOp::Add,
                     Cond::Al,
                     false,
-                    Ident::Register(reg),
-                    Ident::Register(Register::Sp),
+                    Ident::Reg(reg),
+                    Ident::Reg(Register::Sp),
                     FlexOperand::Imm(sp_displacement as u32),
                 ),
                 graph,
@@ -775,16 +786,16 @@ impl AllocationState {
                         MemOp::Ldr,
                         Cond::Al,
                         false,
-                        Ident::Register(reg),
+                        Ident::Reg(reg),
                         MemOperand::Expression(sp_displacement),
                     ),
                     Stat::ApplyOp(
                         RegOp::Add,
                         Cond::Al,
                         false,
-                        Ident::Register(reg),
-                        Ident::Register(reg),
-                        FlexOperand::ShiftReg(Ident::Register(Register::Sp), None),
+                        Ident::Reg(reg),
+                        Ident::Reg(reg),
+                        FlexOperand::ShiftReg(Ident::Reg(Register::Sp), None),
                     ),
                 ],
                 graph,
@@ -827,7 +838,7 @@ impl AllocationState {
         chains.push(self.alloc_to_reg(Alloc::Preserve(9), Register::Pc, graph));
 
         // link the statements together
-        let (start, mut end) = link_optional_chains(chains)
+        let Chain(start, mut end) = link_optional_chains(chains)
             .expect("Must place destination in PC, hence always has a chain");
 
         // Add a literal pool at the end for large functions
@@ -880,16 +891,6 @@ impl AllocationState {
     /// occurs, ensures the offsets )
     pub fn pop_sp(&mut self) {
         self.sp_displacement -= 1
-    }
-}
-
-impl Ident {
-    pub fn get_temp(&self) -> Temporary {
-        if let Ident::Temp(t) = self {
-            *t
-        } else {
-            panic!("cannot get temporary id from a non-temporary id")
-        }
     }
 }
 

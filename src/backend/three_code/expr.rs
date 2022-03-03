@@ -444,7 +444,8 @@ mod tests {
                     hoisting: false,
                     strength_reduction: false,
                     loop_unrolling: false,
-                    common_expressions: false
+                    common_expressions: false,
+                    show_arm_temp_rep: false
                 }
             ),
             expr_type
