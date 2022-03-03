@@ -2,23 +2,20 @@
 //! representation, with temporaries instead of registers.
 use lazy_static::__Deref;
 
-use crate::backend::arm::arm_repr::{CmpOp, MemOp, MemOperand, MulOp};
+use crate::{graph::Graph, intermediate::{VarRepr, DataRef}};
 
 use super::{
-    super::{
-        super::graph::Graph,
-        super::intermediate::{DataRef, VarRepr},
-        three_code::{
-            BinOp, DataRefType, Function, OpSrc, Size, StatCode, StatNode, StatType, ThreeCode,
-        },
+    super::three_code::{
+        BinOp, DataRefType, Function, OpSrc, Size, StatCode, StatNode, StatType, ThreeCode,
     },
-    arm_graph_utils::{is_shifted_8_bit, link_chains, link_stats, link_two_chains, simple_node},
+    arm_graph_utils::{is_shifted_8_bit, link_chains, link_stats, link_two_chains, simple_node, Chain},
     arm_repr::{
-        ArmCode, ArmNode, Cond, ControlFlow, Data, DataIdent, DataKind, FlexOffset, FlexOperand,
-        Ident, MovOp, RegOp, Shift, Stat, Subroutine, Temporary,
+        ArmCode, ArmNode, Cond, ControlFlow, Data, DataIdent, DataType, FlexOffset, FlexOperand,
+        Ident, MovOp, RegOp, Shift, Stat, Subroutine, Temporary,CmpOp, MemOp, MemOperand, MulOp
     },
     int_constraints::ConstrainedInt,
 };
+
 use std::{
     collections::{HashMap, HashSet},
     panic,
@@ -106,37 +103,42 @@ fn translate_data(data_refs: HashMap<DataRef, DataRefType>) -> Vec<Data> {
             match data {
                 DataRefType::String(string) => Data(
                     convert_data_ref(data_ref),
-                    vec![DataKind::Ascii(
+                    vec![DataType::Ascii(
                         String::from_utf8(string).expect("Is always valid Ascii"),
                     )],
                 ),
                 DataRefType::Struct(types) => {
                     // change struct into types, note that all Bytes are collected into strings.
-                    let datas = types
+                    let (mut datas, string) = types
                         .into_iter()
                         .map(|data| match data {
-                            (Size::Byte, val) => DataKind::Byte(val as u8),
-                            (Size::Word, val) => DataKind::HalfWord(val as i16),
-                            (Size::DWord, val) => DataKind::Word(val),
+                            (Size::Byte, val) => DataType::Byte(val as u8),
+                            (Size::Word, val) => DataType::HalfWord(val as i16),
+                            (Size::DWord, val) => DataType::Word(val),
                         })
                         .rfold(
                             (Vec::new(), Vec::new()),
-                            |(mut datas, mut chars): (Vec<DataKind>, Vec<u8>), next| {
-                                if let DataKind::Byte(char_val) = next {
+                            |(mut datas, mut chars): (Vec<DataType>, Vec<u8>), next| {
+                                if let DataType::Byte(char_val)  = next && char_val < 128 {
+                                    // if it is a standard ascii character, push it
                                     chars.push(char_val);
                                     (datas, chars)
                                 } else if chars.is_empty() {
                                     datas.push(next);
                                     (datas, chars)
                                 } else {
-                                    datas.push(DataKind::Ascii(
-                                        String::from_utf8(chars).expect("Always valid utf8"),
+                                    datas.push(DataType::Ascii(
+                                        String::from_utf8(chars).expect("Always valid ascii"),
                                     ));
                                     (datas, Vec::new())
                                 }
                             },
-                        )
-                        .0;
+                        );
+                    
+                    // place any string on the end of the data section into datas
+                    if !string.is_empty() {
+                        datas.push(DataType::Ascii(String::from_utf8(string).expect("Always valid ascii")))
+                    }
 
                     Data(convert_data_ref(data_ref), datas)
                 }
@@ -181,12 +183,12 @@ fn translate_node_inner(
 ) -> (ArmNode, Option<(ArmNode, StatNode)>) {
     match node.get().deref() {
         StatType::Simple(_, stat, succ) => {
-            let (start, end) = translate_statcode(stat, int_handler, graph, temp_map);
+            let Chain(start, end) = translate_statcode(stat, int_handler, graph, temp_map);
             (start, Some((end, succ.clone())))
         }
         StatType::Final(_, stat) => {
             // Create statements, then add a return. Even if the stat is an exit, we still add the return.
-            let (start, mut end) = translate_statcode(stat, int_handler, graph, temp_map);
+            let Chain(start, mut end) = translate_statcode(stat, int_handler, graph, temp_map);
             let ret_node = graph.new_node(ControlFlow::Return(Some(end.clone()), None));
             end.set_successor(ret_node);
             (start, None)
@@ -200,7 +202,7 @@ fn translate_node_inner(
                 translate_map,
                 graph,
             );
-            let (mut start, end) = simple_node(
+            let Chain(mut start, end) = simple_node(
                 Stat::Cmp(
                     CmpOp::Cmp,
                     Cond::Al,
@@ -376,7 +378,7 @@ fn convert_data_ref(i: DataRef) -> DataIdent {
 }
 
 /// place a constant in a temporary
-fn const_to_reg(dst_ident: Ident, i: i32, graph: &mut Graph<ControlFlow>) -> (ArmNode, ArmNode) {
+fn const_to_reg(dst_ident: Ident, i: i32, graph: &mut Graph<ControlFlow>) -> Chain {
     if is_shifted_8_bit(i) {
         // Mov dst_ident, #i
         simple_node(
@@ -411,7 +413,7 @@ fn dataref_to_reg(
     offset: i32,
     temp_map: &mut TempMap,
     graph: &mut Graph<ControlFlow>,
-) -> (ArmNode, ArmNode) {
+) -> Chain {
     if offset == 0 {
         // LDR dst_ident, =data_ident
         simple_node(
@@ -489,7 +491,7 @@ fn translate_statcode(
     int_handler: Option<&String>,
     graph: &mut Graph<ControlFlow>,
     temp_map: &mut TempMap,
-) -> (ArmNode, ArmNode) {
+) -> Chain {
     match code {
         StatCode::Assign(three_temp, opsrc) => {
             let arm_temp = temp_map.use_temp(*three_temp);

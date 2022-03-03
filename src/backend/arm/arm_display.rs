@@ -10,7 +10,7 @@ impl Display for Ident {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Ident::Temp(t) => write!(f, "T{}", t),
-            Ident::Register(r) => write!(f, "{}", r),
+            Ident::Reg(r) => write!(f, "{}", r),
         }
     }
 }
@@ -77,7 +77,7 @@ impl Display for Shift {
                 Shift::Lsl(n) => format!("LSL #{}", i32::from(*n)),
                 Shift::Lsr(n) => format!("LSR #{}", i32::from(*n)),
                 Shift::Ror(n) => format!("ROR #{}", i32::from(*n)),
-                Shift::Rxx => "RXX".into(),
+                Shift::Rrx => "RRX".into(),
             }
         )
     }
@@ -384,16 +384,16 @@ fn display_data_ref(ident: DataIdent) -> String {
     format!("d_ref_{}", ident)
 }
 
-impl Display for DataKind {
+impl Display for DataType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
             "\t{}",
             match self {
-                DataKind::Ascii(s) => format!(".ascii \"{}\"", s),
-                DataKind::Word(w) => format!(".word {}", w),
-                DataKind::HalfWord(h) => format!(".hword {}", h),
-                DataKind::Byte(b) => format!(".byte {}", b),
+                DataType::Ascii(s) => format!(".ascii \"{}\"", s),
+                DataType::Word(w) => format!(".word {}", w),
+                DataType::HalfWord(h) => format!(".hword {}", h),
+                DataType::Byte(b) => format!(".byte {}", b),
             }
         )
     }

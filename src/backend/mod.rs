@@ -1,17 +1,9 @@
-#![allow(unused_variables)]
-
 mod arm;
-mod assembly_gen;
-mod graph_coloring;
-mod ssa;
-mod ssa_opt;
 mod three_code;
 
 use crate::intermediate::Program;
-use graph_coloring::GeneralAssembly;
-use ssa::StaticSingleAssignment;
-use ssa_opt::optimize_ssa;
 use three_code::ThreeCode;
+use arm::ArmResult;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum PropagationOpt {
@@ -31,13 +23,27 @@ struct Options {
     strength_reduction: bool,
     loop_unrolling: bool,
     common_expressions: bool,
+    show_arm_temp_rep: bool
+}
+
+pub struct BackendOutput {
+    assembly: String,
+    intermediates: Vec<String>
 }
 
 /// Compiles the given program into an arm32 assembly
-fn compile(program: Program, options: Options) -> String {
+fn compile(program: Program, options: Options) -> BackendOutput {
     let three_code = ThreeCode::from((program, &options));
-    let ssa = StaticSingleAssignment::from(three_code);
-    let ssa = optimize_ssa(ssa, &options);
-    let general_assembly = GeneralAssembly::from(ssa);
-    format!("{}", general_assembly)
+
+    // the arm result can return a printable intermediate representation.
+    let ArmResult(armcode, temp_rep) = ArmResult::from((three_code, &options));
+    
+    // return the final arm code, and any intermediate representations selected by options
+    BackendOutput{
+        assembly: armcode.to_string(),
+        intermediates: match temp_rep {
+            Some(temp_rep) => vec![temp_rep],
+            None => vec![],
+        }
+    }
 }

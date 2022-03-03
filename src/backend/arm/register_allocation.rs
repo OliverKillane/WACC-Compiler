@@ -1,25 +1,29 @@
 //! Register allocation for the arm representation, using live ranges and
-//! 'time-till-use'.
+//! 'time-till-use' decision for spilling.
+//! 
+//! An allocation state is used to keep track of register usage, and 
+//! create/maintain the stack frame.
 
 use std::{
     collections::{HashMap, HashSet},
     ops::DerefMut,
 };
 
-use crate::backend::arm::{
-    arm_graph_utils::link_optional_chains,
-    arm_repr::{FlexOffset, MemOp, MemOperand},
-    live_ranges::get_live_ranges,
-};
+use crate::graph::Graph;
 
 use super::{
-    super::super::graph::Graph,
     allocation_state::AllocationState,
-    arm_graph_utils::Chain,
-    arm_repr::{ArmCode, ArmNode, ControlFlow, FlexOperand, Ident, Stat, Subroutine, Temporary},
-    live_ranges::LiveRanges,
+    arm_graph_utils::{Chain, link_optional_chains},
+    arm_repr::{ArmCode, ArmNode, ControlFlow, FlexOperand, Ident, Stat, Subroutine, Temporary, FlexOffset, MemOp, MemOperand},
+    live_ranges::{LiveRanges, get_live_ranges},
 };
 
+/// Update the program, allocating registers for every instruction.
+/// 
+/// Invariants:
+/// - Temporary sets must contain all temporaries used in each routine
+/// - All instructions must use temporaries as identifiers
+/// - Live ranges must be correct for livein.
 pub fn allocate_registers(program: ArmCode) -> ArmCode {
     // generate the live ranges for the program.
     let live_ranges = get_live_ranges(&program);
@@ -74,6 +78,9 @@ pub fn allocate_registers(program: ArmCode) -> ArmCode {
     }
 }
 
+/// From the start node of a given routine, generate the stack frame 
+/// (instructions and initial allocation state), and then translate all 
+/// connecting arm nodes using the provided live ranges and temporaries.
 fn allocate_for_routine(
     mut start_node: ArmNode,
     args: &[Temporary],
@@ -83,7 +90,7 @@ fn allocate_for_routine(
     graph: &mut Graph<ControlFlow>,
 ) -> ArmNode {
     let mut state_map = HashMap::new();
-    let (alloc_state, (new_start, mut stack_setup_end)) =
+    let (alloc_state, Chain(new_start, mut stack_setup_end)) =
         AllocationState::create_stack_frame(args, reserved_stack, temps_set, graph);
 
     // connect up the start:
@@ -123,8 +130,8 @@ fn translate_from_node(
         alloc_state.update_live(&livein);
 
         let mut next: ArmNode = match current_node.clone().get_mut().deref_mut() {
-            ControlFlow::Simple(prev, Stat::Call(fun_name, ret, args), next) => {
-                let (mut start, mut end) =
+            ControlFlow::Simple(Some(prev), Stat::Call(fun_name, ret, args), next) => {
+                let Chain(mut start, mut end) =
                     alloc_state.call(fun_name.clone(), ret, args, &liveout, graph);
 
                 // as we entirely replace the 'call' node, we set the successors and
@@ -134,9 +141,8 @@ fn translate_from_node(
                     next_node.replace_predecessor(current_node.clone(), end)
                 }
 
-                let mut prev_node = prev.clone().expect("Every node must have a predecessor");
-                start.set_predecessor(prev_node.clone());
-                prev_node.replace_successor(current_node.clone(), start);
+                start.set_predecessor(prev.clone());
+                prev.replace_successor(current_node.clone(), start);
 
                 if let Some(next_node) = next {
                     next_node.clone()
@@ -206,9 +212,9 @@ fn translate_from_node(
                         );
 
                         // assign the register identifiers
-                        *dst_ident = Ident::Register(dst_reg);
-                        *arg1_ident = Ident::Register(arg1_reg);
-                        *arg2_ident = Ident::Register(arg2_reg);
+                        *dst_ident = Ident::Reg(dst_reg);
+                        *arg1_ident = Ident::Reg(arg1_reg);
+                        *arg2_ident = Ident::Reg(arg2_reg);
 
                         link_optional_chains(vec![arg1_chain, arg2_chain, dst_chain])
                     }
@@ -263,8 +269,8 @@ fn translate_from_node(
                         let (dst_reg, dst_chain) =
                             alloc_state.move_temp_into_reg(dst_t, false, &[arg_t], &liveout, graph);
 
-                        *arg_ident = Ident::Register(arg_reg);
-                        *dst_ident = Ident::Register(dst_reg);
+                        *arg_ident = Ident::Reg(arg_reg);
+                        *dst_ident = Ident::Reg(dst_reg);
 
                         link_optional_chains(vec![arg_chain, dst_chain])
                     }
@@ -318,10 +324,10 @@ fn translate_from_node(
                             graph,
                         );
 
-                        *dst_ident = Ident::Register(dst_reg);
-                        *arg1_ident = Ident::Register(arg1_reg);
-                        *arg2_ident = Ident::Register(arg2_reg);
-                        *arg3_ident = Ident::Register(arg3_reg);
+                        *dst_ident = Ident::Reg(dst_reg);
+                        *arg1_ident = Ident::Reg(arg1_reg);
+                        *arg2_ident = Ident::Reg(arg2_reg);
+                        *arg3_ident = Ident::Reg(arg3_reg);
 
                         link_optional_chains(vec![arg1_chain, arg2_chain, arg3_chain, dst_chain])
                     }
@@ -366,10 +372,10 @@ fn translate_from_node(
                             graph,
                         );
 
-                        *dst1_ident = Ident::Register(dst1_reg);
-                        *dst2_ident = Ident::Register(dst2_reg);
-                        *arg1_ident = Ident::Register(arg1_reg);
-                        *arg2_ident = Ident::Register(arg2_reg);
+                        *dst1_ident = Ident::Reg(dst1_reg);
+                        *dst2_ident = Ident::Reg(dst2_reg);
+                        *arg1_ident = Ident::Reg(arg1_reg);
+                        *arg2_ident = Ident::Reg(arg2_reg);
 
                         link_optional_chains(vec![arg1_chain, arg2_chain, dst1_chain, dst2_chain])
                     }
@@ -392,7 +398,7 @@ fn translate_from_node(
 
                         let (reg, chain) =
                             alloc_state.move_temp_into_reg(dst_t, false, &[], &[], graph);
-                        *dst_ident = Ident::Register(reg);
+                        *dst_ident = Ident::Reg(reg);
                         chain
                     }
                     Stat::MemOp(
@@ -419,8 +425,8 @@ fn translate_from_node(
                         let (arg2_reg, arg2_chain) =
                             alloc_state.move_temp_into_reg(arg2_t, true, &[arg1_t], &livein, graph);
 
-                        *arg1_ident = Ident::Register(arg1_reg);
-                        *arg2_ident = Ident::Register(arg2_reg);
+                        *arg1_ident = Ident::Reg(arg1_reg);
+                        *arg2_ident = Ident::Reg(arg2_reg);
 
                         link_optional_chains(vec![arg1_chain, arg2_chain])
                     }
@@ -462,9 +468,9 @@ fn translate_from_node(
                             graph,
                         );
 
-                        *arg1_ident = Ident::Register(arg1_reg);
-                        *arg2_ident = Ident::Register(arg2_reg);
-                        *arg3_ident = Ident::Register(arg3_reg);
+                        *arg1_ident = Ident::Reg(arg1_reg);
+                        *arg2_ident = Ident::Reg(arg2_reg);
+                        *arg3_ident = Ident::Reg(arg3_reg);
 
                         link_optional_chains(vec![arg1_chain, arg2_chain, arg3_chain])
                     }
@@ -481,7 +487,7 @@ fn translate_from_node(
                         let (arg1_reg, arg_chain) =
                             alloc_state.move_temp_into_reg(arg_t, true, &[], &livein, graph);
 
-                        *arg_ident = Ident::Register(arg1_reg);
+                        *arg_ident = Ident::Reg(arg1_reg);
 
                         arg_chain
                     }
@@ -492,7 +498,7 @@ fn translate_from_node(
                         let (arg1_reg, arg_chain) =
                             alloc_state.move_temp_into_reg(arg_t, true, &[], &livein, graph);
 
-                        *arg_ident = Ident::Register(arg1_reg);
+                        *arg_ident = Ident::Reg(arg1_reg);
 
                         alloc_state.push_sp();
 
@@ -504,7 +510,7 @@ fn translate_from_node(
                         let (arg1_reg, arg_chain) =
                             alloc_state.move_temp_into_reg(arg_t, true, &[], &livein, graph);
 
-                        *arg_ident = Ident::Register(arg1_reg);
+                        *arg_ident = Ident::Reg(arg1_reg);
 
                         alloc_state.pop_sp();
 
@@ -519,7 +525,7 @@ fn translate_from_node(
                             alloc_state.move_temp_into_reg(dst_t, false, &[], &[], graph);
                         let set_address_chain = alloc_state.assign_stack_reserved(reg, graph);
 
-                        *dst_ident = Ident::Register(reg);
+                        *dst_ident = Ident::Reg(reg);
 
                         link_optional_chains(vec![get_reg_chain, Some(set_address_chain)])
                     }
@@ -527,7 +533,7 @@ fn translate_from_node(
                 };
 
                 // if new chains were created, then make them the predecessors to this node.
-                if let Some((mut before_start, mut before_end)) = chain_before {
+                if let Some(Chain(mut before_start, mut before_end)) = chain_before {
                     let mut prev_node =
                         prev_entry.clone().expect("All nodes must have a successor");
                     // connect prev <-> before_start <-> before_end <-> this node
@@ -547,7 +553,7 @@ fn translate_from_node(
             ControlFlow::Branch(_, branch_next, _, next) => {
                 // check if the current node has had its registers allocated already
                 if let Some(conform_alloc_state) = state_map.get(branch_next) {
-                    if let Some((mut chain_start, mut chain_end)) =
+                    if let Some(Chain(mut chain_start, mut chain_end)) =
                         alloc_state.match_state(conform_alloc_state, graph)
                     {
                         let mut next_node = branch_next.clone();
@@ -579,11 +585,10 @@ fn translate_from_node(
                 }
             }
             ControlFlow::Ltorg(_) => return,
-            ControlFlow::Return(prev, ret) => {
+            ControlFlow::Return(Some(prev), ret) => {
                 let start = alloc_state.subroutine_return(ret, graph);
 
-                let mut prev_node = prev.clone().expect("Every node must have a predecessor");
-                prev_node.replace_successor(current_node.clone(), start);
+                prev.replace_successor(current_node.clone(), start);
 
                 return;
             }
@@ -602,11 +607,12 @@ fn translate_from_node(
             ControlFlow::Removed => {
                 panic!("Removed nodes must not be present in the traversable part of the graph")
             }
+            _ => panic!("No previous node, hence the function's invaliant is broken")
         };
 
         // check if the current node has had its registers allocated already
         if let Some(conform_alloc_state) = state_map.get(&next) {
-            if let Some((mut chain_start, mut chain_end)) =
+            if let Some(Chain(mut chain_start, mut chain_end)) =
                 alloc_state.match_state(conform_alloc_state, graph)
             {
                 chain_start.set_predecessor(current_node.clone());
@@ -620,5 +626,16 @@ fn translate_from_node(
         }
 
         current_node = next;
+    }
+}
+
+impl Ident {
+    /// used to extract temporaries
+    pub fn get_temp(&self) -> Temporary {
+        if let Ident::Temp(t) = self {
+            *t
+        } else {
+            panic!("cannot get temporary id from a non-temporary id")
+        }
     }
 }
