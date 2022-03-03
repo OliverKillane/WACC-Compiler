@@ -1,0 +1,18 @@
+# evaluating string equality
+
+# Output:
+# true
+# false
+# false
+
+# Program:
+
+begin
+  string s1 = "Hello" ;
+  string s2 = "foo" ;
+  string s3 = "bar" ;
+  bool b = s1 == s1 ;
+  println b ;
+  println s1 == s2 ;
+  println s2 == s3
+end

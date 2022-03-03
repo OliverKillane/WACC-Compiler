@@ -1,0 +1,32 @@
+# print a fixed size triangle
+
+# Output:
+# --------
+# -------
+# ------
+# -----
+# ----
+# ---
+# --
+# -
+
+# Program:
+
+begin
+  int f(int x) is
+    if x == 0 then
+      skip
+    else
+      int i = x ;
+      while i > 0 do 
+        print "-" ;
+        i = i - 1
+      done ;
+      println "" ;
+      int s = call f(x - 1)
+    fi ;
+    return 0
+  end
+
+  int s = call f(8) 
+end

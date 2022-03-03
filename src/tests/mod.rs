@@ -1,0 +1,240 @@
+// #![cfg(test)]
+
+use crate::frontend::analyse;
+use colored::Colorize;
+use glob::glob;
+use nom::branch::alt;
+use nom::bytes::complete::is_not;
+use nom::bytes::complete::tag;
+use nom::bytes::complete::take_until;
+use nom::character::complete::digit1;
+use nom::character::streaming::line_ending;
+use nom::combinator::map;
+use nom::combinator::map_res;
+use nom::combinator::opt;
+use nom::combinator::recognize;
+use nom::combinator::value;
+use nom::multi::many1;
+use nom::sequence::preceded;
+use nom::sequence::{delimited, pair};
+use rstest::rstest;
+use std::fs::File;
+use std::fs::create_dir;
+use std::fs::create_dir_all;
+use std::io::prelude::*;
+use std::process::Stdio;
+use std::sync::Arc;
+use std::sync::Mutex;
+use lazy_static::lazy_static;
+use std::{cmp::min, fs::read_to_string, fs::write};
+
+use nom::*;
+
+const FILE_FAILURE: i32 = 1;
+
+#[derive(Clone, Debug)]
+struct Behaviour(Vec<Vec<Tokens>>);
+
+#[derive(Clone, Debug)]
+enum Tokens {
+    String(String),
+    Address,
+    Empty,
+    RuntimeError
+}
+
+fn parse_int(input: &str) -> IResult<&str, i32> {
+    map_res(recognize(digit1), |s: &str| s.parse())(input)
+}
+
+fn parse_line(input: &str) -> IResult<&str, Vec<Tokens>> {
+
+    many1(alt((
+        map(is_not("#\n"), |s: &str| {
+            Tokens::String(s.to_string())
+        }),
+
+        value(Tokens::Address, tag("#addrs#")),
+        value(Tokens::Address, tag("#runtime_error#")),
+        
+    )))(input)
+
+}
+
+fn parse_behaviour(input: &str) -> IResult<&str, (Behaviour, Option<i32>)> {
+    let (input, _) = pair(take_until("Output:\n"), tag("Output:\n"))(input)?;
+
+    pair(
+        map(alt((
+            value(vec![vec![Tokens::Empty]], tag("# #empty#")),
+
+            many1(delimited(tag("# "), parse_line, line_ending)),
+            
+        )), |v| Behaviour(v)),
+        opt(preceded(
+            pair(take_until("Exit:\n# "), tag("Exit:\n# ")),
+            parse_int,
+        )),
+    )(input)
+}
+
+const RUNTIME_ERRORS: [&str; 4] = [
+    "NullDereference",
+    "IntegerOverflow",
+    "DivideByZero",
+    "ArrayOutOfBounds"
+];
+
+impl PartialEq<&str> for Behaviour {
+    fn eq(&self, other: &&str) -> bool {
+        let mut iter = other.chars();
+        for line in self.0.iter() {
+            for token in line {
+                match token {
+                    Tokens::String(s) => {
+                        if &iter.by_ref().take(s.len()).collect::<String>() != s {
+                            return false;
+                        }
+                    },
+                    Tokens::Address => {
+                        if !(iter.next() == Some('0') && iter.next() == Some('x')) {
+                            return false;
+                        }
+                        let _ = iter.by_ref().skip_while(|c| c.is_numeric());
+                    },
+                    Tokens::Empty => return iter.next() == None,
+                    Tokens::RuntimeError => {
+                        let rest = iter.as_str();
+                        for err in RUNTIME_ERRORS {
+                            if rest.contains(err) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    },
+                }
+            }
+            if iter.nth(0) != Some('\n') {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+#[rstest]
+#[case("static/basic")]
+#[case("static/expressions")]
+#[case("static/pairs")]
+#[case("static/variables")]
+#[case("static/if")]
+#[case("static/array")]
+#[case("static/function")]
+#[case("static/runtimeErr")]
+#[case("static/scope")]
+#[case("static/sequence")]
+#[case("static/variables")]
+#[case("static/while")]
+fn examples_test(#[case] path: &str) {
+    examples_dir_test(path).unwrap();
+}
+
+fn examples_dir_test(dir: &str) -> Result<(), i32> {
+    for file in glob(&format!("{}{}{}", "src/tests/", dir, "/**/*.wacc"))
+        .unwrap()
+        .map(|e| e.unwrap())
+    {
+        println!("{}", file.to_str().unwrap());
+        let contents = read_to_string(&file).unwrap();
+        let (output, exit_code) = dbg!(parse_behaviour(&contents).unwrap().1);
+        // compiler_test(file.to_str().unwrap(), String::new(), output, exit_code)?;
+    }
+    Ok(())
+}
+lazy_static! {
+    static ref FILE_SYSTEM_LOCK: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
+}
+
+
+fn compiler_test(
+    filename: &str,
+    input: String,
+    output: Behaviour,
+    exit_code: Option<i32>,
+) -> Result<(), i32> {
+    let assembly = match read_to_string(filename) {
+        Ok(source_code) => match analyse(&source_code) {
+            Ok(_ir) => Ok(".text
+
+            .global main
+            main:".to_string()),
+            Err(errs) => {
+                let mut exit_code = i32::MAX;
+                for mut err in errs {
+                    err.set_filepath(filename.to_string());
+                    exit_code = min(exit_code, err.get_code());
+                    println!("{}", err)
+                }
+                Err(exit_code)
+            }
+        },
+        Err(err) => {
+            println!(
+                "{}\n{}",
+                "Error: Could not open file ".red().underline(),
+                err
+            );
+            Err(FILE_FAILURE)
+        }
+    }?;
+
+    let lock = FILE_SYSTEM_LOCK.lock().expect("Could not aquire filesystem lock");
+
+    create_dir_all("./tmp/").unwrap();
+    write("./tmp/tmp.s", assembly.as_bytes()).expect("Unable to write file");
+
+    let stdout = std::process::Command::new("arm-linux-gnueabi-gcc")
+        .args(&[
+            "-o",
+            "tmp/tmps",
+            "-mcpu=arm1176jzf-s",
+            "-mtune=arm1176jzf-s",
+            "tmp/tmp.s",
+        ])
+        .output()
+        .expect("Unable to run program");
+
+    dbg!(String::from_utf8_lossy(&stdout.stdout));
+
+    assert!(stdout.status.success());
+
+    let mut child = std::process::Command::new("qemu-arm")
+        .args(&["-L", "/usr/arm-linux-gnueabi/", "tmp"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("Unable to run program");
+
+    let mut stdin = child.stdin.take().expect("Failed to open stdin");
+    std::thread::spawn(move || {
+        stdin
+            .write_all(input.as_bytes())
+            .expect("Failed to write to stdin");
+    });
+
+    let stdout = child.wait_with_output().expect("Failed to read stdout");
+
+    
+
+    match dbg!(exit_code) {
+        Some(e) => assert_eq!(stdout.status.code().unwrap(), e),
+        None => assert!(stdout.status.success()),
+    }
+
+    assert_eq!(output, &String::from_utf8_lossy(&stdout.stdout).as_ref());
+
+    drop(lock);
+    
+    Ok(())
+}
