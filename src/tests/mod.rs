@@ -83,7 +83,7 @@ impl PartialEq<&str> for Behaviour {
                         }
                     }
                     Tokens::Address => {
-                        if !(iter.next() == Some('0') && iter.next() == Some('x')) {
+                        if iter.by_ref().take(2).collect::<String>() != "0x" {
                             return false;
                         }
                         let _ = iter.by_ref().skip_while(|c| c.is_numeric());
@@ -100,7 +100,7 @@ impl PartialEq<&str> for Behaviour {
                     }
                 }
             }
-            if iter.nth(0) != Some('\n') {
+            if iter.next() != Some('\n') {
                 return false;
             }
         }
