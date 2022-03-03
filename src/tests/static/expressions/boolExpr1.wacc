@@ -1,0 +1,15 @@
+# evaluating a moderately complex boolean expression
+
+# Output:
+# Correct
+
+# Program:
+
+begin
+  bool b = ! ( ( true && false) || (true && false) );
+  if b == true then
+    println "Correct"
+  else
+    println "Wrong"
+  fi
+end

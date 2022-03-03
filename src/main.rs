@@ -50,6 +50,9 @@ mod frontend;
 mod graph;
 mod intermediate;
 
+// #[cfg(test)]
+// mod tests;
+
 use clap::Parser;
 use colored::Colorize;
 use frontend::analyse;

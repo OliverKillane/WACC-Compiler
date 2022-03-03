@@ -1,0 +1,11 @@
+# basic character printing
+
+# Output:
+# A simple character example is f
+
+# Program:
+
+begin
+  print "A simple character example is " ;
+  println 'f'
+end

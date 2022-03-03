@@ -1,0 +1,10 @@
+# create a pair (int, int)
+
+# Output:
+# #empty#
+
+# Program:
+
+begin
+  pair(int, int) p = newpair(10, 3)
+end

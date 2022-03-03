@@ -1,0 +1,11 @@
+# basic Integer printing
+
+# Output:
+# An example integer is 189
+
+# Program:
+
+begin
+  print "An example integer is " ;
+  println 189
+end

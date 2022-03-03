@@ -1,0 +1,11 @@
+# evaluating negation
+
+# Output:
+# -42
+
+# Program:
+
+begin
+	int x = 42 ;
+  println -x
+end

@@ -1,0 +1,125 @@
+# Tests scoping with most variable types
+
+# Output:
+# ( [1, 2, 3] , [a, b, c] )
+# [ #addrs# = (a, true), #addrs# = (b, false) ]
+# 1, 2
+# array, of, strings
+# true, false, true
+# xyz
+# 1, 2, 3
+# this is a string
+# true
+# x
+# 5
+
+# Program:
+
+begin
+
+  string comma = ", ";
+  int x = 5;
+  begin
+    char x = 'x';    
+    begin
+      bool x = true;    
+      begin
+        string x = "this is a string";    
+        begin
+          int[] x = [1,2,3];    
+          begin
+            char[] x = ['x', 'y', 'z'];    
+            begin
+              bool[] x = [true, false, true];
+              begin
+                string[] x = ["array", "of", "strings"];
+                begin
+                  pair(int, int) x = newpair(1, 2);
+                  begin
+                    pair(char, bool) y = newpair('a', true);
+                    pair(char, bool) z = newpair('b', false);
+                    pair(char, bool)[] x = [y, z];
+                    begin
+                      int[] y = [1, 2, 3];
+                      char[] z = ['a', 'b', 'c'];
+                      pair(int[], char[]) x = newpair(y, z);
+                      begin
+                        skip
+                      end;
+                      int[] a = fst x;
+                      char[] b = snd x;
+                      print "( [";
+                      print a[0];
+                      print comma;
+                      print a[1];
+                      print comma;
+                      print a[2];
+                      print "] , [";
+                      print b[0];
+                      print comma;
+                      print b[1];
+                      print comma;
+                      print b[2];
+                      println "] )" # ( [fst x] , [snd x] )
+                    end;
+                    pair(char, bool) a = x[0];
+                    char aa = fst a;
+                    bool ab = snd a;
+                    pair(char, bool) b = x[1];
+                    char ba = fst b;
+                    bool bb = snd b;
+                    print "[ ";
+                    print a;
+                    print " = (";
+                    print aa;
+                    print comma;
+                    print ab;
+                    print "), ";
+                    print b;
+                    print " = (";
+                    print ba;
+                    print comma;
+                    print bb;
+                    println ") ]" # [ x[0], x[1] ]
+                  end;
+                  int y = fst x;
+                  int z = snd x;
+                  print y; 
+                  print comma;
+                  println z # fst x, snd x
+                end;
+                string a = x[0];
+                string b = x[1];
+                string c = x[2];
+                print a;
+                print comma;
+                print b;
+                print comma;
+                println c # string[]
+              end;
+              print x[0];
+              print comma;
+              print x[1];
+              print comma;
+              println x[2] # bool[]
+            end;
+            println x # char[]
+          end;
+          int a = x[0];
+          int b = x[1];
+          int c = x[2];
+          print a;
+          print comma;
+          print b;
+          print comma;
+          println c # int[]
+        end;
+        println x # string
+      end;
+      println x # bool
+    end;
+    println x # char
+  end;
+  println x # int
+
+end
