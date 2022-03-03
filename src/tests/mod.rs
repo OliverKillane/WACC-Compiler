@@ -3,30 +3,21 @@
 use crate::frontend::analyse;
 use colored::Colorize;
 use glob::glob;
-use nom::branch::alt;
-use nom::bytes::complete::is_not;
-use nom::bytes::complete::tag;
-use nom::bytes::complete::take_until;
-use nom::character::complete::digit1;
-use nom::character::streaming::line_ending;
-use nom::combinator::map;
-use nom::combinator::map_res;
-use nom::combinator::opt;
-use nom::combinator::recognize;
-use nom::combinator::value;
-use nom::multi::many1;
-use nom::sequence::preceded;
-use nom::sequence::{delimited, pair};
+use lazy_static::lazy_static;
+use nom::{
+    branch::alt,
+    bytes::complete::{is_not, tag, take_until},
+    character::complete::{digit1, line_ending},
+    combinator::{map, map_res, opt, recognize, value},
+    multi::many1,
+    sequence::{delimited, pair, preceded},
+};
 use rstest::rstest;
-use std::fs::File;
-use std::fs::create_dir;
-use std::fs::create_dir_all;
+use std::cmp::min;
+use std::fs::{create_dir_all, read_to_string, write};
 use std::io::prelude::*;
 use std::process::Stdio;
-use std::sync::Arc;
-use std::sync::Mutex;
-use lazy_static::lazy_static;
-use std::{cmp::min, fs::read_to_string, fs::write};
+use std::sync::{Arc, Mutex};
 
 use nom::*;
 
@@ -40,7 +31,7 @@ enum Tokens {
     String(String),
     Address,
     Empty,
-    RuntimeError
+    RuntimeError,
 }
 
 fn parse_int(input: &str) -> IResult<&str, i32> {
@@ -48,29 +39,24 @@ fn parse_int(input: &str) -> IResult<&str, i32> {
 }
 
 fn parse_line(input: &str) -> IResult<&str, Vec<Tokens>> {
-
     many1(alt((
-        map(is_not("#\n"), |s: &str| {
-            Tokens::String(s.to_string())
-        }),
-
+        map(is_not("#\n"), |s: &str| Tokens::String(s.to_string())),
         value(Tokens::Address, tag("#addrs#")),
         value(Tokens::Address, tag("#runtime_error#")),
-        
     )))(input)
-
 }
 
 fn parse_behaviour(input: &str) -> IResult<&str, (Behaviour, Option<i32>)> {
     let (input, _) = pair(take_until("Output:\n"), tag("Output:\n"))(input)?;
 
     pair(
-        map(alt((
-            value(vec![vec![Tokens::Empty]], tag("# #empty#")),
-
-            many1(delimited(tag("# "), parse_line, line_ending)),
-            
-        )), |v| Behaviour(v)),
+        map(
+            alt((
+                value(vec![vec![Tokens::Empty]], tag("# #empty#")),
+                many1(delimited(tag("# "), parse_line, line_ending)),
+            )),
+            |v| Behaviour(v),
+        ),
         opt(preceded(
             pair(take_until("Exit:\n# "), tag("Exit:\n# ")),
             parse_int,
@@ -79,10 +65,10 @@ fn parse_behaviour(input: &str) -> IResult<&str, (Behaviour, Option<i32>)> {
 }
 
 const RUNTIME_ERRORS: [&str; 4] = [
-    "NullDereference",
-    "IntegerOverflow",
-    "DivideByZero",
-    "ArrayOutOfBounds"
+    "NullReferenceError",
+    "OverflowError",
+    "DivideByZeroError",
+    "ArrayIndexOutOfBoundsError",
 ];
 
 impl PartialEq<&str> for Behaviour {
@@ -95,13 +81,13 @@ impl PartialEq<&str> for Behaviour {
                         if &iter.by_ref().take(s.len()).collect::<String>() != s {
                             return false;
                         }
-                    },
+                    }
                     Tokens::Address => {
                         if !(iter.next() == Some('0') && iter.next() == Some('x')) {
                             return false;
                         }
                         let _ = iter.by_ref().skip_while(|c| c.is_numeric());
-                    },
+                    }
                     Tokens::Empty => return iter.next() == None,
                     Tokens::RuntimeError => {
                         let rest = iter.as_str();
@@ -111,7 +97,7 @@ impl PartialEq<&str> for Behaviour {
                             }
                         }
                         return false;
-                    },
+                    }
                 }
             }
             if iter.nth(0) != Some('\n') {
@@ -148,14 +134,13 @@ fn examples_dir_test(dir: &str) -> Result<(), i32> {
         println!("{}", file.to_str().unwrap());
         let contents = read_to_string(&file).unwrap();
         let (output, exit_code) = dbg!(parse_behaviour(&contents).unwrap().1);
-        // compiler_test(file.to_str().unwrap(), String::new(), output, exit_code)?;
+        compiler_test(file.to_str().unwrap(), String::new(), output, exit_code)?;
     }
     Ok(())
 }
 lazy_static! {
     static ref FILE_SYSTEM_LOCK: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
 }
-
 
 fn compiler_test(
     filename: &str,
@@ -168,7 +153,8 @@ fn compiler_test(
             Ok(_ir) => Ok(".text
 
             .global main
-            main:".to_string()),
+            main:"
+                .to_string()),
             Err(errs) => {
                 let mut exit_code = i32::MAX;
                 for mut err in errs {
@@ -189,7 +175,9 @@ fn compiler_test(
         }
     }?;
 
-    let lock = FILE_SYSTEM_LOCK.lock().expect("Could not aquire filesystem lock");
+    let lock = FILE_SYSTEM_LOCK
+        .lock()
+        .expect("Could not aquire filesystem lock");
 
     create_dir_all("./tmp/").unwrap();
     write("./tmp/tmp.s", assembly.as_bytes()).expect("Unable to write file");
@@ -225,8 +213,6 @@ fn compiler_test(
 
     let stdout = child.wait_with_output().expect("Failed to read stdout");
 
-    
-
     match dbg!(exit_code) {
         Some(e) => assert_eq!(stdout.status.code().unwrap(), e),
         None => assert!(stdout.status.success()),
@@ -235,6 +221,6 @@ fn compiler_test(
     assert_eq!(output, &String::from_utf8_lossy(&stdout.stdout).as_ref());
 
     drop(lock);
-    
+
     Ok(())
 }
