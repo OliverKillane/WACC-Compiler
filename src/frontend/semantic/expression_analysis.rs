@@ -50,7 +50,7 @@ pub fn analyse_expression<'a, 'b>(
         // that the variable is defined, and is an array deep enough to be
         // indexed.
         Expr::ArrayElem(name, indexes) => {
-            let mut correct_indexes = Vec::new();
+            let mut correct_indexes = vec![];
             let mut any_errors = false;
             let index_dim = indexes.len();
 
@@ -182,7 +182,7 @@ mod tests {
                 ASTWrapper("true", Expr::Bool(false)),
                 &local_symb,
                 &var_symb,
-                &mut Vec::new()
+                &mut vec![]
             ),
             Some(ASTWrapper(Some(Type::Bool), Expr::Bool(false)))
         );
@@ -231,7 +231,7 @@ mod tests {
         let var_symb = VariableSymbolTable::new();
 
         let expr1: ExprWrap<&str, &str> = ASTWrapper("x", Expr::Var("x"));
-        let mut expr1_errors = Vec::new();
+        let mut expr1_errors = vec![];
 
         match analyse_expression(expr1, &local_symb, &var_symb, &mut expr1_errors) {
             None => {
@@ -244,7 +244,7 @@ mod tests {
             "'a'",
             Expr::ArrayElem("x", vec![ASTWrapper("'c'", Expr::Char('c'))]),
         );
-        let mut expr2_errors = Vec::new();
+        let mut expr2_errors = vec![];
         match analyse_expression(expr2, &local_symb, &var_symb, &mut expr2_errors) {
             None => {
                 assert!(expr2_errors.contains(&SemanticError::UndefinedVariableUse("x")));
@@ -264,7 +264,7 @@ mod tests {
             Expr::UnOp(UnOp::Minus, box ASTWrapper("3", Expr::Int(3))),
         );
 
-        match analyse_expression(expr1, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr1, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Int), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -274,7 +274,7 @@ mod tests {
             Expr::UnOp(UnOp::Neg, box ASTWrapper("true", Expr::Bool(true))),
         );
 
-        match analyse_expression(expr2, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr2, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Bool), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -284,7 +284,7 @@ mod tests {
             Expr::UnOp(UnOp::Ord, box ASTWrapper("'a'", Expr::Char('a'))),
         );
 
-        match analyse_expression(expr3, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr3, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Int), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -294,7 +294,7 @@ mod tests {
             Expr::UnOp(UnOp::Chr, box ASTWrapper("97", Expr::Int(97))),
         );
 
-        match analyse_expression(expr4, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr4, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Char), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -322,7 +322,7 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr1, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr1, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Int), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -344,7 +344,7 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr2, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr2, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Char), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -381,7 +381,7 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr1, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr1, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Bool), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -412,7 +412,7 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr2, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr2, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Int), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -449,7 +449,7 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr3, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr3, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Char), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -483,7 +483,7 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr4, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr4, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Bool), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -517,7 +517,7 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr5, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr5, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Bool), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -561,7 +561,7 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr1, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr1, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Bool), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -614,7 +614,7 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr4, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr4, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Bool), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -639,7 +639,7 @@ mod tests {
             Expr::ArrayElem("array1", vec![ASTWrapper("5", Expr::Int(5))]),
         );
 
-        match analyse_expression(expr1, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr1, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Int), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -668,7 +668,7 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr2, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr2, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Array(box Type::Int, 1)), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -695,7 +695,7 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr3, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr3, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Int), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -721,7 +721,7 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr4, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr4, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Int), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -750,7 +750,7 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr1, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr1, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Bool), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -785,7 +785,7 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr2, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr2, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(Some(Type::Pair(box Type::Int, box Type::Int)), _)) => assert!(true),
             _ => assert!(false),
         }
@@ -820,7 +820,7 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr3, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr3, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(
                 Some(Type::Pair(box Type::Int, box Type::Pair(box Type::Int, box Type::Char))),
                 _,
@@ -861,7 +861,7 @@ mod tests {
             ),
         );
 
-        match analyse_expression(expr1, &local_symb, &var_symb, &mut Vec::new()) {
+        match analyse_expression(expr1, &local_symb, &var_symb, &mut vec![]) {
             Some(ASTWrapper(
                 Some(Type::Pair(box Type::Array(box Type::Bool, 2), box Type::Int)),
                 _,

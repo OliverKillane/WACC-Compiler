@@ -185,8 +185,8 @@ pub fn get_fn_symbols<'a>(
 ) {
     let mut fun_symb = FunctionSymbolTable::new();
     let mut def_table: HashMap<&str, &str> = HashMap::new();
-    let mut valid_fun = Vec::new();
-    let mut errors = Vec::new();
+    let mut valid_fun = vec![];
+    let mut errors = vec![];
 
     for ASTWrapper(
         fn_def_span,

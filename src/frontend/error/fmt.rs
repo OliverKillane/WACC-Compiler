@@ -285,7 +285,7 @@ impl<'l> SummaryCell<'l> {
         unincluded_suffix: &mut usize,
         annotations: &mut Vec<(usize, usize, String, usize, Color)>,
     ) {
-        let mut spaces = Vec::new();
+        let mut spaces = vec![];
         let mut last_end = 0;
         for &mut (span_begin, span_end, _, _, _) in &mut *annotations {
             if last_end > span_begin {

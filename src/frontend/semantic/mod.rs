@@ -91,7 +91,7 @@ pub fn analyse_semantics<'a>(
     // get function definitions
     let (fun_symb, filtered_fn_defs, fun_def_errs) = get_fn_symbols(fn_defs);
 
-    let mut errors = Vec::new();
+    let mut errors = vec![];
     let mut fun_symbol_tables = HashMap::with_capacity(filtered_fn_defs.len());
     let mut functions = Vec::with_capacity(filtered_fn_defs.len());
 

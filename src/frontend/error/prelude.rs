@@ -176,7 +176,7 @@ impl<'l> Summary<'l> {
             filepath: None,
             input,
             stage,
-            cells: Vec::new(),
+            cells: vec![],
             sep: None,
         }
     }

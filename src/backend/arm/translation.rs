@@ -2,16 +2,22 @@
 //! representation, with temporaries instead of registers.
 use lazy_static::__Deref;
 
-use crate::{graph::Graph, intermediate::{VarRepr, DataRef}};
+use crate::{
+    graph::Graph,
+    intermediate::{DataRef, VarRepr},
+};
 
 use super::{
     super::three_code::{
         BinOp, DataRefType, Function, OpSrc, Size, StatCode, StatNode, StatType, ThreeCode,
     },
-    arm_graph_utils::{is_shifted_8_bit, link_chains, link_stats, link_two_chains, simple_node, Chain},
+    arm_graph_utils::{
+        is_shifted_8_bit, link_chains, link_stats, link_two_chains, simple_node, Chain,
+    },
     arm_repr::{
-        ArmCode, ArmNode, Cond, ControlFlow, Data, DataIdent, DataType, FlexOffset, FlexOperand,
-        Ident, MovOp, RegOp, Shift, Stat, Subroutine, Temporary,CmpOp, MemOp, MemOperand, MulOp
+        ArmCode, ArmNode, CmpOp, Cond, ControlFlow, Data, DataIdent, DataType, FlexOffset,
+        FlexOperand, Ident, MemOp, MemOperand, MovOp, MulOp, RegOp, Shift, Stat, Subroutine,
+        Temporary,
     },
     int_constraints::ConstrainedInt,
 };
@@ -117,7 +123,7 @@ fn translate_data(data_refs: HashMap<DataRef, DataRefType>) -> Vec<Data> {
                             (Size::DWord, val) => DataType::Word(val),
                         })
                         .fold(
-                            (Vec::new(), Vec::new()),
+                            (vec![], vec![]),
                             |(mut datas, mut chars): (Vec<DataType>, Vec<u8>), next| {
                                 if let DataType::Byte(char_val)  = next && char_val < 128 {
                                     // if it is a standard ascii character, push it
@@ -130,14 +136,16 @@ fn translate_data(data_refs: HashMap<DataRef, DataRefType>) -> Vec<Data> {
                                     datas.push(DataType::Ascii(
                                         String::from_utf8(chars).expect("Always valid ascii"),
                                     ));
-                                    (datas, Vec::new())
+                                    (datas, vec![])
                                 }
                             },
                         );
-                    
+
                     // place any string on the end of the data section into datas
                     if !string.is_empty() {
-                        datas.push(DataType::Ascii(String::from_utf8(string).expect("Always valid ascii")))
+                        datas.push(DataType::Ascii(
+                            String::from_utf8(string).expect("Always valid ascii"),
+                        ))
                     }
 
                     Data(convert_data_ref(data_ref), datas)
@@ -163,7 +171,7 @@ fn require_label(
             if precs.len() > 1 || (!precs.is_empty() && start) {
                 // If more predecessors, create a label, place in the
                 // map to found and used.
-                let label = graph.new_node(ControlFlow::Multi(Vec::new(), None));
+                let label = graph.new_node(ControlFlow::Multi(vec![], None));
                 translate_map.insert(node.clone(), label.clone());
                 Some(label)
             } else {
@@ -223,7 +231,7 @@ fn translate_node_inner(
         }
         StatType::Loop(_) => {
             // Create a label, create an unconditional branch to the label, there is no end to chain to.
-            let mut label = graph.new_node(ControlFlow::Multi(Vec::new(), None));
+            let mut label = graph.new_node(ControlFlow::Multi(vec![], None));
             let branch = graph.new_node(ControlFlow::Branch(
                 Some(label.clone()),
                 label.clone(),
@@ -349,7 +357,7 @@ fn translate_routine(
         None => {
             println!("done ");
             graph.new_node(ControlFlow::Return(None, None))
-        },
+        }
     }
 }
 
@@ -528,7 +536,7 @@ fn translate_statcode(
         }
         StatCode::AssignOp(three_temp_dst, first_op, binop, second_op) => {
             let arm_dst_temp = temp_map.use_temp(*three_temp_dst);
-            let mut nodes = Vec::new();
+            let mut nodes = vec![];
 
             let mut opsrc_to_reg = |opsrc: &OpSrc| {
                 match opsrc {
