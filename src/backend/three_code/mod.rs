@@ -503,7 +503,6 @@ fn translate_block(
             let end_node = stat_line.end_node().unwrap();
             (
                 outputs,
-                #[allow(clippy::redundant_clone)]
                 match &end_node.clone().get_mut().incoming()[..] {
                     [] => {
                         stat_line = StatLine::new(stat_graph.clone());
@@ -641,8 +640,8 @@ fn translate_block_graph(
         .into_iter()
         .map(|block| {
             let cond_ids = match &block {
-                ir::Block(_, _, ir::BlockEnding::CondJumps(conds, else_id)) => {
-                    if !conds.is_empty() {
+                ir::Block(_, stats, ir::BlockEnding::CondJumps(conds, else_id)) => {
+                    if stats.len() > 0 || conds.len() > 0 {
                         Some((
                             conds
                                 .iter()
