@@ -1,7 +1,7 @@
 # Makefile used by labTS for using cargo.
 
 all:
-	cargo build --release && mv target/release/compile compile
+	cargo build && mv target/debug/compile compile
 
 # clean up all of the compiled files
 clean:

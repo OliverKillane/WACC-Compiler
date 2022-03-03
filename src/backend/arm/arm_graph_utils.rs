@@ -62,7 +62,11 @@ pub fn simple_node(stat: Stat, graph: &mut Graph<ControlFlow>) -> Chain {
 
 /// Determines if an integer is a left logical shifted 8 bit pattern.
 pub fn is_shifted_8_bit(i: i32) -> bool {
-    ((32 - i.leading_zeros()) - i.trailing_zeros()) <= 8
+    if i != 0 {
+        ((32 - i.leading_zeros()) - i.trailing_zeros()) <= 8
+    } else {
+        true
+    }
 }
 
 impl ArmNode {

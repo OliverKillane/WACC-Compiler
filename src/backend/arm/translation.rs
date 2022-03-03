@@ -116,7 +116,7 @@ fn translate_data(data_refs: HashMap<DataRef, DataRefType>) -> Vec<Data> {
                             (Size::Word, val) => DataType::HalfWord(val as i16),
                             (Size::DWord, val) => DataType::Word(val),
                         })
-                        .rfold(
+                        .fold(
                             (Vec::new(), Vec::new()),
                             |(mut datas, mut chars): (Vec<DataType>, Vec<u8>), next| {
                                 if let DataType::Byte(char_val)  = next && char_val < 128 {
@@ -312,6 +312,8 @@ fn translate_routine(
     temp_map: &mut TempMap,
     graph: &mut Graph<ControlFlow>,
 ) -> ArmNode {
+    // DEBUG
+    println!("translating routine ");
     // Normal nodes require labels for 1 or more predecessors, the first node
     // of a function requires a label if it has any predecessors.
     let mut translate_map = HashMap::new();
@@ -341,10 +343,13 @@ fn translate_routine(
                 node_to_rest.set_predecessor(next_node.clone());
                 next_node.set_successor(node_to_rest);
             }
-
+            println!("done ");
             first
         }
-        None => graph.new_node(ControlFlow::Return(None, None)),
+        None => {
+            println!("done ");
+            graph.new_node(ControlFlow::Return(None, None))
+        },
     }
 }
 

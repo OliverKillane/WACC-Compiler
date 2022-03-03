@@ -50,10 +50,13 @@ mod frontend;
 mod graph;
 mod intermediate;
 
+use backend::{Options, PropagationOpt, compile};
 use clap::Parser;
 use colored::Colorize;
 use frontend::analyse;
 use std::{cmp::min, fs::read_to_string, path::PathBuf, process};
+use std::fs::File;
+use std::io::prelude::*;
 
 /// Command line interface
 #[derive(Parser, Debug)]
@@ -70,6 +73,12 @@ struct Args {
         help = "The name of the output file"
     )]
     outputpath: Option<PathBuf>,
+
+    #[clap(short, long, help = "print the arm representation with temporaries")]
+    temp_arm: bool,
+
+    #[clap(short, long, help = "print the intermediate representation generated")]
+    ir_print: bool,
 }
 
 /// Exit code for a file open failure.
@@ -79,17 +88,58 @@ const FILE_FAILURE: i32 = 1;
 /// Compiler main entry.
 /// - Processes command line arguments controlling compiler behaviour.
 /// - Halts and reports failures through returning exit codes.
-fn main() {
-    let args = Args::parse();
-    let filepath = args.filepath.as_path().display().to_string();
+fn main() -> std::io::Result<()> {
+    let Args {
+        mut filepath,
+        outputpath,
+        temp_arm,
+        ir_print,
+    } = Args::parse();
 
-    match read_to_string(args.filepath) {
+    let filestring = filepath.as_path().display().to_string();
+
+    match read_to_string(filestring.clone()) {
         Ok(source_code) => match analyse(&source_code) {
-            Ok(_ir) => process::exit(COMPILE_SUCCESS),
+            Ok(ir) => {
+
+                if ir_print {
+                    println!("THE INTERMEDIATE REPRESENTATION:\n{}", ir)
+                }
+
+                let options = Options {
+                    sethi_ullman_weights: false,
+                    dead_code_removal: false,
+                    propagation: PropagationOpt::None,
+                    inlining: false,
+                    tail_call: false,
+                    hoisting: false,
+                    strength_reduction: false,
+                    loop_unrolling: false,
+                    common_expressions: false,
+                    show_arm_temp_rep: temp_arm
+                };
+
+                let result = compile(ir, options);
+
+                for res in result.intermediates {
+                    println!("{}", res)
+                }
+                
+                let mut file = if let Some(outpath) = outputpath {
+                    File::create(outpath)?
+                } else {
+                    filepath.set_extension("s");
+                    File::create(filepath)?
+                };
+
+                file.write_all(result.assembly.as_bytes())?;
+
+                process::exit(COMPILE_SUCCESS)
+            },
             Err(errs) => {
                 let mut exit_code = i32::MAX;
                 for mut err in errs {
-                    err.set_filepath(filepath.clone());
+                    err.set_filepath(filestring.clone());
                     exit_code = min(exit_code, err.get_code());
                     println!("{}", err)
                 }

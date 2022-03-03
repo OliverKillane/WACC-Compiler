@@ -4,7 +4,7 @@
 use lazy_static::__Deref;
 
 use super::arm_repr::*;
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::{Display, write}};
 
 impl Display for Ident {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -226,7 +226,7 @@ impl Display for Stat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let conv = |s: &bool| if *s { "S".to_owned() } else { String::from("") };
         match self {
-            Stat::ApplyOp(op, cond, s, dest, operand, operand2) => writeln!(
+            Stat::ApplyOp(op, cond, s, dest, operand, operand2) => write!(
                 f,
                 "\t{}{}{}\t{},\t{},\t{}",
                 op,
@@ -236,7 +236,7 @@ impl Display for Stat {
                 operand,
                 operand2
             ),
-            Stat::Mul(cond, s, dest, operand, operand2) => writeln!(
+            Stat::Mul(cond, s, dest, operand, operand2) => write!(
                 f,
                 "\tMUL{}{}\t{},\t{},\t{}",
                 cond,
@@ -245,7 +245,7 @@ impl Display for Stat {
                 operand,
                 operand2
             ),
-            Stat::MulA(cond, s, dest, operand, operand2, operand3) => writeln!(
+            Stat::MulA(cond, s, dest, operand, operand2, operand3) => write!(
                 f,
                 "\tMULA{}{}\t{},\t{},\t{},\t{}",
                 cond,
@@ -255,7 +255,7 @@ impl Display for Stat {
                 operand2,
                 operand3
             ),
-            Stat::MulOp(op, cond, s, hi, lo, operand, operand2) => writeln!(
+            Stat::MulOp(op, cond, s, hi, lo, operand, operand2) => write!(
                 f,
                 "\t{}{}{}\t{},\t{},\t{},\t{}",
                 op,
@@ -267,21 +267,21 @@ impl Display for Stat {
                 operand2
             ),
             Stat::Move(op, cond, s, ident, operand) => {
-                writeln!(f, "\t{}{}{}\t{},\t{}", op, cond, conv(s), ident, operand)
+                write!(f, "\t{}{}{}\t{},\t{}", op, cond, conv(s), ident, operand)
             }
             Stat::Cmp(op, cond, ident, operand) => {
-                writeln!(f, "\t{}{}\t{},\t{}", op, cond, ident, operand)
+                write!(f, "\t{}{}\t{},\t{}", op, cond, ident, operand)
             }
             Stat::SatOp(op, cond, dest, operand, operand2) => {
-                writeln!(f, "\t{}{}\t{},\t{},\t{}", op, cond, dest, operand, operand2)
+                write!(f, "\t{}{}\t{},\t{},\t{}", op, cond, dest, operand, operand2)
             }
-            Stat::ReadCPSR(reg) => writeln!(f, "\tMSR\t{},\tCPSR", reg),
+            Stat::ReadCPSR(reg) => write!(f, "\tMSR\t{},\tCPSR", reg),
             Stat::MemOp(op, cond, s, ident, operand) => {
-                writeln!(f, "\t{}{}{}\t{},\t{}", op, cond, conv(s), ident, operand)
+                write!(f, "\t{}{}{}\t{},\t{}", op, cond, conv(s), ident, operand)
             }
-            Stat::Push(cond, ident) => writeln!(f, "\tPUSH{}\t{{{}}}", cond, ident,),
-            Stat::Pop(cond, ident) => writeln!(f, "\tPOP{}\t{{{}}}", cond, ident,),
-            Stat::Link(cond, link_to) => writeln!(f, "BL{}\t{}", cond, link_to),
+            Stat::Push(cond, ident) => write!(f, "\tPUSH{}\t{{{}}}", cond, ident,),
+            Stat::Pop(cond, ident) => write!(f, "\tPOP{}\t{{{}}}", cond, ident,),
+            Stat::Link(cond, link_to) => write!(f, "BL{}\t{}", cond, link_to),
             Stat::Call(fun_name, ret_temp, arg_temps) => write!(
                 f,
                 "\tINTERNAL OPERATION: CALL\t{}\t{}, ARGS({})",
@@ -297,15 +297,17 @@ impl Display for Stat {
                     .join(",")
             ),
             Stat::AssignStackWord(ident) => {
-                writeln!(f, "\tINTERNAL OPERATION: ASSIGN WORD OF STACK TO {}", ident)
+                write!(f, "\tINTERNAL OPERATION: ASSIGN WORD OF STACK TO {}", ident)
             }
-            Stat::Nop => writeln!(f, "\tNOP"),
+            Stat::Nop => write!(f, "\tNOP"),
         }
     }
 }
 
+
 impl Display for ArmNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+
         // Used to store label numbers based on the nodes connected, and a
         // boolean describing if their code has been generated yet.
         let mut label_map: HashMap<ArmNode, (usize, bool)> = HashMap::new();
@@ -313,69 +315,119 @@ impl Display for ArmNode {
         // Label identifier conversion tpo strings.
         let label_conv = |id: &usize| format!("b_label_{}", id);
 
-        let mut next_node = Some(self.clone());
+        let mut current = self.clone();
 
         loop {
-            while let Some(current_node) = next_node {
-                label_map
-                    .entry(current_node.clone())
-                    .and_modify(|label_passed| label_passed.1 = true);
-
-                next_node = match current_node.get().deref() {
+            loop {
+                match current.clone().get().deref() {
                     ControlFlow::Simple(_, stat, next) => {
+                        // write the statement
                         writeln!(f, "{}", stat)?;
-                        next.clone()
-                    }
-                    ControlFlow::Branch(_, branch_to, cond, next) => {
-                        // For a conditional branch, branch with the condition, and continue to the (condition failed) next statements.
-                        match label_map.get(branch_to) {
-                            Some((id, _)) => writeln!(f, "\t B{}\t{}", cond, label_conv(id))?,
-                            None => {
-                                let id = label_map.len();
-                                label_map.insert(branch_to.clone(), (id, false));
-                                writeln!(f, "\tB{}\t{}", cond, label_conv(&id))?
+
+                        // check next:
+                        if let Some(next_node) = next {
+                            if let Some((id,_)) = label_map.get(next_node) {
+                                // next node already translated, so place a branch break
+                                writeln!(f, "\tB\t{}", label_conv(id))?;
+                                break
+                            } else {
+                                current = next_node.clone();
                             }
+                        } else {
+                            break
+                        }
+                    },
+                    ControlFlow::Branch(_, branch_next, cond, next) => {
+                        
+                        if let Some((id, _)) = label_map.get(branch_next) {
+                            writeln!(f, "\tB{}\t{}", cond, label_conv(id))?;
+                        } else {
+                            let new_id = label_map.len();
+                            label_map.insert(branch_next.clone(), (new_id, false));
+                            writeln!(f, "\tB{}\t{}", cond, label_conv(&new_id))?;
                         }
 
-                        next.clone()
-                    }
-                    ControlFlow::Multi(_, next) => {
-                        let id = label_map.len();
-                        let id = label_map
-                            .entry(current_node.clone())
-                            .and_modify(|data| {
-                                data.1 = true;
-                            })
-                            .or_insert((id, true))
-                            .0;
 
-                        writeln!(f, "{}:", label_conv(&id))?;
-
-                        next.clone()
-                    }
-                    ControlFlow::Removed => {
-                        unreachable!("Removed should not be found when displaying ARM code")
-                    }
-                    ControlFlow::Return(_, ret_temp) => {
-                        write!(f, "\tINTERNAL OPERATION: RETURN")?;
-                        if let Some(temp) = ret_temp {
-                            write!(f, " t{}", temp)?;
+                        // check next:
+                        if let Some(next_node) = next {
+                            if let Some((id,_)) = label_map.get(next_node) {
+                                // next node already translated, so place a branch break
+                                writeln!(f, "\tB\t{}", label_conv(id))?;
+                                break
+                            } else {
+                                current = next_node.clone();
+                            }
+                        } else {
+                            break
                         }
-                        writeln!(f)?;
-                        None
-                    }
+                        
+                    },
                     ControlFlow::Ltorg(_) => {
-                        writeln!(f, "\t.ltorg")?;
-                        None
-                    }
-                };
+                        writeln!(f, "\tltorg.")?;
+                        break
+                    },
+                    ControlFlow::Return(_, ret) => {
+                        writeln!(f, "\tINTERNAL INSTR: CALL\t{}", if let Some(ret_temp) = ret {
+                            format!{"t{}", ret_temp}
+                        } else {
+                            "no value returned".to_string()
+                        })?;
+                        break
+                    },
+                    ControlFlow::Multi(_, next) => {
+                        match label_map.get_mut(&current) {
+                            Some((id, t @ false)) => {
+                                writeln!(f, "{}:", label_conv(id))?;
+                                *t = true;
+                            },
+                            Some((_, true)) => {
+                                break
+                            }
+                            None => {
+                                let new_id = label_map.len();
+                                label_map.insert(current.clone(), (new_id, true));
+                                writeln!(f, "{}:", label_conv(&new_id))?;
+                            },
+                        }
+
+                        // check next:
+                        if let Some(next_node) = next {
+                            if let Some((id,_)) = label_map.get(next_node) {
+                                // next node already translated, so place a branch break
+                                writeln!(f, "\tB\t{}", label_conv(id))?;
+                                break
+                            } else {
+                                current = next_node.clone();
+                            }
+                        } else {
+                            break
+                        }
+                    },
+                    ControlFlow::Removed => panic!("Cannot display removed nodes"),
+                }
             }
 
-            next_node = label_map
-                .iter()
-                .find(|(_, (_, passed))| !passed)
-                .map(|res| res.0.clone());
-        }
+            // find the next node to write from, and place label
+            current = {
+                let mut next_node = None;
+                for (node, (id, created)) in label_map.iter_mut() {
+                    if !*created {
+                        *created = true;
+                        writeln!(f, "{}:", label_conv(id))?;
+                        next_node = Some(node.clone());
+                        break;
+                    }
+                }
+
+                if let Some(node) = next_node {
+                    node
+                } else {
+                    break
+                }
+            };
+        };
+
+        writeln!(f, "")
     }
 }
 
@@ -407,9 +459,9 @@ impl Display for Data {
             display_data_ref(self.0),
             self.1
                 .iter()
-                .map(|d| format!("{}", d))
+                .map(|d| format!("\t{}", d))
                 .collect::<Vec<_>>()
-                .join("\n")
+                .join("")
         )
     }
 }
