@@ -1,12 +1,12 @@
-//! Defines the [allocation state](AllocationState) struct which keeps track of 
-//! all register usage, stack position, subroutine stack frame and the reserved 
+//! Defines the [allocation state](AllocationState) struct which keeps track of
+//! all register usage, stack position, subroutine stack frame and the reserved
 //! stack section.
-//! 
-//! Generates instructions for moving allocations (temporary variables, or 
+//!
+//! Generates instructions for moving allocations (temporary variables, or
 //! values to preserve) between their stack frame locations and registers.
-//! 
+//!
 //! Generates register mappings for temporaries on a per-instruction basis
-//! 
+//!
 //! Uses live ranges to determine when to spill values from registers.
 
 use std::{
@@ -395,8 +395,8 @@ impl AllocationState {
         used: &[Temporary],
         graph: &mut Graph<ControlFlow>,
     ) -> (Register, Option<Chain>) {
-        let mut free_registers = Vec::new();
-        let mut preserve_registers = Vec::new();
+        let mut free_registers = vec![];
+        let mut preserve_registers = vec![];
         let mut temp_registers = HashMap::new();
 
         // iterate through all registers to get the free, preserved and the temporary registers
@@ -470,13 +470,7 @@ impl AllocationState {
                     dst_register,
                     Some(link_two_chains(
                         pres_to_stack,
-                        self.register_stack_move(
-                            dst_register,
-                            &alloc,
-                            MemOp::Ldr,
-                            Vec::new(),
-                            graph,
-                        ),
+                        self.register_stack_move(dst_register, &alloc, MemOp::Ldr, vec![], graph),
                     )),
                 )
             } else {
@@ -493,7 +487,7 @@ impl AllocationState {
                         dst_register,
                         &Alloc::Temp(*old_temp),
                         MemOp::Str,
-                        Vec::new(),
+                        vec![],
                         graph,
                     );
 
@@ -525,7 +519,7 @@ impl AllocationState {
 
     /// Get the indexes of every free register.
     fn get_free_register_inds(&self) -> Vec<usize> {
-        let mut free_regs = Vec::new();
+        let mut free_regs = vec![];
 
         for (reg_ind, alloc) in self.registers.iter().enumerate() {
             if alloc == &Alloc::Free {
@@ -668,7 +662,7 @@ impl AllocationState {
             return None;
         };
 
-        let chain = self.register_stack_move(Register::Lr, alloc, MemOp::Str, Vec::new(), graph);
+        let chain = self.register_stack_move(Register::Lr, alloc, MemOp::Str, vec![], graph);
         self.registers[Register::Lr as usize] = Alloc::Free;
         Some(chain)
     }
@@ -683,7 +677,7 @@ impl AllocationState {
         live_after: &[Temporary],
         graph: &mut Graph<ControlFlow>,
     ) -> Chain {
-        let mut chains = Vec::new();
+        let mut chains = vec![];
 
         // backup all args used after the call to their stack frame positions
         for arg in args {
@@ -810,7 +804,7 @@ impl AllocationState {
         graph: &mut Graph<ControlFlow>,
     ) -> ArmNode {
         // first we place the return value in R)
-        let mut chains = Vec::new();
+        let mut chains = vec![];
 
         if let Some(temp) = ret {
             chains.push(self.alloc_to_reg(Alloc::Temp(*temp), Register::R0, graph));
@@ -855,7 +849,7 @@ impl AllocationState {
         other_state: &Self,
         graph: &mut Graph<ControlFlow>,
     ) -> Option<Chain> {
-        let mut chain = Vec::new();
+        let mut chain = vec![];
         for (reg, conform, current) in other_state
             .registers
             .iter()

@@ -336,9 +336,9 @@ fn translate_stat(
             block_stats.push(ir::Stat::Free(ptr_expr));
         }
         Stat::Return(ASTWrapper(expr_type, expr)) => {
-            let mut tmp_block_stats = Vec::new();
+            let mut tmp_block_stats = vec![];
             mem::swap(block_stats, &mut tmp_block_stats);
-            let mut tmp_prev_blocks = Vec::new();
+            let mut tmp_prev_blocks = vec![];
             mem::swap(prev_blocks, &mut tmp_prev_blocks);
             block_graph.push(ir::Block(
                 tmp_prev_blocks,
@@ -353,7 +353,7 @@ fn translate_stat(
             ));
         }
         Stat::Exit(ASTWrapper(expr_type, expr)) => {
-            let mut tmp_block_stats = Vec::new();
+            let mut tmp_block_stats = vec![];
             mem::swap(block_stats, &mut tmp_block_stats);
             if let ir::Expr::Num(num_expr) = translate_expr(
                 expr,
@@ -362,7 +362,7 @@ fn translate_stat(
                 data_ref_map,
                 helper_function_flags,
             ) {
-                let mut tmp_prev_blocks = Vec::new();
+                let mut tmp_prev_blocks = vec![];
                 mem::swap(prev_blocks, &mut tmp_prev_blocks);
                 block_graph.push(ir::Block(
                     tmp_prev_blocks,
@@ -417,9 +417,9 @@ fn translate_stat(
         }
         Stat::If(ASTWrapper(expr_type, expr), true_block, false_block) => {
             let cond_block_id = block_graph.len();
-            let mut tmp_prev_blocks = Vec::new();
+            let mut tmp_prev_blocks = vec![];
             mem::swap(prev_blocks, &mut tmp_prev_blocks);
-            let mut tmp_block_stats = Vec::new();
+            let mut tmp_block_stats = vec![];
             mem::swap(block_stats, &mut tmp_block_stats);
             let bool_expr = if let ir::Expr::Bool(bool_expr) = translate_expr(
                 expr,
@@ -497,9 +497,9 @@ fn translate_stat(
             }
         }
         Stat::While(ASTWrapper(expr_type, expr), block) => {
-            let mut tmp_prev_blocks = Vec::new();
+            let mut tmp_prev_blocks = vec![];
             mem::swap(prev_blocks, &mut tmp_prev_blocks);
-            let mut tmp_block_stats = Vec::new();
+            let mut tmp_block_stats = vec![];
             mem::swap(block_stats, &mut tmp_block_stats);
             let pre_block_id = block_graph.len();
             let cond_block_id = block_graph.len() + 1;
@@ -522,7 +522,7 @@ fn translate_stat(
             };
             block_graph.push(ir::Block(
                 vec![pre_block_id],
-                Vec::new(),
+                vec![],
                 ir::BlockEnding::CondJumps(
                     vec![(bool_expr, cond_block_id + 1)],
                     0, // Dummy to fill later
@@ -582,7 +582,7 @@ fn translate_block_jumping(
     data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
     helper_function_flags: &mut HelperFunctionFlags,
 ) -> bool {
-    let mut block_stats = Vec::new();
+    let mut block_stats = vec![];
     translate_block(
         block,
         &mut block_stats,
@@ -600,7 +600,7 @@ fn translate_block_jumping(
         block_graph.push(ir::Block(
             prev_blocks,
             block_stats,
-            BlockEnding::CondJumps(Vec::new(), next_jump.unwrap_or(next_block_id)),
+            BlockEnding::CondJumps(vec![], next_jump.unwrap_or(next_block_id)),
         ));
         true
     } else {
@@ -680,7 +680,7 @@ fn translate_function(
         .iter()
         .map(|(&var, var_type)| (var, var_type.into()))
         .collect();
-    let mut block_graph = Vec::new();
+    let mut block_graph = vec![];
     assert!(!translate_block_jumping(
         block,
         vec![],
@@ -749,10 +749,10 @@ pub(super) fn translate_ast(
         .iter()
         .map(|(&var, var_type)| (var, var_type.into()))
         .collect();
-    let mut block_graph = Vec::new();
+    let mut block_graph = vec![];
     if translate_block_jumping(
         block,
-        Vec::new(),
+        vec![],
         None,
         &mut block_graph,
         free_var,
@@ -765,7 +765,7 @@ pub(super) fn translate_ast(
         let last_block_id = block_graph.len() - 1;
         block_graph.push(ir::Block(
             vec![last_block_id],
-            Vec::new(),
+            vec![],
             ir::BlockEnding::Exit(ir::NumExpr::Const(ir::NumSize::DWord, 0)),
         ));
     }
@@ -786,9 +786,9 @@ mod tests {
 
     #[test]
     fn test_exit() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -824,9 +824,9 @@ mod tests {
                 &mut helper_function_flags,
             );
 
-            let ref_block_stats: Vec<ir::Stat> = Vec::new();
-            let mut ref_block_graph: Vec<ir::Block> = Vec::new();
-            let ref_prev_blocks: Vec<BlockId> = Vec::new();
+            let ref_block_stats: Vec<ir::Stat> = vec![];
+            let mut ref_block_graph: Vec<ir::Block> = vec![];
+            let ref_prev_blocks: Vec<BlockId> = vec![];
 
             ref_block_graph.push(ir::Block(
                 ref_prev_blocks,
@@ -843,9 +843,9 @@ mod tests {
     #[test]
     #[should_panic(expected = "Expected a type for an expression")]
     fn test_exit_no_type() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -881,9 +881,9 @@ mod tests {
                 &mut helper_function_flags,
             );
 
-            let ref_block_stats: Vec<ir::Stat> = Vec::new();
-            let mut ref_block_graph: Vec<ir::Block> = Vec::new();
-            let ref_prev_blocks: Vec<BlockId> = Vec::new();
+            let ref_block_stats: Vec<ir::Stat> = vec![];
+            let mut ref_block_graph: Vec<ir::Block> = vec![];
+            let ref_prev_blocks: Vec<BlockId> = vec![];
 
             ref_block_graph.push(ir::Block(
                 ref_prev_blocks,
@@ -900,9 +900,9 @@ mod tests {
     #[test]
     #[should_panic(expected = "Expected a numeric expression")]
     fn test_exit_non_num_expr() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -932,9 +932,9 @@ mod tests {
 
     #[test]
     fn test_return() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -969,11 +969,11 @@ mod tests {
             &mut helper_function_flags,
         );
 
-        let ref_block_stats: Vec<ir::Stat> = Vec::new();
-        let mut ref_block_graph: Vec<ir::Block> = Vec::new();
+        let ref_block_stats: Vec<ir::Stat> = vec![];
+        let mut ref_block_graph: Vec<ir::Block> = vec![];
 
         ref_block_graph.push(ir::Block(
-            Vec::new(),
+            vec![],
             ref_block_stats,
             BlockEnding::Return(ir_expr),
         ));
@@ -984,9 +984,9 @@ mod tests {
     #[test]
     #[should_panic(expected = "Expected a type for an expression")]
     fn test_return_no_type() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1021,8 +1021,8 @@ mod tests {
             &mut helper_function_flags,
         );
 
-        let ref_block_stats: Vec<ir::Stat> = Vec::new();
-        let mut ref_block_graph: Vec<ir::Block> = Vec::new();
+        let ref_block_stats: Vec<ir::Stat> = vec![];
+        let mut ref_block_graph: Vec<ir::Block> = vec![];
         let ref_block_graph_len = ref_block_graph.len();
 
         ref_block_graph.push(ir::Block(
@@ -1036,9 +1036,9 @@ mod tests {
 
     #[test]
     fn test_print_int() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1073,7 +1073,7 @@ mod tests {
             &mut helper_function_flags,
         );
 
-        let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+        let mut ref_block_stats: Vec<ir::Stat> = vec![];
 
         ref_block_stats.push(ir::Stat::PrintExpr(ir_expr));
 
@@ -1082,9 +1082,9 @@ mod tests {
 
     #[test]
     fn test_print_char() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1120,7 +1120,7 @@ mod tests {
                 &mut helper_function_flags,
             );
 
-            let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+            let mut ref_block_stats: Vec<ir::Stat> = vec![];
 
             ref_block_stats.push(ir::Stat::PrintChar(inner_expr));
 
@@ -1132,9 +1132,9 @@ mod tests {
 
     #[test]
     fn test_print_bool() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1169,7 +1169,7 @@ mod tests {
             &mut helper_function_flags,
         );
 
-        let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+        let mut ref_block_stats: Vec<ir::Stat> = vec![];
 
         ref_block_stats.push(ir::Stat::PrintExpr(ir_expr));
 
@@ -1178,9 +1178,9 @@ mod tests {
 
     #[test]
     fn test_print_pair() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1246,7 +1246,7 @@ mod tests {
             &mut helper_function_flags,
         );
 
-        let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+        let mut ref_block_stats: Vec<ir::Stat> = vec![];
 
         ref_block_stats.push(ir::Stat::PrintExpr(ir_expr));
 
@@ -1261,9 +1261,9 @@ mod tests {
 
     #[test]
     fn test_print_string() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1302,7 +1302,7 @@ mod tests {
             &mut helper_function_flags,
         );
 
-        let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+        let mut ref_block_stats: Vec<ir::Stat> = vec![];
         let ref_free_var: VarRepr = 0;
 
         ref_block_stats.push(ir::Stat::AssignVar(ref_free_var, ir_expr));
@@ -1320,9 +1320,9 @@ mod tests {
 
     #[test]
     fn test_println_int() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1357,7 +1357,7 @@ mod tests {
             &mut helper_function_flags,
         );
 
-        let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+        let mut ref_block_stats: Vec<ir::Stat> = vec![];
 
         ref_block_stats.push(ir::Stat::PrintExpr(ir_expr));
         ref_block_stats.push(ir::Stat::PrintEol());
@@ -1367,9 +1367,9 @@ mod tests {
 
     #[test]
     fn test_println_char() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1405,7 +1405,7 @@ mod tests {
                 &mut helper_function_flags,
             );
 
-            let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+            let mut ref_block_stats: Vec<ir::Stat> = vec![];
 
             ref_block_stats.push(ir::Stat::PrintChar(inner_expr));
             ref_block_stats.push(ir::Stat::PrintEol());
@@ -1418,9 +1418,9 @@ mod tests {
 
     #[test]
     fn test_println_bool() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1455,7 +1455,7 @@ mod tests {
             &mut helper_function_flags,
         );
 
-        let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+        let mut ref_block_stats: Vec<ir::Stat> = vec![];
 
         ref_block_stats.push(ir::Stat::PrintExpr(ir_expr));
         ref_block_stats.push(ir::Stat::PrintEol());
@@ -1465,9 +1465,9 @@ mod tests {
 
     #[test]
     fn test_println_pair() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1533,7 +1533,7 @@ mod tests {
             &mut helper_function_flags,
         );
 
-        let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+        let mut ref_block_stats: Vec<ir::Stat> = vec![];
 
         ref_block_stats.push(ir::Stat::PrintExpr(ir_expr));
         ref_block_stats.push(ir::Stat::PrintEol());
@@ -1549,9 +1549,9 @@ mod tests {
 
     #[test]
     fn test_println_string() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1590,7 +1590,7 @@ mod tests {
             &mut helper_function_flags,
         );
 
-        let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+        let mut ref_block_stats: Vec<ir::Stat> = vec![];
         let ref_free_var: VarRepr = 0;
 
         ref_block_stats.push(ir::Stat::AssignVar(ref_free_var, ir_expr));
@@ -1610,9 +1610,9 @@ mod tests {
     #[test]
     #[should_panic(expected = "Expected a concrete type")]
     fn test_print_generic() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1643,9 +1643,9 @@ mod tests {
     #[test]
     #[should_panic(expected = "Expected a concrete type")]
     fn test_print_any() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1676,9 +1676,9 @@ mod tests {
     #[test]
     #[should_panic(expected = "Expected a concrete type")]
     fn test_println_generic() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1709,9 +1709,9 @@ mod tests {
     #[test]
     #[should_panic(expected = "Expected a concrete type")]
     fn test_println_any() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1742,9 +1742,9 @@ mod tests {
     #[test]
     #[should_panic(expected = "Type does not match the expression")]
     fn test_print_mismatched_types2() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1774,9 +1774,9 @@ mod tests {
 
     #[test]
     fn test_simple_block() {
-        let mut block_stats: Vec<ir::Stat> = Vec::new();
-        let mut block_graph: Vec<ir::Block> = Vec::new();
-        let mut prev_blocks: Vec<BlockId> = Vec::new();
+        let mut block_stats: Vec<ir::Stat> = vec![];
+        let mut block_graph: Vec<ir::Block> = vec![];
+        let mut prev_blocks: Vec<BlockId> = vec![];
         let mut free_var: VarRepr = 0;
         let mut ir_vars: HashMap<VarRepr, ir::Type> = HashMap::new();
         let mut var_symb: VariableSymbolTable = VariableSymbolTable::new();
@@ -1865,7 +1865,7 @@ mod tests {
             &mut helper_function_flags,
         );
 
-        let mut ref_block_stats: Vec<ir::Stat> = Vec::new();
+        let mut ref_block_stats: Vec<ir::Stat> = vec![];
         let ref_free_var: VarRepr = 0;
 
         ref_block_stats.push(ir::Stat::AssignVar(ref_free_var, ir_expr));

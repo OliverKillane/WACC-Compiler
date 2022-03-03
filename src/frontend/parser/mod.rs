@@ -119,7 +119,7 @@ fn parse_func(input: &str) -> IResult<&str, Function<&str, &str>, ErrorTree<&str
                         Lexer::Comma.parser(),
                         Lexer::CloseParen.parser(),
                     ),
-                    map(Lexer::CloseParen.parser(), |_| Vec::new()),
+                    map(Lexer::CloseParen.parser(), |_| vec![]),
                 ))
                 .cut()
                 .context("Argument List"),

@@ -87,8 +87,8 @@ impl LiveRanges {
     /// Create an entry for a node, if an old entry exists, it is replaced.
     fn create_entry(&mut self, node: &ArmNode) {
         // Get the uses and definitions
-        let mut uses = Vec::new();
-        let mut defs = Vec::new();
+        let mut uses = vec![];
+        let mut defs = vec![];
         node.get_defs_and_uses(&mut defs, &mut uses);
 
         // Get the live_out set of a simple node, if no successor livein can be
@@ -107,12 +107,12 @@ impl LiveRanges {
                 Some((
                     self.generate_live_in(prec),
                     simple_live_out(succ, self),
-                    Vec::new(),
+                    vec![],
                 ))
             }
             ControlFlow::Branch(prec, true_succ, _, false_succ) => {
                 // A branch has a livein and liveout, as well as contributing sets from its (potentially) two branches.
-                let mut contribs = Vec::new();
+                let mut contribs = vec![];
 
                 if let Some(set_id) = self.generate_live_out(true_succ) {
                     contribs.push(set_id)
@@ -127,7 +127,7 @@ impl LiveRanges {
                 Some((self.generate_live_in(prec), self.get_new_set(), contribs))
             }
             ControlFlow::Return(prec, _) => {
-                Some((self.generate_live_in(prec), self.get_new_set(), Vec::new()))
+                Some((self.generate_live_in(prec), self.get_new_set(), vec![]))
             }
             ControlFlow::Multi(precs, succ) => {
                 let prev_set = precs.iter().filter_map(|node| {
@@ -146,7 +146,7 @@ impl LiveRanges {
                     .filter(|node| matches!(node.get().deref(), &ControlFlow::Branch(_, _, _, _)))
                     .for_each(|branch_node| self.add_contributor(branch_node, livein_set_id));
 
-                Some((livein_set_id, simple_live_out(succ, self), Vec::new()))
+                Some((livein_set_id, simple_live_out(succ, self), vec![]))
             }
 
             // There are no entries for these types of control flow
@@ -267,7 +267,7 @@ impl LiveRanges {
                 live_in.sort_by(|(_, uses1), (_, uses2)| uses2.cmp(uses1));
                 live_in.into_iter().map(|p| p.0).collect::<Vec<_>>()
             }
-            None => Vec::new(),
+            None => vec![],
         }
     }
 
@@ -277,7 +277,7 @@ impl LiveRanges {
         if let Some((livein, _, _, _, _)) = self.arm_node_map.get(node) {
             self.sort_set(livein)
         } else {
-            Vec::new()
+            vec![]
         }
     }
 
@@ -287,7 +287,7 @@ impl LiveRanges {
         if let Some((_, liveout, _, _, _)) = self.arm_node_map.get(node) {
             self.sort_set(liveout)
         } else {
-            Vec::new()
+            vec![]
         }
     }
 }

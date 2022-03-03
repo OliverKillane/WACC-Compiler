@@ -172,8 +172,8 @@ pub fn binop_match(
     right_type: &Type,
 ) -> Result<Type, (BinOpPossibleTypes, Vec<&'static BinOp>)> {
     let mut generics = HashMap::with_capacity(0);
-    let mut possible_types = Vec::new();
-    let mut possible_binops = Vec::new();
+    let mut possible_types = vec![];
+    let mut possible_binops = vec![];
 
     for (op, output, left, right) in BINOPS.iter() {
         generics.clear();
@@ -200,8 +200,8 @@ pub fn binop_match(
 ///   potential operators for the input type.
 pub fn unop_match(unop: &UnOp, expr_type: &Type) -> Result<Type, (Vec<Type>, Vec<&'static UnOp>)> {
     let mut generics = HashMap::with_capacity(0);
-    let mut possible_types = Vec::new();
-    let mut possible_unops = Vec::new();
+    let mut possible_types = vec![];
+    let mut possible_unops = vec![];
     for (op, out, input) in UNOPS.iter() {
         generics.clear();
         if op == unop {

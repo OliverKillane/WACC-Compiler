@@ -37,9 +37,9 @@ pub fn analyse_function<'a>(
     fun_symb: &FunctionSymbolTable<'a>,
 ) -> Result<FunctionAnalysis<'a>, FunctionErrors<'a>> {
     let mut var_symb = VariableSymbolTable::new();
-    let mut function_errors = Vec::new();
-    let mut param_correct = Vec::new();
-    let mut errors = Vec::new();
+    let mut function_errors = vec![];
+    let mut param_correct = vec![];
+    let mut errors = vec![];
 
     // create a new local symbol table at the top of the scope
     let mut local_symb = LocalSymbolTable::new_root();

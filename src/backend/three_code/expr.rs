@@ -336,7 +336,7 @@ pub(super) fn translate_ptr_expr(
                     )
                 })
                 .fold(
-                    (0, Vec::new()),
+                    (0, vec![]),
                     |(total_width, mut width_prefixes),
                      (mem_width, store_width, setting_stat_line)| {
                         width_prefixes.push((total_width, store_width, setting_stat_line));

@@ -163,27 +163,27 @@ pub(super) struct ThreeCode {
 impl StatType {
     /// Creates a new final statement with an empty list of incoming nodes.
     fn new_final(stat_code: StatCode) -> Self {
-        StatType::Final(Vec::new(), stat_code)
+        StatType::Final(vec![], stat_code)
     }
 
     /// Creates a new simple statement with an empty list of incoming nodes.
     fn new_simple(stat_code: StatCode, next: StatNode) -> Self {
-        StatType::Simple(Vec::new(), stat_code, next)
+        StatType::Simple(vec![], stat_code, next)
     }
 
     /// Creates a new branch statement with an empty list of incoming nodes.
     fn new_branch(cond: VarRepr, if_true: StatNode, if_false: StatNode) -> Self {
-        StatType::Branch(Vec::new(), cond, if_true, if_false)
+        StatType::Branch(vec![], cond, if_true, if_false)
     }
 
     /// Creates a new loop statement with an empty list of incoming nodes.
     fn new_loop() -> Self {
-        StatType::Loop(Vec::new())
+        StatType::Loop(vec![])
     }
 
     /// Creates a new return statement with an empty list of incoming nodes.
     fn new_return(ret: VarRepr) -> Self {
-        StatType::Return(Vec::new(), ret)
+        StatType::Return(vec![], ret)
     }
 
     /// Adds an incoming node to the list of incoming nodes.
@@ -250,7 +250,7 @@ impl Debug for StatType {
 
 impl Deleted for StatType {
     fn deleted() -> Self {
-        Self::Dummy(Vec::new())
+        Self::Dummy(vec![])
     }
 }
 
@@ -434,7 +434,7 @@ fn translate_block(
                 options,
             );
             stat_line.add_stat(StatCode::VoidCall("exit".to_string(), vec![free_var]));
-            (Vec::new(), None)
+            (vec![], None)
         }
         ir::BlockEnding::Return(expr) => {
             translate_expr(
@@ -450,10 +450,10 @@ fn translate_block(
                     .borrow_mut()
                     .new_node(StatType::new_return(free_var)),
             );
-            (Vec::new(), None)
+            (vec![], None)
         }
         ir::BlockEnding::CondJumps(conds, last) => {
-            let mut outputs = Vec::new();
+            let mut outputs = vec![];
             outputs.reserve_exact(conds.len());
             stat_line.add_node(stat_graph.borrow_mut().new_node(StatType::deleted()));
 
@@ -501,18 +501,16 @@ fn translate_block(
             }
 
             let end_node = stat_line.end_node().unwrap();
-            (
-                outputs,
-                match &end_node.clone().get_mut().incoming()[..] {
-                    [] => {
-                        stat_line = StatLine::new(stat_graph.clone());
-                        stat_line.add_node(stat_graph.borrow_mut().new_node(StatType::new_loop()));
-                        None
-                    }
-                    [last_node] => Some(last_node.clone()),
-                    _ => panic!("Expected a non-singleton dummy placeholder"),
-                },
-            )
+            let else_output = match &end_node.get_mut().incoming()[..] {
+                [] => {
+                    stat_line = StatLine::new(stat_graph.clone());
+                    stat_line.add_node(stat_graph.borrow_mut().new_node(StatType::new_loop()));
+                    None
+                }
+                [last_node] => Some(last_node.clone()),
+                _ => panic!("Expected a non-singleton dummy placeholder"),
+            };
+            (outputs, else_output)
         }
     };
     (stat_line.start_node().unwrap(), cond_outputs, else_output)
@@ -574,7 +572,7 @@ fn clean_up_block_graph(block_graph: &mut ir::BlockGraph) {
         new_block_graph_mappings.insert(old_block_id, new_block_id);
     }
 
-    let mut old_block_graph = Vec::new();
+    let mut old_block_graph = vec![];
     mem::swap(block_graph, &mut old_block_graph);
 
     *block_graph = old_block_graph
@@ -641,7 +639,7 @@ fn translate_block_graph(
         .map(|block| {
             let cond_ids = match &block {
                 ir::Block(_, stats, ir::BlockEnding::CondJumps(conds, else_id)) => {
-                    if stats.len() > 0 || conds.len() > 0 {
+                    if !stats.is_empty() || !conds.is_empty() {
                         Some((
                             conds
                                 .iter()
@@ -729,7 +727,7 @@ fn translate_function(
     function_types: &HashMap<String, ir::Type>,
     options: &Options,
 ) -> Function {
-    let mut three_code_args = Vec::new();
+    let mut three_code_args = vec![];
     for (arg_type, arg) in args {
         local_vars.insert(arg, arg_type);
         three_code_args.push(arg);
