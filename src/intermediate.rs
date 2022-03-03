@@ -437,7 +437,7 @@ fn format_local_vars(local_vars: &HashMap<VarRepr, Type>) -> LinkedList<String> 
 
 const INDENT: &str = "    ";
 fn format_block_helper(
-    block_graph: &Vec<Block>,
+    block_graph: &[Block],
     current_block: BlockId,
     visited: &mut HashSet<BlockId>,
 ) -> LinkedList<String> {
@@ -464,7 +464,7 @@ fn format_block_helper(
     output
 }
 
-fn format_block_graph(block_graph: &Vec<Block>) -> LinkedList<String> {
+fn format_block_graph(block_graph: &[Block]) -> LinkedList<String> {
     let mut visited = HashSet::new();
     let mut output = LinkedList::new();
     for block_id in 0..block_graph.len() {

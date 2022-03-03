@@ -10,7 +10,7 @@ use super::{
     super::ast::{ASTWrapper, Expr, ExprWrap, Type, UnOp},
     semantic_errors::SemanticError,
     symbol_table::{LocalSymbolTable, VariableSymbolTable},
-    type_constraints::{binop_match, de_index, unop_match, flatten_type},
+    type_constraints::{binop_match, de_index, flatten_type, unop_match},
 };
 
 /// Recursively analyse a given expression:
@@ -177,11 +177,15 @@ mod tests {
         let local_symb = LocalSymbolTable::new_root();
         let var_symb = VariableSymbolTable::new();
 
-
-        assert_eq!(analyse_expression(ASTWrapper("true", Expr::Bool(false)), &local_symb, &var_symb, &mut Vec::new()), Some(ASTWrapper(Some(Type::Bool), Expr::Bool(false))));
-
-
-
+        assert_eq!(
+            analyse_expression(
+                ASTWrapper("true", Expr::Bool(false)),
+                &local_symb,
+                &var_symb,
+                &mut Vec::new()
+            ),
+            Some(ASTWrapper(Some(Type::Bool), Expr::Bool(false)))
+        );
     }
 
     #[test]
