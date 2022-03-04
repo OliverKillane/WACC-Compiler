@@ -57,6 +57,7 @@ use colored::Colorize;
 use frontend::analyse;
 use intermediate::Program;
 use std::fs::File;
+use std::io::Write;
 use std::{cmp::min, fs::read_to_string, path::PathBuf, process};
 
 /// Command line interface
@@ -154,12 +155,20 @@ fn main() -> std::io::Result<()> {
                         println!("{}", res)
                     }
 
-                    println!("GRAPH BASED BACKEND:\n{}", result.assembly);
-
                     // Note to the marker:
                     // Despite our overwhelming effort, there remain bugs in 
                     // this backend, rather than waste time spent we have added 
                     // it as an option.
+
+                    let mut file = if let Some(outpath) = outputpath {
+                        File::create(outpath)?
+                    } else {
+                        filepath.set_extension("s");
+                        File::create(filepath)?
+                    };
+                    
+                    write!(file, "{}", result.assembly)?;
+
                 } else {
                     // let result = todo!();
                     let file = if let Some(outpath) = outputpath {
