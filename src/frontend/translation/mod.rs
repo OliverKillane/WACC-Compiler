@@ -793,7 +793,7 @@ mod tests {
     use super::{
         super::ast::{ASTWrapper, AssignLhs, AssignRhs, Expr, Stat, Type},
         super::semantic::symbol_table::VariableSymbolTable,
-        helper_funcs::HelperFunctionFlags,
+        helper_funcs::{HelperFunctionFlags, ARRAY_INDEX_FNAME},
         translate_stat,
     };
     use crate::intermediate::{self as ir, DataRef};
@@ -907,6 +907,106 @@ mod tests {
             )],
             vec![],
             HashMap::from([(0, Type::Array(box Type::Int, 1))]),
+            HashMap::new(),
+            HashMap::new(),
+        );
+    }
+
+    #[test]
+    fn test_assign_array_elem() {
+        test_statement(
+            Stat::Assign(
+                AssignLhs::ArrayElem(0, vec![ASTWrapper(Some(Type::Int), Expr::Int(0))]),
+                AssignRhs::Expr(ASTWrapper(Some(Type::Char), Expr::Char('z'))),
+            ),
+            vec![ir::Stat::AssignPtr(
+                ir::PtrExpr::Call(
+                    ARRAY_INDEX_FNAME.to_string(),
+                    vec![
+                        ir::Expr::Ptr(ir::PtrExpr::Var(0)),
+                        ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::DWord, 0)),
+                        ir::Expr::Num(ir::NumExpr::SizeOf(ir::Type::Num(ir::NumSize::Byte))),
+                    ],
+                ),
+                ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::Byte, 'z' as u8 as i32)),
+            )],
+            vec![],
+            HashMap::from([(0, Type::Array(box Type::Char, 1))]),
+            HashMap::new(),
+            HashMap::new(),
+        );
+    }
+
+    #[test]
+    fn test_assign_array_elem_ptr() {
+        test_statement(
+            Stat::Assign(
+                AssignLhs::ArrayElem(0, vec![ASTWrapper(Some(Type::Int), Expr::Int(0))]),
+                AssignRhs::Expr(ASTWrapper(
+                    Some(Type::Char),
+                    Expr::ArrayElem(1, vec![ASTWrapper(Some(Type::Int), Expr::Int(3))]),
+                )),
+            ),
+            vec![ir::Stat::AssignPtr(
+                ir::PtrExpr::Call(
+                    ARRAY_INDEX_FNAME.to_string(),
+                    vec![
+                        ir::Expr::Ptr(ir::PtrExpr::Var(0)),
+                        ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::DWord, 0)),
+                        ir::Expr::Num(ir::NumExpr::SizeOf(ir::Type::Num(ir::NumSize::Byte))),
+                    ],
+                ),
+                ir::Expr::Num(ir::NumExpr::Deref(
+                    ir::NumSize::Byte,
+                    ir::PtrExpr::Call(
+                        ARRAY_INDEX_FNAME.to_string(),
+                        vec![
+                            ir::Expr::Ptr(ir::PtrExpr::Var(1)),
+                            ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::DWord, 3)),
+                            ir::Expr::Num(ir::NumExpr::SizeOf(ir::Type::Num(ir::NumSize::Byte))),
+                        ],
+                    ),
+                )),
+            )],
+            vec![],
+            HashMap::from([
+                (0, Type::Array(box Type::Char, 1)),
+                (1, Type::Array(box Type::Char, 1)),
+            ]),
+            HashMap::new(),
+            HashMap::new(),
+        );
+    }
+
+    #[test]
+    fn test_read_var() {
+        test_statement(
+            Stat::Read(AssignLhs::Var(0)),
+            vec![ir::Stat::ReadIntVar(0)],
+            vec![],
+            HashMap::from([(0, Type::Int)]),
+            HashMap::new(),
+            HashMap::new(),
+        );
+    }
+
+    #[test]
+    fn test_read_ptr() {
+        test_statement(
+            Stat::Read(AssignLhs::ArrayElem(
+                0,
+                vec![ASTWrapper(Some(Type::Char), Expr::Int(0))],
+            )),
+            vec![ir::Stat::ReadCharPtr(ir::PtrExpr::Call(
+                ARRAY_INDEX_FNAME.to_string(),
+                vec![
+                    ir::Expr::Ptr(ir::PtrExpr::Var(0)),
+                    ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::DWord, 0)),
+                    ir::Expr::Num(ir::NumExpr::SizeOf(ir::Type::Num(ir::NumSize::Byte))),
+                ],
+            ))],
+            vec![],
+            HashMap::from([(0, Type::Array(box Type::Char, 1))]),
             HashMap::new(),
             HashMap::new(),
         );
