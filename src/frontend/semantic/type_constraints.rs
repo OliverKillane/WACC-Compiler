@@ -5,7 +5,7 @@
 
 use std::{cmp::Ordering, collections::HashMap};
 
-use super::super::ast::{BinOp, GenericId, Type, UnOp};
+use crate::ast::{BinOp, GenericId, Type, UnOp};
 
 lazy_static! {
     /// Unary Operations allowed (operator, output type, input type)

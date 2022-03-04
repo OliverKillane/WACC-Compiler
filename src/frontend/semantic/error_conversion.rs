@@ -35,12 +35,10 @@
 //! | Function Last Is While             | 198          | The last statement in a function is a while loop, which may not return (undecidable)                                                      |
 
 use super::{
-    super::{
-        ast::{ASTWrapper, BinOp, GenericId, Type, UnOp},
-        error::{Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType},
-    },
+    super::error::{Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType},
     semantic_errors::{SemanticError, StatementErrors},
 };
+use crate::ast::{ASTWrapper, BinOp, GenericId, Type, UnOp};
 use std::fmt::Display;
 
 /// Takes errors from semantic analysis and converts them into:

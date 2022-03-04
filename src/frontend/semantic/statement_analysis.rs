@@ -2,12 +2,12 @@
 //! AST or the errors produced.
 
 use super::{
-    super::ast::{ASTWrapper, AssignLhs, AssignRhs, Stat, StatWrap, Type},
     expression_analysis::analyse_expression,
     semantic_errors::{SemanticError, StatementErrors},
     symbol_table::{FunctionSymbolTable, LocalSymbolTable, VariableSymbolTable},
     type_constraints::{can_coerce, de_index},
 };
+use crate::ast::{ASTWrapper, AssignLhs, AssignRhs, Stat, StatWrap, Type};
 
 /// Analyse a vector of statements.
 /// Parameters:
@@ -692,10 +692,8 @@ fn analyse_lhs<'a, 'b>(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        super::super::ast::{BinOp, Expr, UnOp},
-        *,
-    };
+    use super::*;
+    use crate::ast::{BinOp, Expr, UnOp};
 
     #[test]
     fn analyse_rhs_can_check_valid_function_calls() {

@@ -11,14 +11,12 @@
 //! All other errors are associated with spans of statements within the
 //! function.
 
-use crate::frontend::ast::FunWrap;
-
 use super::{
-    super::ast::{ASTWrapper, Function, Param, Type},
     semantic_errors::StatementErrors,
     statement_analysis::analyse_block,
     symbol_table::{FunctionSymbolTable, LocalSymbolTable, VariableSymbolTable},
 };
+use crate::ast::{ASTWrapper, FunWrap, Function, Param, Type};
 
 /// An error result from a function analysis, containing the function name, and
 /// the statement errors contained.

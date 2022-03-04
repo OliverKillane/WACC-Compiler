@@ -7,7 +7,7 @@ mod tests;
 
 mod lexer;
 
-use super::ast::{
+use crate::ast::{
     ASTWrapper, AssignLhs, AssignRhs, BinOp, Expr, ExprWrap, Function, Param, Program, Stat,
     StatWrap, Type, UnOp,
 };

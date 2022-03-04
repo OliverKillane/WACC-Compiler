@@ -60,10 +60,8 @@ use self::{
     symbol_table::{get_fn_symbols, LocalSymbolTable, VariableSymbolTable},
 };
 
-use super::{
-    ast::{ASTWrapper, FunWrap, Program, StatWrap, Type},
-    error::Summary,
-};
+use super::error::Summary;
+use crate::ast::{ASTWrapper, FunWrap, Program, StatWrap, Type};
 
 /// Analyses a program, either returning a flat variable and function symbol table
 /// and an ast, or a tuple of error (function defs, main body, function errors)

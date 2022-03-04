@@ -7,10 +7,8 @@
 //! The final variable symbol table is output for each function, containing the
 //! renamed identifiers and the types.
 
-use super::{
-    super::ast::{ASTWrapper, FunWrap, Function, Param, Type},
-    semantic_errors::{SemanticError, StatementErrors},
-};
+use super::semantic_errors::{SemanticError, StatementErrors};
+use crate::ast::{ASTWrapper, FunWrap, Function, Param, Type};
 
 use std::collections::HashMap;
 

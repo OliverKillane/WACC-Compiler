@@ -7,11 +7,11 @@
 //! Extensively pushes forwards with finding errors, potentially from every
 //! leaf node of an expression tree.
 use super::{
-    super::ast::{ASTWrapper, Expr, ExprWrap, Type, UnOp},
     semantic_errors::SemanticError,
     symbol_table::{LocalSymbolTable, VariableSymbolTable},
     type_constraints::{binop_match, de_index, unop_match},
 };
+use crate::ast::{ASTWrapper, Expr, ExprWrap, Type, UnOp};
 
 /// Recursively analyse a given expression:
 /// - If the expression is valid, return the renamed ast and the type of the
@@ -169,8 +169,8 @@ pub fn analyse_expression<'a, 'b>(
 
 #[cfg(test)]
 mod tests {
-    use super::super::super::ast::{BinOp, UnOp};
     use super::*;
+    use crate::ast::{BinOp, UnOp};
 
     #[test]
     fn analyse_expression_matches_primitive_expressions() {

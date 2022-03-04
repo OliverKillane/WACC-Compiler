@@ -1,4 +1,3 @@
-pub mod ast;
 mod error;
 pub mod parser;
 pub(crate) mod semantic;
