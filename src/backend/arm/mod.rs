@@ -28,12 +28,7 @@ impl From<(ThreeCode, &Options)> for ArmResult {
         if options.show_arm_temp_rep {
             let arm_temp = translate_threecode(three_code);
             let temp_string = arm_temp.to_string();
-            println!("ARM TEMP:\n{}\n", temp_string);
-
-            let regs = allocate_registers(arm_temp);
-            println!("ARM REG:\n{}\n", regs);
-
-            panic!("done bitch");
+            ArmResult(allocate_registers(arm_temp), Some(temp_string))
         } else {
             ArmResult(allocate_registers(translate_threecode(three_code)), None)
         }

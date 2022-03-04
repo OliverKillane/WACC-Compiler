@@ -4,6 +4,7 @@
 #![feature(box_patterns)]
 #![feature(let_chains)]
 #![feature(let_else)]
+#![feature(backtrace)]
 #![feature(map_try_insert)]
 #![feature(iter_intersperse)]
 #![allow(dead_code)]
@@ -55,7 +56,6 @@ use clap::Parser;
 use colored::Colorize;
 use frontend::analyse;
 use std::fs::File;
-use std::io::prelude::*;
 use std::{cmp::min, fs::read_to_string, path::PathBuf, process};
 
 /// Command line interface
@@ -79,6 +79,9 @@ struct Args {
 
     #[clap(short, long, help = "print the intermediate representation generated")]
     ir_print: bool,
+
+    #[clap(short, long, help = "display graph based backend")]
+    graph_backend: bool,
 }
 
 /// Exit code for a file open failure.
@@ -88,12 +91,14 @@ const FILE_FAILURE: i32 = 1;
 /// Compiler main entry.
 /// - Processes command line arguments controlling compiler behaviour.
 /// - Halts and reports failures through returning exit codes.
+#[allow(unused_variables)]
 fn main() -> std::io::Result<()> {
     let Args {
         mut filepath,
         outputpath,
         temp_arm,
         ir_print,
+        graph_backend,
     } = Args::parse();
 
     let filestring = filepath.as_path().display().to_string();
@@ -105,35 +110,45 @@ fn main() -> std::io::Result<()> {
                     println!("THE INTERMEDIATE REPRESENTATION:\n{}", ir)
                 }
 
-                let options = Options {
-                    sethi_ullman_weights: false,
-                    dead_code_removal: false,
-                    propagation: PropagationOpt::None,
-                    inlining: false,
-                    tail_call: false,
-                    hoisting: false,
-                    strength_reduction: false,
-                    loop_unrolling: false,
-                    common_expressions: false,
-                    show_arm_temp_rep: temp_arm,
-                };
+                if graph_backend {
+                    let options = Options {
+                        sethi_ullman_weights: false,
+                        dead_code_removal: false,
+                        propagation: PropagationOpt::None,
+                        inlining: false,
+                        tail_call: false,
+                        hoisting: false,
+                        strength_reduction: false,
+                        loop_unrolling: false,
+                        common_expressions: false,
+                        show_arm_temp_rep: temp_arm,
+                    };
+    
+                    let result = compile(ir, options);
+    
+                    for res in result.intermediates {
+                        println!("{}", res)
+                    }
 
-                let result = compile(ir, options);
+                    println!("GRAPH BASED BACKEND:\n{}", result.assembly);
 
-                for res in result.intermediates {
-                    println!("{}", res)
-                }
-
-                let mut file = if let Some(outpath) = outputpath {
-                    File::create(outpath)?
+                    // Note to the marker:
+                    // Despite our overwhelming effort, there remain bugs in 
+                    // this backend, rather than waste time spent we have added 
+                    // it as an option.
                 } else {
-                    filepath.set_extension("s");
-                    File::create(filepath)?
-                };
+                    // let result = todo!();
+                    let file = if let Some(outpath) = outputpath {
+                        File::create(outpath)?
+                    } else {
+                        filepath.set_extension("s");
+                        File::create(filepath)?
+                    };
 
-                file.write_all(result.assembly.as_bytes())?;
-
+                    // file.write_all(result.as_bytes())?;
+                }
                 process::exit(COMPILE_SUCCESS)
+
             }
             Err(errs) => {
                 let mut exit_code = i32::MAX;
