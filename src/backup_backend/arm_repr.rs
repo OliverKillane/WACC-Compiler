@@ -4,6 +4,7 @@ use super::int_constraints::ConstrainedInt;
 
 pub(super) type DataIdent = u64;
 
+#[derive(Clone, Copy)]
 /// Condition suffixes to be used in conditionally executing instructions.
 pub(super) enum Cond {
     Eq,
@@ -23,6 +24,7 @@ pub(super) enum Cond {
     Al,
 }
 
+#[derive(Clone, Copy)]
 /// All general purpose register accessible in user mode.
 pub(super) enum Register {
     R0,
@@ -58,9 +60,12 @@ pub(super) enum Shift {
     Rrx,
 }
 
+#[derive(Clone, Copy)]
 pub(super) enum FlexOperand {
     /// Use an immediate operand, must be a shifted 8-bit pattern
     Imm(u32),
+    /// Use an immediate operand as a character
+    Char(ConstrainedInt<0x20, 0x7E>),
     /// Shift register to get operand value
     ///
     /// Note:
@@ -69,6 +74,7 @@ pub(super) enum FlexOperand {
 }
 
 /// Regular operations, two operands and a destination.
+#[derive(Clone, Copy)]
 pub(super) enum RegOp {
     /// Arithmetic addition.
     Add,
@@ -99,6 +105,7 @@ pub(super) enum RegOp {
 }
 
 /// Move a flexible operand to a register.
+#[derive(Clone, Copy)]
 pub(super) enum MovOp {
     /// Move value from one register to another.
     Mov,
@@ -107,6 +114,7 @@ pub(super) enum MovOp {
 }
 
 /// Compare a register and flexible operand.
+#[derive(Clone, Copy)]
 pub(super) enum CmpOp {
     /// Sets conditions bits as set by SUBS.
     Cmp,
@@ -119,6 +127,7 @@ pub(super) enum CmpOp {
 }
 
 /// Sets but does not clear the Q flag for overflows, sets accordingly.
+#[derive(Clone, Copy)]
 pub(super) enum SatOp {
     /// Arithmetic addition.
     Add,
@@ -130,6 +139,7 @@ pub(super) enum SatOp {
     DSub,
 }
 
+#[derive(Clone, Copy)]
 pub(super) enum BranchOp {
     /// Branch (go to a new label).
     B,
@@ -137,6 +147,7 @@ pub(super) enum BranchOp {
     Bl,
 }
 
+#[derive(Clone, Copy)]
 pub(super) enum MulOp {
     /// Unsigned multiplication.
     UMulL,
@@ -151,14 +162,20 @@ pub(super) enum MulOp {
 }
 
 /// Memory operation type
+#[derive(Clone, Copy)]
 pub(super) enum MemOp {
     /// Load-register instruction.
     Ldr,
     /// Store-register instruction
     Str,
+    /// Load-register byte instruction.
+    Ldrb,
+    /// Store-register byte instruction
+    Strb,
 }
 
 /// Memory operand is the second operand of the [memory operand](MemOp).
+#[derive(Clone)]
 pub(super) enum MemOperand {
     /// Indirect memory location stored in [Register].
     Zero(Register),
@@ -176,6 +193,7 @@ pub(super) enum MemOperand {
 }
 
 /// Offset for LDR/STR instructions.
+#[derive(Clone, Copy)]
 pub(super) enum FlexOffset {
     /// Constant offset between -4095 and 4095 inclusive.
     Expr(ConstrainedInt<-4095, 4095>),
@@ -184,6 +202,7 @@ pub(super) enum FlexOffset {
     ShiftReg(bool, Register, Option<Shift>),
 }
 
+#[derive(Clone)]
 pub(super) enum Stat {
     /// A normal register operation of form:
     /// ```text
@@ -270,8 +289,9 @@ pub(super) enum DataType {
 }
 
 /// All types of data that can be kept in the binary.
-/// #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Data(pub(super) DataIdent, pub(super) Vec<DataType>);
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct Data(pub(super) String, pub(super) Vec<DataType>);
 
 /// The main program containing text ([instructions](Stat)) and [data](Data).
+#[derive(Clone)]
 pub(super) struct Program(pub(super) Vec<Data>, pub(super) Vec<Stat>);

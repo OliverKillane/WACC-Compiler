@@ -99,7 +99,8 @@ impl Display for FlexOperand {
             f,
             "{}",
             match self {
-                FlexOperand::Imm(n) => n.to_string(),
+                FlexOperand::Imm(n) => format!("#{}", n),
+                FlexOperand::Char(c) => format!("#'{}'", (i32::from(*c) as u8 as char)),
                 FlexOperand::ShiftReg(reg, Some(shift)) => format!("{},\t{}", reg, shift),
                 FlexOperand::ShiftReg(reg, None) => format!("{}", reg),
             }
@@ -207,6 +208,8 @@ impl Display for MemOp {
             match self {
                 MemOp::Ldr => "ldr",
                 MemOp::Str => "str",
+                MemOp::Ldrb => "ldrb",
+                MemOp::Strb => "strb",
             }
         )
     }
@@ -326,11 +329,6 @@ impl Display for Stat {
     }
 }
 
-/// Converts a data reference into its string representation
-fn display_data_ref(ident: DataIdent) -> String {
-    format!("d_ref_{}", ident)
-}
-
 impl Display for DataType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
@@ -348,11 +346,12 @@ impl Display for DataType {
 
 impl Display for Data {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Data(ref_name, data_types) = self;
         write!(
             f,
             "\t{}:\n{}",
-            display_data_ref(self.0),
-            self.1
+            ref_name,
+            data_types
                 .iter()
                 .map(|d| format!("\t{}", d))
                 .collect::<Vec<_>>()
