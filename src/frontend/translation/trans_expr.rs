@@ -269,7 +269,7 @@ pub(super) fn translate_expr(
                     ))
                 }
                 (ir::Expr::Num(num_expr1), ast::BinOp::Div, ir::Expr::Num(num_expr2)) => {
-                    helper_function_flags.check_null = true;
+                    helper_function_flags.divide_modulo_check = true;
                     ir::Expr::Num(ir::NumExpr::ArithOp(
                         box num_expr1,
                         ir::ArithOp::Div,
@@ -280,7 +280,7 @@ pub(super) fn translate_expr(
                     ))
                 }
                 (ir::Expr::Num(num_expr1), ast::BinOp::Mod, ir::Expr::Num(num_expr2)) => {
-                    helper_function_flags.check_null = true;
+                    helper_function_flags.divide_modulo_check = true;
                     ir::Expr::Num(ir::NumExpr::ArithOp(
                         box num_expr1,
                         ir::ArithOp::Mod,
@@ -546,7 +546,5 @@ mod tests {
                 &mut helper_function_flags
             )
         );
-
-        assert_eq!(true, helper_function_flags.check_null);
     }
 }
