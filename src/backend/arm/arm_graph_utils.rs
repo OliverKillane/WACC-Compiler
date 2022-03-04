@@ -14,7 +14,10 @@ pub struct Chain(pub ArmNode, pub ArmNode);
 /// 2. start <-> leftmiddle <-> rightmiddle -> end
 /// 3. start <-> end
 /// ```
-pub fn link_two_chains(Chain(start, mut leftmiddle): Chain, Chain(mut rightmiddle, end): Chain) -> Chain {
+pub fn link_two_chains(
+    Chain(start, mut leftmiddle): Chain,
+    Chain(mut rightmiddle, end): Chain,
+) -> Chain {
     leftmiddle.set_successor(rightmiddle.clone());
     rightmiddle.set_predecessor(leftmiddle);
     Chain(start, end)
@@ -127,8 +130,9 @@ impl ArmNode {
             | ControlFlow::Return(pre, _) => {
                 if &Some(predecessor) == pre {
                     let _ = pre.insert(new_predecessor);
+                } else {
+                    panic!("Attempted replace a predecessor that was not there")
                 }
-                panic!("Attempted replace a predecessor that was not there")
             }
             ControlFlow::Multi(pres, _) => {
                 for pre in pres.iter_mut() {

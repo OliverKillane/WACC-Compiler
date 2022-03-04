@@ -1,7 +1,7 @@
 //! Register allocation for the arm representation, using live ranges and
 //! 'time-till-use' decision for spilling.
-//! 
-//! An allocation state is used to keep track of register usage, and 
+//!
+//! An allocation state is used to keep track of register usage, and
 //! create/maintain the stack frame.
 
 use std::{
@@ -13,13 +13,16 @@ use crate::graph::Graph;
 
 use super::{
     allocation_state::AllocationState,
-    arm_graph_utils::{Chain, link_optional_chains},
-    arm_repr::{ArmCode, ArmNode, ControlFlow, FlexOperand, Ident, Stat, Subroutine, Temporary, FlexOffset, MemOp, MemOperand},
-    live_ranges::{LiveRanges, get_live_ranges},
+    arm_graph_utils::{link_optional_chains, Chain},
+    arm_repr::{
+        ArmCode, ArmNode, ControlFlow, FlexOffset, FlexOperand, Ident, MemOp, MemOperand, Stat,
+        Subroutine, Temporary,
+    },
+    live_ranges::{get_live_ranges, LiveRanges},
 };
 
 /// Update the program, allocating registers for every instruction.
-/// 
+///
 /// Invariants:
 /// - Temporary sets must contain all temporaries used in each routine
 /// - All instructions must use temporaries as identifiers
@@ -78,8 +81,8 @@ pub fn allocate_registers(program: ArmCode) -> ArmCode {
     }
 }
 
-/// From the start node of a given routine, generate the stack frame 
-/// (instructions and initial allocation state), and then translate all 
+/// From the start node of a given routine, generate the stack frame
+/// (instructions and initial allocation state), and then translate all
 /// connecting arm nodes using the provided live ranges and temporaries.
 fn allocate_for_routine(
     mut start_node: ArmNode,
@@ -607,7 +610,7 @@ fn translate_from_node(
             ControlFlow::Removed => {
                 panic!("Removed nodes must not be present in the traversable part of the graph")
             }
-            _ => panic!("No previous node, hence the function's invaliant is broken")
+            _ => panic!("No previous node, hence the function's invaliant is broken"),
         };
 
         // check if the current node has had its registers allocated already
