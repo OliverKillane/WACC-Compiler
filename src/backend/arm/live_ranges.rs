@@ -17,6 +17,7 @@ type SetId = usize;
 /// Struct containing the live ranges for all nodes in the control flow graph.
 /// In order to conserve memory & speed up, sets can be shared (liveout of a node
 /// is live-in of another).
+#[derive(Debug)]
 pub struct LiveRanges {
     /// A map of set identifiers to Maps from Temporary Identifiers to
     /// Instructions till next use. Effectively a live set with associated
@@ -155,6 +156,13 @@ impl LiveRanges {
         };
 
         if let Some((livein, liveout, contrib)) = sets {
+            uses.iter().for_each(|temp| {
+                self.live_set_map
+                    .get_mut(&livein)
+                    .expect("livein set ids are always valid")
+                    .insert(*temp, 0);
+            });
+
             self.arm_node_map
                 .insert(node.clone(), (livein, liveout, defs, uses, contrib));
         }
@@ -188,7 +196,6 @@ impl LiveRanges {
     fn update_live_ranges(&mut self, node: &ArmNode) -> bool {
         if let Some((livein, liveout, defs, uses, contribs)) = self.arm_node_map.get(node) {
             let mut changes = false;
-
             // Create a temporary map for generating the live-in, live-out sets.
             // Note that this avoids a large number of shared mutable reference
             // issues (all sets are contained in the same live_set_map)
@@ -217,12 +224,12 @@ impl LiveRanges {
                 .expect("Liveout idents are always valid");
             for (temp, use_distance) in temp_map.iter() {
                 match live_out.insert(*temp, *use_distance) {
-                    Some(old_use_distance) => {
-                        changes = changes || old_use_distance != *use_distance
-                    }
+                    Some(other_use_dist) => changes = changes || other_use_dist != *use_distance,
                     None => changes = true,
                 }
             }
+
+            temp_map = self.live_set_map[liveout].clone();
 
             // Remove definitions from the temporary map.
             for def in defs {
@@ -235,21 +242,15 @@ impl LiveRanges {
                 .get_mut(livein)
                 .expect("Liveout idents are always valid");
             for (temp, use_distance) in temp_map.into_iter() {
-                match live_in.insert(temp, use_distance + 1) {
-                    Some(old_use_distance) => {
-                        changes = changes || old_use_distance == use_distance + 1
-                    }
-                    None => changes = true,
+                if live_in.insert(temp, use_distance + 1).is_none() {
+                    changes = true
                 }
             }
 
             // Insert the uses into the live in set, it should already be there
             // with distance zero.
             for temp in uses {
-                match live_in.insert(*temp, 0) {
-                    Some(0) => (),
-                    Some(_) | None => changes = true,
-                }
+                live_in.insert(*temp, 0);
             }
 
             changes
@@ -448,13 +449,12 @@ impl DefsUses for Stat {
             ),
             Stat::Push(_, arg) => add_temps(arg, uses),
             Stat::Pop(_, arg) => add_temps(arg, defs),
-            Stat::Link(_, _) => todo!(),
+            Stat::Link(_, _) => (),
             Stat::Call(_, dst, args) => {
                 if let Some(dst) = dst {
                     defs.push(*dst)
                 }
-                args.iter()
-                    .for_each(|arg| add_temps(&Ident::Temp(*arg), uses))
+                args.iter().for_each(|arg| uses.push(*arg))
             }
             Stat::AssignStackWord(Ident::Temp(dst)) => defs.push(*dst),
             _ => (),
@@ -475,5 +475,16 @@ impl DefsUses for ControlFlow {
 impl DefsUses for ArmNode {
     fn get_defs_and_uses(&self, defs: &mut Vec<Temporary>, uses: &mut Vec<Temporary>) {
         self.get().deref().get_defs_and_uses(defs, uses)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn basic_live_range_test() {
+        // let graph = Graph::new();
     }
 }

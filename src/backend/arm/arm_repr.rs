@@ -9,8 +9,8 @@
 //! - Labels are used for nodes jumped to by more than one other node.
 //!
 //!
-use crate::graph::{Deleted, Graph, NodeRef};
 use super::int_constraints::ConstrainedInt;
+use crate::graph::{Deleted, Graph, NodeRef};
 use std::collections::{HashMap, HashSet};
 
 /// The temporary type (used before register allocation)

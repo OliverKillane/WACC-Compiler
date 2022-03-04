@@ -101,25 +101,8 @@ fn main() -> std::io::Result<()> {
     match read_to_string(filestring.clone()) {
         Ok(source_code) => match analyse(&source_code) {
             Ok(ir) => {
-                match ir.validate() {
-                    Ok(_) => println!("THE INTERMEDIATE REPRESENTATION:\n{}", ir),
-                    Err(_) => {
-                        let intermediate::Program(
-                            functions,
-                            local_vars,
-                            graph,
-                            data_refs,
-                            int_handler,
-                        ) = ir;
-                        panic!(
-                            "INVALID INTERMEDIATE REPRESENTATION:\nProgram{{\n\t[\n{}\t],\n\t{:?},\n\t[\n{}\t],\n\t[\n{}\t],\n\t{:?}\n}}",
-                            functions.iter().map(|f| format!("\t\t{:?}\n", f)).collect::<String>(),
-                            local_vars,
-                            graph.iter().map(|b| format!("\t\t{:?}\n", b)).collect::<String>(),
-                            data_refs.iter().map(|rf| format!("\t\t{:?}\n", rf)).collect::<String>(),
-                            int_handler
-                        )
-                    }
+                if ir_print {
+                    println!("THE INTERMEDIATE REPRESENTATION:\n{}", ir)
                 }
 
                 let options = Options {

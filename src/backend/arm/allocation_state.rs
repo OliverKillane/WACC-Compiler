@@ -12,6 +12,7 @@
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
+    fmt::Display,
 };
 
 use crate::graph::Graph;
@@ -147,7 +148,7 @@ impl AllocationState {
         }
 
         // setup space for preserves
-        for p in 0..9 {
+        for p in 0..=9 {
             alloc_map.insert(Alloc::Preserve(p), sp_displacement);
             sp_displacement += 1;
         }
@@ -284,6 +285,7 @@ impl AllocationState {
         graph: &mut Graph<ControlFlow>,
     ) -> Chain {
         let sp_offset = self.get_alloc_sp_offset(alloc);
+
         if -4095 <= sp_offset && sp_offset <= 4095 {
             // we can use a stack pointer offset to get the temporary
 
@@ -400,7 +402,7 @@ impl AllocationState {
         let mut temp_registers = HashMap::new();
 
         // iterate through all registers to get the free, preserved and the temporary registers
-        for (reg_ind, alloc) in self.registers.iter_mut().enumerate() {
+        for (reg_ind, alloc) in self.registers.iter_mut().enumerate().rev() {
             match alloc {
                 Alloc::Temp(t) => {
                     if *t == temp {
@@ -427,6 +429,7 @@ impl AllocationState {
                     .pop()
                     .expect("vector of free registers is not empty"),
             );
+            self.registers[dst_register as usize] = alloc;
             (
                 dst_register,
                 if load_stack {
@@ -810,11 +813,6 @@ impl AllocationState {
             chains.push(self.alloc_to_reg(Alloc::Temp(*temp), Register::R0, graph));
         }
 
-        // now we must reset the stack to its position prior to the call.
-        if self.sp_displacement != 0 {
-            chains.push(Some(self.move_stack_pointer(self.sp_displacement, graph)));
-        }
-
         // place preserves back (callee saved).
         chains.push(self.alloc_to_reg(Alloc::Preserve(0), Register::R4, graph));
         chains.push(self.alloc_to_reg(Alloc::Preserve(1), Register::R5, graph));
@@ -825,11 +823,26 @@ impl AllocationState {
         chains.push(self.alloc_to_reg(Alloc::Preserve(6), Register::R10, graph));
         chains.push(self.alloc_to_reg(Alloc::Preserve(7), Register::R11, graph));
         chains.push(self.alloc_to_reg(Alloc::Preserve(8), Register::R12, graph));
-
+        chains.push(self.alloc_to_reg(Alloc::Preserve(9), Register::Lr, graph));
         // we place the saved link register, in the program counter. This instruction
         // will always result in a node as the PC is protected, and Preserve(9) cannot
         // therefore be in the PC yet.
-        chains.push(self.alloc_to_reg(Alloc::Preserve(9), Register::Pc, graph));
+
+        // now we must reset the stack to its position prior to the call.
+        if self.sp_displacement != 0 {
+            chains.push(Some(self.move_stack_pointer(self.sp_displacement, graph)));
+        }
+
+        chains.push(Some(simple_node(
+            Stat::Move(
+                MovOp::Mov,
+                Cond::Al,
+                false,
+                Ident::Reg(Register::Pc),
+                FlexOperand::ShiftReg(Ident::Reg(Register::Lr), None),
+            ),
+            graph,
+        )));
 
         // link the statements together
         let Chain(start, mut end) = link_optional_chains(chains)
@@ -970,5 +983,41 @@ mod tests {
         assert_eq!(Register::Sp as usize, 13);
         assert_eq!(Register::Lr as usize, 14);
         assert_eq!(Register::Pc as usize, 15);
+    }
+}
+
+impl Display for Alloc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Alloc::Temp(t) => write!(f, "T{}", t),
+            Alloc::Preserve(p) => write!(f, "P{}", p),
+            Alloc::Free => write!(f, "FREE"),
+            Alloc::Protected => write!(f, "PROTECTED"),
+        }
+    }
+}
+
+impl Display for AllocationState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "REGISTERS: [{}]",
+            self.registers
+                .iter()
+                .map(|alloc| alloc.to_string())
+                .intersperse(", ".to_string())
+                .collect::<String>()
+        )?;
+        writeln!(
+            f,
+            "{}",
+            self.alloc_map
+                .iter()
+                .map(|(alloc, pos)| format!("{} -> {}", alloc, pos))
+                .intersperse("\n".to_string())
+                .collect::<String>()
+        )?;
+        writeln!(f, "STACK RESERVE: {}", self.stack_reserve)?;
+        writeln!(f, "STACK DISPLACEMENT: {}", self.sp_displacement)
     }
 }

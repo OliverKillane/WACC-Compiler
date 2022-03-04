@@ -89,7 +89,7 @@ impl Display for FlexOperand {
             f,
             "{}",
             match self {
-                FlexOperand::Imm(n) => n.to_string(),
+                FlexOperand::Imm(n) => format!("#{}", n),
                 FlexOperand::ShiftReg(reg, Some(shift)) => format!("{},\t{}", reg, shift),
                 FlexOperand::ShiftReg(reg, None) => format!("{}", reg),
             }
@@ -277,11 +277,11 @@ impl Display for Stat {
             }
             Stat::ReadCPSR(reg) => write!(f, "\tMSR\t{},\tCPSR", reg),
             Stat::MemOp(op, cond, s, ident, operand) => {
-                write!(f, "\t{}{}{}\t{},\t{}", op, cond, conv(s), ident, operand)
+                write!(f, "\t{}{}{}\t{},\t{}", op, cond, if *s {"B"} else {""}, ident, operand)
             }
             Stat::Push(cond, ident) => write!(f, "\tPUSH{}\t{{{}}}", cond, ident,),
             Stat::Pop(cond, ident) => write!(f, "\tPOP{}\t{{{}}}", cond, ident,),
-            Stat::Link(cond, link_to) => write!(f, "BL{}\t{}", cond, link_to),
+            Stat::Link(cond, link_to) => write!(f, "\tBL{}\t{}", cond, link_to),
             Stat::Call(fun_name, ret_temp, arg_temps) => write!(
                 f,
                 "\tINTERNAL OPERATION: CALL\t{}\t{}, ARGS({})",
@@ -358,13 +358,13 @@ impl Display for ArmNode {
                         }
                     }
                     ControlFlow::Ltorg(_) => {
-                        writeln!(f, "\tltorg.")?;
+                        writeln!(f, "\t.ltorg")?;
                         break;
                     }
                     ControlFlow::Return(_, ret) => {
                         writeln!(
                             f,
-                            "\tINTERNAL INSTR: CALL\t{}",
+                            "\tINTERNAL OPERATION: RETURN\t{}",
                             if let Some(ret_temp) = ret {
                                 format! {"t{}", ret_temp}
                             } else {

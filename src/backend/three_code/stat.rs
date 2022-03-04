@@ -77,7 +77,7 @@ fn ensure_format(
 /// Adds a call to a flush function
 fn add_flush(free_var: VarRepr, stat_line: &mut StatLine) {
     stat_line.add_stat(StatCode::Assign(free_var, OpSrc::Const(0)));
-    stat_line.add_stat(StatCode::VoidCall("fflush\0".to_string(), vec![free_var]));
+    stat_line.add_stat(StatCode::VoidCall("fflush".to_string(), vec![free_var]));
 }
 
 /// Translates a single [statement](ir::Stat) into a
@@ -302,7 +302,7 @@ pub(super) fn translate_statement(
                 options,
             );
             let string_format =
-                ensure_format(free_data_ref, data_refs, "%.*s", &mut fmt_flags.string);
+                ensure_format(free_data_ref, data_refs, "%.*s\\0", &mut fmt_flags.string);
             stat_line.add_stat(StatCode::Assign(
                 free_var + 2,
                 OpSrc::DataRef(string_format, 0),
@@ -518,7 +518,7 @@ pub(super) mod tests {
             HashMap::from([(0, ir::Type::Num(ir::NumSize::DWord))]),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%d\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%d\\0".as_bytes().to_vec()))]),
             true,
         )
     }
@@ -538,7 +538,7 @@ pub(super) mod tests {
             HashMap::from([(0, ir::Type::Num(ir::NumSize::Byte))]),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%c\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%c\\0".as_bytes().to_vec()))]),
             true,
         )
     }
@@ -556,7 +556,7 @@ pub(super) mod tests {
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%d\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%d\\0".as_bytes().to_vec()))]),
             false,
         )
     }
@@ -574,7 +574,7 @@ pub(super) mod tests {
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%c\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%c\\0".as_bytes().to_vec()))]),
             false,
         )
     }
@@ -605,13 +605,13 @@ pub(super) mod tests {
                 StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::Assign(1, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("printf".to_string(), vec![1, 0]),
-                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::VoidCall("fflush".to_string(), vec![0]),
             ],
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%d\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%d\\0".as_bytes().to_vec()))]),
             false,
         )
     }
@@ -648,8 +648,8 @@ pub(super) mod tests {
         assert_eq!(
             data_refs,
             HashMap::from([
-                (0, DataRefType::String("true\0".as_bytes().to_vec())),
-                (1, DataRefType::String("false\0".as_bytes().to_vec()))
+                (0, DataRefType::String("true\\0".as_bytes().to_vec())),
+                (1, DataRefType::String("false\\0".as_bytes().to_vec()))
             ])
         );
 
@@ -694,13 +694,13 @@ pub(super) mod tests {
                 StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::Assign(1, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("printf".to_string(), vec![1, 0]),
-                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::VoidCall("fflush".to_string(), vec![0]),
             ],
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%p\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%p\\0".as_bytes().to_vec()))]),
             false,
         )
     }
@@ -714,13 +714,13 @@ pub(super) mod tests {
                 StatCode::Assign(0, OpSrc::Const(1)),
                 StatCode::Assign(1, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("printf".to_string(), vec![1, 0]),
-                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::VoidCall("fflush".to_string(), vec![0]),
             ],
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%c\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%c\\0".as_bytes().to_vec()))]),
             false,
         )
     }
@@ -735,13 +735,13 @@ pub(super) mod tests {
                 StatCode::Assign(1, OpSrc::Const(4)),
                 StatCode::Assign(2, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("printf".to_string(), vec![2, 1, 0]),
-                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::VoidCall("fflush".to_string(), vec![0]),
             ],
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%.*s\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%.*s\\0".as_bytes().to_vec()))]),
             false,
         )
     }
@@ -754,13 +754,13 @@ pub(super) mod tests {
             vec![
                 StatCode::Assign(0, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("printf".to_string(), vec![0]),
-                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::VoidCall("fflush".to_string(), vec![0]),
             ],
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("\n\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("\n\\0".as_bytes().to_vec()))]),
             false,
         )
     }
