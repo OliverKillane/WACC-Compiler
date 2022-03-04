@@ -101,20 +101,6 @@ pub(super) fn translate_threecode(
     }
 }
 
-fn ascii_to_string(ascii: Vec<u8>) -> String {
-    const NEWLINE: u8 = 10;
-    const NULL: u8 = 0;
-    let mut chars = Vec::new();
-    for char in ascii {
-        match char {
-            NEWLINE => {println!("newline"); chars.push('\\'); chars.push('n');},
-            NULL => {chars.push('\\'); chars.push('0');},
-            n => chars.push(n as char)
-        }
-    }
-    chars.into_iter().collect::<String>()
-}
-
 /// Translate the data section from the threecode to the arm representation.
 fn translate_data(data_refs: HashMap<DataRef, DataRefType>) -> Vec<Data> {
     data_refs
@@ -148,7 +134,7 @@ fn translate_data(data_refs: HashMap<DataRef, DataRefType>) -> Vec<Data> {
                                     (datas, chars)
                                 } else {
                                     datas.push(DataType::Ascii(
-                                        ascii_to_string(chars),
+                                        String::from_utf8(chars).expect("valid ascii"),
                                     ));
                                     (datas, vec![])
                                 }
@@ -158,7 +144,7 @@ fn translate_data(data_refs: HashMap<DataRef, DataRefType>) -> Vec<Data> {
                     // place any string on the end of the data section into datas
                     if !string.is_empty() {
                         datas.push(DataType::Ascii(
-                            ascii_to_string(string),
+                            String::from_utf8(string).expect("valid ascii"),
                         ))
                     }
 

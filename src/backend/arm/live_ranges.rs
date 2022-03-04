@@ -477,14 +477,3 @@ impl DefsUses for ArmNode {
         self.get().deref().get_defs_and_uses(defs, uses)
     }
 }
-
-#[cfg(test)]
-mod tests {
-
-    use super::*;
-
-    #[test]
-    fn basic_live_range_test() {
-        // let graph = Graph::new();
-    }
-}
