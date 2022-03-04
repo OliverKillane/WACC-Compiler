@@ -150,12 +150,11 @@ pub(super) fn translate_expr(
         }
 
         Expr::UnOp(un_op, box ASTWrapper(sub_expr_type, sub_expr)) => {
-            let sub_expr_type = sub_expr_type.expect("Expected a type for an expression");
             match (
                 un_op,
                 translate_expr(
                     sub_expr,
-                    &sub_expr_type,
+                    &sub_expr_type.expect("Expected a type for an expression"),
                     var_symb,
                     data_ref_map,
                     helper_function_flags,
@@ -181,7 +180,7 @@ pub(super) fn translate_expr(
                 (UnOp::Fst, expr @ ir::Expr::Ptr(_)) => {
                     helper_function_flags.check_null = true;
                     let ptr = ir::PtrExpr::Call(CHECK_NULL_FNAME.to_string(), vec![expr]);
-                    match sub_expr_type {
+                    match ast_expr_type {
                         ast::Type::Int => {
                             ir::Expr::Num(ir::NumExpr::Deref(ir::NumSize::DWord, ptr))
                         }
@@ -203,7 +202,7 @@ pub(super) fn translate_expr(
                         box ir::PtrExpr::Call(CHECK_NULL_FNAME.to_string(), vec![expr]),
                         box ir::NumExpr::SizeOfWideAlloc,
                     );
-                    match sub_expr_type {
+                    match ast_expr_type {
                         ast::Type::Int => {
                             ir::Expr::Num(ir::NumExpr::Deref(ir::NumSize::DWord, offset_ptr))
                         }
