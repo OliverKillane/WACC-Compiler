@@ -745,7 +745,6 @@ pub(super) fn translate_ast(
         })
         .collect();
     let VariableSymbolTable(var_map) = &program_symbol_table;
-    let free_var = &mut var_map.keys().max().copied().map(|k| k + 1).unwrap_or(0);
     let mut ir_vars = var_map
         .iter()
         .map(|(&var, var_type)| (var, var_type.into()))
@@ -756,7 +755,7 @@ pub(super) fn translate_ast(
         vec![],
         None,
         &mut block_graph,
-        free_var,
+        &mut var_map.keys().max().copied().map(|k| k + 1).unwrap_or(0),
         &mut ir_vars,
         &program_symbol_table,
         &function_types,
@@ -766,6 +765,12 @@ pub(super) fn translate_ast(
         let last_block_id = block_graph.len() - 1;
         block_graph.push(ir::Block(
             vec![last_block_id],
+            vec![],
+            ir::BlockEnding::Exit(ir::NumExpr::Const(ir::NumSize::DWord, 0)),
+        ));
+    } else if block_graph.is_empty() {
+        block_graph.push(ir::Block(
+            vec![],
             vec![],
             ir::BlockEnding::Exit(ir::NumExpr::Const(ir::NumSize::DWord, 0)),
         ));
@@ -882,10 +887,10 @@ mod tests {
             Stat::Assign(
                 AssignLhs::Var(0),
                 AssignRhs::Array(ASTWrapper(
-                    Some(Type::Array(box Type::Int, 1)),
+                    Some(Type::Array(box Type::Char, 1)),
                     vec![
-                        ASTWrapper(Some(Type::Int), Expr::Char('a')),
-                        ASTWrapper(Some(Type::Int), Expr::Char('b')),
+                        ASTWrapper(Some(Type::Char), Expr::Char('a')),
+                        ASTWrapper(Some(Type::Char), Expr::Char('b')),
                     ],
                 )),
             ),
