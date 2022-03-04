@@ -3,6 +3,7 @@ use crate::intermediate::{self as ir, VarRepr};
 use std::{
     collections::HashMap,
     iter::{successors, zip},
+    ops::Deref,
 };
 
 impl From<i32> for OpSrc {
@@ -416,7 +417,7 @@ mod tests {
         graph::Graph,
         intermediate::{self as ir, VarRepr},
     };
-    use std::{cell::RefCell, collections::HashMap, rc::Rc};
+    use std::{cell::RefCell, collections::HashMap, ops::Deref, rc::Rc};
 
     fn match_line_stat_vec(
         expr: ir::Expr,
@@ -453,18 +454,19 @@ mod tests {
         let mut node = stat_line.start_node().expect("No start node");
         let mut stats = stats.into_iter();
         while node != stat_line.end_node().expect("No end node") {
-            let next_node = if let StatType::Simple(_, node_stat_code, next_node) = &*node.get() {
-                assert_eq!(
-                    *node_stat_code,
-                    stats.next().expect("More statements than expected")
-                );
-                next_node.clone()
-            } else {
-                panic!("Expected a simple statement")
-            };
+            let next_node =
+                if let StatType::Simple(_, node_stat_code, next_node) = node.get().deref() {
+                    assert_eq!(
+                        *node_stat_code,
+                        stats.next().expect("More statements than expected")
+                    );
+                    next_node.clone()
+                } else {
+                    panic!("Expected a simple statement")
+                };
             node = next_node;
         }
-        if let StatType::Final(_, node_stat_code) = &*node.get() {
+        if let StatType::Final(_, node_stat_code) = node.get().deref() {
             assert_eq!(
                 *node_stat_code,
                 stats.next().expect("More statements than expected")
