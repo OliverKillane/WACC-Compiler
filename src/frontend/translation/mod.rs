@@ -482,7 +482,7 @@ fn translate_stat(
                 data_ref_map,
                 helper_function_flags,
             ) {
-                prev_blocks.push(block_graph.len());
+                prev_blocks.push(block_graph.len() - 1);
             }
 
             let after_jump_id = block_graph.len();
@@ -677,10 +677,13 @@ fn translate_function(
     data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
     helper_function_flags: &mut HelperFunctionFlags,
 ) -> ir::Function {
-    let mut ir_vars = var_map
+    let mut ir_vars: HashMap<usize, ir::Type> = var_map
         .iter()
         .map(|(&var, var_type)| (var, var_type.into()))
         .collect();
+    for ASTWrapper(_, Param(_, arg)) in &args {
+        ir_vars.remove(arg);
+    }
     let mut block_graph = vec![];
     assert!(!translate_block_jumping(
         block,
