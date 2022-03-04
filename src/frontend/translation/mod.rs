@@ -545,6 +545,7 @@ fn translate_stat(
                 let ir::Block(cond_prev_blocks, _, _) = block_graph.get_mut(cond_block_id).unwrap();
                 cond_prev_blocks.push(while_block_id);
             }
+            prev_blocks.push(cond_block_id);
             let after_jump_id = block_graph.len();
             if let ir::Block(_, _, ir::BlockEnding::CondJumps(_, else_jump)) =
                 block_graph.get_mut(cond_block_id).unwrap()
