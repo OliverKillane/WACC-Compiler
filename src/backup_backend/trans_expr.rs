@@ -13,14 +13,66 @@ fn get_type_size(t: &Type) -> i32 {
     }
 }
 
-const RET_REG: Register = Register::R0;
-const PUSH_SIZE: i32 = 4;
-fn trans_expr(
+pub(super) fn translate_variable_get(
+    arm_stats: &mut Vec<Stat>,
+    id: &usize,
+    dest_reg: Register,
+    symbol_table: &HashMap<usize, ast::Type>,
+    id_map: &HashMap<usize, i32>,
+    push_count: i32,
+) {
+    let ldr_instr = if get_type_size(&symbol_table[id]) == 1 {
+        MemOp::Ldrb
+    } else {
+        MemOp::Ldr
+    };
+    let id_offset = id_map[id] + push_count * PUSH_SIZE;
+    if let 4095..=4095 = id_offset {
+        arm_stats.push(Stat::MemOp(
+            ldr_instr,
+            Cond::Al,
+            false,
+            dest_reg,
+            MemOperand::PreIndex(Register::Sp, FlexOffset::Expr(id_offset.into()), false),
+        ));
+    } else {
+        arm_stats.push(Stat::MemOp(
+            MemOp::Ldr,
+            Cond::Al,
+            false,
+            dest_reg,
+            MemOperand::Expression(id_offset),
+        ));
+        arm_stats.push(Stat::MemOp(
+            ldr_instr,
+            Cond::Al,
+            false,
+            dest_reg,
+            MemOperand::PreIndex(
+                Register::Sp,
+                FlexOffset::ShiftReg(false, dest_reg, None),
+                false,
+            ),
+        ));
+    }
+}
+
+pub(super) fn is_flex_imm(val: i32) -> bool {
+    let val = val as u32;
+    (val >> val.trailing_zeros()) <= 0xFF
+}
+
+pub(super) const ARG_REGS: [Register; 4] = [Register::R0, Register::R1, Register::R2, Register::R3];
+pub(super) const RET_REG: Register = Register::R0;
+pub(super) const PUSH_SIZE: i32 = 4;
+
+pub(super) fn trans_expr(
     arm_stats: &mut Vec<Stat>,
     expr: &Expr<Option<Type>, usize>,
+    expr_type: &Type,
     dest_reg: Register,
-    mut registers: &[Register],
-    push_count: i32,
+    registers: &[Register],
+    stack_offset: i32,
     symbol_table: &HashMap<usize, ast::Type>,
     id_map: &HashMap<usize, i32>,
     string_literals: &mut HashMap<String, usize>,
@@ -74,105 +126,135 @@ fn trans_expr(
             ));
         }
         Expr::Var(id) => {
-            let ldr_instr = if get_type_size(&symbol_table[id]) == 1 {
-                MemOp::Ldrb
-            } else {
-                MemOp::Ldr
-            };
-            let id_offset = id_map[id] + push_count * PUSH_SIZE;
-            if let 4095..=4095 = id_offset {
-                arm_stats.push(Stat::MemOp(
-                    ldr_instr,
+            translate_variable_get(arm_stats, id, dest_reg, symbol_table, id_map, stack_offset);
+        }
+        Expr::ArrayElem(id, exprs) => {
+            let id_offset = id_map[id] + stack_offset;
+            if is_flex_imm(id_offset) {
+                arm_stats.push(Stat::ApplyOp(
+                    RegOp::Add,
                     Cond::Al,
                     false,
                     dest_reg,
-                    MemOperand::PreIndex(Register::Sp, FlexOffset::Expr(id_offset.into()), false),
+                    Register::Sp,
+                    FlexOperand::Imm(id_offset as u32),
                 ));
             } else {
                 arm_stats.push(Stat::MemOp(
-                    ldr_instr,
+                    MemOp::Ldr,
                     Cond::Al,
                     false,
                     dest_reg,
                     MemOperand::Expression(id_offset),
                 ));
-                arm_stats.push(Stat::MemOp(
-                    ldr_instr,
+                arm_stats.push(Stat::ApplyOp(
+                    RegOp::Add,
                     Cond::Al,
                     false,
                     dest_reg,
-                    MemOperand::PreIndex(
-                        Register::Sp,
-                        FlexOffset::ShiftReg(false, dest_reg, None),
-                        false,
+                    Register::Sp,
+                    FlexOperand::ShiftReg(dest_reg, None),
+                ));
+            }
+
+            for (expr_idx, ast::ASTWrapper(t, expr)) in exprs.iter().enumerate() {
+                let do_register_fallback = registers.len() == 1;
+                let is_last_expr = expr_idx == exprs.len() - 1;
+
+                let array_index_reg = if do_register_fallback {
+                    arm_stats.push(Stat::Push(Cond::Al, vec![dest_reg]));
+                    dest_reg
+                } else {
+                    registers[0]
+                };
+                trans_expr(
+                    arm_stats,
+                    expr,
+                    t.as_ref().unwrap(),
+                    array_index_reg,
+                    registers,
+                    stack_offset,
+                    symbol_table,
+                    id_map,
+                    string_literals,
+                );
+                let array_ptr_reg = if do_register_fallback {
+                    arm_stats.push(Stat::Pop(Cond::Al, vec![registers[0]]));
+                    registers[0]
+                } else {
+                    dest_reg
+                };
+                arm_stats.push(Stat::MemOp(
+                    MemOp::Ldr,
+                    Cond::Al,
+                    false,
+                    array_ptr_reg,
+                    MemOperand::Zero(array_ptr_reg),
+                ));
+                arm_stats.push(Stat::Move(
+                    MovOp::Mov,
+                    Cond::Al,
+                    false,
+                    ARG_REGS[0],
+                    FlexOperand::ShiftReg(array_index_reg, None),
+                ));
+                arm_stats.push(Stat::Move(
+                    MovOp::Mov,
+                    Cond::Al,
+                    false,
+                    ARG_REGS[1],
+                    FlexOperand::ShiftReg(array_ptr_reg, None),
+                ));
+                arm_stats.push(Stat::Branch(
+                    BranchOp::Bl,
+                    Cond::Al,
+                    "p_check_array_bounds".to_string(),
+                ));
+                arm_stats.push(Stat::ApplyOp(
+                    RegOp::Add,
+                    Cond::Al,
+                    false,
+                    array_ptr_reg,
+                    array_ptr_reg,
+                    FlexOperand::Imm(4),
+                ));
+                arm_stats.push(Stat::ApplyOp(
+                    RegOp::Add,
+                    Cond::Al,
+                    false,
+                    dest_reg,
+                    array_ptr_reg,
+                    FlexOperand::ShiftReg(
+                        array_index_reg,
+                        if is_last_expr && get_type_size(expr_type) == 4 {
+                            Some(Shift::Lsl(2.into()))
+                        } else {
+                            None
+                        },
                     ),
                 ));
             }
-        }
-        Expr::ArrayElem(id, exprs) => {
-            // let array_index_tmp = registers.pop().unwrap();
-            // let id_offset = id_map[id] + push_count * PUSH_SIZE;
-            // arm_stats.push(Stat::ApplyOp(RegOp::Add, Cond::Al, false, ))
-            // writeln!(f, "\tADD {}, sp, #{}", array_index_tmp,)?;
-            // let mut non_final_exprs = exprs.clone();
-            // let ASTWrapper(t, final_expr) = non_final_exprs.pop().unwrap();
-            // for ASTWrapper(_, expr) in non_final_exprs.iter() {
-            //     trans_expr(
-            //         f,
-            //         expr,
-            //         array_index_tmp,
-            //         registers.clone(),
-            //         symbol_table,
-            //         id_map,
-            //         string_literals,
-            //     )?;
-            //     writeln!(f, "\tLDR {} [{}]", dest_reg, dest_reg)?;
 
-            //     writeln!(f, "\tMOV R0 {}", array_index_tmp)?;
-            //     writeln!(f, "\tMOV R1 {}", dest_reg)?;
-
-            //     writeln!(f, "\tBL p_check_array_bounds")?;
-            //     writeln!(f, "\tADD {}, {}, #4", dest_reg, dest_reg)?;
-            //     writeln!(
-            //         f,
-            //         "\tADD {}, {}, {}, LSL #2",
-            //         dest_reg, dest_reg, array_index_tmp
-            //     )?;
-            // }
-
-            // trans_expr(
-            //     f,
-            //     &final_expr,
-            //     array_index_tmp,
-            //     registers.clone(),
-            //     symbol_table,
-            //     id_map,
-            //     string_literals,
-            // )?;
-            // writeln!(f, "\tLDR {} [{}]", dest_reg, dest_reg)?;
-
-            // writeln!(f, "\tMOV R0 {}", array_index_tmp)?;
-            // writeln!(f, "\tMOV R1 {}", dest_reg)?;
-
-            // writeln!(f, "\tBL p_check_array_bounds")?;
-            // writeln!(f, "\tADD {}, {}, #4", dest_reg, dest_reg)?;
-            // writeln!(f, "\tADD {}, {}, {}", dest_reg, dest_reg, array_index_tmp)?;
-
-            // writeln!(
-            //     f,
-            //     "\tLDR{} {} [{}]",
-            //     get_type_suffix(&t.unwrap()),
-            //     dest_reg,
-            //     dest_reg
-            // )?;
+            arm_stats.push(Stat::MemOp(
+                if get_type_size(expr_type) == 1 {
+                    MemOp::Ldrb
+                } else {
+                    MemOp::Ldr
+                },
+                Cond::Al,
+                false,
+                dest_reg,
+                MemOperand::Zero(dest_reg),
+            ))
         }
         ast::Expr::UnOp(un_op, box ast::ASTWrapper(t, e)) => {
             trans_expr(
                 arm_stats,
                 e,
+                t.as_ref().unwrap(),
                 dest_reg,
                 registers,
-                push_count,
+                stack_offset,
                 symbol_table,
                 id_map,
                 string_literals,
@@ -227,7 +309,7 @@ fn trans_expr(
                         MovOp::Mov,
                         Cond::Al,
                         false,
-                        RET_REG,
+                        ARG_REGS[0],
                         FlexOperand::ShiftReg(dest_reg, None),
                     ));
                     arm_stats.push(Stat::Branch(
@@ -264,7 +346,7 @@ fn trans_expr(
                         MovOp::Mov,
                         Cond::Al,
                         false,
-                        RET_REG,
+                        ARG_REGS[0],
                         FlexOperand::ShiftReg(dest_reg, None),
                     ));
                     arm_stats.push(Stat::Branch(
@@ -307,7 +389,7 @@ fn trans_expr(
                 MemOp::Ldr,
                 Cond::Al,
                 false,
-                RET_REG,
+                ARG_REGS[0],
                 MemOperand::Expression(8),
             ));
             arm_stats.push(Stat::Branch(BranchOp::Bl, Cond::Al, "malloc".to_string()));
@@ -326,9 +408,10 @@ fn trans_expr(
             trans_expr(
                 arm_stats,
                 e1,
+                t1.as_ref().unwrap(),
                 sub_expr_dest,
                 &registers[1..],
-                push_count,
+                stack_offset,
                 symbol_table,
                 id_map,
                 string_literals,
@@ -339,7 +422,7 @@ fn trans_expr(
                 MemOp::Ldr,
                 Cond::Al,
                 false,
-                RET_REG,
+                ARG_REGS[0],
                 MemOperand::Expression(get_type_size(t1.as_ref().unwrap())),
             ));
             arm_stats.push(Stat::Branch(BranchOp::Bl, Cond::Al, "malloc".to_string()));
@@ -368,9 +451,10 @@ fn trans_expr(
             trans_expr(
                 arm_stats,
                 e2,
+                t2.as_ref().unwrap(),
                 sub_expr_dest,
                 registers,
-                push_count,
+                stack_offset,
                 symbol_table,
                 id_map,
                 string_literals,
@@ -381,7 +465,7 @@ fn trans_expr(
                 MemOp::Ldr,
                 Cond::Al,
                 false,
-                RET_REG,
+                ARG_REGS[0],
                 MemOperand::Expression(get_type_size(t2.as_ref().unwrap())),
             ));
             arm_stats.push(Stat::Branch(BranchOp::Bl, Cond::Al, "malloc".to_string()));
@@ -406,13 +490,14 @@ fn trans_expr(
                 MemOperand::PreIndex(dest_reg, FlexOffset::Expr(4.into()), false),
             ));
         }
-        Expr::BinOp(box ast::ASTWrapper(_, e1), bin_op, box ast::ASTWrapper(_, e2)) => {
+        Expr::BinOp(box ast::ASTWrapper(t1, e1), bin_op, box ast::ASTWrapper(t2, e2)) => {
             trans_expr(
                 arm_stats,
                 e1,
+                t1.as_ref().unwrap(),
                 dest_reg,
                 registers,
-                push_count,
+                stack_offset,
                 symbol_table,
                 id_map,
                 string_literals,
@@ -430,21 +515,25 @@ fn trans_expr(
             trans_expr(
                 arm_stats,
                 e2,
+                t2.as_ref().unwrap(),
                 e2_dest,
                 if do_register_fallback {
                     registers
                 } else {
                     &registers[1..]
                 },
-                push_count + (do_register_fallback as i32),
+                stack_offset + (do_register_fallback as i32) * PUSH_SIZE,
                 symbol_table,
                 id_map,
                 string_literals,
             );
 
-            if do_register_fallback {
+            let e1_dest = if do_register_fallback {
                 arm_stats.push(Stat::Pop(Cond::Al, vec![registers[0]]));
-            }
+                registers[0]
+            } else {
+                dest_reg
+            };
 
             match bin_op {
                 ast::BinOp::Add => {
@@ -453,7 +542,7 @@ fn trans_expr(
                         Cond::Al,
                         true,
                         dest_reg,
-                        dest_reg,
+                        e1_dest,
                         FlexOperand::ShiftReg(e2_dest, None),
                     ));
                     arm_stats.push(Stat::Branch(
@@ -468,7 +557,7 @@ fn trans_expr(
                         Cond::Al,
                         true,
                         dest_reg,
-                        dest_reg,
+                        e1_dest,
                         FlexOperand::ShiftReg(e2_dest, None),
                     ));
                     arm_stats.push(Stat::Branch(
@@ -478,26 +567,19 @@ fn trans_expr(
                     ));
                 }
                 ast::BinOp::Mul => {
-                    // writeln!(
-                    //     f,
-                    //     "\tSMULL {}, {}, {}, {}",
-                    //     dest_reg, e2_dest, dest_reg, e2_dest
-                    // )?;
-                    // writeln!(f, "\tCMP {}, {}, ASR #31", e2_dest, dest_reg)?;
-                    // writeln!(f, "\tBLNE p_throw_overflow_error")?;
                     arm_stats.push(Stat::MulOp(
                         MulOp::SMulL,
                         Cond::Al,
                         true,
                         dest_reg,
-                        e2_dest,
-                        dest_reg,
+                        registers[0],
+                        e1_dest,
                         e2_dest,
                     ));
                     arm_stats.push(Stat::Cmp(
                         CmpOp::Cmp,
                         Cond::Al,
-                        e2_dest,
+                        registers[0],
                         FlexOperand::ShiftReg(dest_reg, Some(Shift::Asr(31.into()))),
                     ));
                     arm_stats.push(Stat::Branch(
@@ -512,7 +594,7 @@ fn trans_expr(
                         Cond::Al,
                         false,
                         Register::R0,
-                        FlexOperand::ShiftReg(dest_reg, None),
+                        FlexOperand::ShiftReg(e1_dest, None),
                     ));
                     arm_stats.push(Stat::Move(
                         MovOp::Mov,
@@ -547,7 +629,7 @@ fn trans_expr(
                         Cond::Al,
                         false,
                         Register::R0,
-                        FlexOperand::ShiftReg(dest_reg, None),
+                        FlexOperand::ShiftReg(e1_dest, None),
                     ));
                     arm_stats.push(Stat::Move(
                         MovOp::Mov,
@@ -714,7 +796,7 @@ fn trans_expr(
                         Cond::Al,
                         false,
                         dest_reg,
-                        dest_reg,
+                        e1_dest,
                         FlexOperand::ShiftReg(e2_dest, None),
                     ));
                 }
@@ -724,7 +806,7 @@ fn trans_expr(
                         Cond::Al,
                         false,
                         dest_reg,
-                        dest_reg,
+                        e1_dest,
                         FlexOperand::ShiftReg(e2_dest, None),
                     ));
                 }

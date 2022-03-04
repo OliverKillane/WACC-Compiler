@@ -439,7 +439,7 @@ fn trans_rhs(
             writeln!(f, "\tLDR {}, ={}", tmp_reg, exprs.len())?;
             writeln!(f, "\tSTR {}, [{}]", tmp_reg, dest_reg)?;
         }
-        AssignRhs::Call(_, _) => todo!(),
+        AssignRhs::Call(ASTWrapper(_, fname), args) => for (ASTWrapper(expr_type, expr)) in args {},
         _ => panic!("Illegal rhs found: {:?}", rhs),
     };
     Ok(())

@@ -283,13 +283,13 @@ impl Display for Stat {
                     operand2,
                     operand3
                 ),
-                Stat::MulOp(op, cond, s, hi, lo, operand, operand2) => format!(
+                Stat::MulOp(op, cond, s, lo, hi, operand, operand2) => format!(
                     "\t{}{}{}\t{},\t{},\t{},\t{}",
                     op,
                     cond,
                     conv(s),
-                    hi,
                     lo,
+                    hi,
                     operand,
                     operand2
                 ),

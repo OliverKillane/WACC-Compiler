@@ -223,7 +223,7 @@ pub(super) enum Stat {
 
     /// A multiply operation using 4 register.
     /// ```text
-    /// (Multiply Operation, Condition, Set Condition Bits?, Result Hight, Result Low, Register Operand, Second Register Operand)
+    /// (Multiply Operation, Condition, Set Condition Bits?, Result Low, Result Hight, Register Operand, Second Register Operand)
     /// ```
     MulOp(MulOp, Cond, bool, Register, Register, Register, Register),
 
