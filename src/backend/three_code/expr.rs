@@ -3,7 +3,6 @@ use crate::intermediate::{self as ir, VarRepr};
 use std::{
     collections::HashMap,
     iter::{successors, zip},
-    ops::Deref,
 };
 
 impl From<i32> for OpSrc {
