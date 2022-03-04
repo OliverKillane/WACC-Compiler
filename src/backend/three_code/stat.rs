@@ -334,7 +334,7 @@ pub(super) mod tests {
         graph::Graph,
         intermediate::{self as ir, DataRef, VarRepr},
     };
-    use std::{cell::RefCell, collections::HashMap, rc::Rc};
+    use std::{cell::RefCell, collections::HashMap, ops::Deref, rc::Rc};
 
     fn match_graph_dfs(
         exec_node: StatNode,
@@ -346,7 +346,7 @@ pub(super) mod tests {
             return;
         }
         visited_map.insert(exec_node.clone(), template_node.clone());
-        match (&*exec_node.get(), &*template_node.get()) {
+        match (exec_node.get().deref(), template_node.get().deref()) {
             (StatType::Dummy(_), StatType::Dummy(_)) => {}
             (
                 StatType::Simple(_, exec_stat_code, next_exec_node),
@@ -389,8 +389,8 @@ pub(super) mod tests {
             }
             _ => panic!(
                 "Stat type mismatch: expected {:?}, but got {:?}",
-                &*template_node.get(),
-                &*exec_node.get()
+                template_node.get().deref(),
+                exec_node.get().deref()
             ),
         }
     }
@@ -446,18 +446,19 @@ pub(super) mod tests {
         let mut node = stat_line.start_node().expect("No start node");
         let mut stats = stats.into_iter();
         while node != stat_line.end_node().expect("No end node") {
-            let next_node = if let StatType::Simple(_, node_stat_code, next_node) = &*node.get() {
-                assert_eq!(
-                    *node_stat_code,
-                    stats.next().expect("More statements than expected")
-                );
-                next_node.clone()
-            } else {
-                panic!("Expected a simple statement")
-            };
+            let next_node =
+                if let StatType::Simple(_, node_stat_code, next_node) = node.get().deref() {
+                    assert_eq!(
+                        *node_stat_code,
+                        stats.next().expect("More statements than expected")
+                    );
+                    next_node.clone()
+                } else {
+                    panic!("Expected a simple statement")
+                };
             node = next_node;
         }
-        if let StatType::Final(_, node_stat_code) = &*node.get() {
+        if let StatType::Final(_, node_stat_code) = node.get().deref() {
             assert_eq!(
                 *node_stat_code,
                 stats.next().expect("More statements than expected")

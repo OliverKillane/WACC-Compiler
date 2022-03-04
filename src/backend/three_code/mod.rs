@@ -524,7 +524,7 @@ fn clean_up_block_graph_dfs(
     visited: &mut HashSet<ir::BlockId>,
 ) -> ir::BlockId {
     if visited.contains(&block_id) {
-        return block_id;
+        return mappings[&block_id];
     }
 
     visited.insert(block_id);
