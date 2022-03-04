@@ -302,7 +302,7 @@ pub(super) fn translate_statement(
                 options,
             );
             let string_format =
-                ensure_format(free_data_ref, data_refs, "%.*s\\0", &mut fmt_flags.string);
+                ensure_format(free_data_ref, data_refs, "%.*s\0", &mut fmt_flags.string);
             stat_line.add_stat(StatCode::Assign(
                 free_var + 2,
                 OpSrc::DataRef(string_format, 0),
@@ -334,7 +334,7 @@ pub(super) mod tests {
         graph::Graph,
         intermediate::{self as ir, DataRef, VarRepr},
     };
-    use std::{cell::RefCell, collections::HashMap, rc::Rc};
+    use std::{cell::RefCell, collections::HashMap, ops::Deref, rc::Rc};
 
     fn match_graph_dfs(
         exec_node: StatNode,
@@ -346,7 +346,7 @@ pub(super) mod tests {
             return;
         }
         visited_map.insert(exec_node.clone(), template_node.clone());
-        match (&*exec_node.get(), &*template_node.get()) {
+        match (exec_node.get().deref(), template_node.get().deref()) {
             (StatType::Dummy(_), StatType::Dummy(_)) => {}
             (
                 StatType::Simple(_, exec_stat_code, next_exec_node),
@@ -389,8 +389,8 @@ pub(super) mod tests {
             }
             _ => panic!(
                 "Stat type mismatch: expected {:?}, but got {:?}",
-                &*template_node.get(),
-                &*exec_node.get()
+                template_node.get().deref(),
+                exec_node.get().deref()
             ),
         }
     }
@@ -446,18 +446,19 @@ pub(super) mod tests {
         let mut node = stat_line.start_node().expect("No start node");
         let mut stats = stats.into_iter();
         while node != stat_line.end_node().expect("No end node") {
-            let next_node = if let StatType::Simple(_, node_stat_code, next_node) = &*node.get() {
-                assert_eq!(
-                    *node_stat_code,
-                    stats.next().expect("More statements than expected")
-                );
-                next_node.clone()
-            } else {
-                panic!("Expected a simple statement")
-            };
+            let next_node =
+                if let StatType::Simple(_, node_stat_code, next_node) = node.get().deref() {
+                    assert_eq!(
+                        *node_stat_code,
+                        stats.next().expect("More statements than expected")
+                    );
+                    next_node.clone()
+                } else {
+                    panic!("Expected a simple statement")
+                };
             node = next_node;
         }
-        if let StatType::Final(_, node_stat_code) = &*node.get() {
+        if let StatType::Final(_, node_stat_code) = node.get().deref() {
             assert_eq!(
                 *node_stat_code,
                 stats.next().expect("More statements than expected")
@@ -518,7 +519,7 @@ pub(super) mod tests {
             HashMap::from([(0, ir::Type::Num(ir::NumSize::DWord))]),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%d\\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%d\0".as_bytes().to_vec()))]),
             true,
         )
     }
@@ -538,7 +539,7 @@ pub(super) mod tests {
             HashMap::from([(0, ir::Type::Num(ir::NumSize::Byte))]),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%c\\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%c\0".as_bytes().to_vec()))]),
             true,
         )
     }
@@ -556,7 +557,7 @@ pub(super) mod tests {
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%d\\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%d\0".as_bytes().to_vec()))]),
             false,
         )
     }
@@ -574,7 +575,7 @@ pub(super) mod tests {
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%c\\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%c\0".as_bytes().to_vec()))]),
             false,
         )
     }
@@ -611,7 +612,7 @@ pub(super) mod tests {
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%d\\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%d\0".as_bytes().to_vec()))]),
             false,
         )
     }
@@ -648,8 +649,8 @@ pub(super) mod tests {
         assert_eq!(
             data_refs,
             HashMap::from([
-                (0, DataRefType::String("true\\0".as_bytes().to_vec())),
-                (1, DataRefType::String("false\\0".as_bytes().to_vec()))
+                (0, DataRefType::String("true\0".as_bytes().to_vec())),
+                (1, DataRefType::String("false\0".as_bytes().to_vec()))
             ])
         );
 
@@ -700,7 +701,7 @@ pub(super) mod tests {
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%p\\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%p\0".as_bytes().to_vec()))]),
             false,
         )
     }
@@ -720,7 +721,7 @@ pub(super) mod tests {
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%c\\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%c\0".as_bytes().to_vec()))]),
             false,
         )
     }
@@ -741,7 +742,7 @@ pub(super) mod tests {
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%.*s\\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("%.*s\0".as_bytes().to_vec()))]),
             false,
         )
     }
@@ -760,7 +761,7 @@ pub(super) mod tests {
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("\n\\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String("\n\0".as_bytes().to_vec()))]),
             false,
         )
     }

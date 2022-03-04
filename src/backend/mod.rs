@@ -3,6 +3,7 @@ mod three_code;
 
 use crate::intermediate::Program;
 use arm::ArmResult;
+use std::ops::Deref;
 use three_code::{StatType, ThreeCode};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -36,7 +37,7 @@ pub fn compile(program: Program, options: Options) -> BackendOutput {
     let three_code = ThreeCode::from((program, &options));
     #[cfg(debug_assertions)]
     for stat_type in &three_code.graph {
-        if let StatType::Dummy(_) = &*stat_type.get() {
+        if let StatType::Dummy(_) = stat_type.get().deref() {
             panic!("Expected no dummy nodes in the final three code representation");
         }
     }
