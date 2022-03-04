@@ -1,3 +1,7 @@
+mod arm_repr;
+mod arm_repr_display;
+mod int_constraints;
+
 use crate::frontend::{ast::*, semantic::symbol_table::*};
 use std::fmt::Write;
 use std::string;
@@ -89,7 +93,7 @@ fn trans_expr(
     mut registers: Vec<Register>,
     symbol_table: &VariableSymbolTable,
     id_map: &HashMap<usize, usize>,
-    string_literals: &mut HashMap<String, usize>
+    string_literals: &mut HashMap<String, usize>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match expr {
         Expr::Null => {
@@ -119,37 +123,70 @@ fn trans_expr(
             )?;
         }
         Expr::ArrayElem(id, exprs) => {
-            
             let array_index_tmp = registers.pop().unwrap();
             writeln!(f, "\tADD {}, sp, #{}", array_index_tmp, id_map[id])?;
             let mut non_final_exprs = exprs.clone();
             let ASTWrapper(t, final_expr) = non_final_exprs.pop().unwrap();
             for ASTWrapper(_, expr) in non_final_exprs.iter() {
-                trans_expr(f, expr, array_index_tmp, registers.clone(), symbol_table, id_map, string_literals)?;
+                trans_expr(
+                    f,
+                    expr,
+                    array_index_tmp,
+                    registers.clone(),
+                    symbol_table,
+                    id_map,
+                    string_literals,
+                )?;
                 writeln!(f, "\tLDR {} [{}]", dest_reg, dest_reg)?;
 
                 writeln!(f, "\tMOV R0 {}", array_index_tmp)?;
                 writeln!(f, "\tMOV R1 {}", dest_reg)?;
 
-                writeln!(f, "\tBL p_check_array_bounds")?;  
+                writeln!(f, "\tBL p_check_array_bounds")?;
                 writeln!(f, "\tADD {}, {}, #4", dest_reg, dest_reg)?;
-                writeln!(f, "\tADD {}, {}, {}, LSL #2", dest_reg, dest_reg, array_index_tmp)?;  
+                writeln!(
+                    f,
+                    "\tADD {}, {}, {}, LSL #2",
+                    dest_reg, dest_reg, array_index_tmp
+                )?;
             }
 
-            trans_expr(f, &final_expr, array_index_tmp, registers.clone(), symbol_table, id_map, string_literals)?;
+            trans_expr(
+                f,
+                &final_expr,
+                array_index_tmp,
+                registers.clone(),
+                symbol_table,
+                id_map,
+                string_literals,
+            )?;
             writeln!(f, "\tLDR {} [{}]", dest_reg, dest_reg)?;
 
             writeln!(f, "\tMOV R0 {}", array_index_tmp)?;
             writeln!(f, "\tMOV R1 {}", dest_reg)?;
 
-            writeln!(f, "\tBL p_check_array_bounds")?;  
+            writeln!(f, "\tBL p_check_array_bounds")?;
             writeln!(f, "\tADD {}, {}, #4", dest_reg, dest_reg)?;
-            writeln!(f, "\tADD {}, {}, {}", dest_reg, dest_reg, array_index_tmp)?;  
+            writeln!(f, "\tADD {}, {}, {}", dest_reg, dest_reg, array_index_tmp)?;
 
-            writeln!(f, "\tLDR{} {} [{}]", get_type_suffix(&t.unwrap()), dest_reg, dest_reg)?;
-        },
+            writeln!(
+                f,
+                "\tLDR{} {} [{}]",
+                get_type_suffix(&t.unwrap()),
+                dest_reg,
+                dest_reg
+            )?;
+        }
         Expr::UnOp(un_op, box ASTWrapper(t, e)) => {
-            trans_expr(f, e, dest_reg, registers.clone(), symbol_table, id_map, string_literals)?;
+            trans_expr(
+                f,
+                e,
+                dest_reg,
+                registers.clone(),
+                symbol_table,
+                id_map,
+                string_literals,
+            )?;
 
             match un_op {
                 UnOp::Minus => {
@@ -209,7 +246,7 @@ fn trans_expr(
                 registers.clone(),
                 symbol_table,
                 id_map,
-                string_literals
+                string_literals,
             )?;
 
             // allocate space for e1
@@ -232,7 +269,8 @@ fn trans_expr(
                 sub_expr_dest,
                 registers.clone(),
                 symbol_table,
-                id_map, string_literals
+                id_map,
+                string_literals,
             )?;
 
             // allocate space for e2
@@ -249,11 +287,27 @@ fn trans_expr(
             writeln!(f, "\tSTR R0, [{}, #4]", dest_reg)?;
         }
         Expr::BinOp(box ASTWrapper(_, e1), bin_op, box ASTWrapper(_, e2)) => {
-            trans_expr(f, e1, dest_reg, registers.clone(), symbol_table, id_map, string_literals)?;
+            trans_expr(
+                f,
+                e1,
+                dest_reg,
+                registers.clone(),
+                symbol_table,
+                id_map,
+                string_literals,
+            )?;
 
             let e2_dest = registers.pop().unwrap();
 
-            trans_expr(f, e2, e2_dest, registers.clone(), symbol_table, id_map, string_literals)?;
+            trans_expr(
+                f,
+                e2,
+                e2_dest,
+                registers.clone(),
+                symbol_table,
+                id_map,
+                string_literals,
+            )?;
 
             match bin_op {
                 BinOp::Add => {
@@ -340,14 +394,22 @@ fn trans_rhs(
     mut registers: Vec<Register>,
     symbol_table: &VariableSymbolTable,
     id_map: &HashMap<usize, usize>,
-    string_literals: &mut HashMap<String, usize>
+    string_literals: &mut HashMap<String, usize>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match rhs {
         AssignRhs::Expr(ASTWrapper(_, expr)) => {
-            trans_expr(f, expr, dest_reg, registers, symbol_table, id_map, string_literals)?;
+            trans_expr(
+                f,
+                expr,
+                dest_reg,
+                registers,
+                symbol_table,
+                id_map,
+                string_literals,
+            )?;
         }
         AssignRhs::Array(ASTWrapper(Some(Type::Array(box t, _)), exprs)) => {
-            writeln!(f, "\tLDR R0, ={}", get_type_size(t)*exprs.len() + 4)?;
+            writeln!(f, "\tLDR R0, ={}", get_type_size(t) * exprs.len() + 4)?;
             writeln!(f, "\tBL malloc")?;
             writeln!(f, "\tMOV {}, R0", dest_reg)?;
             dbg!(exprs.len());
@@ -355,13 +417,28 @@ fn trans_rhs(
             let tmp_reg = registers.pop().unwrap();
 
             for (i, ASTWrapper(_, expr)) in exprs.iter().enumerate() {
-                trans_expr(f, expr, tmp_reg, registers.clone(), symbol_table, id_map, string_literals)?;
-                writeln!(f, "\tSTR{} {}, [{}, #{}]", get_type_suffix(t), tmp_reg, dest_reg, get_type_size(t)*i + 4)?;
+                trans_expr(
+                    f,
+                    expr,
+                    tmp_reg,
+                    registers.clone(),
+                    symbol_table,
+                    id_map,
+                    string_literals,
+                )?;
+                writeln!(
+                    f,
+                    "\tSTR{} {}, [{}, #{}]",
+                    get_type_suffix(t),
+                    tmp_reg,
+                    dest_reg,
+                    get_type_size(t) * i + 4
+                )?;
             }
 
             writeln!(f, "\tLDR {}, ={}", tmp_reg, exprs.len())?;
             writeln!(f, "\tSTR {}, [{}]", tmp_reg, dest_reg)?;
-        },
+        }
         AssignRhs::Call(_, _) => todo!(),
         _ => panic!("Illegal rhs found: {:?}", rhs),
     };
@@ -371,7 +448,7 @@ fn trans_rhs(
 fn trans_stats(
     stats: &Vec<StatWrap<Option<Type>, usize>>,
     symbol_table: &VariableSymbolTable,
-    string_literals: &mut HashMap<String, usize>
+    string_literals: &mut HashMap<String, usize>,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let mut f = String::new();
     let registers = vec![
@@ -414,7 +491,15 @@ fn trans_stats(
                 let mut new_regs = registers.clone();
                 let dest_reg = new_regs.pop().unwrap();
 
-                trans_rhs(&mut f, rhs, dest_reg, new_regs, symbol_table, &id_map, string_literals)?;
+                trans_rhs(
+                    &mut f,
+                    rhs,
+                    dest_reg,
+                    new_regs,
+                    symbol_table,
+                    &id_map,
+                    string_literals,
+                )?;
 
                 writeln!(
                     f,
@@ -428,7 +513,15 @@ fn trans_stats(
                 let mut new_regs = registers.clone();
                 let expression_reg = new_regs.pop().unwrap();
 
-                trans_rhs(&mut f, rhs, expression_reg, new_regs.clone(), symbol_table, &id_map, string_literals)?;
+                trans_rhs(
+                    &mut f,
+                    rhs,
+                    expression_reg,
+                    new_regs.clone(),
+                    symbol_table,
+                    &id_map,
+                    string_literals,
+                )?;
 
                 match lhs {
                     AssignLhs::Var(id) => {
@@ -440,13 +533,8 @@ fn trans_stats(
                             id_map[id]
                         )?;
                     }
-                    AssignLhs::ArrayElem(id, types) => {
-
-                    },
-                    AssignLhs::PairFst(ASTWrapper(
-                        Some(Type::Pair(box lt, _)),
-                        Expr::Var(id),
-                    )) => {
+                    AssignLhs::ArrayElem(id, types) => {}
+                    AssignLhs::PairFst(ASTWrapper(Some(Type::Pair(box lt, _)), Expr::Var(id))) => {
                         let pair_reg = new_regs.pop().unwrap();
                         // load the pair ptr into a register.
                         writeln!(f, "\tLDR {}, [sp, #{}]", pair_reg, id_map[id])?;
@@ -459,7 +547,13 @@ fn trans_stats(
                         writeln!(f, "\tLDR {}, [{}]", pair_reg, pair_reg)?;
 
                         // store the expression into the first ptr of pair
-                        writeln!(f, "\tSTR{} {}, [{}]", get_type_suffix(lt), expression_reg, pair_reg)?;
+                        writeln!(
+                            f,
+                            "\tSTR{} {}, [{}]",
+                            get_type_suffix(lt),
+                            expression_reg,
+                            pair_reg
+                        )?;
                     }
                     AssignLhs::PairSnd(ASTWrapper(
                         Some(Type::Pair(box lt, box rt)),
@@ -474,10 +568,22 @@ fn trans_stats(
                         writeln!(f, "\tBL p_check_null_pointer")?;
 
                         // deref the second ptr of pair.
-                        writeln!(f, "\tLDR {}, [{}, #{}]", pair_reg, pair_reg, get_type_size(lt))?;
+                        writeln!(
+                            f,
+                            "\tLDR {}, [{}, #{}]",
+                            pair_reg,
+                            pair_reg,
+                            get_type_size(lt)
+                        )?;
 
                         // store the expression into the second ptr of pair
-                        writeln!(f, "\tSTR{} {}, [{}]", get_type_suffix(rt), expression_reg, pair_reg)?;
+                        writeln!(
+                            f,
+                            "\tSTR{} {}, [{}]",
+                            get_type_suffix(rt),
+                            expression_reg,
+                            pair_reg
+                        )?;
                     }
                     _ => panic!("Illegal rhs found: {:?}", lhs),
                 }
@@ -489,7 +595,15 @@ fn trans_stats(
                 let mut new_regs = registers.clone();
                 let dest_reg = new_regs.pop().unwrap();
 
-                trans_expr(&mut f, expr, dest_reg, new_regs, symbol_table, &id_map, string_literals)?;
+                trans_expr(
+                    &mut f,
+                    expr,
+                    dest_reg,
+                    new_regs,
+                    symbol_table,
+                    &id_map,
+                    string_literals,
+                )?;
 
                 writeln!(f, "\tMOV R0, {}", dest_reg)?;
                 writeln!(f, "\tBL exit")?;
@@ -498,7 +612,15 @@ fn trans_stats(
                 let mut new_regs = registers.clone();
                 let dest_reg = new_regs.pop().unwrap();
 
-                trans_expr(&mut f, expr, dest_reg, new_regs, symbol_table, &id_map, string_literals)?;
+                trans_expr(
+                    &mut f,
+                    expr,
+                    dest_reg,
+                    new_regs,
+                    symbol_table,
+                    &id_map,
+                    string_literals,
+                )?;
 
                 writeln!(f, "\tMOV R0, {}", dest_reg)?;
                 writeln!(
@@ -520,7 +642,15 @@ fn trans_stats(
                 let mut new_regs = registers.clone();
                 let dest_reg = new_regs.pop().unwrap();
 
-                trans_expr(&mut f, expr, dest_reg, new_regs, symbol_table, &id_map, string_literals)?;
+                trans_expr(
+                    &mut f,
+                    expr,
+                    dest_reg,
+                    new_regs,
+                    symbol_table,
+                    &id_map,
+                    string_literals,
+                )?;
 
                 writeln!(f, "\tMOV R0, {}", dest_reg)?;
                 writeln!(
@@ -551,7 +681,6 @@ fn trans_stats(
 
 impl<'a> Display for AnalProgram<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-
         let mut string_literals = HashMap::<String, usize>::new();
 
         writeln!(f, ".text")?;
@@ -583,7 +712,7 @@ mod tests {
     #[test]
     fn test_skip() {
         let ast = parse(include_str!(
-            "../../frontend/tests/valid/array/arraySimple.wacc"
+            "../frontend/tests/valid/array/arraySimple.wacc"
         ))
         // let ast = parse("begin
         // bool[] a = [true, false]

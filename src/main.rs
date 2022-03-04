@@ -45,6 +45,7 @@
 extern crate lazy_static;
 
 mod backend;
+mod backup_backend;
 mod frontend;
 mod graph;
 mod intermediate;
