@@ -1,21 +1,9 @@
 use super::arm_repr::*;
-use super::trans_expr::{
-    is_flex_imm, trans_expr, translate_variable_get, ARG_REGS, PUSH_SIZE, RET_REG,
-};
+use super::trans_expr::{get_type_size, get_variable_operand, trans_expr, ARG_REGS, RET_REG};
 use crate::ast;
 use crate::ast::{ASTWrapper, AssignLhs, AssignRhs, Expr, StatWrap, Type};
 use crate::frontend::semantic::symbol_table::VariableSymbolTable;
 use std::collections::HashMap;
-
-fn get_type_size(t: &Type) -> i32 {
-    match t {
-        Type::Bool | Type::Char => 1,
-        Type::Int | Type::String | Type::Pair(_, _) | Type::Array(_, _) => 4,
-        Type::Any | Type::Generic(_) => {
-            panic!("Any type should never show up after semantic analysis")
-        }
-    }
-}
 
 fn trans_rhs(
     arm_stats: &mut Vec<Stat>,
@@ -41,7 +29,6 @@ fn trans_rhs(
             );
         }
         AssignRhs::Array(ASTWrapper(Some(Type::Array(box t, _)), exprs)) => {
-            // writeln!(f, "\tLDR R0, ={}", get_type_size(t) * exprs.len() + 4)?;
             arm_stats.push(Stat::MemOp(
                 MemOp::Ldr,
                 Cond::Al,
@@ -49,9 +36,7 @@ fn trans_rhs(
                 Register::R0,
                 MemOperand::Expression(get_type_size(t) * (exprs.len() as i32) + 4),
             ));
-            // writeln!(f, "\tBL malloc")?;
             arm_stats.push(Stat::Branch(BranchOp::Bl, Cond::Al, "malloc".to_string()));
-            // writeln!(f, "\tMOV {}, R0", dest_reg)?;
             arm_stats.push(Stat::Move(
                 MovOp::Mov,
                 Cond::Al,
@@ -60,61 +45,101 @@ fn trans_rhs(
                 FlexOperand::ShiftReg(Register::R0, None),
             ));
 
-            let tmp_reg = registers.get(0).unwrap();
-
-            for (i, ASTWrapper(Some(expr_type), expr)) in exprs.iter().enumerate() {
+            let expr_reg = REGISTERS[0];
+            for (expr_idx, ASTWrapper(expr_type, expr)) in exprs.iter().enumerate() {
+                assert_eq!(Some(t), expr_type.as_ref());
                 trans_expr(
                     arm_stats,
                     expr,
-                    expr_type,
-                    *tmp_reg,
-                    registers,
+                    t,
+                    expr_reg,
+                    &REGISTERS[1..],
                     0,
                     symbol_table,
                     id_map,
                     string_literals,
                 );
-                // take a look at this, probs wrong
                 arm_stats.push(Stat::MemOp(
-                    if get_type_size(expr_type) == 1 {
+                    if get_type_size(t) == 1 {
                         MemOp::Strb
                     } else {
                         MemOp::Str
                     },
                     Cond::Al,
                     false,
-                    *tmp_reg,
-                    MemOperand::Expression(get_type_size(expr_type) * (i as i32) + 4),
+                    expr_reg,
+                    MemOperand::PreIndex(
+                        dest_reg,
+                        FlexOffset::Expr((get_type_size(t) * (expr_idx as i32) + 4).into()),
+                        false,
+                    ),
                 ));
-                // writeln!(
-                //     f,
-                //     "\tSTR{} {}, [{}, #{}]",
-                //     get_type_suffix(t),
-                //     tmp_reg,
-                //     dest_reg,
-                //     get_type_size(t) * i + 4
-                // )?;
             }
-
-            // writeln!(f, "\tLDR {}, ={}", tmp_reg, exprs.len())?;
             arm_stats.push(Stat::MemOp(
                 MemOp::Ldr,
                 Cond::Al,
                 false,
-                *tmp_reg,
+                expr_reg,
                 MemOperand::Expression(exprs.len() as i32),
             ));
-
-            // writeln!(f, "\tSTR {}, [{}]", tmp_reg, dest_reg)?;
             arm_stats.push(Stat::MemOp(
                 MemOp::Str,
                 Cond::Al,
                 false,
-                *tmp_reg,
-                MemOperand::Zero(dest_reg),
+                expr_reg,
+                MemOperand::Zero(expr_reg),
             ));
         }
-        AssignRhs::Call(_, _) => todo!(),
+        AssignRhs::Call(ASTWrapper(_, fname), args) => {
+            let mut stack_offset = 0;
+            let expr_reg = REGISTERS[0];
+            for ASTWrapper(expr_type, expr) in args.iter().rev() {
+                let expr_width = get_type_size(expr_type.as_ref().unwrap());
+                trans_expr(
+                    arm_stats,
+                    expr,
+                    expr_type.as_ref().unwrap(),
+                    expr_reg,
+                    &REGISTERS[1..],
+                    stack_offset,
+                    symbol_table,
+                    id_map,
+                    string_literals,
+                );
+                arm_stats.push(Stat::MemOp(
+                    if expr_width == 1 {
+                        MemOp::Strb
+                    } else {
+                        MemOp::Str
+                    },
+                    Cond::Al,
+                    false,
+                    expr_reg,
+                    MemOperand::PreIndex(
+                        Register::Sp,
+                        FlexOffset::Expr((-expr_width).into()),
+                        true,
+                    ),
+                ));
+                stack_offset += expr_width;
+            }
+            arm_stats.push(Stat::Branch(BranchOp::Bl, Cond::Al, fname.clone()));
+            arm_stats.push(Stat::ApplyOp(
+                RegOp::Add,
+                Cond::Al,
+                false,
+                Register::Sp,
+                Register::Sp,
+                FlexOperand::Imm(stack_offset as u32),
+            ));
+            arm_stats.push(Stat::Move(
+                MovOp::Mov,
+                Cond::Al,
+                false,
+                dest_reg,
+                FlexOperand::ShiftReg(RET_REG, None),
+            ));
+        }
         _ => panic!("Illegal rhs found: {:?}", rhs),
     };
 }
@@ -135,35 +160,15 @@ fn trans_lhs(
             } else {
                 panic!("Variable indexed should be an array")
             };
-            let id_offset = id_map[id];
-            if is_flex_imm(id_offset) {
-                arm_stats.push(Stat::ApplyOp(
-                    RegOp::Add,
-                    Cond::Al,
-                    false,
-                    dest_reg,
-                    Register::Sp,
-                    FlexOperand::Imm(id_offset as u32),
-                ));
-            } else {
-                arm_stats.push(Stat::MemOp(
-                    MemOp::Ldr,
-                    Cond::Al,
-                    false,
-                    dest_reg,
-                    MemOperand::Expression(id_offset),
-                ));
-                arm_stats.push(Stat::ApplyOp(
-                    RegOp::Add,
-                    Cond::Al,
-                    false,
-                    dest_reg,
-                    Register::Sp,
-                    FlexOperand::ShiftReg(dest_reg, None),
-                ));
-            }
+            arm_stats.push(Stat::ApplyOp(
+                RegOp::Add,
+                Cond::Al,
+                false,
+                dest_reg,
+                Register::Sp,
+                FlexOperand::Imm(id_map[id] as u32),
+            ));
 
-            let mut non_final_exprs = &exprs[..exprs.len() - 1];
             for (expr_idx, ast::ASTWrapper(t, expr)) in exprs.iter().enumerate() {
                 let is_last_expr = expr_idx == exprs.len() - 1;
 
@@ -324,15 +329,15 @@ const REGISTERS: [Register; 9] = [
     Register::R12,
 ];
 
-fn trans_stats(
+pub(super) fn trans_stats(
     arm_stats: &mut Vec<Stat>,
     stats: &Vec<StatWrap<Option<Type>, usize>>,
-    symbol_table: &VariableSymbolTable,
+    VariableSymbolTable(symbol_table): &VariableSymbolTable,
     string_literals: &mut HashMap<String, usize>,
+    label_counter: &mut usize,
 ) {
     let mut used_stack_space = 0;
     let mut id_space: Vec<(_, _)> = symbol_table
-        .0
         .clone()
         .into_iter()
         .map(|(id, typ)| (id, get_type_size(&typ)))
@@ -357,7 +362,16 @@ fn trans_stats(
         FlexOperand::Imm(used_stack_space as u32),
     ));
 
-    for ASTWrapper(_, stat) in stats {}
+    for ASTWrapper(_, stat) in stats {
+        trans_stat(
+            arm_stats,
+            stat,
+            &symbol_table.0,
+            &id_map,
+            string_literals,
+            label_counter,
+        );
+    }
 
     arm_stats.push(Stat::ApplyOp(
         RegOp::Sub,
@@ -392,11 +406,15 @@ fn trans_stat(
             );
 
             arm_stats.push(Stat::MemOp(
-                MemOp::Strb,
+                if get_type_size(&symbol_table[id]) == 1 {
+                    MemOp::Strb
+                } else {
+                    MemOp::Str
+                },
                 Cond::Al,
                 false,
                 dest_reg,
-                MemOperand::PreIndex(Register::Sp, FlexOffset::Expr(id_map[&id].into()), false),
+                get_variable_operand(id_map[&id]),
             ));
         }
         ast::Stat::Assign(lhs, rhs) => {
@@ -422,25 +440,7 @@ fn trans_stat(
             ) {
                 MemOp::Str
             } else {
-                MemOp::Strb };for ASTWrapper(_, s) in body_stats {
-                    trans_stat(
-                        arm_stats,
-                        s,
-                        symbol_table,
-                        id_map,
-                        string_literals,
-                        label_counter,
-                    );
-                } for ASTWrapper(_, s) in body_stats {
-                trans_stat(
-                    arm_stats,
-                    s,
-                    symbol_table,
-                    id_map,
-                    string_literals,
-                    label_counter,
-                );
-            }
+                MemOp::Strb
             };
             arm_stats.push(Stat::MemOp(
                 str_instr,
@@ -451,12 +451,87 @@ fn trans_stat(
             ));
         }
         ast::Stat::Read(AssignLhs::Var(id)) => {
-            todo!()
+            arm_stats.push(Stat::ApplyOp(
+                RegOp::Add,
+                Cond::Al,
+                false,
+                REGISTERS[0],
+                Register::Sp,
+                FlexOperand::Imm(id_map[id] as u32),
+            ));
+            arm_stats.push(Stat::Move(
+                MovOp::Mov,
+                Cond::Al,
+                false,
+                ARG_REGS[0],
+                FlexOperand::ShiftReg(REGISTERS[0], None),
+            )); // For the sake of comparison with the reference compiler
+            arm_stats.push(Stat::Branch(BranchOp::Bl, Cond::Al, "p_read_int".into()));
         }
-        ast::Stat::Free(_) => todo!(),
-        ast::Stat::Return(ASTWrapper(Some(t),  expr)) => {
-            
-        },
+        ast::Stat::Read(lhs) => {
+            trans_lhs(
+                arm_stats,
+                lhs,
+                REGISTERS[0],
+                &REGISTERS[1..],
+                symbol_table,
+                id_map,
+                string_literals,
+            );
+            arm_stats.push(Stat::Move(
+                MovOp::Mov,
+                Cond::Al,
+                false,
+                REGISTERS[0],
+                FlexOperand::ShiftReg(REGISTERS[0], None),
+            )); // For the sake of comparison with the reference compiler
+            arm_stats.push(Stat::Move(
+                MovOp::Mov,
+                Cond::Al,
+                false,
+                ARG_REGS[0],
+                FlexOperand::ShiftReg(REGISTERS[0], None),
+            )); // For the sake of comparison with the reference compiler
+            arm_stats.push(Stat::Branch(BranchOp::Bl, Cond::Al, "p_read_int".into()));
+        }
+        ast::Stat::Free(ASTWrapper(Some(t), expr)) => {
+            trans_expr(
+                arm_stats,
+                &expr,
+                &ast::Type::Int,
+                Register::R0,
+                &REGISTERS[..],
+                0,
+                symbol_table,
+                id_map,
+                string_literals,
+            );
+            arm_stats.push(Stat::Branch(
+                BranchOp::Bl,
+                Cond::Al,
+                format!(
+                    "p_free_{}",
+                    match t {
+                        Type::Pair(_, _) => "pair",
+                        Type::Array(_, _) => "array",
+                        _ => panic!("Cannot free type {}", t),
+                    }
+                ),
+            ));
+        }
+        ast::Stat::Return(ASTWrapper(Some(t), expr)) => {
+            trans_expr(
+                arm_stats,
+                &expr,
+                t,
+                Register::R0,
+                &REGISTERS,
+                0,
+                symbol_table,
+                id_map,
+                string_literals,
+            );
+        }
         ast::Stat::Exit(ASTWrapper(_, expr)) => {
             let dest_reg = REGISTERS[0];
 
@@ -516,7 +591,7 @@ fn trans_stat(
                         Type::String => "string",
                         Type::Pair(_, _) => "reference",
                         Type::Array(_, _) => "reference",
-                        t =>
+                        _ =>
                             panic!("Only allowd prints are int, bool, char, string, or reference!"),
                     }
                 ),
@@ -556,7 +631,7 @@ fn trans_stat(
                         Type::String => "string",
                         Type::Pair(_, _) => "reference",
                         Type::Array(_, _) => "reference",
-                        t =>
+                        _ =>
                             panic!("Only allowd prints are int, bool, char, string, or reference!"),
                     }
                 ),
@@ -673,7 +748,6 @@ fn trans_stat(
             arm_stats.push(Stat::Label(format!("L{}", compare_label)));
 
             // Compare expression
-
             let dest_reg = REGISTERS[0];
 
             trans_expr(

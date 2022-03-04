@@ -3,7 +3,8 @@ use crate::ast;
 use crate::ast::{Expr, Type};
 use std::collections::HashMap;
 
-fn get_type_size(t: &Type) -> i32 {
+/// Returns the the size in bytes of the given AST Type
+pub(super) fn get_type_size(t: &Type) -> i32 {
     match t {
         Type::Bool | Type::Char => 1,
         Type::Int | Type::String | Type::Pair(_, _) | Type::Array(_, _) => 4,
@@ -13,59 +14,21 @@ fn get_type_size(t: &Type) -> i32 {
     }
 }
 
-pub(super) fn translate_variable_get(
-    arm_stats: &mut Vec<Stat>,
-    id: &usize,
-    dest_reg: Register,
-    symbol_table: &HashMap<usize, ast::Type>,
-    id_map: &HashMap<usize, i32>,
-    push_count: i32,
-) {
-    let ldr_instr = if get_type_size(&symbol_table[id]) == 1 {
-        MemOp::Ldrb
+/// Returns the appropriate operand for an offseted variable
+pub(super) fn get_variable_operand(offset: i32) -> MemOperand {
+    if offset == 0 {
+        MemOperand::Zero(Register::Sp)
     } else {
-        MemOp::Ldr
-    };
-    let id_offset = id_map[id] + push_count * PUSH_SIZE;
-    if let 4095..=4095 = id_offset {
-        arm_stats.push(Stat::MemOp(
-            ldr_instr,
-            Cond::Al,
-            false,
-            dest_reg,
-            MemOperand::PreIndex(Register::Sp, FlexOffset::Expr(id_offset.into()), false),
-        ));
-    } else {
-        arm_stats.push(Stat::MemOp(
-            MemOp::Ldr,
-            Cond::Al,
-            false,
-            dest_reg,
-            MemOperand::Expression(id_offset),
-        ));
-        arm_stats.push(Stat::MemOp(
-            ldr_instr,
-            Cond::Al,
-            false,
-            dest_reg,
-            MemOperand::PreIndex(
-                Register::Sp,
-                FlexOffset::ShiftReg(false, dest_reg, None),
-                false,
-            ),
-        ));
+        MemOperand::PreIndex(Register::Sp, FlexOffset::Expr(offset.into()), false)
     }
-}
-
-pub(super) fn is_flex_imm(val: i32) -> bool {
-    let val = val as u32;
-    (val >> val.trailing_zeros()) <= 0xFF
 }
 
 pub(super) const ARG_REGS: [Register; 4] = [Register::R0, Register::R1, Register::R2, Register::R3];
 pub(super) const RET_REG: Register = Register::R0;
 pub(super) const PUSH_SIZE: i32 = 4;
 
+/// Translates AST expressions to the corresponding IR ARM expressions
+/// and pushes the ARM expressions to the provided Vector of Statements
 pub(super) fn trans_expr(
     arm_stats: &mut Vec<Stat>,
     expr: &Expr<Option<Type>, usize>,
@@ -78,6 +41,8 @@ pub(super) fn trans_expr(
     string_literals: &mut HashMap<String, usize>,
 ) {
     match expr {
+        /// Null translation
+        /// Loads 0 into the destination register
         Expr::Null => {
             arm_stats.push(Stat::MemOp(
                 MemOp::Ldr,
@@ -87,6 +52,8 @@ pub(super) fn trans_expr(
                 MemOperand::Expression(0),
             ));
         }
+        /// Int translation
+        /// Loads the value of the given integer into the destination register
         Expr::Int(i) => {
             arm_stats.push(Stat::MemOp(
                 MemOp::Ldr,
@@ -96,6 +63,9 @@ pub(super) fn trans_expr(
                 MemOperand::Expression(*i),
             ));
         }
+        /// Bool translation
+        /// Loads the corresponding integer value of the given boolean into the destination register
+        ///
         Expr::Bool(b) => {
             arm_stats.push(Stat::MemOp(
                 MemOp::Ldr,
@@ -105,6 +75,7 @@ pub(super) fn trans_expr(
                 MemOperand::Expression(if *b { 1 } else { 0 }),
             ));
         }
+        /// Char translation
         Expr::Char(c) => {
             arm_stats.push(Stat::Move(
                 MovOp::Mov,
@@ -114,6 +85,7 @@ pub(super) fn trans_expr(
                 FlexOperand::Char((*c as u8 as i32).into()),
             ));
         }
+        /// String translation
         Expr::String(s) => {
             let str_id = string_literals.len();
             let str_id = string_literals.entry(s.clone()).or_insert(str_id);
@@ -125,37 +97,32 @@ pub(super) fn trans_expr(
                 MemOperand::Label(format!("msg_{}", str_id)),
             ));
         }
+        /// Variable translation
+        /// Decic
         Expr::Var(id) => {
-            translate_variable_get(arm_stats, id, dest_reg, symbol_table, id_map, stack_offset);
+            let ldr_instr = if get_type_size(&symbol_table[id]) == 1 {
+                MemOp::Ldrb
+            } else {
+                MemOp::Ldr
+            };
+            arm_stats.push(Stat::MemOp(
+                ldr_instr,
+                Cond::Al,
+                false,
+                dest_reg,
+                get_variable_operand(&id_map[id] + stack_offset),
+            ));
         }
         Expr::ArrayElem(id, exprs) => {
             let id_offset = id_map[id] + stack_offset;
-            if is_flex_imm(id_offset) {
-                arm_stats.push(Stat::ApplyOp(
-                    RegOp::Add,
-                    Cond::Al,
-                    false,
-                    dest_reg,
-                    Register::Sp,
-                    FlexOperand::Imm(id_offset as u32),
-                ));
-            } else {
-                arm_stats.push(Stat::MemOp(
-                    MemOp::Ldr,
-                    Cond::Al,
-                    false,
-                    dest_reg,
-                    MemOperand::Expression(id_offset),
-                ));
-                arm_stats.push(Stat::ApplyOp(
-                    RegOp::Add,
-                    Cond::Al,
-                    false,
-                    dest_reg,
-                    Register::Sp,
-                    FlexOperand::ShiftReg(dest_reg, None),
-                ));
-            }
+            arm_stats.push(Stat::ApplyOp(
+                RegOp::Add,
+                Cond::Al,
+                false,
+                dest_reg,
+                Register::Sp,
+                FlexOperand::Imm(id_offset as u32),
+            ));
 
             for (expr_idx, ast::ASTWrapper(t, expr)) in exprs.iter().enumerate() {
                 let do_register_fallback = registers.len() == 1;
