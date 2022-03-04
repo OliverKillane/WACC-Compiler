@@ -802,7 +802,7 @@ impl AllocationState {
 
     // Create clean up and return
     pub fn subroutine_return(
-        mut self,
+        &mut self,
         ret: &Option<Temporary>,
         graph: &mut Graph<ControlFlow>,
     ) -> ArmNode {

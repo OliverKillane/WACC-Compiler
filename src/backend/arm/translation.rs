@@ -12,7 +12,7 @@ use super::{
         BinOp, DataRefType, Function, OpSrc, Size, StatCode, StatNode, StatType, ThreeCode,
     },
     arm_graph_utils::{
-        is_shifted_8_bit, link_chains, link_stats, link_two_chains, simple_node, Chain,
+        is_shifted_8_bit, link_chains, link_stats, link_two_chains, simple_node, Chain, link_two_nodes,
     },
     arm_repr::{
         ArmCode, ArmNode, CmpOp, Cond, ControlFlow, Data, DataIdent, DataType, FlexOffset,
@@ -101,6 +101,20 @@ pub(super) fn translate_threecode(
     }
 }
 
+fn ascii_to_string(ascii: Vec<u8>) -> String {
+    const NEWLINE: u8 = 10;
+    const NULL: u8 = 0;
+    let mut chars = Vec::new();
+    for char in ascii {
+        match char {
+            NEWLINE => {println!("newline"); chars.push('\\'); chars.push('n');},
+            NULL => {chars.push('\\'); chars.push('0');},
+            n => chars.push(n as char)
+        }
+    }
+    chars.into_iter().collect::<String>()
+}
+
 /// Translate the data section from the threecode to the arm representation.
 fn translate_data(data_refs: HashMap<DataRef, DataRefType>) -> Vec<Data> {
     data_refs
@@ -134,7 +148,7 @@ fn translate_data(data_refs: HashMap<DataRef, DataRefType>) -> Vec<Data> {
                                     (datas, chars)
                                 } else {
                                     datas.push(DataType::Ascii(
-                                        String::from_utf8(chars).expect("Always valid ascii"),
+                                        ascii_to_string(chars),
                                     ));
                                     (datas, vec![])
                                 }
@@ -144,7 +158,7 @@ fn translate_data(data_refs: HashMap<DataRef, DataRefType>) -> Vec<Data> {
                     // place any string on the end of the data section into datas
                     if !string.is_empty() {
                         datas.push(DataType::Ascii(
-                            String::from_utf8(string).expect("Always valid ascii"),
+                            ascii_to_string(string),
                         ))
                     }
 
@@ -154,6 +168,7 @@ fn translate_data(data_refs: HashMap<DataRef, DataRefType>) -> Vec<Data> {
         })
         .collect::<Vec<_>>()
 }
+
 
 fn require_label(
     node: StatNode,
@@ -172,6 +187,8 @@ fn require_label(
                 // If more predecessors, create a label, place in the
                 // map to found and used.
                 let label = graph.new_node(ControlFlow::Multi(vec![], None));
+
+                println!("Created multi: {}", label.print_arm_node());
                 translate_map.insert(node.clone(), label.clone());
                 Some(label)
             } else {
@@ -210,7 +227,7 @@ fn translate_node_inner(
                 translate_map,
                 graph,
             );
-            let Chain(mut start, end) = simple_node(
+            let Chain(start, end) = simple_node(
                 Stat::Cmp(
                     CmpOp::Cmp,
                     Cond::Al,
@@ -223,11 +240,12 @@ fn translate_node_inner(
                 None,
                 true_branch.clone(),
                 Cond::Eq,
-                Some(start.clone()),
+                None,
             ));
+
+            link_two_nodes(end, branch.clone());
             true_branch.set_predecessor(branch.clone());
-            start.set_predecessor(branch.clone());
-            (branch, Some((end, false_branch.clone())))
+            (start, Some((branch, false_branch.clone())))
         }
         StatType::Loop(_) => {
             // Create a label, create an unconditional branch to the label, there is no end to chain to.
@@ -264,12 +282,11 @@ fn translate_node(
             let label = require_label(node.clone(), translate_map, graph, false);
 
             // translate the statement to get the start, and (potentially) and end.
-            let (mut start, next) =
+            let (start, next) =
                 translate_node_inner(node, int_handler, temp_map, translate_map, graph);
 
-            if let Some(mut label_node) = label {
-                label_node.set_successor(start.clone());
-                start.set_predecessor(label_node.clone());
+            if let Some(label_node) = label {
+                link_two_nodes(label_node.clone(), start);
                 (label_node, next)
             } else {
                 (start, next)
@@ -288,6 +305,8 @@ fn translate_from_node(
 ) -> ArmNode {
     // Translate the first node, the continue translating until there are no nodes to go to.
     let (first, next) = translate_node(node, int_handler, temp_map, translate_map, graph);
+
+
 
     if let Some((mut prev, mut next_stat_node)) = next {
         loop {

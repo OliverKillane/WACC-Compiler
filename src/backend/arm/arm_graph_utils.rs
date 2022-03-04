@@ -1,6 +1,8 @@
 //! Utility functions to allow easy manipoulation of the arm graph for
 //! translation and final register allocation.
 
+use lazy_static::__Deref;
+
 use super::arm_repr::{ArmNode, ControlFlow, Stat};
 use crate::graph::Graph;
 use std::ops::DerefMut;
@@ -15,12 +17,19 @@ pub struct Chain(pub ArmNode, pub ArmNode);
 /// 3. start <-> end
 /// ```
 pub fn link_two_chains(
-    Chain(start, mut leftmiddle): Chain,
-    Chain(mut rightmiddle, end): Chain,
+    Chain(start, leftmiddle): Chain,
+    Chain(rightmiddle, end): Chain,
 ) -> Chain {
-    leftmiddle.set_successor(rightmiddle.clone());
-    rightmiddle.set_predecessor(leftmiddle);
+    link_two_nodes(leftmiddle, rightmiddle);
     Chain(start, end)
+}
+
+pub fn link_opt_to_chain(opt: Option<Chain>, chain: Chain) -> Chain {
+    if let Some(other_c) = opt {
+        link_two_chains(other_c, chain)
+    } else {
+        chain
+    }
 }
 
 /// Given a vector of optional chains, link the present chains in order.
@@ -61,6 +70,12 @@ pub fn link_stats(stats: Vec<Stat>, graph: &mut Graph<ControlFlow>) -> Chain {
 pub fn simple_node(stat: Stat, graph: &mut Graph<ControlFlow>) -> Chain {
     let node = graph.new_node(ControlFlow::Simple(None, stat, None));
     Chain(node.clone(), node)
+}
+
+/// Link two nodes together
+pub fn link_two_nodes(mut start: ArmNode, mut end: ArmNode) {
+    start.set_successor(end.clone());
+    end.set_predecessor(start);
 }
 
 /// Determines if an integer is a left logical shifted 8 bit pattern.
@@ -141,9 +156,20 @@ impl ArmNode {
                         return;
                     }
                 }
-                panic!("Attempted replace a predecessor that was not there")
+                // panic!("Attempted replace a predecessor that was not there")
             }
             ControlFlow::Removed => panic!("Cannot replace a predecessor to a removed node."),
+        }
+    }
+
+    pub fn print_arm_node(&self) -> &str {
+        match self.get().deref() {
+            ControlFlow::Simple(_, _, _) => "Simple",
+            ControlFlow::Branch(_, _, _, _) => "Branch",
+            ControlFlow::Ltorg(_) => "Ltorg",
+            ControlFlow::Return(_, _) => "Return",
+            ControlFlow::Multi(_, _) => "Multi",
+            ControlFlow::Removed => "Removed",
         }
     }
 }

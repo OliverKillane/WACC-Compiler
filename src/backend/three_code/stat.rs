@@ -314,7 +314,7 @@ pub(super) fn translate_statement(
             add_flush(free_var, stat_line);
         }
         ir::Stat::PrintEol() => {
-            let eol_format = ensure_format(free_data_ref, data_refs, "\n", &mut fmt_flags.eol);
+            let eol_format = ensure_format(free_data_ref, data_refs, "\\n", &mut fmt_flags.eol);
             stat_line.add_stat(StatCode::Assign(free_var, OpSrc::DataRef(eol_format, 0)));
             stat_line.add_stat(StatCode::VoidCall("printf".to_string(), vec![free_var]));
             add_flush(free_var, stat_line);
