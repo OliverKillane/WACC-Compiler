@@ -587,8 +587,10 @@ impl<'l> SummaryCell<'l> {
     }
 
     /// Formats a single error cell.
-    fn fmt(&self, filepath: Option<&str>, input: &str) -> String {
-        let input_locator = SpanLocator::new(input);
+    fn fmt(&self, multi_input_locator: &MultiInputLocator<'l>) -> String {
+        let input_locator = multi_input_locator
+            .get_locator(self.span)
+            .expect("Span not in any input file");
         let mut components = self.components.iter().collect::<Vec<_>>();
 
         // sort components by their location
@@ -687,7 +689,7 @@ impl<'l> Summary<'l> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::{Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType};
 
     use colored::control::SHOULD_COLORIZE;
