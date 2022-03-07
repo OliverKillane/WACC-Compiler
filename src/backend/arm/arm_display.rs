@@ -4,7 +4,7 @@
 use lazy_static::__Deref;
 
 use super::arm_repr::*;
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::{Display, write}};
 
 impl Display for Ident {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -435,16 +435,23 @@ fn display_data_ref(ident: DataIdent) -> String {
 
 impl Display for DataType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "\t{}",
-            match self {
-                DataType::Ascii(s) => format!(".ascii \"{}\"", s),
-                DataType::Word(w) => format!(".word {}", w),
-                DataType::HalfWord(h) => format!(".hword {}", h),
-                DataType::Byte(b) => format!(".byte {}", b),
-            }
-        )
+        write!(f, "\t")?;
+        match self {
+            DataType::Ascii(s) => {
+                write!(f, ".ascii \"")?;
+                for char in s.chars() {
+                    match char {
+                        '\0' => write!(f, "\\0")?,
+                        '\n' => write!(f, "\\n")?,
+                        c => write!(f, "{}", c)?,
+                    }
+                }
+                writeln!(f, "\"")
+            },
+            DataType::Word(w) => writeln!(f, ".word {}", w),
+            DataType::HalfWord(h) => writeln!(f, ".hword {}", h),
+            DataType::Byte(b) => writeln!(f, ".byte {}", b),
+        }
     }
 }
 
