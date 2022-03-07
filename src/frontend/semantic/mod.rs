@@ -79,7 +79,6 @@ use super::{
 #[allow(clippy::type_complexity)]
 pub fn analyse_semantics<'a>(
     Program(fn_defs, main_block): Program<&'a str, &'a str>,
-    source_code: &'a str,
 ) -> Result<
     (
         Program<Option<Type>, usize>,

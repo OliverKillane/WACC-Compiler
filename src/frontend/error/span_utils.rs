@@ -1,7 +1,7 @@
 //! Contains utility functions for determining the placement of spans within
 //! the original source code string.
 
-use std::{cmp::min, collections::HashMap};
+use std::{cmp::min, collections::HashMap, iter::zip};
 
 use super::InputFile;
 
@@ -145,6 +145,17 @@ impl<'l> MultiInputLocator<'l> {
             .collect();
         locators.sort_by_key(|(input_start, _, _)| *input_start);
 
+        #[cfg(debug_assertions)]
+        if locators.len() > 0 {
+            for ((input_start, _, locator), (next_input_start, _, _)) in
+                zip(&locators, &locators[1..])
+            {
+                if *input_start + locator.input.len() > *next_input_start {
+                    panic!("Overlapping input files")
+                }
+            }
+        }
+
         Self { locators }
     }
 
@@ -157,7 +168,8 @@ impl<'l> MultiInputLocator<'l> {
             .binary_search_by_key(&(span.as_ptr() as usize), |(input_start, _, _)| {
                 *input_start
             })
-            .unwrap_or_else(|idx| idx - 1);
+            .map(|idx| Some(idx))
+            .unwrap_or_else(|idx| if idx > 0 { Some(idx - 1) } else { None })?;
         let (_, filename, locator) = self.locators.get(locator_idx)?;
         locator
             .get_optional_range(span)
@@ -251,12 +263,30 @@ mod tests {
     }
 
     #[test]
-    fn multi_locator_get_filepath() {
-        let s = ["a", "b", "c", "d", "e"];
+    fn multi_locator_get_filepath_test() {
+        let input = "abcde other";
+        let s = [
+            &input[..1],
+            &input[1..2],
+            &input[2..3],
+            &input[3..4],
+            &input[4..5],
+        ];
         let input_files = s.map(|s| InputFile::new(s, s.to_string()));
         let multi_locator = MultiInputLocator::new(&input_files);
         for input in s {
             assert_eq!(multi_locator.get_optional_filepath(input), Some(input));
         }
+        assert_eq!(multi_locator.get_optional_filepath(&input[6..]), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "Overlapping input files")]
+    fn overlapping_input_files_test() {
+        let input = "abc";
+        MultiInputLocator::new(&[
+            InputFile::new(&input[..2], String::new()),
+            InputFile::new(&input[1..], String::new()),
+        ]);
     }
 }

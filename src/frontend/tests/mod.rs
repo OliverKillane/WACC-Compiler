@@ -2046,7 +2046,7 @@ fn commentInLine() {
 #[test]
 fn funcExpr2() {
     let input = include_str!("invalid/syntaxErr/function/funcExpr2.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/funcExpr2.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2056,7 +2056,7 @@ fn funcExpr2() {
 #[test]
 fn functionMissingCall() {
     let input = include_str!("invalid/syntaxErr/function/functionMissingCall.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/functionMissingCall.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2066,7 +2066,7 @@ fn functionMissingCall() {
 #[test]
 fn functionEndingNotReturn() {
     let input = include_str!("invalid/syntaxErr/function/functionEndingNotReturn.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/functionEndingNotReturn.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2076,7 +2076,7 @@ fn functionEndingNotReturn() {
 #[test]
 fn functionMissingParam() {
     let input = include_str!("invalid/syntaxErr/function/functionMissingParam.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/functionMissingParam.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2086,7 +2086,7 @@ fn functionMissingParam() {
 #[test]
 fn functionReturnInLoop() {
     let input = include_str!("invalid/syntaxErr/function/functionReturnInLoop.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/functionReturnInLoop.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2096,7 +2096,7 @@ fn functionReturnInLoop() {
 #[test]
 fn badlyPlaced() {
     let input = include_str!("invalid/syntaxErr/function/badlyPlaced.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/badlyPlaced.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2106,7 +2106,7 @@ fn badlyPlaced() {
 #[test]
 fn badlyNamed() {
     let input = include_str!("invalid/syntaxErr/function/badlyNamed.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/badlyNamed.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2116,7 +2116,7 @@ fn badlyNamed() {
 #[test]
 fn funcExpr() {
     let input = include_str!("invalid/syntaxErr/function/funcExpr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/funcExpr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2126,7 +2126,7 @@ fn funcExpr() {
 #[test]
 fn functionMissingType() {
     let input = include_str!("invalid/syntaxErr/function/functionMissingType.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/functionMissingType.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2136,7 +2136,7 @@ fn functionMissingType() {
 #[test]
 fn functionMissingPType() {
     let input = include_str!("invalid/syntaxErr/function/functionMissingPType.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/functionMissingPType.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2146,7 +2146,7 @@ fn functionMissingPType() {
 #[test]
 fn thisIsNotC() {
     let input = include_str!("invalid/syntaxErr/function/thisIsNotC.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/thisIsNotC.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2156,7 +2156,7 @@ fn thisIsNotC() {
 #[test]
 fn functionScopeDef() {
     let input = include_str!("invalid/syntaxErr/function/functionScopeDef.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/functionScopeDef.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2166,7 +2166,7 @@ fn functionScopeDef() {
 #[test]
 fn functionLateDefine() {
     let input = include_str!("invalid/syntaxErr/function/functionLateDefine.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/functionLateDefine.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2176,7 +2176,7 @@ fn functionLateDefine() {
 #[test]
 fn noBodyAfterFuncs() {
     let input = include_str!("invalid/syntaxErr/function/noBodyAfterFuncs.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/noBodyAfterFuncs.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2186,7 +2186,7 @@ fn noBodyAfterFuncs() {
 #[test]
 fn functionNoReturn() {
     let input = include_str!("invalid/syntaxErr/function/functionNoReturn.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/functionNoReturn.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2196,7 +2196,7 @@ fn functionNoReturn() {
 #[test]
 fn mutualRecursionNoReturn() {
     let input = include_str!("invalid/syntaxErr/function/mutualRecursionNoReturn.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/mutualRecursionNoReturn.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2206,7 +2206,7 @@ fn mutualRecursionNoReturn() {
 #[test]
 fn functionConditionalNoReturn() {
     let input = include_str!("invalid/syntaxErr/function/functionConditionalNoReturn.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/function/functionConditionalNoReturn.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2216,7 +2216,7 @@ fn functionConditionalNoReturn() {
 #[test]
 fn badintAssignments() {
     let input = include_str!("invalid/syntaxErr/variables/badintAssignments.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/variables/badintAssignments.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2226,7 +2226,7 @@ fn badintAssignments() {
 #[test]
 fn bigIntAssignment() {
     let input = include_str!("invalid/syntaxErr/variables/bigIntAssignment.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/variables/bigIntAssignment.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2236,7 +2236,7 @@ fn bigIntAssignment() {
 #[test]
 fn varNoName() {
     let input = include_str!("invalid/syntaxErr/variables/varNoName.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/variables/varNoName.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2246,7 +2246,7 @@ fn varNoName() {
 #[test]
 fn badintAssignments2() {
     let input = include_str!("invalid/syntaxErr/variables/badintAssignments2.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/variables/badintAssignments2.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2256,7 +2256,7 @@ fn badintAssignments2() {
 #[test]
 fn badintAssignments1() {
     let input = include_str!("invalid/syntaxErr/variables/badintAssignments1.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/variables/badintAssignments1.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2266,7 +2266,7 @@ fn badintAssignments1() {
 #[test]
 fn arrayExpr() {
     let input = include_str!("invalid/syntaxErr/array/arrayExpr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/array/arrayExpr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2276,7 +2276,7 @@ fn arrayExpr() {
 #[test]
 fn printlnCharArry() {
     let input = include_str!("invalid/syntaxErr/print/printlnCharArry.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/print/printlnCharArry.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2286,7 +2286,7 @@ fn printlnCharArry() {
 #[test]
 fn donoErr() {
     let input = include_str!("invalid/syntaxErr/while/donoErr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/while/donoErr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2296,7 +2296,7 @@ fn donoErr() {
 #[test]
 fn dooErr() {
     let input = include_str!("invalid/syntaxErr/while/dooErr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/while/dooErr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2306,7 +2306,7 @@ fn dooErr() {
 #[test]
 fn whileNodo() {
     let input = include_str!("invalid/syntaxErr/while/whileNodo.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/while/whileNodo.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2316,7 +2316,7 @@ fn whileNodo() {
 #[test]
 fn whileNodone() {
     let input = include_str!("invalid/syntaxErr/while/whileNodone.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/while/whileNodone.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2326,7 +2326,7 @@ fn whileNodone() {
 #[test]
 fn whilErr() {
     let input = include_str!("invalid/syntaxErr/while/whilErr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/while/whilErr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2336,7 +2336,7 @@ fn whilErr() {
 #[test]
 fn missingOperand2() {
     let input = include_str!("invalid/syntaxErr/expressions/missingOperand2.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/expressions/missingOperand2.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2346,7 +2346,7 @@ fn missingOperand2() {
 #[test]
 fn printlnConcat() {
     let input = include_str!("invalid/syntaxErr/expressions/printlnConcat.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/expressions/printlnConcat.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2356,7 +2356,7 @@ fn printlnConcat() {
 #[test]
 fn missingOperand1() {
     let input = include_str!("invalid/syntaxErr/expressions/missingOperand1.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/expressions/missingOperand1.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2366,7 +2366,7 @@ fn missingOperand1() {
 #[test]
 fn emptySeq() {
     let input = include_str!("invalid/syntaxErr/sequence/emptySeq.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/sequence/emptySeq.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2376,7 +2376,7 @@ fn emptySeq() {
 #[test]
 fn endSeq() {
     let input = include_str!("invalid/syntaxErr/sequence/endSeq.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/sequence/endSeq.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2386,7 +2386,7 @@ fn endSeq() {
 #[test]
 fn extraSeq() {
     let input = include_str!("invalid/syntaxErr/sequence/extraSeq.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/sequence/extraSeq.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2396,7 +2396,7 @@ fn extraSeq() {
 #[test]
 fn doubleSeq() {
     let input = include_str!("invalid/syntaxErr/sequence/doubleSeq.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/sequence/doubleSeq.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2406,7 +2406,7 @@ fn doubleSeq() {
 #[test]
 fn missingSeq() {
     let input = include_str!("invalid/syntaxErr/sequence/missingSeq.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/sequence/missingSeq.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2416,7 +2416,7 @@ fn missingSeq() {
 #[test]
 fn ifiErr() {
     let input = include_str!("invalid/syntaxErr/if/ifiErr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/if/ifiErr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2426,7 +2426,7 @@ fn ifiErr() {
 #[test]
 fn ifNothen() {
     let input = include_str!("invalid/syntaxErr/if/ifNothen.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/if/ifNothen.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2436,7 +2436,7 @@ fn ifNothen() {
 #[test]
 fn ifNoelse() {
     let input = include_str!("invalid/syntaxErr/if/ifNoelse.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/if/ifNoelse.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2446,7 +2446,7 @@ fn ifNoelse() {
 #[test]
 fn ifNofi() {
     let input = include_str!("invalid/syntaxErr/if/ifNofi.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/if/ifNofi.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2456,7 +2456,7 @@ fn ifNofi() {
 #[test]
 fn badLookup02() {
     let input = include_str!("invalid/syntaxErr/pairs/badLookup02.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/pairs/badLookup02.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2466,7 +2466,7 @@ fn badLookup02() {
 #[test]
 fn badLookup01() {
     let input = include_str!("invalid/syntaxErr/pairs/badLookup01.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/pairs/badLookup01.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2476,7 +2476,7 @@ fn badLookup01() {
 #[test]
 fn unescapedChar() {
     let input = include_str!("invalid/syntaxErr/basic/unescapedChar.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/basic/unescapedChar.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2486,7 +2486,7 @@ fn unescapedChar() {
 #[test]
 fn badEscape() {
     let input = include_str!("invalid/syntaxErr/basic/badEscape.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/basic/badEscape.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2496,7 +2496,7 @@ fn badEscape() {
 #[test]
 fn badComment2() {
     let input = include_str!("invalid/syntaxErr/basic/badComment2.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/basic/badComment2.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2506,7 +2506,7 @@ fn badComment2() {
 #[test]
 fn multipleBegins() {
     let input = include_str!("invalid/syntaxErr/basic/multipleBegins.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/basic/multipleBegins.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2516,7 +2516,7 @@ fn multipleBegins() {
 #[test]
 fn badComment() {
     let input = include_str!("invalid/syntaxErr/basic/badComment.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/basic/badComment.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2526,7 +2526,7 @@ fn badComment() {
 #[test]
 fn beginNoend() {
     let input = include_str!("invalid/syntaxErr/basic/beginNoend.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/basic/beginNoend.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2536,7 +2536,7 @@ fn beginNoend() {
 #[test]
 fn bgnErr() {
     let input = include_str!("invalid/syntaxErr/basic/bgnErr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/basic/bgnErr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2546,7 +2546,7 @@ fn bgnErr() {
 #[test]
 fn noBody() {
     let input = include_str!("invalid/syntaxErr/basic/noBody.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/basic/noBody.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2556,7 +2556,7 @@ fn noBody() {
 #[test]
 fn skpErr() {
     let input = include_str!("invalid/syntaxErr/basic/skpErr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/syntaxErr/basic/skpErr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2566,7 +2566,7 @@ fn skpErr() {
 #[test]
 fn funcMess() {
     let input = include_str!("invalid/semanticErr/multiple/funcMess.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/multiple/funcMess.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2576,7 +2576,7 @@ fn funcMess() {
 #[test]
 fn ifAndWhileErrs() {
     let input = include_str!("invalid/semanticErr/multiple/ifAndWhileErrs.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/multiple/ifAndWhileErrs.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2586,7 +2586,7 @@ fn ifAndWhileErrs() {
 #[test]
 fn multiTypeErrs() {
     let input = include_str!("invalid/semanticErr/multiple/multiTypeErrs.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/multiple/multiTypeErrs.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2596,7 +2596,7 @@ fn multiTypeErrs() {
 #[test]
 fn multiCaseSensitivity() {
     let input = include_str!("invalid/semanticErr/multiple/multiCaseSensitivity.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/multiple/multiCaseSensitivity.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2606,7 +2606,7 @@ fn multiCaseSensitivity() {
 #[test]
 fn messyExpr() {
     let input = include_str!("invalid/semanticErr/multiple/messyExpr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/multiple/messyExpr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2616,7 +2616,7 @@ fn messyExpr() {
 #[test]
 fn badScopeRedefine() {
     let input = include_str!("invalid/semanticErr/scope/badScopeRedefine.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/scope/badScopeRedefine.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2626,7 +2626,7 @@ fn badScopeRedefine() {
 #[test]
 fn readTypeErr01() {
     let input = include_str!("invalid/semanticErr/read/readTypeErr01.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/read/readTypeErr01.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2636,7 +2636,7 @@ fn readTypeErr01() {
 #[test]
 fn functionOverArgs() {
     let input = include_str!("invalid/semanticErr/function/functionOverArgs.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/function/functionOverArgs.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2646,7 +2646,7 @@ fn functionOverArgs() {
 #[test]
 fn functionBadParam() {
     let input = include_str!("invalid/semanticErr/function/functionBadParam.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/function/functionBadParam.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2656,7 +2656,7 @@ fn functionBadParam() {
 #[test]
 fn functionBadReturn() {
     let input = include_str!("invalid/semanticErr/function/functionBadReturn.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/function/functionBadReturn.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2666,7 +2666,7 @@ fn functionBadReturn() {
 #[test]
 fn funcVarAccess() {
     let input = include_str!("invalid/semanticErr/function/funcVarAccess.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/function/funcVarAccess.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2676,7 +2676,7 @@ fn funcVarAccess() {
 #[test]
 fn functionSwapArgs() {
     let input = include_str!("invalid/semanticErr/function/functionSwapArgs.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/function/functionSwapArgs.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2686,7 +2686,7 @@ fn functionSwapArgs() {
 #[test]
 fn functionBadCall() {
     let input = include_str!("invalid/semanticErr/function/functionBadCall.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/function/functionBadCall.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2696,7 +2696,7 @@ fn functionBadCall() {
 #[test]
 fn functionUnderArgs() {
     let input = include_str!("invalid/semanticErr/function/functionUnderArgs.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/function/functionUnderArgs.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2706,7 +2706,7 @@ fn functionUnderArgs() {
 #[test]
 fn functionBadArgUse() {
     let input = include_str!("invalid/semanticErr/function/functionBadArgUse.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/function/functionBadArgUse.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2716,7 +2716,7 @@ fn functionBadArgUse() {
 #[test]
 fn functionAssign() {
     let input = include_str!("invalid/semanticErr/function/functionAssign.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/function/functionAssign.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2726,7 +2726,7 @@ fn functionAssign() {
 #[test]
 fn functionRedefine() {
     let input = include_str!("invalid/semanticErr/function/functionRedefine.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/function/functionRedefine.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2736,7 +2736,7 @@ fn functionRedefine() {
 #[test]
 fn undeclaredVar() {
     let input = include_str!("invalid/semanticErr/variables/undeclaredVar.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/undeclaredVar.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2746,7 +2746,7 @@ fn undeclaredVar() {
 #[test]
 fn basicTypeErr08() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr08.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/basicTypeErr08.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2756,7 +2756,7 @@ fn basicTypeErr08() {
 #[test]
 fn basicTypeErr01() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr01.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/basicTypeErr01.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2766,7 +2766,7 @@ fn basicTypeErr01() {
 #[test]
 fn basicTypeErr10() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr10.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/basicTypeErr10.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2776,7 +2776,7 @@ fn basicTypeErr10() {
 #[test]
 fn undeclaredVarAccess() {
     let input = include_str!("invalid/semanticErr/variables/undeclaredVarAccess.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/undeclaredVarAccess.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2786,7 +2786,7 @@ fn undeclaredVarAccess() {
 #[test]
 fn basicTypeErr07() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr07.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/basicTypeErr07.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2796,7 +2796,7 @@ fn basicTypeErr07() {
 #[test]
 fn basicTypeErr02() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr02.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/basicTypeErr02.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2806,7 +2806,7 @@ fn basicTypeErr02() {
 #[test]
 fn basicTypeErr06() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr06.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/basicTypeErr06.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2816,7 +2816,7 @@ fn basicTypeErr06() {
 #[test]
 fn basicTypeErr03() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr03.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/basicTypeErr03.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2826,7 +2826,7 @@ fn basicTypeErr03() {
 #[test]
 fn basicTypeErr04() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr04.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/basicTypeErr04.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2836,7 +2836,7 @@ fn basicTypeErr04() {
 #[test]
 fn basicTypeErr05() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr05.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/basicTypeErr05.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2846,7 +2846,7 @@ fn basicTypeErr05() {
 #[test]
 fn basicTypeErr12() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr12.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/basicTypeErr12.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2856,7 +2856,7 @@ fn basicTypeErr12() {
 #[test]
 fn doubleDeclare() {
     let input = include_str!("invalid/semanticErr/variables/doubleDeclare.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/doubleDeclare.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2866,7 +2866,7 @@ fn doubleDeclare() {
 #[test]
 fn caseMatters() {
     let input = include_str!("invalid/semanticErr/variables/caseMatters.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/caseMatters.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2876,7 +2876,7 @@ fn caseMatters() {
 #[test]
 fn undeclaredScopeVar() {
     let input = include_str!("invalid/semanticErr/variables/undeclaredScopeVar.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/undeclaredScopeVar.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2886,7 +2886,7 @@ fn undeclaredScopeVar() {
 #[test]
 fn basicTypeErr11() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr11.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/basicTypeErr11.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2896,7 +2896,7 @@ fn basicTypeErr11() {
 #[test]
 fn basicTypeErr09() {
     let input = include_str!("invalid/semanticErr/variables/basicTypeErr09.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/variables/basicTypeErr09.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2906,7 +2906,7 @@ fn basicTypeErr09() {
 #[test]
 fn printTypeErr01() {
     let input = include_str!("invalid/semanticErr/print/printTypeErr01.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/print/printTypeErr01.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2916,7 +2916,7 @@ fn printTypeErr01() {
 #[test]
 fn badCharExit() {
     let input = include_str!("invalid/semanticErr/exit/badCharExit.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/exit/badCharExit.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2926,7 +2926,7 @@ fn badCharExit() {
 #[test]
 fn globalReturn() {
     let input = include_str!("invalid/semanticErr/exit/globalReturn.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/exit/globalReturn.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2936,7 +2936,7 @@ fn globalReturn() {
 #[test]
 fn exitNonInt() {
     let input = include_str!("invalid/semanticErr/exit/exitNonInt.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/exit/exitNonInt.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2946,7 +2946,7 @@ fn exitNonInt() {
 #[test]
 fn readTypeErr() {
     let input = include_str!("invalid/semanticErr/IO/readTypeErr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/IO/readTypeErr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2956,7 +2956,7 @@ fn readTypeErr() {
 #[test]
 fn falsErr() {
     let input = include_str!("invalid/semanticErr/while/falsErr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/while/falsErr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2966,7 +2966,7 @@ fn falsErr() {
 #[test]
 fn truErr() {
     let input = include_str!("invalid/semanticErr/while/truErr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/while/truErr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2976,7 +2976,7 @@ fn truErr() {
 #[test]
 fn whileIntCondition() {
     let input = include_str!("invalid/semanticErr/while/whileIntCondition.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/while/whileIntCondition.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2986,7 +2986,7 @@ fn whileIntCondition() {
 #[test]
 fn exprTypeErr() {
     let input = include_str!("invalid/semanticErr/expressions/exprTypeErr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/expressions/exprTypeErr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -2996,7 +2996,7 @@ fn exprTypeErr() {
 #[test]
 fn boolOpTypeErr() {
     let input = include_str!("invalid/semanticErr/expressions/boolOpTypeErr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/expressions/boolOpTypeErr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -3006,7 +3006,7 @@ fn boolOpTypeErr() {
 #[test]
 fn intOpTypeErr() {
     let input = include_str!("invalid/semanticErr/expressions/intOpTypeErr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/expressions/intOpTypeErr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -3016,7 +3016,7 @@ fn intOpTypeErr() {
 #[test]
 fn moreArrExpr() {
     let input = include_str!("invalid/semanticErr/expressions/moreArrExpr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/expressions/moreArrExpr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -3026,7 +3026,7 @@ fn moreArrExpr() {
 #[test]
 fn lessPairExpr() {
     let input = include_str!("invalid/semanticErr/expressions/lessPairExpr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/expressions/lessPairExpr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -3036,7 +3036,7 @@ fn lessPairExpr() {
 #[test]
 fn stringElemErr() {
     let input = include_str!("invalid/semanticErr/expressions/stringElemErr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/expressions/stringElemErr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -3046,7 +3046,7 @@ fn stringElemErr() {
 #[test]
 fn mixedOpTypeErr() {
     let input = include_str!("invalid/semanticErr/expressions/mixedOpTypeErr.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/expressions/mixedOpTypeErr.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -3056,7 +3056,7 @@ fn mixedOpTypeErr() {
 #[test]
 fn ifIntCondition() {
     let input = include_str!("invalid/semanticErr/if/ifIntCondition.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/if/ifIntCondition.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -3066,7 +3066,7 @@ fn ifIntCondition() {
 #[test]
 fn sndNull() {
     let input = include_str!("invalid/semanticErr/pairs/sndNull.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/pairs/sndNull.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -3076,7 +3076,7 @@ fn sndNull() {
 #[test]
 fn fstNull() {
     let input = include_str!("invalid/semanticErr/pairs/fstNull.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/pairs/fstNull.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }
@@ -3086,7 +3086,7 @@ fn fstNull() {
 #[test]
 fn freeNonPair() {
     let input = include_str!("invalid/semanticErr/pairs/freeNonPair.wacc");
-    let res = analyse(input);
+    let res = analyse(input).map_err(|mut e| {e.add_input_file(input, "invalid/semanticErr/pairs/freeNonPair.wacc".to_string()); e});
     if let Err(e) = &res {
         println!("{}", e);
     }

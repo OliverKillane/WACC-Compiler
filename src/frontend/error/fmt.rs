@@ -88,7 +88,7 @@ impl<'l> SummaryComponent<'l> {
         Some(format!(
             "{} {}",
             format!("[{}]", index).bold(),
-            format!("first declared in {}:{}:{}", filepath, line, column)
+            format!("first declared in {}:{}:{}", filepath, line + 1, column + 1)
                 .color(DECLARED_COLOR)
                 .bold()
         ))
@@ -628,7 +628,7 @@ impl<'l> SummaryCell<'l> {
                 {
                     Some(format!(
                         " {}\n",
-                        component.fmt_declaration(index, multi_input_locator)?
+                        component.fmt_declaration(index + 1, multi_input_locator)?
                     ))
                 } else {
                     None
@@ -679,12 +679,12 @@ impl<'l> Summary<'l> {
     fn check_span_relations(&self, multi_input_locator: &MultiInputLocator<'l>) {
         for cell in &self.cells {
             multi_input_locator
-                .get_optional_locator(cell.span)
+                .get_optional_filepath(cell.span)
                 .expect("Statement not in any input file");
             for component in &cell.components {
                 if let Some(declaration) = component.declaration {
                     multi_input_locator
-                        .get_optional_locator(declaration)
+                        .get_optional_filepath(declaration)
                         .expect("Declaration not in any input file");
                 }
             }
@@ -697,6 +697,7 @@ impl<'l> Display for Summary<'l> {
     /// Produces a string for the entire summary.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let multi_input_locator = MultiInputLocator::new(&self.input_files);
+        #[cfg(debug_assertions)]
         self.check_span_relations(&multi_input_locator);
 
         let preamble = format!(
@@ -1480,6 +1481,51 @@ mod tests {
     }
 
     #[test]
+    fn test_multiple_files() {
+        let input1 = "abc";
+        let input2 = "def";
+        let input3 = "ghi";
+        SHOULD_COLORIZE.set_override(false);
+        let mut summary = Summary::new(SummaryStage::Parser);
+        summary.add_input_file(input1, "a.wacc".to_string());
+        summary.add_input_file(input2, "b.wacc".to_string());
+        summary.add_input_file(input3, "c.wacc".to_string());
+        for input in [input1, input2] {
+            let mut cell = SummaryCell::new(input);
+            cell.add_component(
+                SummaryComponent::new(SummaryType::Error, 200, &input[1..], String::new())
+                    .set_declaration(&input3[1..]),
+            );
+            summary.add_cell(cell);
+        }
+
+        assert_eq_multiline(
+            format!("{}", summary),
+            indoc! {"
+                2 erroneous statements have been found during parsing
+                a.wacc:1:2
+                1. error[200]:
+                 1 | abc
+                   |  ^^
+                   |  |
+                   |  V
+                   | [1]
+                 [1] first declared in c.wacc:1:2
+                
+                b.wacc:1:2
+                1. error[200]:
+                 1 | def
+                   |  ^^
+                   |  |
+                   |  V
+                   | [1]
+                 [1] first declared in c.wacc:1:2
+            "}
+            .to_string(),
+        )
+    }
+
+    #[test]
     #[should_panic(expected = "Overlapping spans in a summary cell")]
     fn test_overlapping_spans() {
         let input = "abc";
@@ -1498,6 +1544,33 @@ mod tests {
             &input[1..],
             String::new(),
         ));
+        summary.add_cell(cell);
+        format!("{}", summary);
+    }
+
+    #[test]
+    #[should_panic(expected = "Statement not in any input file")]
+    fn test_statement_not_in_input() {
+        let input = "ab other";
+        let mut summary = Summary::new(SummaryStage::Parser);
+        summary.add_input_file(&input[..1], "a".to_string());
+        summary.add_input_file(&input[1..2], "b".to_string());
+        summary.add_cell(SummaryCell::new(&input[3..]));
+        format!("{}", summary);
+    }
+
+    #[test]
+    #[should_panic(expected = "Declaration not in any input file")]
+    fn test_declaration_not_in_input() {
+        let input = "ab other";
+        let mut summary = Summary::new(SummaryStage::Parser);
+        summary.add_input_file(&input[..1], "a".to_string());
+        summary.add_input_file(&input[1..2], "b".to_string());
+        let mut cell = SummaryCell::new(&input[..1]);
+        cell.add_component(
+            SummaryComponent::new(SummaryType::Error, 200, &input[..1], String::new())
+                .set_declaration(&input[3..]),
+        );
         summary.add_cell(cell);
         format!("{}", summary);
     }
