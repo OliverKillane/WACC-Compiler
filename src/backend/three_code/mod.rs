@@ -558,13 +558,12 @@ fn clean_up_block_graph_dfs(
     block_graph: &mut ir::BlockGraph,
     block_id: ir::BlockId,
     mappings: &mut HashMap<ir::BlockId, ir::BlockId>,
-    visited: &mut HashSet<ir::BlockId>,
 ) -> ir::BlockId {
-    if visited.contains(&block_id) {
+    if mappings.contains_key(&block_id) {
         return mappings[&block_id];
     }
 
-    visited.insert(block_id);
+    mappings.insert(block_id, block_id);
     let next_block_id = match &mut block_graph[block_id] {
         ir::Block(_, _, ir::BlockEnding::Exit(_) | ir::BlockEnding::Return(_)) => {
             mappings.insert(block_id, block_id);
@@ -578,7 +577,7 @@ fn clean_up_block_graph_dfs(
             *else_id
         }
     };
-    let mapping_id = clean_up_block_graph_dfs(block_graph, next_block_id, mappings, visited);
+    let mapping_id = clean_up_block_graph_dfs(block_graph, next_block_id, mappings);
     mappings.insert(block_id, mapping_id);
     mapping_id
 }
@@ -596,9 +595,8 @@ fn clean_up_block_graph(block_graph: &mut ir::BlockGraph) {
     }
 
     let mut edge_mappings = HashMap::new();
-    let mut visited = HashSet::new();
     for block_id in 0..block_graph.len() {
-        clean_up_block_graph_dfs(block_graph, block_id, &mut edge_mappings, &mut visited);
+        clean_up_block_graph_dfs(block_graph, block_id, &mut edge_mappings);
     }
 
     let mut new_block_graph_mappings = HashMap::new();
