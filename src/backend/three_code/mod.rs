@@ -10,8 +10,10 @@ use eval::eval_expr;
 use expr::{translate_bool_expr, translate_expr, translate_num_expr};
 use stat::{translate_statement, FmtDataRefFlags};
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::DefaultHasher;
+use std::collections::{HashMap, HashSet, LinkedList};
 use std::fmt::Debug;
+use std::hash::{Hash, Hasher};
 use std::iter::zip;
 use std::mem;
 use std::rc::Rc;
@@ -235,15 +237,50 @@ impl StatType {
     }
 }
 
+pub(super) fn hashed<T: Hash>(x: T) -> u8 {
+    let mut h = DefaultHasher::new();
+    x.hash(&mut h);
+    h.finish() as u8
+}
+
+pub(super) fn hashed_array<T: Hash, C: IntoIterator<Item = T>>(collection: C) -> LinkedList<u8> {
+    collection.into_iter().map(hashed).collect()
+}
+
 impl Debug for StatType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Dummy(arg0) => f.debug_tuple("Dummy").finish(),
-            Self::Simple(_, stat_code, _) => f.debug_tuple("Simple").field(stat_code).finish(),
-            Self::Final(_, stat_code) => f.debug_tuple("Final").field(stat_code).finish(),
-            Self::Branch(_, var, _, _) => f.debug_tuple("Branch").field(var).finish(),
-            Self::Loop(_) => f.debug_tuple("Loop").finish(),
-            Self::Return(_, var) => f.debug_tuple("Return").field(var).finish(),
+            Self::Dummy(incoming) => f
+                .debug_tuple("Dummy")
+                .field(&hashed_array(incoming))
+                .finish(),
+            Self::Simple(incoming, stat_code, next_node) => f
+                .debug_tuple("Simple")
+                .field(&hashed_array(incoming))
+                .field(stat_code)
+                .field(&hashed(next_node))
+                .finish(),
+            Self::Final(incoming, stat_code) => f
+                .debug_tuple("Final")
+                .field(&hashed_array(incoming))
+                .field(stat_code)
+                .finish(),
+            Self::Branch(incoming, var, true_node, false_node) => f
+                .debug_tuple("Branch")
+                .field(&hashed_array(incoming))
+                .field(var)
+                .field(&hashed(true_node))
+                .field(&hashed(false_node))
+                .finish(),
+            Self::Loop(incoming) => f
+                .debug_tuple("Loop")
+                .field(&hashed_array(incoming))
+                .finish(),
+            Self::Return(incoming, var) => f
+                .debug_tuple("Return")
+                .field(&hashed_array(incoming))
+                .field(var)
+                .finish(),
         }
     }
 }
