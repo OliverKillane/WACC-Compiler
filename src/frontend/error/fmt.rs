@@ -72,6 +72,27 @@ impl<'l> SummaryComponent<'l> {
             self.note.as_ref()?
         ))
     }
+
+    /// Produces a formatted code-less declared message in the declarations
+    /// section of the error cell.
+    fn fmt_declaration(
+        &self,
+        index: usize,
+        multi_input_locator: &MultiInputLocator<'l>,
+    ) -> Option<String> {
+        let declaration = self.declaration?;
+        let filepath = multi_input_locator.get_filepath(declaration);
+        let (line, column) = multi_input_locator
+            .get_locator(declaration)
+            .get_coords(declaration);
+        Some(format!(
+            "{} {}",
+            format!("[{}]", index).bold(),
+            format!("first declared in {}:{}:{}", filepath, line, column)
+                .color(DECLARED_COLOR)
+                .bold()
+        ))
+    }
 }
 
 static DECLARED_COLOR: Color = Color::BrightBlue;
@@ -108,6 +129,7 @@ impl<'l> SummaryCell<'l> {
     /// Simplifies the error cell components before formatting them line-by-line.
     fn get_annotations(
         components: &[&SummaryComponent<'l>],
+        input_locator: &SpanLocator,
     ) -> LinkedList<(&'l str, String, Color)> {
         components
             .iter()
@@ -124,11 +146,15 @@ impl<'l> SummaryCell<'l> {
                     .iter()
                     .enumerate()
                     .filter_map(|(index, component)| {
-                        Some((
-                            component.declaration?,
-                            format!("[{}] first declared here", index + 1),
-                            DECLARED_COLOR,
-                        ))
+                        input_locator
+                            .get_optional_range(component.declaration?)
+                            .map(|_| {
+                                (
+                                    component.declaration.unwrap(),
+                                    format!("[{}] first declared here", index + 1),
+                                    DECLARED_COLOR,
+                                )
+                            })
                     }),
             )
             .collect()
@@ -498,7 +524,7 @@ impl<'l> SummaryCell<'l> {
         span: &str,
         input_locator: &SpanLocator,
     ) -> String {
-        let mut annotations = Self::get_annotations(components)
+        let mut annotations = Self::get_annotations(components, input_locator)
             .into_iter()
             .collect::<Vec<_>>();
         if annotations.is_empty() {
@@ -586,11 +612,35 @@ impl<'l> SummaryCell<'l> {
             .collect()
     }
 
+    /// Formats the declarations section of the error cell.
+    fn fmt_declarations(
+        components: &[&SummaryComponent<'l>],
+        input_locator: &SpanLocator<'l>,
+        multi_input_locator: &MultiInputLocator<'l>,
+    ) -> String {
+        components
+            .iter()
+            .enumerate()
+            .filter_map(|(index, component)| {
+                if input_locator
+                    .get_optional_range(component.declaration?)
+                    .is_none()
+                {
+                    Some(format!(
+                        " {}\n",
+                        component.fmt_declaration(index, multi_input_locator)?
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     /// Formats a single error cell.
     fn fmt(&self, multi_input_locator: &MultiInputLocator<'l>) -> String {
-        let input_locator = multi_input_locator
-            .get_locator(self.span)
-            .expect("Span not in any input file");
+        let input_locator = multi_input_locator.get_locator(self.span);
+        let filepath = multi_input_locator.get_filepath(self.span);
         let mut components = self.components.iter().collect::<Vec<_>>();
 
         // sort components by their location
@@ -607,8 +657,8 @@ impl<'l> SummaryCell<'l> {
         format!(
             "{}",
             format!(
-                "{}{}:{}{}\n",
-                filepath.map_or(String::default(), |s| format!("{}:", s)),
+                "{}:{}:{}{}\n",
+                filepath,
                 span_line + 1,
                 span_column + 1,
                 self.title
@@ -621,14 +671,34 @@ impl<'l> SummaryCell<'l> {
         ) + &Self::fmt_messages(&components)
             + &Self::fmt_refs(&components, self.span, &input_locator)
             + &Self::fmt_notes(&components)
+            + &Self::fmt_declarations(&components, input_locator, multi_input_locator)
+    }
+}
+
+impl<'l> Summary<'l> {
+    fn check_span_relations(&self, multi_input_locator: &MultiInputLocator<'l>) {
+        for cell in &self.cells {
+            multi_input_locator
+                .get_optional_locator(cell.span)
+                .expect("Statement not in any input file");
+            for component in &cell.components {
+                if let Some(declaration) = component.declaration {
+                    multi_input_locator
+                        .get_optional_locator(declaration)
+                        .expect("Declaration not in any input file");
+                }
+            }
+        }
     }
 }
 
 static MAIN_HEADER_COLOR: Color = Color::Cyan;
-
 impl<'l> Display for Summary<'l> {
     /// Produces a string for the entire summary.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let multi_input_locator = MultiInputLocator::new(&self.input_files);
+        self.check_span_relations(&multi_input_locator);
+
         let preamble = format!(
             "{} been found during {}\n",
             if self.cells.len() > 1 {
@@ -646,7 +716,7 @@ impl<'l> Display for Summary<'l> {
         let cell_strings = self
             .cells
             .iter()
-            .map(|cell| cell.fmt(self.filepath.as_deref(), self.input))
+            .map(|cell| cell.fmt(&multi_input_locator))
             .collect::<LinkedList<_>>();
 
         let max_cell_width = cell_strings
@@ -697,7 +767,7 @@ mod tests {
 
     #[allow(clippy::too_many_arguments)]
     fn singleton_summary(
-        filepath: Option<&str>,
+        filepath: &str,
         input: &str,
         stage: SummaryStage,
         stat: &str,
@@ -710,10 +780,8 @@ mod tests {
         declaration: Option<&str>,
         note: Option<&str>,
     ) -> String {
-        let mut summary = Summary::new(input, stage);
-        if let Some(filepath) = filepath {
-            summary.set_filepath(filepath.to_string());
-        }
+        let mut summary = Summary::new(stage);
+        summary.add_input_file(input, filepath.to_string());
         let mut cell = SummaryCell::new(stat);
         if let Some(title) = title {
             cell.set_title(title.to_string());
@@ -746,8 +814,8 @@ mod tests {
 
     #[test]
     fn test_code() {
-        assert_eq!(Summary::new("abc", SummaryStage::Parser).code(), 100);
-        assert_eq!(Summary::new("abc", SummaryStage::Semantic).code(), 200);
+        assert_eq!(Summary::new(SummaryStage::Parser).code(), 100);
+        assert_eq!(Summary::new(SummaryStage::Semantic).code(), 200);
     }
 
     #[test]
@@ -756,7 +824,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                None,
+                "",
                 input,
                 SummaryStage::Parser,
                 &input[4..16],
@@ -789,7 +857,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                None,
+                "",
                 input,
                 SummaryStage::Parser,
                 input,
@@ -822,7 +890,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                None,
+                "",
                 input,
                 SummaryStage::Parser,
                 &input[1..8],
@@ -861,7 +929,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                None,
+                "",
                 input,
                 SummaryStage::Parser,
                 &input[0..5],
@@ -894,7 +962,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                None,
+                "",
                 input,
                 SummaryStage::Parser,
                 &input[0..7],
@@ -927,7 +995,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                None,
+                "",
                 input,
                 SummaryStage::Parser,
                 &input[0..7],
@@ -960,7 +1028,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                None,
+                "",
                 input,
                 SummaryStage::Parser,
                 &input[0..7],
@@ -993,7 +1061,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                Some("test/test.wacc"),
+                "test/test.wacc",
                 input,
                 SummaryStage::Parser,
                 &input[0..3],
@@ -1022,17 +1090,16 @@ mod tests {
 
     #[test]
     fn test_stage() {
-        let input = "abcdefgh";
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
-            format!("{}", Summary::new(input, SummaryStage::Parser)),
+            format!("{}", Summary::new(SummaryStage::Parser)),
             indoc! {"
                 An erroneous statement has been found during parsing
             "}
             .to_string(),
         );
         assert_eq_multiline(
-            format!("{}", Summary::new(input, SummaryStage::Semantic)),
+            format!("{}", Summary::new(SummaryStage::Semantic)),
             indoc! {"
                 An erroneous statement has been found during semantic analysis
             "}
@@ -1046,7 +1113,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                None,
+                "",
                 input,
                 SummaryStage::Parser,
                 &input[0..3],
@@ -1079,7 +1146,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                None,
+                "",
                 input,
                 SummaryStage::Parser,
                 input,
@@ -1112,7 +1179,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                None,
+                "",
                 input,
                 SummaryStage::Parser,
                 &input[0..3],
@@ -1144,7 +1211,8 @@ mod tests {
     fn test_spacing() {
         let input = "abc";
         SHOULD_COLORIZE.set_override(false);
-        let mut summary = Summary::new(input, SummaryStage::Parser);
+        let mut summary = Summary::new(SummaryStage::Parser);
+        summary.add_input_file(input, String::new());
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
@@ -1193,7 +1261,8 @@ mod tests {
     fn test_main_message_alignment() {
         let input = "a b c";
         SHOULD_COLORIZE.set_override(false);
-        let mut summary = Summary::new(input, SummaryStage::Parser);
+        let mut summary = Summary::new(SummaryStage::Parser);
+        summary.add_input_file(input, String::new());
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
@@ -1242,7 +1311,8 @@ mod tests {
     fn test_multicomponent() {
         let input = "a b\nc";
         SHOULD_COLORIZE.set_override(false);
-        let mut summary = Summary::new(input, SummaryStage::Parser);
+        let mut summary = Summary::new(SummaryStage::Parser);
+        summary.add_input_file(input, String::new());
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
@@ -1294,7 +1364,8 @@ mod tests {
     fn test_multicell() {
         let input = "a b\nc";
         SHOULD_COLORIZE.set_override(false);
-        let mut summary = Summary::new(input, SummaryStage::Parser);
+        let mut summary = Summary::new(SummaryStage::Parser);
+        summary.add_input_file(input, String::new());
         summary.set_sep('~');
         for _ in 0..3 {
             let mut cell = SummaryCell::new(input);
@@ -1343,7 +1414,8 @@ mod tests {
     fn test_doubleline_expr() {
         let input = "a b\nc d";
         SHOULD_COLORIZE.set_override(false);
-        let mut summary = Summary::new(input, SummaryStage::Parser);
+        let mut summary = Summary::new(SummaryStage::Parser);
+        summary.add_input_file(input, String::new());
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
@@ -1375,7 +1447,8 @@ mod tests {
     fn test_multiline_expr() {
         let input = "a b\ncd\ne f";
         SHOULD_COLORIZE.set_override(false);
-        let mut summary = Summary::new(input, SummaryStage::Parser);
+        let mut summary = Summary::new(SummaryStage::Parser);
+        summary.add_input_file(input, String::new());
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
@@ -1410,7 +1483,8 @@ mod tests {
     #[should_panic(expected = "Overlapping spans in a summary cell")]
     fn test_overlapping_spans() {
         let input = "abc";
-        let mut summary = Summary::new(input, SummaryStage::Parser);
+        let mut summary = Summary::new(SummaryStage::Parser);
+        summary.add_input_file(input, String::new());
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,

@@ -54,11 +54,11 @@ where
 /// Parses the input string into a [Program]. If the input string contains
 /// syntax errors, a [Vec<Summary>](Vec<Summary>) is produced instead to be used by the
 /// error handler.
-pub fn parse(input: &str) -> Result<Program<&str, &str>, Vec<Summary>> {
+pub fn parse(input: &str) -> Result<Program<&str, &str>, Summary> {
     let semantic_info = final_parser(parse_program)(input);
     match semantic_info {
         Ok(ast) => Ok(ast),
-        Err(err) => Err(vec![convert_error_tree(input, err)]),
+        Err(err) => Err(convert_error_tree(input, err)),
     }
 }
 
@@ -639,7 +639,7 @@ pub fn convert_error_tree<'a>(input: &'a str, err: ErrorTree<&'a str>) -> Summar
     let mut h = HashMap::new();
     collect_errors(err, &mut h, vec![]);
 
-    let mut summary = Summary::new(input, SummaryStage::Parser);
+    let mut summary = Summary::new(SummaryStage::Parser);
     for (k, v) in h {
         let k = match k {
             "" => &input[input.len() - 2..],

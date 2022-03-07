@@ -141,15 +141,10 @@ fn main() -> std::io::Result<()> {
 
                 process::exit(COMPILE_SUCCESS)
             }
-            Err(errs) => {
-                // syntactic or semantic errors occurred
-                let mut exit_code = i32::MAX;
-                for mut err in errs {
-                    err.set_filepath(filestring.clone());
-                    exit_code = min(exit_code, err.get_code());
-                    println!("{}", err)
-                }
-                process::exit(exit_code);
+            Err(mut err) => {
+                err.add_input_file(&source_code, filestring);
+                println!("{}", err);
+                process::exit(err.get_code());
             }
         },
         Err(err) => {

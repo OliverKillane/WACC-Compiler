@@ -1,10 +1,7 @@
 //! Contains utility functions for determining the placement of spans within
 //! the original source code string.
 
-use std::{
-    cmp::min,
-    collections::{BTreeMap, HashMap},
-};
+use std::{cmp::min, collections::HashMap};
 
 use super::InputFile;
 
