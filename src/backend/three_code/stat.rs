@@ -302,7 +302,7 @@ pub(super) fn translate_statement(
                 options,
             );
             let string_format =
-                ensure_format(free_data_ref, data_refs, "%.*s\0", &mut fmt_flags.string);
+                ensure_format(free_data_ref, data_refs, "%.*s", &mut fmt_flags.string);
             stat_line.add_stat(StatCode::Assign(
                 free_var + 2,
                 OpSrc::DataRef(string_format, 0),
@@ -314,7 +314,7 @@ pub(super) fn translate_statement(
             add_flush(free_var, stat_line);
         }
         ir::Stat::PrintEol() => {
-            let eol_format = ensure_format(free_data_ref, data_refs, "\\n", &mut fmt_flags.eol);
+            let eol_format = ensure_format(free_data_ref, data_refs, "\n", &mut fmt_flags.eol);
             stat_line.add_stat(StatCode::Assign(free_var, OpSrc::DataRef(eol_format, 0)));
             stat_line.add_stat(StatCode::VoidCall("printf".to_string(), vec![free_var]));
             add_flush(free_var, stat_line);
@@ -660,7 +660,7 @@ pub(super) mod tests {
             vec![0],
         )));
         let stdout_set_node = template_graph.new_node(StatType::new_simple(
-            StatCode::Assign(0, OpSrc::Const(1)),
+            StatCode::Assign(0, OpSrc::Const(0)),
             flush_node,
         ));
         let call_node = template_graph.new_node(StatType::new_simple(
