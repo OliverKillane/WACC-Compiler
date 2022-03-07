@@ -960,7 +960,7 @@ mod tests {
             exit_set_node,
         ));
         let stdout_set_node = graph.new_node(StatType::new_simple(
-            StatCode::Assign(1, OpSrc::Const(1)),
+            StatCode::Assign(1, OpSrc::Const(0)),
             flush_call_node,
         ));
         let print_call_node = graph.new_node(StatType::new_simple(
