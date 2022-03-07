@@ -824,7 +824,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "",
+                "test.wacc",
                 input,
                 SummaryStage::Parser,
                 &input[4..16],
@@ -839,7 +839,7 @@ mod tests {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:2
+                test.wacc:1:2
                 1. error[200]: message
                  1 | 😊😊😊😊😊
                    |   ^^^^
@@ -857,7 +857,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "",
+                "test.wacc",
                 input,
                 SummaryStage::Parser,
                 input,
@@ -872,7 +872,7 @@ mod tests {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:4
+                test.wacc:1:4
                 1. error[200]: message
                  1 | abc
                    |    ^
@@ -890,7 +890,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "",
+                "test.wacc",
                 input,
                 SummaryStage::Parser,
                 &input[1..8],
@@ -905,7 +905,7 @@ mod tests {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                4:1
+                test.wacc:4:1
                 1. error[200]: message
                  1 | ab
                    |  ^
@@ -929,7 +929,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "",
+                "test.wacc",
                 input,
                 SummaryStage::Parser,
                 &input[0..5],
@@ -944,7 +944,7 @@ mod tests {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:4
+                test.wacc:1:4
                 1. error[200]: message
                  1 | abcdef
                    |    ^^
@@ -962,7 +962,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "",
+                "test.wacc",
                 input,
                 SummaryStage::Parser,
                 &input[0..7],
@@ -977,7 +977,7 @@ mod tests {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:5
+                test.wacc:1:5
                 1. error[200]: message
                  1 | abcdefgh
                    |     ^
@@ -995,7 +995,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "",
+                "test.wacc",
                 input,
                 SummaryStage::Parser,
                 &input[0..7],
@@ -1010,7 +1010,7 @@ mod tests {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:6
+                test.wacc:1:6
                 1. error[200]: message
                  1 | abcdefgh
                    |      ^
@@ -1028,7 +1028,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "",
+                "test.wacc",
                 input,
                 SummaryStage::Parser,
                 &input[0..7],
@@ -1043,7 +1043,7 @@ mod tests {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:7
+                test.wacc:1:7
                 1. error[200]: message
                  1 | abcdefgh
                    |       ^
@@ -1113,7 +1113,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "",
+                "test.wacc",
                 input,
                 SummaryStage::Parser,
                 &input[0..3],
@@ -1128,7 +1128,7 @@ mod tests {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:1 -> title
+                test.wacc:1:1 -> title
                 1. error[200]: message
                  1 | abc
                    | ^^^
@@ -1146,7 +1146,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "",
+                "test.wacc",
                 input,
                 SummaryStage::Parser,
                 input,
@@ -1161,7 +1161,7 @@ mod tests {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:5
+                test.wacc:1:5
                 1. error[200]: message
                  1 | abcdefg
                    |     ^^^
@@ -1179,7 +1179,7 @@ mod tests {
         SHOULD_COLORIZE.set_override(false);
         assert_eq_multiline(
             singleton_summary(
-                "",
+                "test.wacc",
                 input,
                 SummaryStage::Parser,
                 &input[0..3],
@@ -1194,7 +1194,7 @@ mod tests {
             ),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:1
+                test.wacc:1:1
                 1. error[200]: message
                  1 | abc
                    | ^^^
@@ -1212,7 +1212,7 @@ mod tests {
         let input = "abc";
         SHOULD_COLORIZE.set_override(false);
         let mut summary = Summary::new(SummaryStage::Parser);
-        summary.add_input_file(input, String::new());
+        summary.add_input_file(input, "test.wacc".to_string());
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
@@ -1237,7 +1237,7 @@ mod tests {
             format!("{}", summary),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:1
+                test.wacc:1:1
                 1. error[200]:
                 2. error[200]:
                 3. error[200]:
@@ -1262,7 +1262,7 @@ mod tests {
         let input = "a b c";
         SHOULD_COLORIZE.set_override(false);
         let mut summary = Summary::new(SummaryStage::Parser);
-        summary.add_input_file(input, String::new());
+        summary.add_input_file(input, "test.wacc".to_string());
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
@@ -1287,7 +1287,7 @@ mod tests {
             format!("{}", summary),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:1
+                test.wacc:1:1
                 1.   error[200]: 
                 2. warning[200]: 
                 3.     error[1]: 
@@ -1312,7 +1312,7 @@ mod tests {
         let input = "a b\nc";
         SHOULD_COLORIZE.set_override(false);
         let mut summary = Summary::new(SummaryStage::Parser);
-        summary.add_input_file(input, String::new());
+        summary.add_input_file(input, "test.wacc".to_string());
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
@@ -1337,7 +1337,7 @@ mod tests {
             format!("{}", summary),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:1
+                test.wacc:1:1
                 1. error[200]:
                 2. error[200]:
                 3. error[200]:
@@ -1365,7 +1365,7 @@ mod tests {
         let input = "a b\nc";
         SHOULD_COLORIZE.set_override(false);
         let mut summary = Summary::new(SummaryStage::Parser);
-        summary.add_input_file(input, String::new());
+        summary.add_input_file(input, "test.wacc".to_string());
         summary.set_sep('~');
         for _ in 0..3 {
             let mut cell = SummaryCell::new(input);
@@ -1382,7 +1382,7 @@ mod tests {
             format!("{}", summary),
             indoc! {"
                 3 erroneous statements have been found during parsing
-                1:1
+                test.wacc:1:1
                 1. error[200]:
                  1 | a b
                    | ^
@@ -1390,7 +1390,7 @@ mod tests {
                    | V
                    | [1]
                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                1:1
+                test.wacc:1:1
                 1. error[200]:
                  1 | a b
                    | ^
@@ -1398,7 +1398,7 @@ mod tests {
                    | V
                    | [1]
                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                1:1
+                test.wacc:1:1
                 1. error[200]:
                  1 | a b
                    | ^
@@ -1415,7 +1415,7 @@ mod tests {
         let input = "a b\nc d";
         SHOULD_COLORIZE.set_override(false);
         let mut summary = Summary::new(SummaryStage::Parser);
-        summary.add_input_file(input, String::new());
+        summary.add_input_file(input, "test.wacc".to_string());
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
@@ -1428,7 +1428,7 @@ mod tests {
             format!("{}", summary),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:3
+                test.wacc:1:3
                 1. error[200]:
                  1 | a b
                    |   ^
@@ -1448,7 +1448,7 @@ mod tests {
         let input = "a b\ncd\ne f";
         SHOULD_COLORIZE.set_override(false);
         let mut summary = Summary::new(SummaryStage::Parser);
-        summary.add_input_file(input, String::new());
+        summary.add_input_file(input, "test.wacc".to_string());
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
@@ -1461,7 +1461,7 @@ mod tests {
             format!("{}", summary),
             indoc! {"
                 An erroneous statement has been found during parsing
-                1:3
+                test.wacc:1:3
                 1. error[200]:
                  1 | a b
                    |   ^
@@ -1484,7 +1484,7 @@ mod tests {
     fn test_overlapping_spans() {
         let input = "abc";
         let mut summary = Summary::new(SummaryStage::Parser);
-        summary.add_input_file(input, String::new());
+        summary.add_input_file(input, "test.wacc".to_string());
         let mut cell = SummaryCell::new(input);
         cell.add_component(SummaryComponent::new(
             SummaryType::Error,
