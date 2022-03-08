@@ -69,7 +69,7 @@ pub fn parse(input: &str) -> Result<Program<&str, &str>, Summary> {
 /// Parses the mod declarations in the file.
 pub fn parse_modules(input: &str) -> Result<(&str, Vec<PathBuf>), &str> {
     many0(delimited(
-        Lexer::Module.parser(),
+        tuple((ws(success(())), Lexer::Module.parser())),
         ws(parse_path),
         Lexer::SemiColon.parser(),
     ))(input)
@@ -140,10 +140,7 @@ pub fn parse_path(input: &str) -> IResult<&str, PathBuf, ErrorTree<&str>> {
 fn parse_program(input: &str) -> IResult<&str, Program<&str, &str>, ErrorTree<&str>> {
     map(
         delimited(
-            tuple((
-                ws(success(())),
-                Lexer::Begin.parser().context("Start of Program"),
-            )),
+            Lexer::Begin.parser().context("Start of Program"),
             tuple((
                 many0(span(parse_func)),
                 parse_stats(Lexer::End).context("End of Program"),
@@ -772,7 +769,7 @@ mod unit_tests {
     #[test]
     fn mod_delcarations_parsed_correctly() {
         let contents = indoc! {"
-            mod a.wacc;
+                            mod a.wacc;
             mod b/c.txt;
             mod d////e/f/g.txt;
             mod h/i\\;\\\\ .txt;
