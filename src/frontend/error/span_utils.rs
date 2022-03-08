@@ -26,7 +26,7 @@ pub(super) fn get_relative_range(input: &str, span: &str) -> Option<(usize, usiz
 
 /// Span locator. Manages calculations regarding positioning of a span within
 /// the input string, as well as calculating the line at which the span starts.
-pub(super) struct SpanLocator<'l> {
+pub(in super::super) struct SpanLocator<'l> {
     input: &'l str,
     input_lines: Vec<(usize, usize, bool)>,
     input_lines_characters_map: Vec<HashMap<usize, usize>>,

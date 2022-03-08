@@ -55,7 +55,9 @@ use backend::{compile, Options, PropagationOpt};
 use clap::Parser;
 use colored::Colorize;
 use frontend::analyse;
-use std::{cmp::min, fs::read_to_string, fs::File, io::Write, path::PathBuf, process};
+use std::fs::File;
+use std::io::Write;
+use std::{fs::read_to_string, path::PathBuf, process};
 
 /// Command line interface
 #[derive(Parser, Debug)]

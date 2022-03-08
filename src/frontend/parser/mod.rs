@@ -14,6 +14,7 @@ use super::ast::{
 use lexer::{parse_ident, ws, Lexer};
 use nom::{
     branch::alt,
+    character::complete::{char, none_of, one_of},
     combinator::{cut, eof, map, opt, success, value},
     error::{context, ParseError},
     multi::{many0, many1, separated_list0},
@@ -26,7 +27,10 @@ use nom_supreme::{
     multi::collect_separated_terminated,
     ParserExt,
 };
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use lexer::{parse_int, str_delimited};
 
@@ -60,6 +64,53 @@ pub fn parse(input: &str) -> Result<Program<&str, &str>, Summary> {
         Ok(ast) => Ok(ast),
         Err(err) => Err(convert_error_tree(input, err)),
     }
+}
+
+/// Parses the mod declarations in the file.
+pub fn parse_modules(input: &str) -> Result<(&str, Vec<PathBuf>), &str> {
+    many0(delimited(
+        Lexer::Module.parser(),
+        ws(parse_path),
+        Lexer::SemiColon.parser(),
+    ))(input)
+    .map_err(|err| {
+        if let nom::Err::Error(ErrorTree::Base { location, kind: _ }) = err {
+            location
+        } else {
+            panic!("Expected a base error only")
+        }
+    })
+}
+
+/// Parses a unix-style path.
+pub fn parse_path(input: &str) -> IResult<&str, PathBuf, ErrorTree<&str>> {
+    let path_component = many0(alt((
+        none_of("\0\\;/"),
+        preceded(char('\\'), one_of("\\;/")),
+    )));
+    let first_path_component = many0(alt((
+        none_of("\0\\;/"),
+        preceded(char('\\'), one_of("\\;/")),
+    )));
+    map(
+        tuple((
+            first_path_component,
+            many0(preceded(char('/'), path_component)),
+        )),
+        |(first_component, path)| {
+            Path::new(
+                &vec![first_component]
+                    .into_iter()
+                    .chain(path)
+                    .into_iter()
+                    .map(|component| component.into_iter().collect::<String>())
+                    .intersperse("/".to_string())
+                    .collect::<String>(),
+            )
+            .iter()
+            .collect::<PathBuf>()
+        },
+    )(input)
 }
 
 /// Parses an input string into a [Program].
@@ -675,6 +726,8 @@ pub fn convert_error_tree<'a>(input: &'a str, err: ErrorTree<&'a str>) -> Summar
 
 #[cfg(test)]
 mod unit_tests {
+    use indoc::indoc;
+
     use super::*;
 
     #[test]
@@ -714,5 +767,30 @@ mod unit_tests {
                 )
             )
         );
+    }
+
+    #[test]
+    fn mod_delcarations_parsed_correctly() {
+        let contents = indoc! {"
+            mod a.wacc;
+            mod b/c.txt;
+            mod d////e/f/g.txt;
+            mod h/i\\;\\\\ .txt;
+        "};
+        if let Ok((_, mods)) = parse_modules(contents) {
+            assert_eq!(
+                mods.iter()
+                    .map(|path| path.as_os_str().to_str())
+                    .collect::<Vec<_>>(),
+                vec![
+                    Some("a.wacc"),
+                    Some("b/c.txt"),
+                    Some("d/e/f/g.txt"),
+                    Some("h/i;\\ .txt")
+                ]
+            )
+        } else {
+            panic!("Parsing should succeed")
+        }
     }
 }

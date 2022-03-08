@@ -26,9 +26,7 @@ use nom::{
     sequence::{delimited, pair, terminated},
     IResult, Parser,
 };
-use nom_supreme::{
-    error::ErrorTree, multi::collect_separated_terminated, tag::complete::tag, ParserExt,
-};
+use nom_supreme::{error::ErrorTree, tag::complete::tag, ParserExt};
 use std::collections::HashSet;
 
 /// Parser for WACC comments. Returns the parsed comment on success.
