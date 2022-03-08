@@ -10,7 +10,7 @@ lazy_static! {
             "if", "then", "else", "fi", "fst", "snd", "int", "bool", "char", "string", "pair",
             "newpair", "begin", "end", "is", "while", "do", "done", "exit", "return", "call",
             "println", "print", "skip", "read", "free", "chr", "ord", "len", "null", "false",
-            "true",
+            "true", "mod",
         ];
         HashSet::from_iter(arr)
     };
@@ -26,7 +26,9 @@ use nom::{
     sequence::{delimited, pair, terminated},
     IResult, Parser,
 };
-use nom_supreme::{error::ErrorTree, tag::complete::tag, ParserExt};
+use nom_supreme::{
+    error::ErrorTree, multi::collect_separated_terminated, tag::complete::tag, ParserExt,
+};
 use std::collections::HashSet;
 
 /// Parser for WACC comments. Returns the parsed comment on success.
@@ -152,6 +154,8 @@ pub enum Lexer {
     Ord,
     /// "chr"
     Chr,
+    /// "mod"
+    Module,
 }
 
 impl Lexer {
@@ -224,6 +228,7 @@ impl Lexer {
             Self::Len => "len",
             Self::Ord => "ord",
             Self::Chr => "chr",
+            Self::Module => "mod",
         };
 
         move |input| match KEYWORD_HASHSET.get(literal) {
