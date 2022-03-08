@@ -53,11 +53,9 @@ mod intermediate;
 
 use backend::{compile, Options, PropagationOpt};
 use clap::Parser;
-use colored::Colorize;
-use frontend::analyse;
+use frontend::{analyse, gather_modules, GatherModulesError};
 use std::fs::File;
-use std::io::Write;
-use std::{fs::read_to_string, path::PathBuf, process};
+use std::{io::Write, path::PathBuf, process};
 
 /// Command line interface
 #[derive(Parser, Debug)]
@@ -89,6 +87,9 @@ struct Args {
 /// Exit code for a file open failure.
 const COMPILE_SUCCESS: i32 = 0;
 const FILE_FAILURE: i32 = 1;
+const ENCODING_FAILURE: i32 = 2;
+const MODULE_NOT_FOUND_FAILURE: i32 = 3;
+const MODULE_PARSING_FAILURE: i32 = 100;
 
 /// Compiler main entry.
 /// - Processes command line arguments controlling compiler behaviour.
@@ -96,67 +97,100 @@ const FILE_FAILURE: i32 = 1;
 #[allow(unused_variables)]
 fn main() -> std::io::Result<()> {
     let Args {
-        mut filepath,
+        filepath: mut main_file_path,
         outputpath,
         backend_temps: temp_arm,
         ir_print,
     } = Args::parse();
 
-    let filestring = filepath.as_path().display().to_string();
+    let (main_file, module_files) = match gather_modules(&main_file_path) {
+        Ok(files) => files,
+        Err(gather_err) => {
+            let (message, exit_code) = match gather_err {
+                GatherModulesError::MainFileNotPresent => (
+                    format!("File \'{}\' not found", main_file_path.display()),
+                    FILE_FAILURE,
+                ),
+                GatherModulesError::InvalidEncoding(path) => (
+                    format!("File \'{}\': unsupported file encoding", path.display()),
+                    ENCODING_FAILURE,
+                ),
+                GatherModulesError::InvalidModDecl(path, line, column) => (
+                    format!(
+                        "File {}:{}:{}: error while parsing module imports",
+                        path.display(),
+                        line,
+                        column
+                    ),
+                    MODULE_PARSING_FAILURE,
+                ),
+                GatherModulesError::ModuleNotPresent(path, module) => (
+                    format!(
+                        "Module \'{}\' imported from \'{}\' not found",
+                        module.display(),
+                        path.display()
+                    ),
+                    MODULE_NOT_FOUND_FAILURE,
+                ),
+            };
+            println!("{}", message);
+            process::exit(exit_code);
+        }
+    };
 
-    match read_to_string(filestring.clone()) {
-        Ok(source_code) => match analyse(&source_code) {
-            Ok(ir) => {
-                if ir_print {
-                    println!("INTERMEDIATE REPRESENTATION:\n{}", ir);
-                }
-
-                let options = Options {
-                    sethi_ullman_weights: false,
-                    dead_code_removal: false,
-                    propagation: PropagationOpt::None,
-                    inlining: false,
-                    tail_call: false,
-                    hoisting: false,
-                    strength_reduction: false,
-                    loop_unrolling: false,
-                    common_expressions: false,
-                    show_arm_temp_rep: temp_arm,
-                };
-
-                let result = compile(ir, options);
-
-                if temp_arm {
-                    for temp in result.intermediates {
-                        println!("{}", temp)
-                    }
-                }
-
-                let mut file = if let Some(outpath) = outputpath {
-                    File::create(outpath)?
-                } else {
-                    filepath.set_extension("s");
-                    File::create(filepath)?
-                };
-
-                write!(file, "{}", result.assembly)?;
-
-                process::exit(COMPILE_SUCCESS)
+    match analyse(&main_file, module_files.iter().collect()) {
+        Ok(ir) => {
+            if cfg!(debug_assertions) && ir.validate().is_err() {
+                panic!("Invalid Intermediate Representation\n");
             }
-            Err(mut err) => {
-                err.add_input_file(&source_code, filestring);
-                println!("{}", err);
-                process::exit(err.get_code());
+            if ir_print {
+                println!("Intermediate Representation:\n{}", ir);
             }
-        },
-        Err(err) => {
-            // failed to open the file
-            println!(
-                "{}\n{}",
-                "Error: Could not open file ".red().underline(),
-                err
+            let options = Options {
+                sethi_ullman_weights: false,
+                dead_code_removal: false,
+                propagation: PropagationOpt::None,
+                inlining: false,
+                tail_call: false,
+                hoisting: false,
+                strength_reduction: false,
+                loop_unrolling: false,
+                common_expressions: false,
+                show_arm_temp_rep: temp_arm,
+            };
+
+            let result = compile(ir, options);
+
+            if temp_arm {
+                for temp in result.intermediates {
+                    println!("{}", temp)
+                }
+            }
+
+            let mut file = if let Some(outpath) = outputpath {
+                File::create(outpath)?
+            } else {
+                main_file_path.set_extension("s");
+                File::create(main_file_path.file_name().unwrap())?
+            };
+
+            write!(file, "{}", result.assembly)?;
+
+            process::exit(COMPILE_SUCCESS)
+        }
+        Err(mut summary) => {
+            summary.add_input_file(
+                main_file.contents(),
+                main_file.filepath.display().to_string(),
             );
-            process::exit(FILE_FAILURE)
+            for module_file in &module_files {
+                summary.add_input_file(
+                    module_file.contents(),
+                    module_file.filepath.display().to_string(),
+                );
+            }
+            println!("{}", summary);
+            process::exit(summary.get_code());
         }
     }
 }
