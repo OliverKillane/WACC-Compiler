@@ -113,11 +113,11 @@ pub fn parse<'a>(
 
 /// Parses the mod declarations in the file.
 pub fn parse_imports(input: &str) -> Result<(&str, Vec<PathBuf>), &str> {
-    many0(delimited(
-        tuple((ws(success(())), Lexer::Module.parser())),
+    preceded(ws(success(())), many0(delimited(
+     Lexer::Module.parser(),
         ws(parse_path),
         Lexer::SemiColon.parser(),
-    ))(input)
+    )))(input)
     .map_err(|err| {
         if let nom::Err::Error(ErrorTree::Base { location, kind: _ }) = err {
             location

@@ -21,6 +21,7 @@ impl InputFile {
     }
 
     pub(super) fn to_parse_contents(&self) -> &str {
+        println!("Start of parse: {}", self.to_parse_start_idx);
         &self.contents[self.to_parse_start_idx..]
     }
 }
@@ -37,6 +38,7 @@ impl Hash for InputFile {
     }
 }
 
+#[derive(Debug)]
 pub enum GatherModulesError {
     MainFileNotPresent,
     InvalidEncoding(PathBuf),
