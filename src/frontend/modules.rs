@@ -60,9 +60,7 @@ fn process_component(filepath: PathBuf) -> Result<(InputFile, Vec<PathBuf>), Gat
             contents,
             to_parse_start_idx: remaining_start_idx,
         },
-        mods.into_iter()
-            .map(|path| path.absolutize().unwrap().into_owned())
-            .collect(),
+        mods,
     ))
 }
 
@@ -78,7 +76,7 @@ pub fn gather_modules(
         module_analyze_queue.append(
             &mut modules
                 .into_iter()
-                .map(|import| next_module.join(import))
+                .map(|import| next_module.join(import).absolutize().unwrap().into_owned())
                 .collect(),
         );
     }

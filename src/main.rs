@@ -54,8 +54,14 @@ mod intermediate;
 use backend::{compile, Options, PropagationOpt};
 use clap::Parser;
 use frontend::{analyse, gather_modules, GatherModulesError};
-use std::fs::File;
-use std::{io::Write, path::PathBuf, process};
+use pathdiff::diff_paths;
+use std::{
+    env::current_dir,
+    fs::File,
+    io::{self, Write},
+    path::{Path, PathBuf},
+    process,
+};
 
 /// Command line interface
 #[derive(Parser, Debug)]
@@ -91,11 +97,15 @@ const ENCODING_FAILURE: i32 = 2;
 const MODULE_NOT_FOUND_FAILURE: i32 = 3;
 const MODULE_PARSING_FAILURE: i32 = 100;
 
+fn get_relative_path(path: &Path) -> io::Result<PathBuf> {
+    Ok(diff_paths(path, current_dir()?).unwrap())
+}
+
 /// Compiler main entry.
 /// - Processes command line arguments controlling compiler behaviour.
 /// - Halts and reports failures through returning exit codes.
 #[allow(unused_variables)]
-fn main() -> std::io::Result<()> {
+fn main() -> io::Result<()> {
     let Args {
         filepath: mut main_file_path,
         outputpath,
@@ -108,17 +118,23 @@ fn main() -> std::io::Result<()> {
         Err(gather_err) => {
             let (message, exit_code) = match gather_err {
                 GatherModulesError::MainFileNotPresent => (
-                    format!("File \'{}\' not found", main_file_path.display()),
+                    format!(
+                        "File \'{}\' not found",
+                        get_relative_path(&main_file_path)?.display()
+                    ),
                     FILE_FAILURE,
                 ),
                 GatherModulesError::InvalidEncoding(path) => (
-                    format!("File \'{}\': unsupported file encoding", path.display()),
+                    format!(
+                        "File \'{}\': unsupported file encoding",
+                        get_relative_path(&path)?.display()
+                    ),
                     ENCODING_FAILURE,
                 ),
                 GatherModulesError::InvalidModDecl(path, line, column) => (
                     format!(
                         "File {}:{}:{}: error while parsing module imports",
-                        path.display(),
+                        get_relative_path(&path)?.display(),
                         line,
                         column
                     ),
@@ -127,8 +143,8 @@ fn main() -> std::io::Result<()> {
                 GatherModulesError::ModuleNotPresent(path, module) => (
                     format!(
                         "Module \'{}\' imported from \'{}\' not found",
-                        module.display(),
-                        path.display()
+                        get_relative_path(&module)?.display(),
+                        get_relative_path(&path)?.display()
                     ),
                     MODULE_NOT_FOUND_FAILURE,
                 ),
@@ -181,12 +197,16 @@ fn main() -> std::io::Result<()> {
         Err(mut summary) => {
             summary.add_input_file(
                 main_file.contents(),
-                main_file.filepath.display().to_string(),
+                get_relative_path(&main_file.filepath)?
+                    .display()
+                    .to_string(),
             );
             for module_file in &module_files {
                 summary.add_input_file(
                     module_file.contents(),
-                    module_file.filepath.display().to_string(),
+                    get_relative_path(&module_file.filepath)?
+                        .display()
+                        .to_string(),
                 );
             }
             println!("{}", summary);
