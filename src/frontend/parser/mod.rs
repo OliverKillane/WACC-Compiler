@@ -77,6 +77,7 @@ pub fn parse<'a>(
             None
         }
     };
+    #[allow(clippy::needless_collect)]
     let module_functions = zip(&module_inputs, module_semantic_infos)
         .map(
             |(module_input, module_semantic_info)| match module_semantic_info {
@@ -87,7 +88,7 @@ pub fn parse<'a>(
                 }
             },
         )
-        .collect::<Vec<_>>();
+        .collect::<LinkedList<_>>();
     if error_trees.is_empty() {
         let Program(functions, main_code) = ast.unwrap();
         let functions = vec![functions]
@@ -223,6 +224,7 @@ fn parse_program(input: &str) -> IResult<&str, Program<&str, &str>, ErrorTree<&s
 /// begin
 /// end
 /// ```
+#[allow(clippy::type_complexity)]
 fn parse_module(
     input: &str,
 ) -> IResult<&str, Vec<ASTWrapper<&str, Function<&str, &str>>>, ErrorTree<&str>> {
@@ -235,7 +237,7 @@ fn parse_module(
             )),
             eof.context("End of File"),
         ),
-        |funcs| funcs.unwrap_or(vec![]),
+        |funcs| funcs.unwrap_or_default(),
     )(input)
 }
 

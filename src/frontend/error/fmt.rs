@@ -669,7 +669,7 @@ impl<'l> SummaryCell<'l> {
             .color(TITLE_COLOR)
             .bold()
         ) + &Self::fmt_messages(&components)
-            + &Self::fmt_refs(&components, self.span, &input_locator)
+            + &Self::fmt_refs(&components, self.span, input_locator)
             + &Self::fmt_notes(&components)
             + &Self::fmt_declarations(&components, input_locator, multi_input_locator)
     }

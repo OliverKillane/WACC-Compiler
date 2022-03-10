@@ -146,7 +146,7 @@ impl<'l> MultiInputLocator<'l> {
         locators.sort_by_key(|(input_start, _, _)| *input_start);
 
         #[cfg(debug_assertions)]
-        if locators.len() > 0 {
+        if !locators.is_empty() {
             for ((input_start, _, locator), (next_input_start, _, _)) in
                 zip(&locators, &locators[1..])
             {
@@ -168,7 +168,7 @@ impl<'l> MultiInputLocator<'l> {
             .binary_search_by_key(&(span.as_ptr() as usize), |(input_start, _, _)| {
                 *input_start
             })
-            .map(|idx| Some(idx))
+            .map(Some)
             .unwrap_or_else(|idx| if idx > 0 { Some(idx - 1) } else { None })?;
         let (_, filename, locator) = self.locators.get(locator_idx)?;
         locator

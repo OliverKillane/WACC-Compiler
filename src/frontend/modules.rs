@@ -5,7 +5,7 @@ use std::hash::Hash;
 use std::{
     collections::{HashSet, LinkedList},
     fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 #[derive(Eq)]
@@ -65,8 +65,8 @@ fn process_component(filepath: PathBuf) -> Result<(InputFile, Vec<PathBuf>), Gat
     ))
 }
 
-pub fn chain_modules(module: &PathBuf, imports: Vec<PathBuf>) -> LinkedList<(PathBuf, PathBuf)> {
-    let mut module = module.clone();
+pub fn chain_modules(module: &Path, imports: Vec<PathBuf>) -> LinkedList<(PathBuf, PathBuf)> {
+    let mut module = module.to_owned();
     module.pop();
     imports
         .into_iter()
@@ -80,13 +80,13 @@ pub fn chain_modules(module: &PathBuf, imports: Vec<PathBuf>) -> LinkedList<(Pat
 }
 
 pub fn gather_modules(
-    main_file_path: &PathBuf,
+    main_file_path: &Path,
 ) -> Result<(InputFile, Vec<InputFile>), GatherModulesError> {
     let main_file_path = main_file_path
         .absolutize()
         .map_err(|_| GatherModulesError::MainFileNotPresent)?
         .into_owned();
-    let (main_input_file, main_imports) = process_component(main_file_path.clone())?;
+    let (main_input_file, main_imports) = process_component(main_file_path)?;
     let mut analyzed_modules = Vec::new();
     let mut analyzed_modules_paths = HashSet::new();
     let mut module_analyze_queue = chain_modules(&main_input_file.filepath, main_imports);
