@@ -21,7 +21,6 @@ impl InputFile {
     }
 
     pub(super) fn to_parse_contents(&self) -> &str {
-        println!("Start of parse: {}", self.to_parse_start_idx);
         &self.contents[self.to_parse_start_idx..]
     }
 }
@@ -66,21 +65,45 @@ fn process_component(filepath: PathBuf) -> Result<(InputFile, Vec<PathBuf>), Gat
     ))
 }
 
+pub fn chain_modules(module: &PathBuf, imports: Vec<PathBuf>) -> LinkedList<(PathBuf, PathBuf)> {
+    let mut module = module.clone();
+    module.pop();
+    imports
+        .into_iter()
+        .map(|import| {
+            (
+                module.clone(),
+                module.join(import).absolutize().unwrap().into_owned(),
+            )
+        })
+        .collect()
+}
+
 pub fn gather_modules(
     main_file_path: &PathBuf,
 ) -> Result<(InputFile, Vec<InputFile>), GatherModulesError> {
-    let (main_input_file, module_analyze_queue) = process_component(main_file_path.clone())?;
-    let mut analyzed_modules = HashSet::new();
-    let mut module_analyze_queue = module_analyze_queue.into_iter().collect::<LinkedList<_>>();
-    while let Some(next_module) = module_analyze_queue.pop_front() {
-        let (input_file, modules) = process_component(next_module.clone())?;
-        analyzed_modules.insert(input_file);
-        module_analyze_queue.append(
-            &mut modules
-                .into_iter()
-                .map(|import| next_module.join(import).absolutize().unwrap().into_owned())
-                .collect(),
-        );
+    let main_file_path = main_file_path
+        .absolutize()
+        .map_err(|_| GatherModulesError::MainFileNotPresent)?
+        .into_owned();
+    let (main_input_file, main_imports) = process_component(main_file_path.clone())?;
+    let mut analyzed_modules = Vec::new();
+    let mut analyzed_modules_paths = HashSet::new();
+    let mut module_analyze_queue = chain_modules(&main_input_file.filepath, main_imports);
+    while let Some((prev_module, next_module)) = module_analyze_queue.pop_front() {
+        if analyzed_modules_paths.contains(&next_module) {
+            continue;
+        }
+        let (input_file, imports) = process_component(next_module.clone()).map_err(|err| {
+            if let GatherModulesError::MainFileNotPresent = err {
+                GatherModulesError::ModuleNotPresent(prev_module, next_module.clone())
+            } else {
+                err
+            }
+        })?;
+        analyzed_modules.push(input_file);
+        module_analyze_queue.append(&mut chain_modules(&next_module, imports));
+        analyzed_modules_paths.insert(next_module);
     }
 
     Ok((main_input_file, analyzed_modules.into_iter().collect()))

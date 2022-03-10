@@ -211,6 +211,9 @@ use std::path::Path;
 #[case("valid/basic/skip/skip.wacc")]
 #[case("valid/basic/skip/comment.wacc")]
 #[case("valid/basic/skip/commentInLine.wacc")]
+#[case("valid/modules/main_files/ticTacToe.wacc")]
+#[case("valid/modules/main_files/hashTable.wacc")]
+#[case("valid/modules/main_files/binarySortTree.wacc")]
 fn semantic_anal_pass(#[case] file_name: &str) {
     let mut absolute_prefix = Path::new(file!()).to_owned();
     absolute_prefix.pop();
@@ -285,6 +288,7 @@ fn semantic_anal_pass(#[case] file_name: &str) {
 #[case("invalid/syntaxErr/basic/bgnErr.wacc")]
 #[case("invalid/syntaxErr/basic/noBody.wacc")]
 #[case("invalid/syntaxErr/basic/skpErr.wacc")]
+#[case("invalid/syntaxErr/modules/no_semicolon.wacc")]
 #[case("invalid/semanticErr/multiple/funcMess.wacc")]
 #[case("invalid/semanticErr/multiple/ifAndWhileErrs.wacc")]
 #[case("invalid/semanticErr/multiple/multiTypeErrs.wacc")]
@@ -357,4 +361,13 @@ fn semantic_anal_fail(#[case] file_name: &str) {
         println!("{:#?}", p);
     }
     assert!(res.is_err());
+}
+
+#[rstest]
+#[case("invalid/syntaxErr/modules/empty_path.wacc")]
+#[case("invalid/syntaxErr/modules/illegal_path.wacc")]
+fn module_gather_fail(#[case] file_name: &str) {
+    let mut absolute_prefix = Path::new(file!()).to_owned();
+    absolute_prefix.pop();
+    assert!(gather_modules(&absolute_prefix.join(Path::new(file_name))).is_err());
 }

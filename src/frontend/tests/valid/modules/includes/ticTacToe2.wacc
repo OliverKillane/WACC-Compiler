@@ -1,0 +1,273 @@
+mod ticTacToe1.wacc;
+
+begin
+    ############################### Game Engine Functions ##################################
+	
+	# Ask for a move from the current player. The valid move is stored in the move array. Return true.
+	bool askForAMove(pair(pair, pair) board, char currentTurn, char playerSymbol, pair(pair, pair) aiData, int[] move) is
+		if currentTurn == playerSymbol then
+			bool _ = call askForAMoveHuman(board, move)
+		else 
+			bool _ = call askForAMoveAI(board, currentTurn, playerSymbol, aiData, move)
+		fi ;
+		return true
+	end
+	
+	# Place the given move of the currentTurn in the board. Return true.
+	bool placeMove(pair(pair, pair) board, char currentTurn, int moveRow, int moveColumn) is
+		
+		# Find the target row.
+		pair(pair, char) targetRow = null ;
+		if moveRow <= 2 then
+			pair(pair, pair) front = fst board ;
+			if moveRow == 1 then
+				targetRow = fst front
+			else
+				# moveRow == 2
+				targetRow = snd front
+			fi
+		else
+			# moveRow == 3
+			targetRow = snd board
+		fi ;
+		
+		# Set the target cell
+		if moveColumn <= 2 then
+			pair(char, char) front = fst targetRow ;
+			if moveColumn == 1 then
+				fst front = currentTurn
+			else
+				# moveColumn == 2
+				snd front = currentTurn
+			fi
+		else
+			# moveColumn == 3
+			snd targetRow = currentTurn
+		fi ;
+		return true
+		
+	end
+	
+	# Notify the opponent about a move of another party. Return true.
+	bool notifyMove(pair(pair, pair) board, char currentTurn, char playerSymbol, pair(pair, pair) aiData, int moveRow, int moveColumn) is
+		if currentTurn == playerSymbol then
+			bool _ = call notifyMoveAI(board, currentTurn, playerSymbol, aiData, moveRow, moveColumn)
+		else 
+			bool _ = call notifyMoveHuman(board, currentTurn, playerSymbol, moveRow, moveColumn)
+		fi ;
+		return true
+	end
+	
+	# Given either 'x' or 'o', returns another one.
+	char oppositeSymbol(char symbol) is
+		if symbol == 'x' then
+			return 'o' 
+		else
+			if symbol == 'o' then
+				return 'x'
+			else
+				# Should not happen!
+				println "Internal Error: symbol given is neither \'x\' or \'o\'" ;
+				exit -1 
+			fi 
+		fi
+	end
+	
+	# row = 1, 2 or 3
+	# column = 1, 2 or 3
+	char symbolAt(pair(pair, pair) board, int row, int column) is
+	
+		# Find the target row.
+		pair(pair, char) targetRow = null ;
+		if row <= 2 then
+			pair(pair, pair) front = fst board ;
+			if row == 1 then
+				targetRow = fst front
+			else
+				# row == 2
+				targetRow = snd front
+			fi
+		else
+			# row == 3
+			targetRow = snd board
+		fi ;
+		
+		# Now find the target cell.
+		char targetCell = '\0' ;
+		if column <= 2 then
+			pair(char, char) front = fst targetRow ;
+			if column == 1 then 
+				targetCell = fst front 
+			else
+				# column == 2
+				targetCell = snd front
+			fi
+		else
+			# column == 3
+			targetCell = snd targetRow
+		fi ;
+			
+		return targetCell	
+	end
+	
+	# Return true if there is at least one empty cell where the next player can place a move. Otherwise, return false (game ends).
+	bool containEmptyCell(pair(pair, pair) board) is
+		pair(pair, pair) front = fst board ;
+		
+		pair(pair, char) row1 = fst front ;
+		pair(pair, char) row2 = snd front ;
+		pair(pair, char) row3 = snd board ;
+		
+		bool row1ContainEmpty = call containEmptyCellRow(row1) ;
+		bool row2ContainEmpty = call containEmptyCellRow(row2) ;
+		bool row3ContainEmpty = call containEmptyCellRow(row3) ;
+		
+		return row1ContainEmpty || row2ContainEmpty || row3ContainEmpty
+	end
+	
+	bool containEmptyCellRow(pair(pair, char) row) is
+		pair(char, char) front = fst row ;
+		
+		char cell1 = fst front ;
+		char cell2 = snd front ;
+		char cell3 = snd row ;
+		
+		return cell1 == '\0' || cell2 == '\0' || cell3 == '\0'
+	end
+	
+	# Find if the candidate symbol ('x' or 'o') has won the game.
+	# Returns true if and only if it has won. 
+	bool hasWon(pair(pair, pair) board, char candidate) is
+		char c11 = call symbolAt(board, 1, 1) ;
+		char c12 = call symbolAt(board, 1, 2) ;
+		char c13 = call symbolAt(board, 1, 3) ;
+		char c21 = call symbolAt(board, 2, 1) ;
+		char c22 = call symbolAt(board, 2, 2) ;
+		char c23 = call symbolAt(board, 2, 3) ;
+		char c31 = call symbolAt(board, 3, 1) ;
+		char c32 = call symbolAt(board, 3, 2) ;
+		char c33 = call symbolAt(board, 3, 3) ;
+		
+		return 
+			# Row win
+			c11 == candidate && c12 == candidate && c13 == candidate ||
+			c21 == candidate && c22 == candidate && c23 == candidate ||
+			c31 == candidate && c32 == candidate && c33 == candidate ||
+			 
+			# Column win
+			c11 == candidate && c21 == candidate && c31 == candidate ||
+			c12 == candidate && c22 == candidate && c32 == candidate ||
+			c13 == candidate && c23 == candidate && c33 == candidate ||
+			
+			# Diagonal win
+			c11 == candidate && c22 == candidate && c33 == candidate ||
+			c13 == candidate && c22 == candidate && c31 == candidate
+	end
+	
+	# Allocate a new board. 
+	# We use a Pair4Three structure to store pointers to the 3 rows.
+	pair(pair, pair) allocateNewBoard() is
+		pair(pair, char) row1 = call allocateNewRow() ;
+		pair(pair, char) row2 = call allocateNewRow() ;
+		pair(pair, char) row3 = call allocateNewRow() ;
+		
+		pair(pair, pair) front = newpair(row1, row2) ;
+		pair(pair, pair) root = newpair(front, row3) ;
+		return root
+	end
+	
+	# Allocate a row of the board. 
+	# A row is represented by a Pair4Three structure.
+	# The default value in each cell is '\0'.
+	pair(pair, char) allocateNewRow() is
+		pair(char, char) front = newpair('\0', '\0') ;
+		pair(pair, char) root = newpair(front, '\0') ;
+		return root
+	end
+
+	# Free a memory used to store the whole board.
+	# Return true.
+	bool freeBoard(pair(pair, pair) board) is
+		pair(pair, pair) front = fst board ;
+		
+		pair(pair, char) row1 = fst front ;
+		pair(pair, char) row2 = snd front ;
+		pair(pair, char) row3 = snd board ;
+		
+		bool _ = call freeRow(row1) ;
+		_ = call freeRow(row2) ;
+		_ = call freeRow(row3) ;
+		
+		free front ;
+		free board ;
+		return true
+	end
+	
+	# Free the memory used for a row. Return true.
+	bool freeRow(pair(pair, char) row) is
+		pair(char, char) front = fst row ;
+		free front ;
+		free row ;
+		return true
+	end
+	
+	# For debugging purpose.
+	bool printAiData(pair(pair, pair) aiData) is
+		
+		pair(char, pair) info = fst aiData ;
+		pair(pair, int) stateTree = snd aiData ;
+		
+		bool _ = call printStateTreeRecursively(stateTree) ;
+		exit 0
+	end
+	
+	bool printStateTreeRecursively(pair(pair, int) stateTree) is
+		if stateTree == null then
+			return true 
+		else 
+			pair(pair, pair) front = fst stateTree ;
+			
+			pair(pair, pair) board = fst front ;
+			pair(pair, pair) pointers = snd front ;
+			int value = snd stateTree ;
+			
+			# Print the value
+			print 'v' ;
+			print '=' ;
+			println value ;
+			
+			bool _ = call printBoard(board) ;
+			_ = call printChildrenStateTree(pointers) ;
+			
+			println 'p' ;
+			return true
+		fi
+	end
+	
+	bool printChildrenStateTree(pair(pair, pair) pointers) is
+		pair(pair, pair) front = fst pointers ;
+		
+		pair(pair, pair) row1 = fst front ;
+		pair(pair, pair) row2 = snd front ;
+		pair(pair, pair) row3 = snd pointers ;
+		
+		bool _ = call printChildrenStateTreeRow(row1) ;
+		_ = call printChildrenStateTreeRow(row2) ;
+		_ = call printChildrenStateTreeRow(row3) ;
+		return true
+	end
+	
+	bool printChildrenStateTreeRow(pair(pair, pair) rowPointers) is
+		pair(pair, pair) front = fst rowPointers ;
+		
+		pair(pair, int) cell1 = fst front ;
+		pair(pair, int) cell2 = snd front ;
+		pair(pair, int) cell3 = snd rowPointers ;
+		
+		bool _ = call printStateTreeRecursively(cell1) ;
+		_ = call printStateTreeRecursively(cell2) ;
+		_ = call printStateTreeRecursively(cell3) ;
+		
+		return true
+	end
+end

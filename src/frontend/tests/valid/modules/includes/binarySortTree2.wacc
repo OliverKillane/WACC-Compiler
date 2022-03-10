@@ -1,0 +1,18 @@
+begin
+  # Print the integers in the binary search tree in the increasing order.
+  int printTree(pair(int, pair) root) is
+    if root == null then
+      return 0 
+    else
+      pair(pair, pair) body = snd root ;
+      pair(int, pair) p = fst body ;
+      int temp = call printTree(p) ;
+      temp = fst root ; 
+      print temp ;
+      print ' ' ;
+      p = snd body ;
+      temp = call printTree(p) ;
+      return 0
+    fi
+  end
+end

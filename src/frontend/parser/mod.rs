@@ -18,7 +18,7 @@ use nom::{
     combinator::{cut, eof, map, opt, success, value},
     error::{context, ParseError},
     multi::{many0, many1, separated_list0},
-    sequence::{delimited, pair, preceded, separated_pair, tuple},
+    sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
     IResult,
 };
 use nom_supreme::{
@@ -113,11 +113,14 @@ pub fn parse<'a>(
 
 /// Parses the mod declarations in the file.
 pub fn parse_imports(input: &str) -> Result<(&str, Vec<PathBuf>), &str> {
-    preceded(ws(success(())), many0(delimited(
-     Lexer::Module.parser(),
-        ws(parse_path),
-        Lexer::SemiColon.parser(),
-    )))(input)
+    preceded(
+        ws(success(())),
+        many0(delimited(
+            Lexer::Module.parser(),
+            ws(parse_path),
+            Lexer::SemiColon.parser(),
+        )),
+    )(input)
     .map_err(|err| {
         if let nom::Err::Error(ErrorTree::Base { location, kind: _ }) = err {
             location
@@ -223,10 +226,16 @@ fn parse_program(input: &str) -> IResult<&str, Program<&str, &str>, ErrorTree<&s
 fn parse_module(
     input: &str,
 ) -> IResult<&str, Vec<ASTWrapper<&str, Function<&str, &str>>>, ErrorTree<&str>> {
-    delimited(
-        Lexer::Begin.parser().context("Start of Program"),
-        many0(span(parse_func)),
-        eof.context("End of File"),
+    map(
+        terminated(
+            opt(delimited(
+                Lexer::Begin.parser().context("Start of Module"),
+                many0(span(parse_func)),
+                Lexer::End.parser().context("End of Module"),
+            )),
+            eof.context("End of File"),
+        ),
+        |funcs| funcs.unwrap_or(vec![]),
     )(input)
 }
 
@@ -768,7 +777,7 @@ pub fn convert_error_tree<'a>(summary: &mut Summary<'a>, input: &'a str, err: Er
 
     for (k, v) in h {
         let k = match k {
-            "" => &input[input.len() - 2..],
+            "" => &input[input.len() - 1..],
             _ => &k[..1],
         };
 
