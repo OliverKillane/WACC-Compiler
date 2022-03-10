@@ -569,6 +569,7 @@ fn analyse_rhs<'a, 'b>(
                     for expr in args.into_iter() {
                         analyse_expression(expr, local_symb, var_symb, errors);
                     }
+                    errors.push(SemanticError::UndefinedFunction(fun_name));
                     None
                 }
             }
