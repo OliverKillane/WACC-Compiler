@@ -11,7 +11,7 @@ use expr::{translate_bool_expr, translate_expr, translate_num_expr};
 use stat::{translate_statement, FmtDataRefFlags};
 use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{HashMap, HashSet, LinkedList};
+use std::collections::{HashMap, LinkedList};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::iter::zip;

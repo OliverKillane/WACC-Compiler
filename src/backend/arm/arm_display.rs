@@ -4,7 +4,7 @@
 use lazy_static::__Deref;
 
 use super::arm_repr::*;
-use std::{collections::HashMap, fmt::{Display, write}};
+use std::{collections::HashMap, fmt::Display};
 
 impl Display for Ident {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -228,7 +228,7 @@ impl Display for Stat {
         match self {
             Stat::ApplyOp(op, cond, s, dest, operand, operand2) => write!(
                 f,
-                "\t{}{}{}\t{},\t{},\t{}",
+                "\t{}{}{}\t\t{},\t{},\t{}",
                 op,
                 cond,
                 conv(s),
@@ -238,7 +238,7 @@ impl Display for Stat {
             ),
             Stat::Mul(cond, s, dest, operand, operand2) => write!(
                 f,
-                "\tMUL{}{}\t{},\t{},\t{}",
+                "\tMUL{}{}\t\t{},\t{},\t{}",
                 cond,
                 conv(s),
                 dest,
@@ -247,7 +247,7 @@ impl Display for Stat {
             ),
             Stat::MulA(cond, s, dest, operand, operand2, operand3) => write!(
                 f,
-                "\tMULA{}{}\t{},\t{},\t{},\t{}",
+                "\tMULA{}{}\t\t{},\t{},\t{},\t{}",
                 cond,
                 conv(s),
                 dest,
@@ -257,7 +257,7 @@ impl Display for Stat {
             ),
             Stat::MulOp(op, cond, s, hi, lo, operand, operand2) => write!(
                 f,
-                "\t{}{}{}\t{},\t{},\t{},\t{}",
+                "\t{}{}{}\t\t{},\t{},\t{},\t{}",
                 op,
                 cond,
                 conv(s),
@@ -267,24 +267,36 @@ impl Display for Stat {
                 operand2
             ),
             Stat::Move(op, cond, s, ident, operand) => {
-                write!(f, "\t{}{}{}\t{},\t{}", op, cond, conv(s), ident, operand)
+                write!(f, "\t{}{}{}\t\t{},\t{}", op, cond, conv(s), ident, operand)
             }
             Stat::Cmp(op, cond, ident, operand) => {
-                write!(f, "\t{}{}\t{},\t{}", op, cond, ident, operand)
+                write!(f, "\t{}{}\t\t{},\t{}", op, cond, ident, operand)
             }
             Stat::SatOp(op, cond, dest, operand, operand2) => {
-                write!(f, "\t{}{}\t{},\t{},\t{}", op, cond, dest, operand, operand2)
+                write!(
+                    f,
+                    "\t{}{}\t\t{},\t{},\t{}",
+                    op, cond, dest, operand, operand2
+                )
             }
             Stat::ReadCPSR(reg) => write!(f, "\tMSR\t{},\tCPSR", reg),
             Stat::MemOp(op, cond, s, ident, operand) => {
-                write!(f, "\t{}{}{}\t{},\t{}", op, cond, if *s {"B"} else {""}, ident, operand)
+                write!(
+                    f,
+                    "\t{}{}{}\t\t{},\t{}",
+                    op,
+                    cond,
+                    if *s { "B" } else { "" },
+                    ident,
+                    operand
+                )
             }
-            Stat::Push(cond, ident) => write!(f, "\tPUSH{}\t{{{}}}", cond, ident,),
-            Stat::Pop(cond, ident) => write!(f, "\tPOP{}\t{{{}}}", cond, ident,),
-            Stat::Link(cond, link_to) => write!(f, "\tBL{}\t{}", cond, link_to),
+            Stat::Push(cond, ident) => write!(f, "\tPUSH{}\t\t{{{}}}", cond, ident,),
+            Stat::Pop(cond, ident) => write!(f, "\tPOP{}\t\t{{{}}}", cond, ident,),
+            Stat::Link(cond, link_to) => write!(f, "\tBL{}\t\t{}", cond, link_to),
             Stat::Call(fun_name, ret_temp, arg_temps) => write!(
                 f,
-                "\tINTERNAL OPERATION: CALL\t{}\t{}, ARGS({})",
+                "\tINTERNAL OPERATION: CALL\t\t{}\t{}, ARGS({})",
                 fun_name,
                 match ret_temp {
                     Some(t) => format!("{}", t),
@@ -447,7 +459,7 @@ impl Display for DataType {
                     }
                 }
                 writeln!(f, "\"")
-            },
+            }
             DataType::Word(w) => writeln!(f, ".word {}", w),
             DataType::HalfWord(h) => writeln!(f, ".hword {}", h),
             DataType::Byte(b) => writeln!(f, ".byte {}", b),

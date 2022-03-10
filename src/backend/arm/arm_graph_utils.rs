@@ -1,8 +1,6 @@
 //! Utility functions to allow easy manipoulation of the arm graph for
 //! translation and final register allocation.
 
-use lazy_static::__Deref;
-
 use super::arm_repr::{ArmNode, ControlFlow, Stat};
 use crate::graph::Graph;
 use std::ops::DerefMut;
@@ -16,10 +14,7 @@ pub struct Chain(pub ArmNode, pub ArmNode);
 /// 2. start <-> leftmiddle <-> rightmiddle -> end
 /// 3. start <-> end
 /// ```
-pub fn link_two_chains(
-    Chain(start, leftmiddle): Chain,
-    Chain(rightmiddle, end): Chain,
-) -> Chain {
+pub fn link_two_chains(Chain(start, leftmiddle): Chain, Chain(rightmiddle, end): Chain) -> Chain {
     link_two_nodes(leftmiddle, rightmiddle);
     Chain(start, end)
 }
@@ -162,14 +157,14 @@ impl ArmNode {
         }
     }
 
-    pub fn print_arm_node(&self) -> &str {
-        match self.get().deref() {
-            ControlFlow::Simple(_, _, _) => "Simple",
-            ControlFlow::Branch(_, _, _, _) => "Branch",
-            ControlFlow::Ltorg(_) => "Ltorg",
-            ControlFlow::Return(_, _) => "Return",
-            ControlFlow::Multi(_, _) => "Multi",
-            ControlFlow::Removed => "Removed",
+    pub fn remove_successor(&mut self) {
+        match self.get_mut().deref_mut() {
+            ControlFlow::Simple(_, _, succ)
+            | ControlFlow::Branch(_, _, _, succ)
+            | ControlFlow::Multi(_, succ) => *succ = None,
+            ControlFlow::Ltorg(_) => panic!("literal pool has no successor"),
+            ControlFlow::Return(_, _) => panic!("return statement has no successor"),
+            ControlFlow::Removed => panic!("cannot replace successor for a removed node"),
         }
     }
 }

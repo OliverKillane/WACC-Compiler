@@ -27,10 +27,10 @@ use super::{
     },
 };
 
+/// Type alias for the preserved value identifiers (registers R4-R12 and R14)
 type Preserved = u128;
-type Reserved = i128;
 
-/// A type for each part of the registers and stack,
+/// A descriptor for the type of data held in a register.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Alloc {
     /// A temporary variable (in register/stack)
@@ -250,9 +250,7 @@ impl AllocationState {
         }
     }
 
-    /// Mark the space used for any variable not used as free, place all use
-    /// temporaries in registers.
-    /// Note: temps is sorted for 'wait longest till use' and the end.
+    /// Mark all registers containing dead temporaries as free.
     pub fn update_live(&mut self, temps: &[Temporary]) {
         for reg in self.registers.iter_mut() {
             if let Alloc::Temp(t) = reg {
@@ -288,9 +286,7 @@ impl AllocationState {
 
         if -4095 <= sp_offset && sp_offset <= 4095 {
             // we can use a stack pointer offset to get the temporary
-
             // LDR reg_ind, [Sp, #offset]
-
             simple_node(
                 Stat::MemOp(
                     memop,
@@ -347,8 +343,10 @@ impl AllocationState {
             // choose a low usage register R12 to push and pop, we store the offset here
             let tmp_register = Ident::Reg(Register::R12);
 
+            // as we push, we must increase offset by 4
+
             // PUSH {tmp_reg}
-            // LDR tmp_reg, =offset
+            // LDR tmp_reg, =offset + 4
             // ADD tmp_reg, tmp_reg, SP
             // LDR reg_ind, [tmp_reg]
             // POP {tmp_reg}
@@ -361,7 +359,7 @@ impl AllocationState {
                         Cond::Al,
                         false,
                         tmp_register,
-                        MemOperand::Expression(sp_offset as i32),
+                        MemOperand::Expression(sp_offset as i32 + 4),
                     ),
                     Stat::ApplyOp(
                         RegOp::Add,
@@ -397,8 +395,8 @@ impl AllocationState {
         used: &[Temporary],
         graph: &mut Graph<ControlFlow>,
     ) -> (Register, Option<Chain>) {
-        let mut free_registers = vec![];
-        let mut preserve_registers = vec![];
+        let mut free_registers = Vec::new();
+        let mut preserve_registers = Vec::new();
         let mut temp_registers = HashMap::new();
 
         // iterate through all registers to get the free, preserved and the temporary registers
@@ -533,7 +531,8 @@ impl AllocationState {
         free_regs
     }
 
-    /// backup an allocation to the stack frame, if it is currently not in a register, it is already backed up.
+    /// backup an allocation to the stack frame, if it is currently not in a
+    /// register, it is already backed up.
     fn backup_alloc_to_frame(
         &mut self,
         alloc: Alloc,
@@ -849,8 +848,7 @@ impl AllocationState {
             .expect("Must place destination in PC, hence always has a chain");
 
         // Add a literal pool at the end for large functions
-        let ltorg = graph.new_node(ControlFlow::Ltorg(Some(end.clone())));
-        end.set_successor(ltorg);
+        end.set_successor(graph.new_node(ControlFlow::Ltorg(Some(end.clone()))));
 
         start
     }

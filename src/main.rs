@@ -55,10 +55,7 @@ use backend::{compile, Options, PropagationOpt};
 use clap::Parser;
 use colored::Colorize;
 use frontend::analyse;
-use intermediate::Program;
-use std::fs::File;
-use std::io::Write;
-use std::{cmp::min, fs::read_to_string, path::PathBuf, process};
+use std::{cmp::min, fs::read_to_string, fs::File, io::Write, path::PathBuf, process};
 
 /// Command line interface
 #[derive(Parser, Debug)]
@@ -76,14 +73,15 @@ struct Args {
     )]
     outputpath: Option<PathBuf>,
 
-    #[clap(short, long, help = "print the arm representation with temporaries")]
-    temp_arm: bool,
+    #[clap(
+        short,
+        long,
+        help = "print the backend representations (arm with temporaries)"
+    )]
+    backend_temps: bool,
 
     #[clap(short, long, help = "print the intermediate representation generated")]
     ir_print: bool,
-
-    #[clap(short, long, help = "display graph based backend")]
-    graph_backend: bool,
 }
 
 /// Exit code for a file open failure.
@@ -98,9 +96,8 @@ fn main() -> std::io::Result<()> {
     let Args {
         mut filepath,
         outputpath,
-        temp_arm,
+        backend_temps: temp_arm,
         ir_print,
-        graph_backend,
     } = Args::parse();
 
     let filestring = filepath.as_path().display().to_string();
@@ -108,82 +105,44 @@ fn main() -> std::io::Result<()> {
     match read_to_string(filestring.clone()) {
         Ok(source_code) => match analyse(&source_code) {
             Ok(ir) => {
-                match if cfg!(debug_assertions) {
-                    ir.validate()
-                } else {
-                    Ok(())
-                } {
-                    Ok(_) => {
-                        if ir_print {
-                            println!("THE INTERMEDIATE REPRESENTATION:\n{}", ir);
-                        }
-                    }
-                    Err(_) => {
-                        let Program(functions, local_vars, block_graph, data_refs, int_handler) =
-                            ir;
-                        if ir_print {
-                            panic!("INVALID INTERMEDIATE REPRESENTATION: Program{{\n\t[\n{}\t],\n\t[\n{}\t],\n\t[\n{}\t],\n\t[\n{}\t],\n\t{:?}\n}}",
-                                functions.iter().map(|f| format!("\t\t{:?}\n", f)).collect::<String>(),
-                                local_vars.iter().map(|v| format!("\t\t{:?}\n", v)).collect::<String>(),
-                                block_graph.iter().map(|b| format!("\t\t{:?}\n", b)).collect::<String>(),
-                                data_refs.iter().map(|rf| format!("\t\t{:?}\n", rf)).collect::<String>(),
-                                int_handler
-                            )
-                        } else {
-                            panic!("INVALID INTERMEDIATE REPRESENTATION");
-                        }
+                if ir_print {
+                    println!("INTERMEDIATE REPRESENTATION:\n{}", ir);
+                }
+
+                let options = Options {
+                    sethi_ullman_weights: false,
+                    dead_code_removal: false,
+                    propagation: PropagationOpt::None,
+                    inlining: false,
+                    tail_call: false,
+                    hoisting: false,
+                    strength_reduction: false,
+                    loop_unrolling: false,
+                    common_expressions: false,
+                    show_arm_temp_rep: temp_arm,
+                };
+
+                let result = compile(ir, options);
+
+                if temp_arm {
+                    for temp in result.intermediates {
+                        println!("{}", temp)
                     }
                 }
 
-                if graph_backend {
-                    let options = Options {
-                        sethi_ullman_weights: false,
-                        dead_code_removal: false,
-                        propagation: PropagationOpt::None,
-                        inlining: false,
-                        tail_call: false,
-                        hoisting: false,
-                        strength_reduction: false,
-                        loop_unrolling: false,
-                        common_expressions: false,
-                        show_arm_temp_rep: temp_arm,
-                    };
-    
-                    let result = compile(ir, options);
-    
-                    for res in result.intermediates {
-                        println!("{}", res)
-                    }
-
-                    // Note to the marker:
-                    // Despite our overwhelming effort, there remain bugs in 
-                    // this backend, rather than waste time spent we have added 
-                    // it as an option.
-
-                    let mut file = if let Some(outpath) = outputpath {
-                        File::create(outpath)?
-                    } else {
-                        filepath.set_extension("s");
-                        File::create(filepath)?
-                    };
-                    
-                    write!(file, "{}", result.assembly)?;
-
+                let mut file = if let Some(outpath) = outputpath {
+                    File::create(outpath)?
                 } else {
-                    // let result = todo!();
-                    let file = if let Some(outpath) = outputpath {
-                        File::create(outpath)?
-                    } else {
-                        filepath.set_extension("s");
-                        File::create(filepath)?
-                    };
+                    filepath.set_extension("s");
+                    File::create(filepath)?
+                };
 
-                    // file.write_all(result.as_bytes())?;
-                }
+                write!(file, "{}", result.assembly)?;
+
                 process::exit(COMPILE_SUCCESS)
-
             }
             Err(errs) => {
+                // syntactic or semantic errors occurred
                 let mut exit_code = i32::MAX;
                 for mut err in errs {
                     err.set_filepath(filestring.clone());
@@ -194,12 +153,13 @@ fn main() -> std::io::Result<()> {
             }
         },
         Err(err) => {
+            // failed to open the file
             println!(
                 "{}\n{}",
                 "Error: Could not open file ".red().underline(),
                 err
             );
-            process::exit(FILE_FAILURE);
+            process::exit(FILE_FAILURE)
         }
     }
 }

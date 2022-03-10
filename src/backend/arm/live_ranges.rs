@@ -430,8 +430,8 @@ impl DefsUses for Stat {
                 add_temps(dst, defs);
                 flexop.get_defs_and_uses(defs, uses)
             }
-            Stat::Cmp(_, _, dst, flexop) => {
-                add_temps(dst, defs);
+            Stat::Cmp(_, _, arg, flexop) => {
+                add_temps(arg, uses);
                 flexop.get_defs_and_uses(defs, uses)
             }
             Stat::SatOp(_, _, dst, arg1, arg2) => {
@@ -440,13 +440,16 @@ impl DefsUses for Stat {
                 add_temps(arg2, uses)
             }
             Stat::ReadCPSR(dst) => add_temps(dst, defs),
-            Stat::MemOp(op, _, _, ident, _) => add_temps(
-                ident,
-                match op {
-                    MemOp::Ldr => defs,
-                    MemOp::Str => uses,
-                },
-            ),
+            Stat::MemOp(op, _, _, ident, memop) => {
+                add_temps(
+                    ident,
+                    match op {
+                        MemOp::Ldr => defs,
+                        MemOp::Str => uses,
+                    },
+                );
+                memop.get_defs_and_uses(defs, uses);
+            },
             Stat::Push(_, arg) => add_temps(arg, uses),
             Stat::Pop(_, arg) => add_temps(arg, defs),
             Stat::Link(_, _) => (),
