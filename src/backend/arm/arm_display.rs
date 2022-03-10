@@ -299,12 +299,12 @@ impl Display for Stat {
                 "\tINTERNAL OPERATION: CALL\t{}\t{}, ARGS({})",
                 fun_name,
                 match ret_temp {
-                    Some(t) => format!("{}", t),
+                    Some(t) => format!("T{}", t),
                     None => "No Return".to_string(),
                 },
                 arg_temps
                     .iter()
-                    .map(|t| format!("t{}", t))
+                    .map(|t| format!("T{}", t))
                     .collect::<Vec<_>>()
                     .join(",")
             ),
@@ -400,7 +400,7 @@ fn display_routine(start_node: &ArmNode, name: &String, f: &mut std::fmt::Format
                             f,
                             "\tINTERNAL OPERATION: RETURN\t{}",
                             if let Some(ret_temp) = ret {
-                                format! {"t{}", ret_temp}
+                                format! {"T{}", ret_temp}
                             } else {
                                 "no value returned".to_string()
                             }

@@ -390,13 +390,7 @@ fn translate_stat(
                 helper_function_flags,
             );
             match (expr_type, expr) {
-                (Type::Int | Type::Bool | Type::Pair(_, _) | Type::Array(_, _), expr) => {
-                    block_stats.push(ir::Stat::PrintExpr(expr));
-                }
-                (Type::Char, ir::Expr::Num(num_expr)) => {
-                    block_stats.push(ir::Stat::PrintChar(num_expr))
-                }
-                (Type::String, expr @ ir::Expr::Ptr(_)) => {
+                (Type::String | Type::Array(box Type::Char, 1), expr @ ir::Expr::Ptr(_)) => {
                     ir_vars.insert(*free_var, ir::Type::Ptr);
                     block_stats.push(ir::Stat::AssignVar(*free_var, expr));
                     block_stats.push(ir::Stat::PrintStr(
@@ -407,6 +401,12 @@ fn translate_stat(
                         ir::NumExpr::Deref(ir::NumSize::DWord, ir::PtrExpr::Var(*free_var)),
                     ));
                     *free_var += 1;
+                }
+                (Type::Int | Type::Bool | Type::Pair(_, _) | Type::Array(_, _), expr) => {
+                    block_stats.push(ir::Stat::PrintExpr(expr));
+                }
+                (Type::Char, ir::Expr::Num(num_expr)) => {
+                    block_stats.push(ir::Stat::PrintChar(num_expr))
                 }
                 (Type::Generic(_) | Type::Any, _) => panic!("Expected a concrete type"),
                 _ => panic!("Type does not match the expression"),

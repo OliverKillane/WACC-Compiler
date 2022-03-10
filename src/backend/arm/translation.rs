@@ -695,17 +695,17 @@ fn translate_statcode(
                                         MulOp::SMulL,
                                         Cond::Al,
                                         true,
-                                        holder_temp,
                                         arm_dst_temp,
+                                        holder_temp,
                                         left_reg,
                                         right_reg,
                                     ),
                                     Stat::Cmp(
                                         CmpOp::Cmp,
                                         Cond::Al,
-                                        arm_dst_temp,
+                                        holder_temp,
                                         FlexOperand::ShiftReg(
-                                            holder_temp,
+                                            arm_dst_temp,
                                             Some(Shift::Asr(31.into())),
                                         ),
                                     ),
@@ -772,7 +772,7 @@ fn translate_statcode(
             graph,
         ),
         // STR(size is bytes) three_temp, [temp_ptr]
-        StatCode::Store(three_temp, temp_ptr, size) => simple_node(
+        StatCode::Store(temp_ptr, three_temp, size) => simple_node(
             Stat::MemOp(
                 MemOp::Str,
                 Cond::Al,

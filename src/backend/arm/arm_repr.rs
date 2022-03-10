@@ -245,7 +245,7 @@ pub enum Stat {
     /// ```text
     /// (Multiply Operation, Condition, Set Condition Bits?, Result Hight, Result Low, Register Operand, Second Register Operand)
     /// ```
-    /// The high, low and first argument registers must be different
+    /// The low, high and first argument registers must be different
     MulOp(MulOp, Cond, bool, Ident, Ident, Ident, Ident),
 
     /// A move instruction from register to register of form:
