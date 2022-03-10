@@ -13,7 +13,7 @@ use super::{
     arm_graph_utils::{link_optional_chains, link_two_nodes, Chain},
     arm_repr::{
         ArmCode, ArmNode, ControlFlow, FlexOffset, FlexOperand, Ident, MemOp, MemOperand, Stat,
-        Subroutine, Temporary,
+        Subroutine, Temporary, Cond,
     },
     live_ranges::{get_live_ranges, LiveRanges},
 };
@@ -143,6 +143,9 @@ fn translate_from_node(
         // update the registers for current live_in
         alloc_state.update_live(&livein);
 
+        // a helper closure for checking conditions
+        let load_dst = |cond: &Cond| cond != &Cond::Al;
+
         // println!("----------------------------");
         // println!(
         //     "LIVEIN: {}",
@@ -183,21 +186,21 @@ fn translate_from_node(
                 let chain_before: Option<Chain> = match stat {
                     Stat::MemOp(
                         MemOp::Ldr,
-                        _,
+                        cond,
                         _,
                         dst_ident,
                         MemOperand::PreIndex(arg1_ident, FlexOffset::ShiftReg(_, arg2_ident, _)),
                     )
-                    | Stat::Mul(_, _, dst_ident, arg1_ident, arg2_ident)
+                    | Stat::Mul(cond, _, dst_ident, arg1_ident, arg2_ident)
                     | Stat::ApplyOp(
                         _,
-                        _,
+                        cond,
                         _,
                         dst_ident,
                         arg1_ident,
                         FlexOperand::ShiftReg(arg2_ident, _),
                     )
-                    | Stat::SatOp(_, _, dst_ident, arg1_ident, arg2_ident) => {
+                    | Stat::SatOp(_, cond, dst_ident, arg1_ident, arg2_ident) => {
                         // Arguments can be the same and match the destination.
                         let dst_t = dst_ident.get_temp();
                         let arg1_t = arg1_ident.get_temp();
@@ -218,7 +221,7 @@ fn translate_from_node(
                         // Use any free register, if arg1 or arg2 are live after the instruction, we do not want to use their register.
                         let (dst_reg, dst_chain) = alloc_state.move_temp_into_reg(
                             dst_t,
-                            false,
+                            load_dst(cond),
                             &[arg1_t, arg2_t],
                             &liveout,
                             graph,
@@ -231,16 +234,16 @@ fn translate_from_node(
 
                         link_optional_chains(vec![arg1_chain, arg2_chain, dst_chain])
                     }
-                    Stat::MemOp(MemOp::Ldr, _, _, dst_ident, MemOperand::Zero(arg_ident))
-                    | Stat::Move(_, _, _, dst_ident, FlexOperand::ShiftReg(arg_ident, _))
+                    Stat::MemOp(MemOp::Ldr, cond, _, dst_ident, MemOperand::Zero(arg_ident))
+                    | Stat::Move(_, cond, _, dst_ident, FlexOperand::ShiftReg(arg_ident, _))
                     | Stat::MemOp(
                         MemOp::Ldr,
-                        _,
+                        cond,
                         _,
                         dst_ident,
                         MemOperand::PreIndex(arg_ident, FlexOffset::Expr(_)),
                     )
-                    | Stat::ApplyOp(_, _, _, dst_ident, arg_ident, _) => {
+                    | Stat::ApplyOp(_, cond, _, dst_ident, arg_ident, _) => {
                         // A destination and argument, these can be the same register.
                         let dst_t = dst_ident.get_temp();
                         let arg_t = arg_ident.get_temp();
@@ -255,14 +258,14 @@ fn translate_from_node(
 
                         // find and place the dst in a register
                         let (dst_reg, dst_chain) =
-                            alloc_state.move_temp_into_reg(dst_t, false, &[arg_t], &liveout, graph);
+                            alloc_state.move_temp_into_reg(dst_t, load_dst(cond), &[arg_t], &liveout, graph);
 
                         *arg_ident = Ident::Reg(arg_reg);
                         *dst_ident = Ident::Reg(dst_reg);
 
                         link_optional_chains(vec![arg_chain, dst_chain])
                     }
-                    Stat::MulA(_, _, dst_ident, arg1_ident, arg2_ident, arg3_ident) => {
+                    Stat::MulA(cond, _, dst_ident, arg1_ident, arg2_ident, arg3_ident) => {
                         // three arguments and one destination
                         let dst_t = dst_ident.get_temp();
                         let arg1_t = arg1_ident.get_temp();
@@ -299,7 +302,7 @@ fn translate_from_node(
                         // find a destination, assign register
                         let (dst_reg, dst_chain) = alloc_state.move_temp_into_reg(
                             dst_t,
-                            false,
+                            load_dst(cond),
                             &[arg1_t, arg2_t, arg3_t],
                             &liveout,
                             graph,
@@ -312,7 +315,7 @@ fn translate_from_node(
 
                         link_optional_chains(vec![arg1_chain, arg2_chain, arg3_chain, dst_chain])
                     }
-                    Stat::MulOp(_, _, _, dst1_ident, dst2_ident, arg1_ident, arg2_ident) => {
+                    Stat::MulOp(_, cond, _, dst1_ident, dst2_ident, arg1_ident, arg2_ident) => {
                         // two destinations and two arguments
 
                         let dst1_t = dst1_ident.get_temp();
@@ -332,14 +335,14 @@ fn translate_from_node(
                         // assign the argument registers
                         let (dst1_reg, dst1_chain) = alloc_state.move_temp_into_reg(
                             dst1_t,
-                            false,
+                            load_dst(cond),
                             &[arg1_t, arg2_t],
                             &livein,
                             graph,
                         );
                         let (dst2_reg, dst2_chain) = alloc_state.move_temp_into_reg(
                             dst2_t,
-                            false,
+                            load_dst(cond),
                             &[arg1_t, arg2_t, dst1_t],
                             &livein,
                             graph,
@@ -353,15 +356,26 @@ fn translate_from_node(
                         link_optional_chains(vec![arg1_chain, arg2_chain, dst1_chain, dst2_chain])
                     }
 
-                    Stat::Move(_, _, _, dst_ident, _)
+                    Stat::Move(_, cond, _, dst_ident, _)
                     | Stat::MemOp(
                         MemOp::Ldr,
-                        _,
+                        cond,
                         _,
                         dst_ident,
                         MemOperand::Label(_) | MemOperand::Expression(_),
-                    )
-                    | Stat::ReadCPSR(dst_ident) => {
+                    ) => {
+                        // single destination
+                        let dst_t = dst_ident.get_temp();
+
+                        // kill unused variables before determining destination
+                        alloc_state.update_live(&liveout);
+
+                        let (reg, chain) =
+                            alloc_state.move_temp_into_reg(dst_t, load_dst(cond), &[], &[], graph);
+                        *dst_ident = Ident::Reg(reg);
+                        chain
+                    },
+                    Stat::ReadCPSR(dst_ident) => {
                         // single destination
                         let dst_t = dst_ident.get_temp();
 
@@ -372,7 +386,7 @@ fn translate_from_node(
                             alloc_state.move_temp_into_reg(dst_t, false, &[], &[], graph);
                         *dst_ident = Ident::Reg(reg);
                         chain
-                    }
+                    },
                     Stat::MemOp(
                         MemOp::Str,
                         _,
@@ -470,17 +484,17 @@ fn translate_from_node(
 
                         arg_chain
                     }
-                    Stat::Pop(_, dst_ident) => {
+                    Stat::Pop(cond, dst_ident) => {
                         // pop from the stack into some temporary
                         let dst_t = dst_ident.get_temp();
-                        let (arg1_reg, arg_chain) =
-                            alloc_state.move_temp_into_reg(dst_t, false, &[], &livein, graph);
+                        let (dst_reg, dst_chain) =
+                            alloc_state.move_temp_into_reg(dst_t, load_dst(cond), &[], &livein, graph);
 
-                        *dst_ident = Ident::Reg(arg1_reg);
+                        *dst_ident = Ident::Reg(dst_reg);
 
                         alloc_state.pop_sp();
 
-                        arg_chain
+                        dst_chain
                     }
                     Stat::Link(_, _) => None,
                     Stat::AssignStackWord(dst_ident) => {

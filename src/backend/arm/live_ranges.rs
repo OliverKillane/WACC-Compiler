@@ -8,7 +8,7 @@ use linked_hash_set::LinkedHashSet;
 
 use super::arm_repr::{
     ArmCode, ArmNode, ControlFlow, FlexOffset, FlexOperand, Ident, MemOp, MemOperand, Stat,
-    Subroutine, Temporary,
+    Subroutine, Temporary, Cond,
 };
 
 /// The identifier type for live range sets in the LiveRanges structure.
@@ -364,7 +364,11 @@ fn traverse_live_ranges(start_node: ArmNode, liveranges: &mut LiveRanges) {
     {}
 }
 
-/// Trait used to enforce all components of the arm representation can have temporary definitions and uses found.
+/// Trait used to enforce all components of the arm representation can have 
+/// temporary definitions and uses found.
+/// 
+/// If an instruction is conditional, it does not define the temporary (uses 
+/// still need to be propagated).
 trait DefsUses {
     fn get_defs_and_uses(&self, defs: &mut Vec<Temporary>, uses: &mut Vec<Temporary>);
 }
@@ -404,54 +408,69 @@ impl DefsUses for Stat {
             }
         };
         match self {
-            Stat::ApplyOp(_, _, _, dst, arg1, flexop) => {
-                add_temps(dst, defs);
+            Stat::ApplyOp(_, cond, _, dst, arg1, flexop) => {
+                if cond == &Cond::Al {
+                    add_temps(dst, defs);
+                }
                 add_temps(arg1, uses);
                 flexop.get_defs_and_uses(defs, uses)
             }
-            Stat::Mul(_, _, dst, arg1, arg2) => {
-                add_temps(dst, defs);
+            Stat::Mul(cond, _, dst, arg1, arg2) => {
+                if cond == &Cond::Al {
+                    add_temps(dst, defs);
+                }
                 add_temps(arg1, uses);
                 add_temps(arg2, uses)
             }
-            Stat::MulA(_, _, dsthi, dstlo, arg1, arg2) => {
-                add_temps(dsthi, defs);
-                add_temps(dstlo, defs);
+            Stat::MulA(cond, _, dstlo, dsthi, arg1, arg2) => {
+                if cond == &Cond::Al {
+                    add_temps(dsthi, defs);
+                    add_temps(dstlo, defs);
+                }
                 add_temps(arg1, uses);
                 add_temps(arg2, uses)
             }
-            Stat::MulOp(_, _, _, dsthi, dstlo, arg1, arg2) => {
-                add_temps(dsthi, defs);
-                add_temps(dstlo, defs);
+            Stat::MulOp(_, cond, _, dstlo, dsthi, arg1, arg2) => {
+                if cond == &Cond::Al {
+                    add_temps(dsthi, defs);
+                    add_temps(dstlo, defs);
+                }
                 add_temps(arg1, uses);
                 add_temps(arg2, uses)
             }
-            Stat::Move(_, _, _, dst, flexop) => {
-                add_temps(dst, defs);
+            Stat::Move(_, cond, _, dst, flexop) => {
+                if cond == &Cond::Al {
+                    add_temps(dst, defs);
+                }
                 flexop.get_defs_and_uses(defs, uses)
             }
             Stat::Cmp(_, _, arg, flexop) => {
                 add_temps(arg, uses);
                 flexop.get_defs_and_uses(defs, uses)
             }
-            Stat::SatOp(_, _, dst, arg1, arg2) => {
-                add_temps(dst, defs);
+            Stat::SatOp(_, cond, dst, arg1, arg2) => {
+                if cond == &Cond::Al {
+                    add_temps(dst, defs);
+                }
                 add_temps(arg1, uses);
                 add_temps(arg2, uses)
             }
             Stat::ReadCPSR(dst) => add_temps(dst, defs),
-            Stat::MemOp(op, _, _, ident, memop) => {
-                add_temps(
-                    ident,
-                    match op {
-                        MemOp::Ldr => defs,
-                        MemOp::Str => uses,
+            Stat::MemOp(op, cond, _, ident, memop) => {
+                match op {
+                    MemOp::Ldr => {
+                        if cond == &Cond::Al {
+                            add_temps(ident, defs);
+                        }
                     },
-                );
+                    MemOp::Str => add_temps(ident, uses),
+                }
                 memop.get_defs_and_uses(defs, uses);
             },
             Stat::Push(_, arg) => add_temps(arg, uses),
-            Stat::Pop(_, arg) => add_temps(arg, defs),
+            Stat::Pop(cond, dst) => if cond == &Cond::Al {
+                add_temps(dst, defs);
+            },
             Stat::Link(_, _) => (),
             Stat::Call(_, dst, args) => {
                 if let Some(dst) = dst {
