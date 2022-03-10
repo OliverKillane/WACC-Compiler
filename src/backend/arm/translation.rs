@@ -244,7 +244,10 @@ fn translate_node_inner(
             (label, None)
         }
         StatType::Return(_, three_var) => (
-            graph.new_node(ControlFlow::Return(None, Some(temp_map.use_id(*three_var)))),
+            graph.new_node(ControlFlow::Return(
+                None,
+                three_var.map(|three_var| temp_map.use_id(three_var)),
+            )),
             None,
         ),
         StatType::Dummy(_) => panic!("No dummy nodes should be in the final threecode"),

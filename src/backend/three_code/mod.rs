@@ -483,12 +483,14 @@ fn translate_block(
                     function_types,
                     options,
                 );
+                stat_line.add_node(
+                    stat_graph
+                        .borrow_mut()
+                        .new_node(StatType::new_return(Some(free_var))),
+                );
+            } else {
+                stat_line.add_node(stat_graph.borrow_mut().new_node(StatType::new_return(None)));
             }
-            stat_line.add_node(
-                stat_graph
-                    .borrow_mut()
-                    .new_node(StatType::new_return(expr.map(|_| free_var))),
-            );
             (vec![], None)
         }
         ir::BlockEnding::CondJumps(conds, last) => {
