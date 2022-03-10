@@ -126,12 +126,13 @@ pub enum BoolExpr {
     /// Dereference of a boolean under a given pointer.
     Deref(PtrExpr),
 
-    /// Tests whether the numeric expression evaluates to zero.
-    TestZero(NumExpr),
-    /// Tests whether the numeric expression evaluates to a positive signed value.
-    TestPositive(NumExpr),
     /// Check if two pointers point to the same address.
     PtrEq(PtrExpr, PtrExpr),
+    /// Check if 2 numbers are equal. The numbers have to have the same size.
+    NumEq(NumExpr, NumExpr),
+    /// Check if one number is smaller than the other. The numbers have to have
+    /// the same size.
+    NumLt(NumExpr, NumExpr),
 
     /// A boolean operation expression.
     BoolOp(Box<BoolExpr>, BoolOp, Box<BoolExpr>),
@@ -376,8 +377,12 @@ impl Display for BoolExpr {
             Self::PtrEq(ptr_expr1, ptr_expr2) => {
                 write!(f, "({})==({})", ptr_expr1, ptr_expr2)
             }
-            Self::TestPositive(num_expr) => write!(f, "({}) > 0", num_expr),
-            Self::TestZero(num_expr) => write!(f, "({}) == 0", num_expr),
+            Self::NumEq(num_expr1, num_expr2) => {
+                write!(f, "({})==({})", num_expr1, num_expr2)
+            }
+            Self::NumLt(num_expr1, num_expr2) => {
+                write!(f, "({})<({})", num_expr1, num_expr2)
+            }
             Self::Var(var_name) => write!(f, "v_{}", var_name),
         }
     }
@@ -560,9 +565,11 @@ impl BoolExpr {
                 ptr_expr.validate(functions, vars, data_refs, const_eval)?;
                 cond_result(!const_eval)
             }
-            BoolExpr::TestZero(num_expr) | BoolExpr::TestPositive(num_expr) => num_expr
-                .validate(functions, vars, data_refs, const_eval)
-                .map(|_| ()),
+            BoolExpr::NumEq(num_expr1, num_expr2) | BoolExpr::NumLt(num_expr1, num_expr2) => {
+                let size1 = num_expr1.validate(functions, vars, data_refs, const_eval)?;
+                let size2 = num_expr2.validate(functions, vars, data_refs, const_eval)?;
+                cond_result(size1 != size2)
+            }
             BoolExpr::PtrEq(ptr_expr1, ptr_expr2) => {
                 ptr_expr1.validate(functions, vars, data_refs, const_eval)?;
                 ptr_expr2.validate(functions, vars, data_refs, const_eval)
