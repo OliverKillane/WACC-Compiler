@@ -1141,6 +1141,49 @@ mod tests {
     }
 
     #[test]
+    fn translate_void_function_test() {
+        let graph = Rc::new(RefCell::new(Graph::new()));
+        let mut data_refs = HashMap::new();
+        let Function {
+            args,
+            code,
+            read_ref,
+        } = translate_function(
+            ir::Function(
+                None,
+                vec![(ir::Type::Num(ir::NumSize::DWord), 0)],
+                HashMap::from([(1, ir::Type::Num(ir::NumSize::Byte))]),
+                vec![ir::Block(vec![], vec![], ir::BlockEnding::Return(None))],
+            ),
+            graph.clone(),
+            &mut 0,
+            &mut data_refs,
+            &mut FmtDataRefFlags::default(),
+            &HashMap::from([("function".to_string(), None)]),
+            &Options {
+                sethi_ullman_weights: false,
+                dead_code_removal: false,
+                propagation: PropagationOpt::None,
+                inlining: false,
+                tail_call: false,
+                hoisting: false,
+                strength_reduction: false,
+                loop_unrolling: false,
+                common_expressions: false,
+                show_arm_temp_rep: false,
+            },
+        );
+        assert_eq!(args, vec![0]);
+        assert!(!read_ref);
+
+        let mut graph = Rc::try_unwrap(graph)
+            .expect("Multiple references to the graph")
+            .into_inner();
+        let return_node = graph.new_node(StatType::new_return(None));
+        match_graph(code.expect("No code"), return_node);
+    }
+
+    #[test]
     fn translate_program_test() {
         let ThreeCode {
             functions,
