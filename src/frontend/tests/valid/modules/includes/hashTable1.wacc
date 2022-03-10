@@ -1,0 +1,84 @@
+mod hashTable2.wacc;
+
+begin
+    ######################### Functions for Hash Table Interface ###############################
+	
+	# Given a hash table, initialise it. Return true.
+	bool init(pair(int, pair)[] table) is
+		int length = len table ;
+		int i = 0 ;
+		while i < length do
+			table[i] = null ; 
+			i = i + 1
+		done ;
+		return true
+	end
+
+	# Returns true if and only if the given hash table contains x.
+	bool contain(pair(int, pair)[] table, int x) is
+		int index = call calculateIndex(table, x) ;
+		pair(int, pair) node = call findNode(table[index], x) ;
+		return node != null
+	end
+	
+	# Insert the given x into the hash table if it does not already contain x.
+	# Returns true if and only if the table does not already contain x.
+	bool insertIfNotContain(pair(int, pair)[] table, int x) is
+		int index = call calculateIndex(table, x) ;
+		pair(int, pair) node = call findNode(table[index], x) ;
+		if node != null then
+			# Already contain it. Do nothing.
+			return false
+		else
+			# Insert in the front of the list.
+			pair(int, pair) p = newpair(x, table[index]) ;
+			table[index] = p ;
+			return true 
+		fi
+	end
+	
+	# Remove the given x from the hash table. Returns true if an only if the table contains x. 
+	# Otherwise, do nothing and returns false.
+	bool remove(pair(int, pair)[] table, int x) is
+		int index = call calculateIndex(table, x) ;
+		pair(int, pair) node = call findNode(table[index], x) ;
+		if node == null then
+			# Not found x. Just return false.
+			return false
+		else
+			# Found x, have to remove the node.
+			table[index] = call removeNode(table[index], node) ;
+			return true
+		fi
+	end
+	
+	# Remove all nodes from the table. Returns true.
+	bool removeAll(pair(int, pair)[] table) is
+		int length = len table ;
+		int i = 0 ;
+		while i < length do
+			pair(int, pair) p = table[i] ;
+			while p != null do
+				pair(int, pair) p2 = snd p ;
+				free p ;
+				p = p2
+			done ;
+			table[i] = null ;
+			i = i + 1
+		done ; 
+		return true
+	end
+	
+	# Count the number of integers in the table and return it.
+	int count(pair(int, pair)[] table) is
+		int length = len table ;
+		int sum = 0 ;
+		int i = 0 ;
+		while i < length do
+			int subSum = call countNodes(table[i]) ;
+			sum = sum + subSum ;
+			i = i + 1
+		done ;
+		return sum
+	end
+end

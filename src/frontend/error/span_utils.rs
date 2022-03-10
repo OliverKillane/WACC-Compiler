@@ -1,7 +1,9 @@
 //! Contains utility functions for determining the placement of spans within
 //! the original source code string.
 
-use std::{cmp::min, collections::HashMap};
+use std::{cmp::min, collections::HashMap, iter::zip};
+
+use super::InputFile;
 
 /// Returns the range of the indices of the span within the input string, provided
 /// the span starts somewhere within the input string.
@@ -24,7 +26,7 @@ pub(super) fn get_relative_range(input: &str, span: &str) -> Option<(usize, usiz
 
 /// Span locator. Manages calculations regarding positioning of a span within
 /// the input string, as well as calculating the line at which the span starts.
-pub(super) struct SpanLocator<'l> {
+pub(in super::super) struct SpanLocator<'l> {
     input: &'l str,
     input_lines: Vec<(usize, usize, bool)>,
     input_lines_characters_map: Vec<HashMap<usize, usize>>,
@@ -128,10 +130,83 @@ impl<'l> SpanLocator<'l> {
     }
 }
 
+/// Span locator for multiple files
+pub(super) struct MultiInputLocator<'l> {
+    /// The vector of all locators and the data used for searching through it
+    locators: Vec<(usize, String, SpanLocator<'l>)>,
+}
+
+impl<'l> MultiInputLocator<'l> {
+    /// Creates a new multi input locator from an array of error input files.
+    pub fn new(input_files: &[InputFile<'l>]) -> Self {
+        let mut locators: Vec<_> = input_files
+            .iter()
+            .cloned()
+            .map(|InputFile { input, filepath }| {
+                (input.as_ptr() as usize, filepath, SpanLocator::new(input))
+            })
+            .collect();
+        locators.sort_by_key(|(input_start, _, _)| *input_start);
+
+        #[cfg(debug_assertions)]
+        if !locators.is_empty() {
+            for ((input_start, _, locator), (next_input_start, _, _)) in
+                zip(&locators, &locators[1..])
+            {
+                if *input_start + locator.input.len() > *next_input_start {
+                    panic!("Overlapping input files")
+                }
+            }
+        }
+
+        Self { locators }
+    }
+
+    /// Helper function for binary searching for the parent input in all the inputs
+    fn get_locator_filepath<'s>(
+        &'s self,
+        span: &'l str,
+    ) -> Option<(&'s SpanLocator<'l>, &'s String)> {
+        let locator_idx = self
+            .locators
+            .binary_search_by_key(&(span.as_ptr() as usize), |(input_start, _, _)| {
+                *input_start
+            })
+            .map(Some)
+            .unwrap_or_else(|idx| if idx > 0 { Some(idx - 1) } else { None })?;
+        let (_, filename, locator) = self.locators.get(locator_idx)?;
+        locator
+            .get_optional_range(span)
+            .map(|_| (locator, filename))
+    }
+
+    /// Get the locator for the span, provided that the span starts within any input.
+    pub fn get_optional_locator<'loc>(&'loc self, span: &'l str) -> Option<&'loc SpanLocator<'l>> {
+        self.get_locator_filepath(span).map(|(locator, _)| locator)
+    }
+
+    /// Get the locator for the span. Throws error if the span is not within any input
+    pub fn get_locator<'loc>(&'loc self, span: &'l str) -> &'loc SpanLocator<'l> {
+        self.get_optional_locator(span)
+            .expect("Span not in any input")
+    }
+
+    /// Get the filepath for the span, provided that the span starts within any input.
+    pub fn get_optional_filepath<'path>(&'path self, span: &'l str) -> Option<&'path str> {
+        self.get_locator_filepath(span)
+            .map(|(_, filepath)| &filepath[..])
+    }
+
+    /// Get the filepath for the span. Throws error if the span is not within any input
+    pub fn get_filepath<'path>(&'path self, span: &'l str) -> &'path str {
+        self.get_optional_filepath(span)
+            .expect("Span not in any input")
+    }
+}
+
 #[cfg(test)]
-mod test {
-    use super::get_relative_range;
-    use super::SpanLocator;
+mod tests {
+    use super::{super::InputFile, get_relative_range, MultiInputLocator, SpanLocator};
 
     #[test]
     fn get_relative_range_test() {
@@ -193,5 +268,33 @@ mod test {
         assert_eq!(locator.get_optional_coords(a), Some((0, 0)));
         assert_eq!(locator.get_optional_coords(b), Some((2, 1)));
         assert_eq!(locator.get_optional_coords("other"), None);
+    }
+
+    #[test]
+    fn multi_locator_get_filepath_test() {
+        let input = "abcde other";
+        let s = [
+            &input[..1],
+            &input[1..2],
+            &input[2..3],
+            &input[3..4],
+            &input[4..5],
+        ];
+        let input_files = s.map(|s| InputFile::new(s, s.to_string()));
+        let multi_locator = MultiInputLocator::new(&input_files);
+        for input in s {
+            assert_eq!(multi_locator.get_optional_filepath(input), Some(input));
+        }
+        assert_eq!(multi_locator.get_optional_filepath(&input[6..]), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "Overlapping input files")]
+    fn overlapping_input_files_test() {
+        let input = "abc";
+        MultiInputLocator::new(&[
+            InputFile::new(&input[..2], String::new()),
+            InputFile::new(&input[1..], String::new()),
+        ]);
     }
 }

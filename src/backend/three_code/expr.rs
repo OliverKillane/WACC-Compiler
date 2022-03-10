@@ -700,7 +700,7 @@ mod tests {
             vec![
                 StatCode::Assign(0, OpSrc::Const(420)),
                 StatCode::Assign(1, OpSrc::Const(69)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Ne, OpSrc::Var(1)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Eq, OpSrc::Var(1)),
             ],
             HashMap::new(),
             HashMap::new(),
@@ -719,7 +719,7 @@ mod tests {
             vec![
                 StatCode::Assign(0, OpSrc::Const(420)),
                 StatCode::Assign(1, OpSrc::Const(69)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Gte, OpSrc::Var(1)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Lt, OpSrc::Var(1)),
             ],
             HashMap::new(),
             HashMap::new(),
@@ -738,7 +738,7 @@ mod tests {
             vec![
                 StatCode::Assign(0, OpSrc::Const(420)),
                 StatCode::Assign(1, OpSrc::Const(69)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Eq, OpSrc::Var(1)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Ne, OpSrc::Var(1)),
             ],
             HashMap::new(),
             HashMap::new(),
@@ -757,7 +757,7 @@ mod tests {
             vec![
                 StatCode::Assign(0, OpSrc::Const(420)),
                 StatCode::Assign(1, OpSrc::Const(69)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Lt, OpSrc::Var(1)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Gte, OpSrc::Var(1)),
             ],
             HashMap::new(),
             HashMap::new(),

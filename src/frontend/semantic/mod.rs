@@ -79,14 +79,13 @@ use super::{
 #[allow(clippy::type_complexity)]
 pub fn analyse_semantics<'a>(
     Program(fn_defs, main_block): Program<&'a str, &'a str>,
-    source_code: &'a str,
 ) -> Result<
     (
         Program<Option<Type>, usize>,
         HashMap<String, VariableSymbolTable>,
         VariableSymbolTable,
     ),
-    Vec<Summary<'a>>,
+    Summary<'a>,
 > {
     // get function definitions
     let (fun_symb, filtered_fn_defs, fun_def_errs) = get_fn_symbols(fn_defs);
@@ -128,14 +127,9 @@ pub fn analyse_semantics<'a>(
                     main_var_symb,
                 ))
             } else {
-                Err(convert_errors(fun_def_errs, vec![], errors, source_code))
+                Err(convert_errors(fun_def_errs, vec![], errors))
             }
         }
-        None => Err(convert_errors(
-            fun_def_errs,
-            main_errors,
-            errors,
-            source_code,
-        )),
+        None => Err(convert_errors(fun_def_errs, main_errors, errors)),
     }
 }

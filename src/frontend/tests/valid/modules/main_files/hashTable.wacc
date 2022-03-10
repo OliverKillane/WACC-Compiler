@@ -1,0 +1,157 @@
+# This program is interactive. We implement a hash table containing integers and we play with it.
+# 
+# A hash table is represented by an array of node lists. Each node in a node list is represented 
+# by pair(int, pair). The first element of the pair is the integer at that node, the second element 
+# is the pointer to the next node (or null if no more node). 
+# 
+# Integers those mapped to the same index are stored on the list (in any order) in that index.
+
+mod ../includes////hashTable1.wacc;
+
+begin
+	######################### Functions for Command Line Interface ###############################
+	
+	# Print the menu and ask to choose. Returns a valid decision.
+	char printMenu() is
+		println "===========================================" ;
+		println "========== Hash Table Program =============" ;
+		println "===========================================" ;
+		println "=                                         =" ;
+		println "= Please choose the following options:    =" ;
+		println "=                                         =" ;
+		println "= a: insert an integer                    =" ;
+		println "= b: find an integer                      =" ;
+		println "= c: count the integers                   =" ;
+		println "= d: print all integers                   =" ;
+		println "= e: remove an integer                    =" ;
+		println "= f: remove all integers                  =" ;
+		println "= g: exit                                 =" ;
+		println "=                                         =" ;
+		println "===========================================" ;
+		
+		int minChoice = ord 'a' ;
+		int maxChoice = ord 'g' ;
+		
+		while true do
+			print   "Your decision: " ;
+			char d = '\0' ;
+			read d ;
+			int dInt = ord d ;
+			if minChoice <= dInt && dInt <= maxChoice then
+				return d
+			else 
+				print "You have entered: " ;
+				print d ;
+				println " which is invalid, please try again."
+			fi
+		done ;
+		# The compiler is not smart enough to know that this never reaches. 
+		# We have to add a return statement here.
+		return '\0'
+	end
+	
+	# Print out the question, and then read an integer. After that print the integer back and return it.
+	int askForInt(string message) is
+		print message ;
+		int x = 0 ;
+		read x ;
+		print "You have entered: " ;
+		println x ;
+		return x
+	end
+	
+	# Handle menu insert. Returns true.
+	bool handleMenuInsert(pair(int, pair)[] table) is
+		int x = call askForInt("Please enter an integer to insert: ") ;
+		bool notContain = call insertIfNotContain(table, x) ;
+		if notContain then
+			println "Successfully insert it. The integer is new." 
+		else 
+			println "The integer is already there. No insertion is made."
+		fi ;
+		return true		
+	end
+	
+	# Handle menu find. Returns true.
+	bool handleMenuFind(pair(int, pair)[] table) is
+		int x = call askForInt("Please enter an integer to find: ") ;
+		bool find = call contain(table, x) ;
+		if find then
+			println "Find the integer." 
+		else 
+			println "The integer is not found."
+		fi ;
+		return true		
+	end
+	
+	# Handle menu count. Returns true.
+	bool handleMenuCount(pair(int, pair)[] table) is
+		int size = call count(table) ;
+		if size == 1 then
+			println "There is only 1 integer."
+		else
+			print "There are " ;
+			print size ;
+			println " integers."
+		fi ; 
+		return true
+	end
+	
+	# Handle menu print. Returns true.
+	bool handleMenuPrint(pair(int, pair)[] table) is
+		print "Here are the integers: " ;
+		bool junk = call printAll(table) ;
+		return true
+	end
+	
+	# Handle menu remove. Returns true.
+	bool handleMenuRemove(pair(int, pair)[] table) is
+		int x = call askForInt("Please enter an integer to remove: ") ;
+		bool find = call remove(table, x) ;
+		if find then
+			println "The integer has been removed." 
+		else 
+			println "The integer is not found."
+		fi ;
+		return true		
+	end
+	
+	# Handle menu remove all. Returns true.
+	bool handleMenuRemoveAll(pair(int, pair)[] table) is
+		bool junk = call removeAll(table) ; 
+		println "All integers have been removed." ; 
+		return true
+	end
+
+	################################# The main function ########################################
+	# Our hash table of size 13.
+	pair(int, pair)[] table = [null, null, null, null, null, null, null, null, null, null, null, null, null] ;
+	bool junk = call init(table) ;
+	
+	bool continue = true ;
+	while continue do
+		char choice = call printMenu() ;
+		if choice == 'a' then
+			bool result = call handleMenuInsert(table)
+		else if choice == 'b' then
+			bool result = call handleMenuFind(table)
+		else if choice == 'c' then
+			bool result = call handleMenuCount(table)
+		else if choice == 'd' then
+			bool result = call handleMenuPrint(table)
+		else if choice == 'e' then
+			bool result = call handleMenuRemove(table)
+		else if choice == 'f' then
+			bool result = call handleMenuRemoveAll(table)
+		else if choice == 'g' then
+			println "Goodbye Human" ;
+			continue = false
+		else
+			# Should not happen.
+			print "Error: unknown choice (" ;
+			print choice ;
+			println ")" ;
+			exit -1
+		fi fi fi fi fi fi fi
+	done
+end
