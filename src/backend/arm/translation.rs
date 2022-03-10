@@ -164,7 +164,6 @@ fn require_label(
 ) -> Option<ArmNode> {
     match node.get().deref() {
         StatType::Simple(precs, _, _)
-        | StatType::Final(precs, _)
         | StatType::Branch(precs, _, _, _)
         | StatType::Loop(precs)
         | StatType::Return(precs, _) => {
@@ -194,13 +193,6 @@ fn translate_node_inner(
         StatType::Simple(_, stat, succ) => {
             let Chain(start, end) = translate_statcode(stat, int_handler, graph, temp_map);
             (start, Some((end, succ.clone())))
-        }
-        StatType::Final(_, stat) => {
-            // Create statements, then add a return. Even if the stat is an exit, we still add the return.
-            let Chain(start, mut end) = translate_statcode(stat, int_handler, graph, temp_map);
-            let ret_node = graph.new_node(ControlFlow::Return(Some(end.clone()), None));
-            end.set_successor(ret_node);
-            (start, None)
         }
         StatType::Branch(_, three_temp, true_branch, false_branch) => {
             // Recur to get the true_branch
