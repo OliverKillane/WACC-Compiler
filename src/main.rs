@@ -54,6 +54,7 @@ mod intermediate;
 use backend::{compile, Options, PropagationOpt};
 use clap::Parser;
 use frontend::{analyse, gather_modules, GatherModulesError};
+use path_absolutize::Absolutize;
 use pathdiff::diff_paths;
 use std::{
     env::current_dir,
@@ -120,7 +121,7 @@ fn main() -> io::Result<()> {
                 GatherModulesError::MainFileNotPresent => (
                     format!(
                         "File \'{}\' not found",
-                        get_relative_path(&main_file_path)?.display()
+                        get_relative_path(&main_file_path.absolutize()?.into_owned())?.display()
                     ),
                     FILE_FAILURE,
                 ),
@@ -157,7 +158,7 @@ fn main() -> io::Result<()> {
     match analyse(&main_file, module_files.iter().collect()) {
         Ok(ir) => {
             if cfg!(debug_assertions) && ir.validate().is_err() {
-                panic!("Invalid Intermediate Representation\n");
+                panic!("Invalid Intermediate Representation{}\n", ir);
             }
             if ir_print {
                 println!("Intermediate Representation:\n{}", ir);

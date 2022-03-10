@@ -36,11 +36,9 @@ pub struct BackendOutput {
 pub fn compile(program: Program, options: Options) -> BackendOutput {
     let three_code = ThreeCode::from((program, &options));
     #[cfg(debug_assertions)]
-    for stat_type in &three_code.graph {
-        if let StatType::Dummy(_) = stat_type.get().deref() {
-            panic!("Expected no dummy nodes in the final three code representation");
-        }
-    }
+    three_code
+        .check_dummy()
+        .expect("There are left-over dummy nodes in the ThreeCode");
 
     // the arm result can return a printable intermediate representation.
     let ArmResult(armcode, temp_rep) = ArmResult::from((three_code, &options));
