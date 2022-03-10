@@ -5,7 +5,7 @@ use std::hash::Hash;
 use std::{
     collections::{HashSet, LinkedList},
     fs,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 #[derive(Eq)]
