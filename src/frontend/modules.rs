@@ -8,18 +8,24 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// Gathered input wacc file
 #[derive(Eq)]
 pub struct InputFile {
+    /// Absolute path to the file, with no going up the directory strucutre.
     pub filepath: PathBuf,
+    /// Contents of the entire file.
     pub contents: String,
+    /// The index in the contents of the file where the module parsing stopped.
     to_parse_start_idx: usize,
 }
 
 impl InputFile {
+    /// The entire contents of the file, from start to end
     pub fn contents(&self) -> &str {
         &self.contents
     }
 
+    /// The part of the file contents that the main parser parses
     pub(super) fn to_parse_contents(&self) -> &str {
         &self.contents[self.to_parse_start_idx..]
     }
@@ -37,14 +43,21 @@ impl Hash for InputFile {
     }
 }
 
+/// Error type for problems with gathering modules.
 #[derive(Debug)]
 pub enum GatherModulesError {
+    /// Main file is not present at all
     MainFileNotPresent,
+    /// A module is not encoded with a utf-8 encoding.
     InvalidEncoding(PathBuf),
+    /// A mod declaration in a specific file, line and column is wrongly formatted.
     InvalidModDecl(PathBuf, usize, usize),
+    /// A module tries to import another module that does not exist under this
+    /// relative path.
     ModuleNotPresent(PathBuf, PathBuf),
 }
 
+/// Extracts import paths from a single component
 fn process_component(filepath: PathBuf) -> Result<(InputFile, Vec<PathBuf>), GatherModulesError> {
     let contents =
         String::from_utf8(fs::read(&filepath).map_err(|_| GatherModulesError::MainFileNotPresent)?)
@@ -65,6 +78,8 @@ fn process_component(filepath: PathBuf) -> Result<(InputFile, Vec<PathBuf>), Gat
     ))
 }
 
+/// Chains the main module path with all import paths, making them relative to the
+/// main module.
 pub fn chain_modules(module: &Path, imports: Vec<PathBuf>) -> LinkedList<(PathBuf, PathBuf)> {
     let mut module = module.to_owned();
     module.pop();
@@ -79,6 +94,7 @@ pub fn chain_modules(module: &Path, imports: Vec<PathBuf>) -> LinkedList<(PathBu
         .collect()
 }
 
+/// Gathers all the modules imported directly or indirectly from the main file.
 pub fn gather_modules(
     main_file_path: &Path,
 ) -> Result<(InputFile, Vec<InputFile>), GatherModulesError> {

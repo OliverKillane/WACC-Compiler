@@ -130,11 +130,14 @@ impl<'l> SpanLocator<'l> {
     }
 }
 
+/// Span locator for multiple files
 pub(super) struct MultiInputLocator<'l> {
+    /// The vector of all locators and the data used for searching through it
     locators: Vec<(usize, String, SpanLocator<'l>)>,
 }
 
 impl<'l> MultiInputLocator<'l> {
+    /// Creates a new multi input locator from an array of error input files.
     pub fn new(input_files: &[InputFile<'l>]) -> Self {
         let mut locators: Vec<_> = input_files
             .iter()
@@ -159,6 +162,7 @@ impl<'l> MultiInputLocator<'l> {
         Self { locators }
     }
 
+    /// Helper function for binary searching for the parent input in all the inputs
     fn get_locator_filepath<'s>(
         &'s self,
         span: &'l str,
@@ -176,20 +180,24 @@ impl<'l> MultiInputLocator<'l> {
             .map(|_| (locator, filename))
     }
 
+    /// Get the locator for the span, provided that the span starts within any input.
     pub fn get_optional_locator<'loc>(&'loc self, span: &'l str) -> Option<&'loc SpanLocator<'l>> {
         self.get_locator_filepath(span).map(|(locator, _)| locator)
     }
 
+    /// Get the locator for the span. Throws error if the span is not within any input
     pub fn get_locator<'loc>(&'loc self, span: &'l str) -> &'loc SpanLocator<'l> {
         self.get_optional_locator(span)
             .expect("Span not in any input")
     }
 
+    /// Get the filepath for the span, provided that the span starts within any input.
     pub fn get_optional_filepath<'path>(&'path self, span: &'l str) -> Option<&'path str> {
         self.get_locator_filepath(span)
             .map(|(_, filepath)| &filepath[..])
     }
 
+    /// Get the filepath for the span. Throws error if the span is not within any input
     pub fn get_filepath<'path>(&'path self, span: &'l str) -> &'path str {
         self.get_optional_filepath(span)
             .expect("Span not in any input")

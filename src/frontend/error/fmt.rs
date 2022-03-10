@@ -676,6 +676,8 @@ impl<'l> SummaryCell<'l> {
 }
 
 impl<'l> Summary<'l> {
+    /// Checks whether the runtime relations between spans are preserved and
+    /// all unwraps in the cell formatting will work as expected.
     fn check_span_relations(&self, multi_input_locator: &MultiInputLocator<'l>) {
         for cell in &self.cells {
             multi_input_locator
@@ -750,12 +752,6 @@ impl<'l> Display for Summary<'l> {
                 })
                 .collect::<String>()
         )
-    }
-}
-
-impl<'l> Summary<'l> {
-    fn code(&self) -> u32 {
-        self.stage as u32
     }
 }
 
