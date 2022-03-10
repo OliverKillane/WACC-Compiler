@@ -879,8 +879,10 @@ impl AllocationState {
                 (Alloc::Free, alloc) => chain.push(self.backup_alloc_to_frame(alloc, graph)),
                 (alloc, Alloc::Free) => chain.push(self.alloc_to_reg(alloc, reg, graph)),
                 (conf, curr) => {
-                    chain.push(self.backup_alloc_to_frame(curr, graph));
-                    chain.push(self.alloc_to_reg(conf, reg, graph))
+                    if conf != curr {
+                        chain.push(self.backup_alloc_to_frame(curr, graph));
+                        chain.push(self.alloc_to_reg(conf, reg, graph))
+                    }
                 }
             }
         }
