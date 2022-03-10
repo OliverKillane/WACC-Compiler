@@ -18,7 +18,7 @@ fn translate_function_call(
     result: VarRepr,
     stat_line: &mut StatLine,
     vars: &HashMap<VarRepr, ir::Type>,
-    function_types: &HashMap<String, ir::Type>,
+    function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
 ) {
     let stat_code = StatCode::Call(
@@ -68,7 +68,7 @@ pub(super) fn translate_num_expr(
     result: VarRepr,
     stat_line: &mut StatLine,
     vars: &HashMap<VarRepr, ir::Type>,
-    function_types: &HashMap<String, ir::Type>,
+    function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
 ) -> ir::NumSize {
     match num_expr {
@@ -142,7 +142,7 @@ pub(super) fn translate_num_expr(
             size
         }
         ir::NumExpr::Call(name, args) => {
-            let size = if let ir::Type::Num(size) =
+            let size = if let Some(ir::Type::Num(size)) =
                 function_types.get(&name).expect("Function not found")
             {
                 *size
@@ -173,7 +173,7 @@ pub(super) fn translate_bool_expr(
     result: VarRepr,
     stat_line: &mut StatLine,
     vars: &HashMap<VarRepr, ir::Type>,
-    function_types: &HashMap<String, ir::Type>,
+    function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
 ) {
     match bool_expr {
@@ -320,7 +320,7 @@ pub(super) fn translate_ptr_expr(
     result: VarRepr,
     stat_line: &mut StatLine,
     vars: &HashMap<VarRepr, ir::Type>,
-    function_types: &HashMap<String, ir::Type>,
+    function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
 ) {
     match ptr_expr {
@@ -433,7 +433,7 @@ pub(super) fn translate_expr(
     result: VarRepr,
     stat_line: &mut StatLine,
     vars: &HashMap<VarRepr, ir::Type>,
-    function_types: &HashMap<String, ir::Type>,
+    function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
 ) -> ir::Type {
     match expr {
@@ -474,7 +474,7 @@ mod tests {
         result: VarRepr,
         stats: Vec<StatCode>,
         vars: HashMap<VarRepr, ir::Type>,
-        function_types: HashMap<String, ir::Type>,
+        function_types: HashMap<String, Option<ir::Type>>,
         expr_type: ir::Type,
     ) {
         let graph = Rc::new(RefCell::new(Graph::new()));
@@ -644,7 +644,7 @@ mod tests {
                 StatCode::Call(0, "f".to_string(), vec![0, 1]),
             ],
             HashMap::new(),
-            HashMap::from([("f".to_string(), ir::Type::Num(ir::NumSize::Word))]),
+            HashMap::from([("f".to_string(), Some(ir::Type::Num(ir::NumSize::Word)))]),
             ir::Type::Num(ir::NumSize::Word),
         )
     }
@@ -818,7 +818,7 @@ mod tests {
                 StatCode::Call(0, "f".to_string(), vec![0, 1]),
             ],
             HashMap::new(),
-            HashMap::from([("f".to_string(), ir::Type::Bool)]),
+            HashMap::from([("f".to_string(), Some(ir::Type::Bool))]),
             ir::Type::Bool,
         )
     }
@@ -962,7 +962,7 @@ mod tests {
                 StatCode::Call(0, "f".to_string(), vec![0, 1]),
             ],
             HashMap::new(),
-            HashMap::from([("f".to_string(), ir::Type::Ptr)]),
+            HashMap::from([("f".to_string(), Some(ir::Type::Ptr))]),
             ir::Type::Ptr,
         )
     }
