@@ -1,0 +1,84 @@
+begin
+    # Print all the integers inside the table, separated by a space and ended with a newline. Returns true.
+	bool printAll(pair(int, pair)[] table) is
+		int length = len table ;
+		int i = 0 ;
+		while i < length do
+      bool result = call printAllNodes(table[i]) ;
+			i = i + 1
+		done ;
+		println "" ;
+		return true
+	end
+		
+	# A helper function.
+	# Given a hash table and an integer, calculate the index of the integer in the table.
+	int calculateIndex(pair(int, pair)[] table, int x) is
+		int length = len table ;
+		return x % length
+	end
+	
+	# A helper function.
+	# Given a head of a chain of nodes, returns the first node containing the value x.
+	# Returns null if no such node.
+	pair(int, pair) findNode(pair(int, pair) head, int x) is
+		while head != null do
+			int y = fst head ;
+			if y == x then
+				return head
+			else
+				head = snd head
+			fi 
+		done ;
+		return null
+	end
+
+	# A helper function.
+	# Given a list of nodes and a node to remove, remove that node from the 
+	# list and return the new list.
+	pair(int, pair) removeNode(pair(int, pair) head, pair(int, pair) toRemove) is
+		if head == null then
+			# Should not happen actually.
+			return null
+		else
+			if head == toRemove then
+				# Save the new head.
+				head = snd head ;
+				
+				# Deallocate the memory of the old node.
+				free toRemove ;
+				
+				# Return the new head.
+				return head
+			else
+				# Not this node, recursive.
+				pair(int, pair) tail = snd head ;
+				snd head = call removeNode(tail, toRemove) ;
+				return head
+			fi
+		fi
+	end
+
+	# A helper function.
+	# Given a list of nodes, count how many nodes there are.
+	int countNodes(pair(int, pair) head) is 
+		int sum = 0 ;
+		while head != null do
+			sum = sum + 1 ;
+			head = snd head
+		done ;
+		return sum
+	end
+
+	# A helper function.
+	# Given a list of nodes, print each integer in the node followed by a space. Returns true.
+	bool printAllNodes(pair(int, pair) head) is
+    while head != null do
+			int x = fst head ;
+			print x ;
+			print ' ' ;
+			head = snd head
+		done ;
+		return true
+	end
+end

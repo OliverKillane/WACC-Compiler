@@ -12,3 +12,4 @@ mod prelude;
 mod span_utils;
 
 pub use prelude::*;
+pub(super) use span_utils::SpanLocator;
