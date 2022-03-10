@@ -56,18 +56,19 @@ pub fn allocate_registers(program: ArmCode) -> ArmCode {
                         reserved_stack,
                     },
                 )| {
+                    let start_node = allocate_for_routine(
+                        start_node,
+                        &args,
+                        reserved_stack,
+                        &temps,
+                        &live_ranges,
+                        &mut cfg,
+                    );
                     (
                         name,
                         Subroutine {
                             args,
-                            start_node: allocate_for_routine(
-                                start_node,
-                                &[],
-                                reserved_stack,
-                                &temps,
-                                &live_ranges,
-                                &mut cfg,
-                            ),
+                            start_node,
                             temps,
                             reserved_stack,
                         },

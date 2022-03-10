@@ -130,6 +130,8 @@ impl AllocationState {
         for reg in 0..(args.len().min(4)) {
             registers[reg] = Alloc::Temp(args[reg])
         }
+        println!("---------------------------------");
+        println!("{:?}", args);
 
         // now put all other arguments onto the stack. These will be just
         // before the stack pointer in reverse order (were pushed and popped)
@@ -171,6 +173,7 @@ impl AllocationState {
             simple_node(Stat::Nop, graph)
         };
 
+        println!("alloc state after call \n{}", new_state);
         (new_state, chain)
     }
 
