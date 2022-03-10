@@ -316,16 +316,17 @@ impl Display for Stat {
     }
 }
 
-impl Display for ArmNode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Used to store label numbers based on the nodes connected, and a
+fn display_routine(start_node: &ArmNode, name: &String, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+// Used to store label numbers based on the nodes connected, and a
         // boolean describing if their code has been generated yet.
         let mut label_map: HashMap<ArmNode, (usize, bool)> = HashMap::new();
 
-        // Label identifier conversion tpo strings.
-        let label_conv = |id: &usize| format!("b_label_{}", id);
+        // Label identifier conversion to strings.
+        let label_conv = |id: &usize| format!("b_{}_{}",name, id);
 
-        let mut current = self.clone();
+        let mut current = start_node.clone();
+
+        writeln!(f, "{}:", name)?;
 
         loop {
             loop {
@@ -437,7 +438,6 @@ impl Display for ArmNode {
         }
 
         writeln!(f)
-    }
 }
 
 /// Converts a data reference into its string representation
@@ -499,7 +499,8 @@ impl Display for ArmCode {
             }
         };
 
-        writeln!(f, ".text\n.global main\nmain:\n{}", main)?;
+        writeln!(f, ".text\n.global main")?;
+        display_routine(main, &"main".to_string(), f)?;
 
         for (
             fun_name,
@@ -511,7 +512,7 @@ impl Display for ArmCode {
             },
         ) in functions
         {
-            write!(f, "{}:\n{}", fun_name, start_node)?;
+            display_routine(start_node, fun_name, f)?;
         }
 
         writeln!(f)

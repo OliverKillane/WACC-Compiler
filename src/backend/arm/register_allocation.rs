@@ -8,9 +8,6 @@ use std::{
     collections::{HashMap, HashSet},
     ops::DerefMut,
 };
-
-use lazy_static::__Deref;
-
 use super::{
     allocation_state::AllocationState,
     arm_graph_utils::{link_optional_chains, link_two_nodes, Chain},
@@ -102,21 +99,38 @@ fn allocate_for_routine(
     // stack_setup_end.set_successor(start_node.clone());
     link_two_nodes(stack_setup_end, start_node.clone());
 
-    translate_from_node(start_node, alloc_state, &mut state_map, live_ranges, graph);
+    let mut current = Some((start_node, alloc_state));
+
+    // while there are still nodes to be translated, translate the nodes using the appropriate state.
+    while let Some((current_node, current_state)) = current {
+        translate_from_node(current_node, current_state, &mut state_map, live_ranges, graph);
+
+        current = get_next_node(&mut state_map);
+    }
 
     new_start
 }
 
-/// Starting from a given node, translate all temporaries to registers.
-/// - Traverses from 'node', this must not have already been translated.
-/// - state_map contains labels where a state already exists, and must be conformed to.
-/// - alloc_state holds the current state of the stack and registers
-/// - graph contains all arm nodes.
-/// - every node must have a predecessor.
+/// Get the next node to translate from, using a translation map from nodes to 
+/// states & if they have already been translated.
+fn get_next_node(state_map: &mut HashMap<ArmNode, (AllocationState, bool)>) -> Option<(ArmNode, AllocationState)> {
+    for (node, (state, translated)) in state_map.iter_mut() {
+        if !*translated {
+            *translated = true;
+            return Some((node.clone(), state.clone()))
+        }
+    }
+    None
+}
+
+
+/// Starting from a given node, translate all nodes connected linearly (direct 
+/// successors - for branch only the false-branch). Add indirect successors to 
+/// the trans_map.
 fn translate_from_node(
     mut current_node: ArmNode,
     mut alloc_state: AllocationState,
-    state_map: &mut HashMap<ArmNode, AllocationState>,
+    state_map: &mut HashMap<ArmNode, (AllocationState, bool)>,
     live_ranges: &LiveRanges,
     graph: &mut Graph<ControlFlow>,
 ) {
@@ -127,6 +141,7 @@ fn translate_from_node(
 
         // update the registers for current live_in
         alloc_state.update_live(&livein);
+
         // println!("----------------------------");
         // println!(
         //     "LIVEIN: {}",
@@ -144,7 +159,7 @@ fn translate_from_node(
         //         .map(|t| format!("T{}, ", t))
         //         .collect::<String>()
         // );
-        println!("here is the issue");
+
         let mut next: ArmNode = match current_node.clone().get_mut().deref_mut() {
             ControlFlow::Simple(Some(prev), Stat::Call(fun_name, ret, args), next) => {
                 let Chain(mut start, mut end) =
@@ -155,97 +170,12 @@ fn translate_from_node(
 
                 // as we entirely replace the 'call' node, we set the successors and
                 // predecessors to point to the ends of our chain of statements
-                println!("inside1");
                 if let Some(next_node) = next {
                     end.set_successor(next_node.clone());
                     next_node.replace_predecessor(current_node.clone(), end);
                     next_node.clone()
                 } else {
                     return;
-                }
-            }
-            ControlFlow::Simple(
-                Some(prev),
-                Stat::Move(_, _, _, dst_ident, FlexOperand::ShiftReg(arg_ident, _)),
-                next,
-            ) => {
-                // A destination and argument, these can be the same register.
-                let dst_t = dst_ident.get_temp();
-                let arg_t = arg_ident.get_temp();
-
-                // place the arg in a register
-                let (arg_reg, arg_chain) =
-                    alloc_state.move_temp_into_reg(arg_t, true, &[], &livein, graph);
-
-                // update the live temps, this means that if the argument
-                // dies after this statement, its register can be used.
-                alloc_state.update_live(&liveout);
-
-                // find and place the dst in a register
-                let (dst_reg, dst_chain) =
-                    alloc_state.move_temp_into_reg(dst_t, false, &[arg_t], &liveout, graph);
-
-                let chain = link_optional_chains(vec![arg_chain, dst_chain]);
-                println!("inside2");
-                if arg_reg == dst_reg {
-                    // source and destination registers are identical, no need for a move instruction.
-                    println!("inside7");
-                    if let Some(Chain(mut before_start, mut before_end)) = chain {
-                        println!("inside10");
-                        // if there is a chain of instructions required before, insert the chain
-                        prev.replace_successor(current_node.clone(), before_start.clone());
-                        before_start.set_predecessor(prev.clone());
-
-                        if let Some(next_node) = next {
-                            println!("inside11");
-                            // if there is a next node, connect the end of the chain to the next node
-                            next_node.replace_predecessor(current_node.clone(), before_end.clone());
-                            before_end.set_successor(next_node.clone());
-                            next_node.clone()
-                        } else {
-                            // there is no next node, so end of chain is end of instructions
-                            return;
-                        }
-                    } else if let Some(next_node) = next {
-                        println!("inside9");
-                        // there is no chain, but there is a next node, so connect from the previous to next (bypass current)
-                        // fails here with "thread 'main' panicked at 'already borrowed: BorrowMutError"
-                        println!("prev:{:?}   current:{:?}", prev, current_node);
-                        prev.replace_successor(current_node.clone(), next_node.clone());
-                        // prev has already been mutable borrowed.
-                        println!("aaaaaaaaaaaaaaa");
-                        next_node.replace_predecessor(current_node.clone(), prev.clone());
-                        println!("aaaaaaaaaaaaaaa");
-                        next_node.clone()
-                    } else {
-                        println!("inside12");
-                        // there is no next node, hence the previous is the last node.
-                        prev.remove_successor();
-                        return;
-                    }
-                } else {
-                    println!("inside8");
-                    // update the identifiers to registers.
-                    *arg_ident = Ident::Reg(arg_reg);
-                    *dst_ident = Ident::Reg(dst_reg);
-
-                    // We still need a move instruction (different registers)
-                    if let Some(Chain(mut before_start, mut before_end)) = chain {
-                        // place the chain between the previous node and the current node.
-                        // prev <-> (before_start <-> before_end) <-> current_node
-                        before_start.set_predecessor(prev.clone());
-                        prev.replace_successor(current_node.clone(), before_start.clone());
-
-                        before_end.set_successor(current_node.clone());
-                        *prev = before_end;
-                    }
-
-                    // if there is a next, continue
-                    if let Some(next_node) = next {
-                        next_node.clone()
-                    } else {
-                        return;
-                    }
                 }
             }
             ControlFlow::Simple(prev_entry, stat, next_entry) => {
@@ -301,6 +231,7 @@ fn translate_from_node(
                         link_optional_chains(vec![arg1_chain, arg2_chain, dst_chain])
                     }
                     Stat::MemOp(MemOp::Ldr, _, _, dst_ident, MemOperand::Zero(arg_ident))
+                    | Stat::Move(_, _, _, dst_ident, FlexOperand::ShiftReg(arg_ident, _))
                     | Stat::MemOp(
                         MemOp::Ldr,
                         _,
@@ -565,6 +496,7 @@ fn translate_from_node(
                     }
                     _ => None, // No temporaries, so no chain
                 };
+
                 // if new chains were created, then make them the predecessors to this node.
                 if let Some(Chain(mut before_start, mut before_end)) = chain_before {
                     let mut prev_node =
@@ -584,29 +516,21 @@ fn translate_from_node(
                 }
             }
             ControlFlow::Branch(_, branch_next, _, next) => {
-                // check if the current node has had its registers allocated already
-                if let Some(conform_alloc_state) = state_map.get(branch_next) {
-                    if let Some(Chain(mut chain_start, mut chain_end)) =
-                        alloc_state.clone().match_state(conform_alloc_state, graph)
-                    {
-                        let mut next_node = branch_next.clone();
+                // check if branch next is already state set, and if so, conform.
+                // if not, set a state for it.
 
-                        chain_start.set_predecessor(current_node.clone());
-
-                        chain_end.set_successor(branch_next.clone());
-                        *branch_next = chain_start;
-
-                        next_node.replace_predecessor(current_node.clone(), chain_end)
+                if let Some((conform_state, _)) = state_map.get(branch_next) {
+                    // if there is some state to conform to, then alter from the current alloc state, to the new one, insert instructions.
+                    if let Some(Chain(mut conform_start, mut conform_end)) = alloc_state.clone().match_state(conform_state, graph) {
+                        branch_next.replace_predecessor(current_node.clone(), conform_end.clone());
+                        conform_end.set_successor(branch_next.clone());
+                        
+                        conform_start.set_predecessor(current_node.clone());
+                        *branch_next = conform_start
                     }
                 } else {
-                    println!("branching");
-                    translate_from_node(
-                        branch_next.clone(),
-                        alloc_state.clone(),
-                        state_map,
-                        live_ranges,
-                        graph,
-                    );
+                    // No state yet exists, hence branch_next has the current state, and is not yet translated
+                    state_map.insert(branch_next.clone(), (alloc_state.clone(), false));
                 }
 
                 if let Some(next_node) = next {
@@ -619,16 +543,17 @@ fn translate_from_node(
             }
             ControlFlow::Ltorg(_) => return,
             ControlFlow::Return(Some(prev), ret) => {
-                let start = alloc_state.subroutine_return(ret, graph);
+                let mut start = alloc_state.subroutine_return(ret, graph);
 
-                prev.replace_successor(current_node.clone(), start);
+                prev.replace_successor(current_node.clone(), start.clone());
+                start.set_predecessor(prev.clone());
 
                 return;
             }
             ControlFlow::Multi(_, next) => {
                 // this instruction has no temporaries, however we must keep
                 // track that we have translated this (other nodes go here)
-                state_map.insert(current_node.clone(), alloc_state.clone());
+                state_map.insert(current_node.clone(), (alloc_state.clone(), true));
 
                 // no other instructions are needed, so we simpy move to the next node.
                 if let Some(next_node) = next {
@@ -640,12 +565,12 @@ fn translate_from_node(
             ControlFlow::Removed => {
                 panic!("Removed nodes must not be present in the traversable part of the graph")
             }
-            _ => panic!("No previous node, hence the function's invaliant is broken"),
+            _ => panic!("No previous node, hence the function's invariant is broken"),
         };
 
 
-        // check if the next node has had its registers allocated already
-        if let Some(conform_alloc_state) = state_map.get(&next) {
+        // check if the next node has a state associated, and needs to be translated in another pass.
+        if let Some((conform_alloc_state, _)) = state_map.get(&next) {
             if let Some(Chain(mut chain_start, mut chain_end)) =
                 alloc_state.match_state(conform_alloc_state, graph)
             {
