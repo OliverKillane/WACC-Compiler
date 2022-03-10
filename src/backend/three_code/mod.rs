@@ -118,7 +118,7 @@ pub(super) enum StatType {
     /// A self-looping infinite loop, which might occur as a user program.
     Loop(Vec<StatNode>),
     /// A return from a function. The variable contains the return value.
-    Return(Vec<StatNode>, VarRepr),
+    Return(Vec<StatNode>, Option<VarRepr>),
 }
 
 /// A statement graph node.
@@ -184,7 +184,7 @@ impl StatType {
     }
 
     /// Creates a new return statement with an empty list of incoming nodes.
-    fn new_return(ret: VarRepr) -> Self {
+    fn new_return(ret: Option<VarRepr>) -> Self {
         StatType::Return(vec![], ret)
     }
 
@@ -442,7 +442,7 @@ fn translate_block(
     read_ref: &mut bool,
     fmt_flags: &mut FmtDataRefFlags,
     vars: &HashMap<VarRepr, ir::Type>,
-    function_types: &HashMap<String, ir::Type>,
+    function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
 ) -> (StatNode, Vec<StatNode>, Option<StatNode>) {
     let mut stat_line = StatLine::new(stat_graph.clone());
@@ -474,18 +474,20 @@ fn translate_block(
             (vec![], None)
         }
         ir::BlockEnding::Return(expr) => {
-            translate_expr(
-                expr,
-                free_var,
-                &mut stat_line,
-                vars,
-                function_types,
-                options,
-            );
+            if let Some(expr) = expr {
+                translate_expr(
+                    expr,
+                    free_var,
+                    &mut stat_line,
+                    vars,
+                    function_types,
+                    options,
+                );
+            }
             stat_line.add_node(
                 stat_graph
                     .borrow_mut()
-                    .new_node(StatType::new_return(free_var)),
+                    .new_node(StatType::new_return(expr.map(|_| free_var))),
             );
             (vec![], None)
         }
@@ -664,7 +666,7 @@ fn translate_block_graph(
     read_ref: &mut bool,
     fmt_flags: &mut FmtDataRefFlags,
     vars: &HashMap<VarRepr, ir::Type>,
-    function_types: &HashMap<String, ir::Type>,
+    function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
 ) -> Option<StatNode> {
     clean_up_block_graph(&mut block_graph);
@@ -759,7 +761,7 @@ fn translate_function(
     free_data_ref: &mut DataRef,
     data_refs: &mut HashMap<DataRef, DataRefType>,
     fmt_flags: &mut FmtDataRefFlags,
-    function_types: &HashMap<String, ir::Type>,
+    function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
 ) -> Function {
     let mut three_code_args = vec![];
@@ -1021,7 +1023,7 @@ mod tests {
                 ir::Block(
                     vec![0],
                     vec![],
-                    ir::BlockEnding::Return(ir::Expr::Bool(ir::BoolExpr::Var(0))),
+                    ir::BlockEnding::Return(Some(ir::Expr::Bool(ir::BoolExpr::Var(0)))),
                 ),
                 ir::Block(vec![0, 4], vec![], ir::BlockEnding::CondJumps(vec![], 3)),
                 ir::Block(vec![2], vec![], ir::BlockEnding::CondJumps(vec![], 4)),
@@ -1053,7 +1055,7 @@ mod tests {
             .expect("Multiple references to the graph")
             .into_inner();
         let loop_node = graph.new_node(StatType::new_loop());
-        let return_node = graph.new_node(StatType::new_return(1));
+        let return_node = graph.new_node(StatType::new_return(Some(1)));
         let return_assign_node = graph.new_node(StatType::new_simple(
             StatCode::Assign(1, OpSrc::Var(0)),
             return_node,
@@ -1095,20 +1097,20 @@ mod tests {
             read_ref,
         } = translate_function(
             ir::Function(
-                ir::Type::Bool,
+                Some(ir::Type::Bool),
                 vec![(ir::Type::Num(ir::NumSize::DWord), 0)],
                 HashMap::from([(1, ir::Type::Num(ir::NumSize::Byte))]),
                 vec![ir::Block(
                     vec![],
                     vec![],
-                    ir::BlockEnding::Return(ir::Expr::Bool(ir::BoolExpr::Const(false))),
+                    ir::BlockEnding::Return(Some(ir::Expr::Bool(ir::BoolExpr::Const(false)))),
                 )],
             ),
             graph.clone(),
             &mut 0,
             &mut data_refs,
             &mut FmtDataRefFlags::default(),
-            &HashMap::from([("function".to_string(), ir::Type::Bool)]),
+            &HashMap::from([("function".to_string(), Some(ir::Type::Bool))]),
             &Options {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
@@ -1128,7 +1130,7 @@ mod tests {
         let mut graph = Rc::try_unwrap(graph)
             .expect("Multiple references to the graph")
             .into_inner();
-        let return_node = graph.new_node(StatType::new_return(2));
+        let return_node = graph.new_node(StatType::new_return(Some(2)));
         let return_assign_node = graph.new_node(StatType::new_simple(
             StatCode::Assign(2, OpSrc::Const(0)),
             return_node,

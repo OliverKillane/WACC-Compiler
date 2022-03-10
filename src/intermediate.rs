@@ -204,6 +204,9 @@ pub enum Stat {
     /// Frees a malloced structure with a size given by the number expression.
     Free(PtrExpr),
 
+    /// Calls a function without assigning its return value
+    Call(String, Vec<Expr>),
+
     /// Prints a raw value of an expression according to that expression's string format.
     PrintExpr(Expr),
     /// Prints the value of a number expression as a character. The expression must have
@@ -230,8 +233,9 @@ pub enum BlockEnding {
     Exit(NumExpr),
     /// Returns a value of an expression. Cannot be used in a block in the
     /// main program. If used in a function, must have the type and size of the expression
-    /// matching the output type of the function.
-    Return(Expr),
+    /// matching the output type of the function, or not have any expression if the function
+    /// does not return anything.
+    Return(Option<Expr>),
 }
 
 /// A block of statements. Contains the blocks that have conditional jumps to it.
@@ -259,7 +263,7 @@ pub enum Type {
 /// first block in the block graph.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Function(
-    pub Type,
+    pub Option<Type>,
     pub Vec<(Type, VarRepr)>,
     pub HashMap<VarRepr, Type>,
     pub BlockGraph,
@@ -419,6 +423,7 @@ impl Display for Stat {
             Self::AssignPtr(ptr_expr, expr) => write!(f, "{} = {};", ptr_expr, expr),
             Self::AssignVar(var, expr) => write!(f, "v_{} = {};", var, expr),
             Self::Free(ptr_expr) => write!(f, "free({});", ptr_expr),
+            Self::Call(fname, args) => write!(f, "{}({})", fname, format_args(args)),
             Self::PrintChar(num_expr) => write!(f, "print_char({});", num_expr),
             Self::PrintExpr(expr) => write!(f, "print_expr({});", expr),
             Self::PrintEol() => write!(f, "print_eol();"),
@@ -454,7 +459,14 @@ fn format_block_helper(
     }
     match ending {
         BlockEnding::Exit(num_expr) => output.push_back(format!("exit({});", num_expr)),
-        BlockEnding::Return(expr) => output.push_back(format!("return {};", expr)),
+        BlockEnding::Return(expr) => output.push_back(format!(
+            "return{};",
+            if let Some(expr) = expr {
+                format!(" {}", expr)
+            } else {
+                String::new()
+            }
+        )),
         BlockEnding::CondJumps(cond_jumps, else_jump) => {
             for (bool_expr, cond_jump) in cond_jumps {
                 output.push_back(format!("if {} goto b_{}", bool_expr, cond_jump));
@@ -491,7 +503,11 @@ fn format_function(
 ) -> String {
     format!(
         "{} {}({}){} {{\n{}}}\n",
-        ret_type,
+        if let Some(ret_type) = ret_type {
+            format!("{}", ret_type)
+        } else {
+            "void".to_string()
+        },
         fname,
         format_args(
             args.iter()
@@ -584,7 +600,8 @@ impl BoolExpr {
             BoolExpr::Call(name, exprs) => {
                 let function = functions.get(name).ok_or(())?;
                 cond_result(
-                    Type::Bool == function.validate_call(exprs, functions, vars, data_refs)?
+                    Some(Type::Bool)
+                        == function.validate_call(exprs, functions, vars, data_refs)?
                         && !const_eval,
                 )
             }
@@ -629,7 +646,7 @@ impl PtrExpr {
             PtrExpr::Call(name, exprs) => {
                 let function = functions.get(name).ok_or(())?;
                 cond_result(
-                    Type::Ptr == function.validate_call(exprs, functions, vars, data_refs)?
+                    Some(Type::Ptr) == function.validate_call(exprs, functions, vars, data_refs)?
                         && !const_eval,
                 )
             }
@@ -691,7 +708,7 @@ impl NumExpr {
             },
             NumExpr::Call(name, exprs) => {
                 let function = functions.get(name).ok_or(())?;
-                if let Type::Num(size) =
+                if let Some(Type::Num(size)) =
                     function.validate_call(exprs, functions, vars, data_refs)? && !const_eval
                 {
                     size
@@ -755,6 +772,12 @@ impl Stat {
                 ptr_expr.validate(functions, vars, data_refs, false)
             }
             Stat::Free(ptr_expr) => ptr_expr.validate(functions, vars, data_refs, false),
+            Stat::Call(name, exprs) => {
+                let function = functions.get(name).ok_or(())?;
+                function
+                    .validate_call(exprs, functions, vars, data_refs)
+                    .map(|_| {})
+            }
             Stat::PrintStr(ptr_expr, num_expr) => {
                 num_expr.validate(functions, vars, data_refs, false)?;
                 ptr_expr.validate(functions, vars, data_refs, false)
@@ -776,7 +799,7 @@ fn validate_block_graph(
     functions: &HashMap<String, Function>,
     vars: &HashMap<VarRepr, Type>,
     data_refs: &HashMap<DataRef, Vec<Expr>>,
-) -> Result<Option<Type>, ()> {
+) -> Result<Option<Option<Type>>, ()> {
     let size = graph.len();
     if size == 0 {
         return Err(());
@@ -818,7 +841,11 @@ fn validate_block_graph(
                 }
             }
             BlockEnding::Return(expr) => {
-                let expr_type = expr.validate(functions, vars, data_refs, false)?;
+                let expr_type = if let Some(expr) = expr {
+                    Some(expr.validate(functions, vars, data_refs, false)?)
+                } else {
+                    None
+                };
                 if return_type.is_none() {
                     return_type = Some(expr_type);
                 } else if return_type != Some(expr_type) {
@@ -870,7 +897,7 @@ impl Function {
         functions: &HashMap<String, Function>,
         vars: &HashMap<VarRepr, Type>,
         data_refs: &HashMap<DataRef, Vec<Expr>>,
-    ) -> Result<Type, ()> {
+    ) -> Result<Option<Type>, ()> {
         let Function(ret_type, args, _, _) = self;
         if arg_values.len() != args.len() {
             return Err(());
@@ -943,10 +970,10 @@ mod test {
     }
 
     fn validate_call(
-        expr: Expr,
+        call_stat: Stat,
         fname: String,
         args: Vec<(Type, VarRepr)>,
-        ret_type: Type,
+        ret_type: Option<Type>,
     ) -> Result<(), ()> {
         let program = Program(
             HashMap::from([(
@@ -954,22 +981,26 @@ mod test {
                 Function(
                     ret_type,
                     args,
-                    HashMap::from([(0, ret_type)]),
+                    if let Some(ret_type) = ret_type {
+                        HashMap::from([(0, ret_type)])
+                    } else {
+                        HashMap::new()
+                    },
                     vec![Block(
                         vec![],
                         vec![Stat::PrintEol()],
-                        BlockEnding::Return(match ret_type {
+                        BlockEnding::Return(ret_type.map(|ret_type| match ret_type {
                             Type::Ptr => Expr::Ptr(PtrExpr::Var(0)),
                             Type::Bool => Expr::Bool(BoolExpr::Var(0)),
                             Type::Num(_) => Expr::Num(NumExpr::Var(0)),
-                        }),
+                        })),
                     )],
                 ),
             )]),
             HashMap::new(),
             vec![Block(
                 vec![],
-                vec![Stat::PrintExpr(expr)],
+                vec![call_stat],
                 BlockEnding::Exit(NumExpr::Const(NumSize::DWord, 0)),
             )],
             HashMap::new(),
@@ -1091,19 +1122,24 @@ mod test {
 
     #[test]
     fn check_call_ok() {
-        for (call_expr, ret_type) in [
+        for (call_stat, ret_type) in [
             (
-                Expr::Num(NumExpr::Call("f".to_string(), vec![])),
-                Type::Num(NumSize::Byte),
+                Stat::PrintExpr(Expr::Num(NumExpr::Call("f".to_string(), vec![]))),
+                Some(Type::Num(NumSize::Byte)),
             ),
             (
-                Expr::Bool(BoolExpr::Call("f".to_string(), vec![])),
-                Type::Bool,
+                Stat::PrintExpr(Expr::Bool(BoolExpr::Call("f".to_string(), vec![]))),
+                Some(Type::Bool),
             ),
-            (Expr::Ptr(PtrExpr::Call("f".to_string(), vec![])), Type::Ptr),
+            (
+                Stat::PrintExpr(Expr::Ptr(PtrExpr::Call("f".to_string(), vec![]))),
+                Some(Type::Ptr),
+            ),
+            (Stat::Call("f".to_string(), vec![]), None),
+            (Stat::Call("f".to_string(), vec![]), Some(Type::Ptr)),
         ] {
             assert_eq!(
-                validate_call(call_expr, "f".to_string(), vec![], ret_type),
+                validate_call(call_stat, "f".to_string(), vec![], ret_type),
                 Ok(())
             )
         }
@@ -1113,10 +1149,10 @@ mod test {
     fn check_call_exists_err() {
         assert_eq!(
             validate_call(
-                Expr::Bool(BoolExpr::Call("f".to_string(), vec![])),
+                Stat::PrintExpr(Expr::Bool(BoolExpr::Call("f".to_string(), vec![]))),
                 "g".to_string(),
                 vec![],
-                Type::Bool
+                Some(Type::Bool)
             ),
             Err(())
         )
@@ -1126,13 +1162,13 @@ mod test {
     fn check_call_args_num_err() {
         assert_eq!(
             validate_call(
-                Expr::Bool(BoolExpr::Call(
+                Stat::PrintExpr(Expr::Bool(BoolExpr::Call(
                     "f".to_string(),
                     vec![Expr::Bool(BoolExpr::Const(true))]
-                )),
+                ))),
                 "g".to_string(),
                 vec![],
-                Type::Bool
+                Some(Type::Bool)
             ),
             Err(())
         )
@@ -1142,13 +1178,13 @@ mod test {
     fn check_call_args_types_err() {
         assert_eq!(
             validate_call(
-                Expr::Bool(BoolExpr::Call(
+                Stat::PrintExpr(Expr::Bool(BoolExpr::Call(
                     "f".to_string(),
                     vec![Expr::Bool(BoolExpr::Const(true))]
-                )),
+                ))),
                 "f".to_string(),
                 vec![(Type::Ptr, 1)],
-                Type::Bool
+                Some(Type::Bool)
             ),
             Err(())
         )
@@ -1158,16 +1194,16 @@ mod test {
     fn check_call_args_collision_err() {
         assert_eq!(
             validate_call(
-                Expr::Bool(BoolExpr::Call(
+                Stat::PrintExpr(Expr::Bool(BoolExpr::Call(
                     "f".to_string(),
                     vec![
                         Expr::Bool(BoolExpr::Const(true)),
                         Expr::Bool(BoolExpr::Const(true))
                     ]
-                )),
+                ))),
                 "f".to_string(),
                 vec![(Type::Bool, 1), (Type::Bool, 1)],
-                Type::Bool
+                Some(Type::Bool)
             ),
             Err(())
         )
@@ -1175,26 +1211,30 @@ mod test {
 
     #[test]
     fn check_call_ret_type_err() {
-        for (call_expr, ret_type) in [
+        for (call_stat, ret_type) in [
             (
-                Expr::Num(NumExpr::ArithOp(
+                Stat::PrintExpr(Expr::Num(NumExpr::ArithOp(
                     box NumExpr::Call("f".to_string(), vec![]),
                     ArithOp::Add,
                     box NumExpr::Const(NumSize::DWord, 0),
-                )),
-                Type::Num(NumSize::Byte),
+                ))),
+                Some(Type::Num(NumSize::Byte)),
             ),
             (
-                Expr::Bool(BoolExpr::Call("f".to_string(), vec![])),
-                Type::Ptr,
+                Stat::PrintExpr(Expr::Bool(BoolExpr::Call("f".to_string(), vec![]))),
+                Some(Type::Ptr),
             ),
             (
-                Expr::Ptr(PtrExpr::Call("f".to_string(), vec![])),
-                Type::Bool,
+                Stat::PrintExpr(Expr::Ptr(PtrExpr::Call("f".to_string(), vec![]))),
+                Some(Type::Bool),
+            ),
+            (
+                Stat::PrintExpr(Expr::Ptr(PtrExpr::Call("f".to_string(), vec![]))),
+                None,
             ),
         ] {
             assert_eq!(
-                validate_call(call_expr, "f".to_string(), vec![], ret_type),
+                validate_call(call_stat, "f".to_string(), vec![], ret_type),
                 Err(())
             )
         }
@@ -1242,10 +1282,14 @@ mod test {
             validate_block_graph(vec![Block(
                 vec![],
                 vec![],
-                BlockEnding::Return(Expr::Num(NumExpr::Const(NumSize::DWord, 0)))
+                BlockEnding::Return(Some(Expr::Num(NumExpr::Const(NumSize::DWord, 0))))
             )]),
             Err(())
-        )
+        );
+        assert_eq!(
+            validate_block_graph(vec![Block(vec![], vec![], BlockEnding::Return(None))]),
+            Err(())
+        );
     }
 
     #[test]
@@ -1255,13 +1299,13 @@ mod test {
                 HashMap::from([(
                     "f".to_string(),
                     Function(
-                        Type::Num(NumSize::Byte),
+                        Some(Type::Num(NumSize::Byte)),
                         vec![],
                         HashMap::new(),
                         vec![Block(
                             vec![],
                             vec![],
-                            BlockEnding::Return(Expr::Num(NumExpr::Const(NumSize::Word, 0)))
+                            BlockEnding::Return(Some(Expr::Num(NumExpr::Const(NumSize::Word, 0))))
                         )],
                     )
                 )]),
@@ -1305,13 +1349,13 @@ mod test {
                 HashMap::from([(
                     "f".to_string(),
                     Function(
-                        Type::Num(NumSize::DWord),
+                        Some(Type::Num(NumSize::DWord)),
                         vec![],
                         HashMap::new(),
                         vec![Block(
                             vec![],
                             vec![],
-                            BlockEnding::Return(Expr::Num(NumExpr::Const(NumSize::DWord, 0)))
+                            BlockEnding::Return(Some(Expr::Num(NumExpr::Const(NumSize::DWord, 0))))
                         )]
                     )
                 )]),
@@ -1336,13 +1380,13 @@ mod test {
                 HashMap::from([(
                     "f".to_string(),
                     Function(
-                        Type::Num(NumSize::DWord),
+                        Some(Type::Num(NumSize::DWord)),
                         vec![(Type::Ptr, 0)],
                         HashMap::new(),
                         vec![Block(
                             vec![],
                             vec![],
-                            BlockEnding::Return(Expr::Num(NumExpr::Const(NumSize::DWord, 0))),
+                            BlockEnding::Return(Some(Expr::Num(NumExpr::Const(NumSize::DWord, 0)))),
                         )],
                     ),
                 )]),

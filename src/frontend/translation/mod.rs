@@ -343,13 +343,13 @@ fn translate_stat(
             block_graph.push(ir::Block(
                 tmp_prev_blocks,
                 tmp_block_stats,
-                BlockEnding::Return(translate_expr(
+                BlockEnding::Return(Some(translate_expr(
                     expr,
                     &expr_type.expect("Expected a type for an expression"),
                     var_symb,
                     data_ref_map,
                     helper_function_flags,
-                )),
+                ))),
             ));
         }
         Stat::Exit(ASTWrapper(expr_type, expr)) => {
@@ -698,7 +698,7 @@ fn translate_function(
         helper_function_flags
     ));
     ir::Function(
-        ret_type.into(),
+        Some(ret_type.into()),
         args.iter()
             .map(|ASTWrapper(_, Param(arg_type, arg))| (arg_type.into(), *arg))
             .collect(),
