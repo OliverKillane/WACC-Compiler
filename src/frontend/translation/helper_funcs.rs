@@ -104,20 +104,16 @@ fn array_indexing_function(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -
                 ir::BlockEnding::CondJumps(
                     vec![
                         (
-                            ir::BoolExpr::TestPositive(ir::NumExpr::ArithOp(
-                                box ir::NumExpr::Const(ir::NumSize::DWord, 0),
-                                ir::ArithOp::Sub,
-                                box ir::NumExpr::Var(1),
-                            )),
+                            ir::BoolExpr::NumLt(
+                                ir::NumExpr::Var(1),
+                                ir::NumExpr::Const(ir::NumSize::DWord, 0),
+                            ),
                             1,
                         ),
                         (
-                            ir::BoolExpr::Not(box ir::BoolExpr::TestPositive(
-                                ir::NumExpr::ArithOp(
-                                    box ir::NumExpr::Deref(ir::NumSize::DWord, ir::PtrExpr::Var(0)),
-                                    ir::ArithOp::Sub,
-                                    box ir::NumExpr::Var(1),
-                                ),
+                            ir::BoolExpr::Not(box ir::BoolExpr::NumLt(
+                                ir::NumExpr::Var(1),
+                                ir::NumExpr::Deref(ir::NumSize::DWord, ir::PtrExpr::Var(0)),
                             )),
                             2,
                         ),
@@ -198,7 +194,13 @@ fn divide_modulo_check(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir
                 vec![],
                 vec![],
                 ir::BlockEnding::CondJumps(
-                    vec![(ir::BoolExpr::TestZero(ir::NumExpr::Var(0)), 1)],
+                    vec![(
+                        ir::BoolExpr::NumEq(
+                            ir::NumExpr::Var(0),
+                            ir::NumExpr::Const(ir::NumSize::DWord, 0),
+                        ),
+                        1,
+                    )],
                     2,
                 ),
             ),

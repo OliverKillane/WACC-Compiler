@@ -193,22 +193,38 @@ pub(super) fn translate_bool_expr(
                 OpSrc::from(0x01),
             ));
         }
-        ir::BoolExpr::TestZero(num_expr) => {
-            translate_num_expr(num_expr, result, stat_line, vars, function_types, options);
+        ir::BoolExpr::NumEq(num_expr1, num_expr2) => {
+            translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
+            translate_num_expr(
+                num_expr2,
+                result + 1,
+                stat_line,
+                vars,
+                function_types,
+                options,
+            );
             stat_line.add_stat(StatCode::AssignOp(
                 result,
                 OpSrc::Var(result),
                 BinOp::Eq,
-                OpSrc::from(0x00),
+                OpSrc::Var(result + 1),
             ));
         }
-        ir::BoolExpr::TestPositive(num_expr) => {
-            translate_num_expr(num_expr, result, stat_line, vars, function_types, options);
+        ir::BoolExpr::NumLt(num_expr1, num_expr2) => {
+            translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
+            translate_num_expr(
+                num_expr2,
+                result + 1,
+                stat_line,
+                vars,
+                function_types,
+                options,
+            );
             stat_line.add_stat(StatCode::AssignOp(
                 result,
                 OpSrc::Var(result),
-                BinOp::Gt,
-                OpSrc::from(0x00),
+                BinOp::Lt,
+                OpSrc::Var(result + 1),
             ));
         }
         ir::BoolExpr::PtrEq(ptr_expr1, ptr_expr2) => {
@@ -245,6 +261,41 @@ pub(super) fn translate_bool_expr(
                 OpSrc::Var(result + 1),
             ));
         }
+        ir::BoolExpr::Not(box ir::BoolExpr::NumEq(num_expr1, num_expr2)) => {
+            translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
+            translate_num_expr(
+                num_expr2,
+                result + 1,
+                stat_line,
+                vars,
+                function_types,
+                options,
+            );
+            stat_line.add_stat(StatCode::AssignOp(
+                result,
+                OpSrc::Var(result),
+                BinOp::Ne,
+                OpSrc::Var(result + 1),
+            ));
+        }
+        ir::BoolExpr::Not(box ir::BoolExpr::NumLt(num_expr1, num_expr2)) => {
+            translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
+            translate_num_expr(
+                num_expr2,
+                result + 1,
+                stat_line,
+                vars,
+                function_types,
+                options,
+            );
+            stat_line.add_stat(StatCode::AssignOp(
+                result,
+                OpSrc::Var(result),
+                BinOp::Gte,
+                OpSrc::Var(result + 1),
+            ));
+        }
+
         ir::BoolExpr::Not(box bool_expr) => {
             let bool_const =
                 translate_bool_expr(bool_expr, result, stat_line, vars, function_types, options);
@@ -639,16 +690,17 @@ mod tests {
     }
 
     #[test]
-    fn translate_test_zero_bool_expr() {
+    fn translate_num_eq_bool_expr() {
         match_line_stat_vec(
-            ir::Expr::Bool(ir::BoolExpr::TestZero(ir::NumExpr::Const(
-                ir::NumSize::Word,
-                0,
-            ))),
+            ir::Expr::Bool(ir::BoolExpr::NumEq(
+                ir::NumExpr::Const(ir::NumSize::Word, 420),
+                ir::NumExpr::Const(ir::NumSize::Word, 69),
+            )),
             0,
             vec![
-                StatCode::Assign(0, OpSrc::Const(0)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Eq, OpSrc::Const(0)),
+                StatCode::Assign(0, OpSrc::Const(420)),
+                StatCode::Assign(1, OpSrc::Const(69)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Ne, OpSrc::Var(1)),
             ],
             HashMap::new(),
             HashMap::new(),
@@ -657,16 +709,55 @@ mod tests {
     }
 
     #[test]
-    fn translate_test_positive_bool_expr() {
+    fn translate_num_lt_bool_expr() {
         match_line_stat_vec(
-            ir::Expr::Bool(ir::BoolExpr::TestPositive(ir::NumExpr::Const(
-                ir::NumSize::Word,
-                0,
+            ir::Expr::Bool(ir::BoolExpr::NumLt(
+                ir::NumExpr::Const(ir::NumSize::Word, 420),
+                ir::NumExpr::Const(ir::NumSize::Word, 69),
+            )),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::Const(420)),
+                StatCode::Assign(1, OpSrc::Const(69)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Gte, OpSrc::Var(1)),
+            ],
+            HashMap::new(),
+            HashMap::new(),
+            ir::Type::Bool,
+        )
+    }
+
+    #[test]
+    fn translate_not_num_eq_bool_expr() {
+        match_line_stat_vec(
+            ir::Expr::Bool(ir::BoolExpr::Not(box ir::BoolExpr::NumEq(
+                ir::NumExpr::Const(ir::NumSize::Word, 420),
+                ir::NumExpr::Const(ir::NumSize::Word, 69),
             ))),
             0,
             vec![
-                StatCode::Assign(0, OpSrc::Const(0)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Gt, OpSrc::Const(0)),
+                StatCode::Assign(0, OpSrc::Const(420)),
+                StatCode::Assign(1, OpSrc::Const(69)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Eq, OpSrc::Var(1)),
+            ],
+            HashMap::new(),
+            HashMap::new(),
+            ir::Type::Bool,
+        )
+    }
+
+    #[test]
+    fn translate_not_num_lt_bool_expr() {
+        match_line_stat_vec(
+            ir::Expr::Bool(ir::BoolExpr::Not(box ir::BoolExpr::NumLt(
+                ir::NumExpr::Const(ir::NumSize::Word, 420),
+                ir::NumExpr::Const(ir::NumSize::Word, 69),
+            ))),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::Const(420)),
+                StatCode::Assign(1, OpSrc::Const(69)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Lt, OpSrc::Var(1)),
             ],
             HashMap::new(),
             HashMap::new(),
