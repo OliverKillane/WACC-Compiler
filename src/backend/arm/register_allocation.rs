@@ -9,16 +9,18 @@ use std::{
     ops::DerefMut,
 };
 
-use crate::graph::Graph;
+use lazy_static::__Deref;
+
 use super::{
     allocation_state::AllocationState,
-    arm_graph_utils::{link_optional_chains, Chain, link_two_nodes},
+    arm_graph_utils::{link_optional_chains, link_two_nodes, Chain},
     arm_repr::{
         ArmCode, ArmNode, ControlFlow, FlexOffset, FlexOperand, Ident, MemOp, MemOperand, Stat,
         Subroutine, Temporary,
     },
     live_ranges::{get_live_ranges, LiveRanges},
 };
+use crate::graph::Graph;
 
 /// Update the program, allocating registers for every instruction.
 ///
@@ -100,17 +102,10 @@ fn allocate_for_routine(
     // stack_setup_end.set_successor(start_node.clone());
     link_two_nodes(stack_setup_end, start_node.clone());
 
-    translate_from_node(
-        start_node,
-        alloc_state,
-        &mut state_map,
-        live_ranges,
-        graph,
-    );
+    translate_from_node(start_node, alloc_state, &mut state_map, live_ranges, graph);
 
     new_start
 }
-
 
 /// Starting from a given node, translate all temporaries to registers.
 /// - Traverses from 'node', this must not have already been translated.
@@ -132,35 +127,48 @@ fn translate_from_node(
 
         // update the registers for current live_in
         alloc_state.update_live(&livein);
-
+        // println!("----------------------------");
+        // println!(
+        //     "LIVEIN: {}",
+        //     livein
+        //         .iter()
+        //         .map(|t| format!("T{}, ", t))
+        //         .collect::<String>()
+        // );
+        // println!("{}", alloc_state);
+        // println!("{:?}", current_node.get().deref());
+        // println!(
+        //     "LIVEOUT: {}",
+        //     liveout
+        //         .iter()
+        //         .map(|t| format!("T{}, ", t))
+        //         .collect::<String>()
+        // );
+        println!("here is the issue");
         let mut next: ArmNode = match current_node.clone().get_mut().deref_mut() {
             ControlFlow::Simple(Some(prev), Stat::Call(fun_name, ret, args), next) => {
                 let Chain(mut start, mut end) =
                     alloc_state.call(fun_name.clone(), ret, args, &liveout, graph);
 
-                // as we entirely replace the 'call' node, we set the successors and
-                // predecessors to point to the ends of our chain of statements
-                if let Some(next_node) = next {
-                    end.set_successor(next_node.clone());
-                    next_node.replace_predecessor(current_node.clone(), end)
-                }
-
                 start.set_predecessor(prev.clone());
                 prev.replace_successor(current_node.clone(), start);
 
+                // as we entirely replace the 'call' node, we set the successors and
+                // predecessors to point to the ends of our chain of statements
+                println!("inside1");
                 if let Some(next_node) = next {
+                    end.set_successor(next_node.clone());
+                    next_node.replace_predecessor(current_node.clone(), end);
                     next_node.clone()
                 } else {
                     return;
                 }
             }
-            ControlFlow::Simple(Some(prev), Stat::Move(
-                _,
-                _,
-                _,
-                dst_ident @ Ident::Temp(_),
-                FlexOperand::ShiftReg(arg_ident @ Ident::Temp(_), _),
-            ), next) => {
+            ControlFlow::Simple(
+                Some(prev),
+                Stat::Move(_, _, _, dst_ident, FlexOperand::ShiftReg(arg_ident, _)),
+                next,
+            ) => {
                 // A destination and argument, these can be the same register.
                 let dst_t = dst_ident.get_temp();
                 let arg_t = arg_ident.get_temp();
@@ -177,28 +185,62 @@ fn translate_from_node(
                 let (dst_reg, dst_chain) =
                     alloc_state.move_temp_into_reg(dst_t, false, &[arg_t], &liveout, graph);
 
-                *arg_ident = Ident::Reg(arg_reg);
-                *dst_ident = Ident::Reg(dst_reg);
+                let chain = link_optional_chains(vec![arg_chain, dst_chain]);
+                println!("inside2");
+                if arg_reg == dst_reg {
+                    // source and destination registers are identical, no need for a move instruction.
+                    println!("inside7");
+                    if let Some(Chain(mut before_start, mut before_end)) = chain {
+                        println!("inside10");
+                        // if there is a chain of instructions required before, insert the chain
+                        prev.replace_successor(current_node.clone(), before_start.clone());
+                        before_start.set_predecessor(prev.clone());
 
-                if *arg_ident == *dst_ident {
-                    if let Some(next_node) = next {
+                        if let Some(next_node) = next {
+                            println!("inside11");
+                            // if there is a next node, connect the end of the chain to the next node
+                            next_node.replace_predecessor(current_node.clone(), before_end.clone());
+                            before_end.set_successor(next_node.clone());
+                            next_node.clone()
+                        } else {
+                            // there is no next node, so end of chain is end of instructions
+                            return;
+                        }
+                    } else if let Some(next_node) = next {
+                        println!("inside9");
+                        // there is no chain, but there is a next node, so connect from the previous to next (bypass current)
+                        // fails here with "thread 'main' panicked at 'already borrowed: BorrowMutError"
+                        println!("prev:{:?}   current:{:?}", prev, current_node);
                         prev.replace_successor(current_node.clone(), next_node.clone());
+                        // prev has already been mutable borrowed.
+                        println!("aaaaaaaaaaaaaaa");
                         next_node.replace_predecessor(current_node.clone(), prev.clone());
+                        println!("aaaaaaaaaaaaaaa");
                         next_node.clone()
                     } else {
-                        return
+                        println!("inside12");
+                        // there is no next node, hence the previous is the last node.
+                        prev.remove_successor();
+                        return;
                     }
                 } else {
-                    if let Some(Chain(mut before_start, mut before_end)) = link_optional_chains(vec![arg_chain, dst_chain]) {
-                        let mut prev_node = prev.clone();
-                        // connect prev <-> before_start <-> before_end <-> this node
-                        prev_node.replace_successor(current_node.clone(), before_start.clone());
-                        before_start.set_predecessor(prev_node);
-    
-                        *prev = before_end.clone();
-                        before_end.set_successor(current_node.clone())
+                    println!("inside8");
+                    // update the identifiers to registers.
+                    *arg_ident = Ident::Reg(arg_reg);
+                    *dst_ident = Ident::Reg(dst_reg);
+
+                    // We still need a move instruction (different registers)
+                    if let Some(Chain(mut before_start, mut before_end)) = chain {
+                        // place the chain between the previous node and the current node.
+                        // prev <-> (before_start <-> before_end) <-> current_node
+                        before_start.set_predecessor(prev.clone());
+                        prev.replace_successor(current_node.clone(), before_start.clone());
+
+                        before_end.set_successor(current_node.clone());
+                        *prev = before_end;
                     }
-    
+
+                    // if there is a next, continue
                     if let Some(next_node) = next {
                         next_node.clone()
                     } else {
@@ -212,39 +254,23 @@ fn translate_from_node(
                         MemOp::Ldr,
                         _,
                         _,
-                        dst_ident @ Ident::Temp(_),
-                        MemOperand::PreIndex(
-                            arg1_ident @ Ident::Temp(_),
-                            FlexOffset::ShiftReg(_, arg2_ident @ Ident::Temp(_), _),
-                        ),
+                        dst_ident,
+                        MemOperand::PreIndex(arg1_ident, FlexOffset::ShiftReg(_, arg2_ident, _)),
                     )
-                    | Stat::Mul(
-                        _,
-                        _,
-                        dst_ident @ Ident::Temp(_),
-                        arg1_ident @ Ident::Temp(_),
-                        arg2_ident @ Ident::Temp(_),
-                    )
+                    | Stat::Mul(_, _, dst_ident, arg1_ident, arg2_ident)
                     | Stat::ApplyOp(
                         _,
                         _,
                         _,
-                        dst_ident @ Ident::Temp(_),
-                        arg1_ident @ Ident::Temp(_),
-                        FlexOperand::ShiftReg(arg2_ident @ Ident::Temp(_), _),
+                        dst_ident,
+                        arg1_ident,
+                        FlexOperand::ShiftReg(arg2_ident, _),
                     )
-                    | Stat::SatOp(
-                        _,
-                        _,
-                        dst_ident @ Ident::Temp(_),
-                        arg1_ident @ Ident::Temp(_),
-                        arg2_ident @ Ident::Temp(_),
-                    ) => {
+                    | Stat::SatOp(_, _, dst_ident, arg1_ident, arg2_ident) => {
                         // Arguments can be the same and match the destination.
-
                         let dst_t = dst_ident.get_temp();
                         let arg1_t = arg1_ident.get_temp();
-                        let arg2_t = arg1_ident.get_temp();
+                        let arg2_t = arg2_ident.get_temp();
 
                         // ensure both arguments are in registers, and leave
                         // the arguments alone if they are already in a register.
@@ -274,34 +300,15 @@ fn translate_from_node(
 
                         link_optional_chains(vec![arg1_chain, arg2_chain, dst_chain])
                     }
-                    Stat::MemOp(
-                        MemOp::Ldr,
-                        _,
-                        _,
-                        dst_ident @ Ident::Temp(_),
-                        MemOperand::Zero(arg_ident @ Ident::Temp(_)),
-                    )
+                    Stat::MemOp(MemOp::Ldr, _, _, dst_ident, MemOperand::Zero(arg_ident))
                     | Stat::MemOp(
                         MemOp::Ldr,
                         _,
                         _,
-                        dst_ident @ Ident::Temp(_),
-                        MemOperand::PreIndex(arg_ident @ Ident::Temp(_), FlexOffset::Expr(_)),
+                        dst_ident,
+                        MemOperand::PreIndex(arg_ident, FlexOffset::Expr(_)),
                     )
-                    | Stat::Cmp(
-                        _,
-                        _,
-                        dst_ident @ Ident::Temp(_),
-                        FlexOperand::ShiftReg(arg_ident @ Ident::Temp(_), _),
-                    )
-                    | Stat::ApplyOp(
-                        _,
-                        _,
-                        _,
-                        dst_ident @ Ident::Temp(_),
-                        arg_ident @ Ident::Temp(_),
-                        _,
-                    ) => {
+                    | Stat::ApplyOp(_, _, _, dst_ident, arg_ident, _) => {
                         // A destination and argument, these can be the same register.
                         let dst_t = dst_ident.get_temp();
                         let arg_t = arg_ident.get_temp();
@@ -323,19 +330,12 @@ fn translate_from_node(
 
                         link_optional_chains(vec![arg_chain, dst_chain])
                     }
-                    Stat::MulA(
-                        _,
-                        _,
-                        dst_ident @ Ident::Temp(_),
-                        arg1_ident @ Ident::Temp(_),
-                        arg2_ident @ Ident::Temp(_),
-                        arg3_ident @ Ident::Temp(_),
-                    ) => {
+                    Stat::MulA(_, _, dst_ident, arg1_ident, arg2_ident, arg3_ident) => {
                         // three arguments and one destination
                         let dst_t = dst_ident.get_temp();
                         let arg1_t = arg1_ident.get_temp();
                         let arg2_t = arg2_ident.get_temp();
-                        let arg3_t = arg2_ident.get_temp();
+                        let arg3_t = arg3_ident.get_temp();
 
                         // ensure both arguments are in registers, and leave
                         // the arguments alone if they are already in a register.
@@ -356,7 +356,7 @@ fn translate_from_node(
                         let (arg3_reg, arg3_chain) = alloc_state.move_temp_into_reg(
                             arg3_t,
                             true,
-                            &[arg3_t, arg2_t],
+                            &[arg1_t, arg2_t],
                             &livein,
                             graph,
                         );
@@ -380,15 +380,7 @@ fn translate_from_node(
 
                         link_optional_chains(vec![arg1_chain, arg2_chain, arg3_chain, dst_chain])
                     }
-                    Stat::MulOp(
-                        _,
-                        _,
-                        _,
-                        dst1_ident @ Ident::Temp(_),
-                        dst2_ident @ Ident::Temp(_),
-                        arg1_ident @ Ident::Temp(_),
-                        arg2_ident @ Ident::Temp(_),
-                    ) => {
+                    Stat::MulOp(_, _, _, dst1_ident, dst2_ident, arg1_ident, arg2_ident) => {
                         // two destinations and two arguments
 
                         let dst1_t = dst1_ident.get_temp();
@@ -429,16 +421,15 @@ fn translate_from_node(
                         link_optional_chains(vec![arg1_chain, arg2_chain, dst1_chain, dst2_chain])
                     }
 
-                    Stat::Move(_, _, _, dst_ident @ Ident::Temp(_), _)
-                    | Stat::Cmp(_, _, dst_ident @ Ident::Temp(_), _)
+                    Stat::Move(_, _, _, dst_ident, _)
                     | Stat::MemOp(
                         MemOp::Ldr,
                         _,
                         _,
-                        dst_ident @ Ident::Temp(_),
+                        dst_ident,
                         MemOperand::Label(_) | MemOperand::Expression(_),
                     )
-                    | Stat::ReadCPSR(dst_ident @ Ident::Temp(_)) => {
+                    | Stat::ReadCPSR(dst_ident) => {
                         // single destination
                         let dst_t = dst_ident.get_temp();
 
@@ -454,16 +445,11 @@ fn translate_from_node(
                         MemOp::Str,
                         _,
                         _,
-                        arg1_ident @ Ident::Temp(_),
-                        MemOperand::PreIndex(arg2_ident @ Ident::Temp(_), FlexOffset::Expr(_)),
+                        arg1_ident,
+                        MemOperand::PreIndex(arg2_ident, FlexOffset::Expr(_)),
                     )
-                    | Stat::MemOp(
-                        MemOp::Str,
-                        _,
-                        _,
-                        arg1_ident @ Ident::Temp(_),
-                        MemOperand::Zero(arg2_ident @ Ident::Temp(_)),
-                    ) => {
+                    | Stat::MemOp(MemOp::Str, _, _, arg1_ident, MemOperand::Zero(arg2_ident))
+                    | Stat::Cmp(_, _, arg1_ident, FlexOperand::ShiftReg(arg2_ident, _)) => {
                         // two arguments
                         let arg1_t = arg1_ident.get_temp();
                         let arg2_t = arg2_ident.get_temp();
@@ -483,11 +469,8 @@ fn translate_from_node(
                         MemOp::Str,
                         _,
                         _,
-                        arg1_ident @ Ident::Temp(_),
-                        MemOperand::PreIndex(
-                            arg2_ident @ Ident::Temp(_),
-                            FlexOffset::ShiftReg(_, arg3_ident @ Ident::Temp(_), _),
-                        ),
+                        arg1_ident,
+                        MemOperand::PreIndex(arg2_ident, FlexOffset::ShiftReg(_, arg3_ident, _)),
                     ) => {
                         // two arguments
                         let arg1_t = arg1_ident.get_temp();
@@ -527,9 +510,10 @@ fn translate_from_node(
                         MemOp::Str,
                         _,
                         _,
-                        arg_ident @ Ident::Temp(_),
+                        arg_ident,
                         MemOperand::Label(_) | MemOperand::Expression(_),
-                    ) => {
+                    )
+                    | Stat::Cmp(_, _, arg_ident, FlexOperand::Imm(_)) => {
                         // single argument used (a store)
                         let arg_t = arg_ident.get_temp();
 
@@ -541,9 +525,10 @@ fn translate_from_node(
                         arg_chain
                     }
 
-                    Stat::Push(_, arg_ident @ Ident::Temp(_)) => {
-                        // push to the stack
+                    Stat::Push(_, arg_ident) => {
+                        // push some temporary to the stack
                         let arg_t = arg_ident.get_temp();
+
                         let (arg1_reg, arg_chain) =
                             alloc_state.move_temp_into_reg(arg_t, true, &[], &livein, graph);
 
@@ -553,20 +538,20 @@ fn translate_from_node(
 
                         arg_chain
                     }
-                    Stat::Pop(_, arg_ident @ Ident::Temp(_)) => {
-                        // push to the stack
-                        let arg_t = arg_ident.get_temp();
+                    Stat::Pop(_, dst_ident) => {
+                        // pop from the stack into some temporary
+                        let dst_t = dst_ident.get_temp();
                         let (arg1_reg, arg_chain) =
-                            alloc_state.move_temp_into_reg(arg_t, true, &[], &livein, graph);
+                            alloc_state.move_temp_into_reg(dst_t, false, &[], &livein, graph);
 
-                        *arg_ident = Ident::Reg(arg1_reg);
+                        *dst_ident = Ident::Reg(arg1_reg);
 
                         alloc_state.pop_sp();
 
                         arg_chain
                     }
                     Stat::Link(_, _) => None,
-                    Stat::AssignStackWord(dst_ident @ Ident::Temp(_)) => {
+                    Stat::AssignStackWord(dst_ident) => {
                         // single destination
                         let dst_t = dst_ident.get_temp();
 
@@ -580,7 +565,6 @@ fn translate_from_node(
                     }
                     _ => None, // No temporaries, so no chain
                 };
-
                 // if new chains were created, then make them the predecessors to this node.
                 if let Some(Chain(mut before_start, mut before_end)) = chain_before {
                     let mut prev_node =
@@ -608,13 +592,14 @@ fn translate_from_node(
                         let mut next_node = branch_next.clone();
 
                         chain_start.set_predecessor(current_node.clone());
-                        
+
                         chain_end.set_successor(branch_next.clone());
                         *branch_next = chain_start;
 
                         next_node.replace_predecessor(current_node.clone(), chain_end)
                     }
                 } else {
+                    println!("branching");
                     translate_from_node(
                         branch_next.clone(),
                         alloc_state.clone(),
@@ -658,8 +643,8 @@ fn translate_from_node(
             _ => panic!("No previous node, hence the function's invaliant is broken"),
         };
 
-        
-        // check if the current node has had its registers allocated already
+
+        // check if the next node has had its registers allocated already
         if let Some(conform_alloc_state) = state_map.get(&next) {
             if let Some(Chain(mut chain_start, mut chain_end)) =
                 alloc_state.match_state(conform_alloc_state, graph)

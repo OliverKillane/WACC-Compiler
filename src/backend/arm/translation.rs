@@ -12,7 +12,8 @@ use super::{
         BinOp, DataRefType, Function, OpSrc, Size, StatCode, StatNode, StatType, ThreeCode,
     },
     arm_graph_utils::{
-        is_shifted_8_bit, link_chains, link_stats, link_two_chains, simple_node, Chain, link_two_nodes,
+        is_shifted_8_bit, link_chains, link_stats, link_two_chains, link_two_nodes, simple_node,
+        Chain,
     },
     arm_repr::{
         ArmCode, ArmNode, CmpOp, Cond, ControlFlow, Data, DataIdent, DataType, FlexOffset,
@@ -155,7 +156,6 @@ fn translate_data(data_refs: HashMap<DataRef, DataRefType>) -> Vec<Data> {
         .collect::<Vec<_>>()
 }
 
-
 fn require_label(
     node: StatNode,
     translate_map: &mut HashMap<StatNode, ArmNode>,
@@ -173,8 +173,6 @@ fn require_label(
                 // If more predecessors, create a label, place in the
                 // map to found and used.
                 let label = graph.new_node(ControlFlow::Multi(vec![], None));
-
-                println!("Created multi: {}", label.print_arm_node());
                 translate_map.insert(node.clone(), label.clone());
                 Some(label)
             } else {
@@ -292,8 +290,6 @@ fn translate_from_node(
     // Translate the first node, the continue translating until there are no nodes to go to.
     let (first, next) = translate_node(node, int_handler, temp_map, translate_map, graph);
 
-
-
     if let Some((mut prev, mut next_stat_node)) = next {
         loop {
             let (mut trans_start, next_nodes) =
@@ -356,9 +352,7 @@ fn translate_routine(
             }
             first
         }
-        None => {
-            graph.new_node(ControlFlow::Return(None, None))
-        }
+        None => graph.new_node(ControlFlow::Return(None, None)),
     }
 }
 
@@ -537,7 +531,7 @@ fn translate_statcode(
         }
         StatCode::AssignOp(three_temp_dst, first_op, binop, second_op) => {
             let arm_dst_temp = temp_map.use_temp(*three_temp_dst);
-            let mut nodes = vec![];
+            let mut nodes = Vec::new();
 
             let mut opsrc_to_reg = |opsrc: &OpSrc| {
                 match opsrc {
@@ -570,27 +564,29 @@ fn translate_statcode(
             let left_reg = opsrc_to_reg(first_op);
             let right_reg = opsrc_to_reg(second_op);
 
-            let compare_op = |cond: Cond, graph| {
+            let mut compare_op = |cond: Cond, graph| {
+                let othertemp = temp_map.get_new_temp();
                 // Move 0 into the register, then compare, if equal set to 1
                 // MOV arm_dst_temp, #0
                 // CMP left_reg, right_reg
                 // MOV(cond) arm_dst_temp, #1
                 link_stats(
                     vec![
-                        Stat::Move(
-                            MovOp::Mov,
-                            Cond::Al,
-                            false,
-                            arm_dst_temp,
-                            FlexOperand::Imm(0),
-                        ),
+                        Stat::Move(MovOp::Mov, Cond::Al, false, othertemp, FlexOperand::Imm(0)),
                         Stat::Cmp(
                             CmpOp::Cmp,
                             Cond::Al,
                             left_reg,
                             FlexOperand::ShiftReg(right_reg, None),
                         ),
-                        Stat::Move(MovOp::Mov, cond, false, arm_dst_temp, FlexOperand::Imm(1)),
+                        Stat::Move(MovOp::Mov, cond, false, othertemp, FlexOperand::Imm(1)),
+                        Stat::Move(
+                            MovOp::Mov,
+                            Cond::Al,
+                            false,
+                            arm_dst_temp,
+                            FlexOperand::ShiftReg(othertemp, None),
+                        ),
                     ],
                     graph,
                 )

@@ -22,9 +22,11 @@ pub use arm_repr::ArmCode;
 pub struct ArmResult(pub ArmCode, pub Option<String>);
 
 impl From<(ThreeCode, &Options)> for ArmResult {
+    
     /// Using the provided options and the three code representation, generate
     /// arm assembly and optionally the assembly using temporaries.
     fn from((three_code, options): (ThreeCode, &Options)) -> Self {
+        println!("arm backend");
         if options.show_arm_temp_rep {
             let arm_temp = translate_threecode(three_code);
             let temp_string = arm_temp.to_string();
