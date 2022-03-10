@@ -290,39 +290,27 @@ pub(super) fn translate_expr(
                     ))
                 }
                 (ir::Expr::Num(num_expr1), ast::BinOp::Gt, ir::Expr::Num(num_expr2)) => {
-                    ir::Expr::Bool(ir::BoolExpr::TestPositive(ir::NumExpr::ArithOp(
-                        box num_expr1,
-                        ir::ArithOp::Sub,
-                        box num_expr2,
-                    )))
+                    ir::Expr::Bool(ir::BoolExpr::NumLt(num_expr2, num_expr1))
                 }
                 (ir::Expr::Num(num_expr1), ast::BinOp::Gte, ir::Expr::Num(num_expr2)) => {
-                    ir::Expr::Bool(ir::BoolExpr::Not(box ir::BoolExpr::TestPositive(
-                        ir::NumExpr::ArithOp(box num_expr2, ir::ArithOp::Sub, box num_expr1),
+                    ir::Expr::Bool(ir::BoolExpr::Not(box ir::BoolExpr::NumLt(
+                        num_expr1, num_expr2,
                     )))
                 }
                 (ir::Expr::Num(num_expr1), ast::BinOp::Lt, ir::Expr::Num(num_expr2)) => {
-                    ir::Expr::Bool(ir::BoolExpr::TestPositive(ir::NumExpr::ArithOp(
-                        box num_expr2,
-                        ir::ArithOp::Sub,
-                        box num_expr1,
-                    )))
+                    ir::Expr::Bool(ir::BoolExpr::NumLt(num_expr1, num_expr2))
                 }
                 (ir::Expr::Num(num_expr1), ast::BinOp::Lte, ir::Expr::Num(num_expr2)) => {
-                    ir::Expr::Bool(ir::BoolExpr::Not(box ir::BoolExpr::TestPositive(
-                        ir::NumExpr::ArithOp(box num_expr1, ir::ArithOp::Sub, box num_expr2),
+                    ir::Expr::Bool(ir::BoolExpr::Not(box ir::BoolExpr::NumLt(
+                        num_expr2, num_expr1,
                     )))
                 }
                 (ir::Expr::Num(num_expr1), ast::BinOp::Eq, ir::Expr::Num(num_expr2)) => {
-                    ir::Expr::Bool(ir::BoolExpr::TestZero(ir::NumExpr::ArithOp(
-                        box num_expr1,
-                        ir::ArithOp::Sub,
-                        box num_expr2,
-                    )))
+                    ir::Expr::Bool(ir::BoolExpr::NumEq(num_expr1, num_expr2))
                 }
                 (ir::Expr::Num(num_expr1), ast::BinOp::Ne, ir::Expr::Num(num_expr2)) => {
-                    ir::Expr::Bool(ir::BoolExpr::Not(box ir::BoolExpr::TestZero(
-                        ir::NumExpr::ArithOp(box num_expr1, ir::ArithOp::Sub, box num_expr2),
+                    ir::Expr::Bool(ir::BoolExpr::Not(box ir::BoolExpr::NumEq(
+                        num_expr1, num_expr2,
                     )))
                 }
                 (ir::Expr::Bool(bool_expr1), ast::BinOp::And, ir::Expr::Bool(bool_expr2)) => {
@@ -408,14 +396,13 @@ mod tests {
         let var_symb = VariableSymbolTable::new();
 
         let translated: intermediate::Expr = ir::Expr::Bool(ir::BoolExpr::BoolOp(
-            box ir::BoolExpr::TestZero(ir::NumExpr::ArithOp(
-                box ir::NumExpr::Cast(
+            box ir::BoolExpr::NumEq(
+                ir::NumExpr::Cast(
                     ir::NumSize::DWord,
                     box ir::NumExpr::Const(ir::NumSize::Byte, 'a' as i32),
                 ),
-                ir::ArithOp::Sub,
-                box ir::NumExpr::Const(ir::NumSize::DWord, 65),
-            )),
+                ir::NumExpr::Const(ir::NumSize::DWord, 65),
+            ),
             ir::BoolOp::Or,
             box ir::BoolExpr::BoolOp(
                 box ir::BoolExpr::Const(true),

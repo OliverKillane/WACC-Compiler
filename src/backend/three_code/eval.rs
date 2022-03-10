@@ -6,13 +6,15 @@ use crate::intermediate as ir;
 fn eval_bool_expr(bool_expr: ir::BoolExpr) -> bool {
     match bool_expr {
         ir::BoolExpr::Const(bool_const) => bool_const,
-        ir::BoolExpr::TestZero(num_expr) => {
-            let (_, num_const) = eval_num_expr(num_expr);
-            num_const == 0
+        ir::BoolExpr::NumEq(num_expr1, num_expr2) => {
+            let (_, num_const1) = eval_num_expr(num_expr1);
+            let (_, num_const2) = eval_num_expr(num_expr2);
+            num_const1 == num_const2
         }
-        ir::BoolExpr::TestPositive(num_expr) => {
-            let (_, num_const) = eval_num_expr(num_expr);
-            num_const > 0
+        ir::BoolExpr::NumLt(num_expr1, num_expr2) => {
+            let (_, num_const1) = eval_num_expr(num_expr1);
+            let (_, num_const2) = eval_num_expr(num_expr2);
+            num_const1 < num_const2
         }
         ir::BoolExpr::PtrEq(ptr_expr1, ptr_expr2) => {
             eval_ptr_expr(ptr_expr1) == eval_ptr_expr(ptr_expr2)
@@ -122,10 +124,10 @@ mod test {
     #[test]
     fn test_positive_bool_expressions() {
         assert_eq!(
-            eval_bool_expr(ir::BoolExpr::TestPositive(ir::NumExpr::Const(
-                ir::NumSize::Word,
-                -42
-            ))),
+            eval_bool_expr(ir::BoolExpr::NumLt(
+                ir::NumExpr::Const(ir::NumSize::Word, -41),
+                ir::NumExpr::Const(ir::NumSize::Word, -42)
+            )),
             false
         );
     }
@@ -133,10 +135,10 @@ mod test {
     #[test]
     fn test_zero_bool_expressions() {
         assert_eq!(
-            eval_bool_expr(ir::BoolExpr::TestZero(ir::NumExpr::Const(
-                ir::NumSize::Byte,
-                0
-            ))),
+            eval_bool_expr(ir::BoolExpr::NumEq(
+                ir::NumExpr::Const(ir::NumSize::Word, 35),
+                ir::NumExpr::Const(ir::NumSize::Word, 35)
+            )),
             true
         );
     }
