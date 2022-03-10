@@ -224,11 +224,11 @@ impl Display for FlexOffset {
 
 impl Display for Stat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let conv = |s: &bool| if *s { "S".to_owned() } else { String::from("") };
+        let conv = |s: &bool| if *s { "S".to_string() } else { "".to_string() };
         match self {
             Stat::ApplyOp(op, cond, s, dest, operand, operand2) => write!(
                 f,
-                "\t{}{}{}\t\t{},\t{},\t{}",
+                "\t{}{}{}\t{},\t{},\t{}",
                 op,
                 cond,
                 conv(s),
@@ -238,7 +238,7 @@ impl Display for Stat {
             ),
             Stat::Mul(cond, s, dest, operand, operand2) => write!(
                 f,
-                "\tMUL{}{}\t\t{},\t{},\t{}",
+                "\tMUL{}{}\t{},\t{},\t{}",
                 cond,
                 conv(s),
                 dest,
@@ -247,7 +247,7 @@ impl Display for Stat {
             ),
             Stat::MulA(cond, s, dest, operand, operand2, operand3) => write!(
                 f,
-                "\tMULA{}{}\t\t{},\t{},\t{},\t{}",
+                "\tMULA{}{}\t{},\t{},\t{},\t{}",
                 cond,
                 conv(s),
                 dest,
@@ -257,7 +257,7 @@ impl Display for Stat {
             ),
             Stat::MulOp(op, cond, s, hi, lo, operand, operand2) => write!(
                 f,
-                "\t{}{}{}\t\t{},\t{},\t{},\t{}",
+                "\t{}{}{}\t{},\t{},\t{},\t{}",
                 op,
                 cond,
                 conv(s),
@@ -267,15 +267,15 @@ impl Display for Stat {
                 operand2
             ),
             Stat::Move(op, cond, s, ident, operand) => {
-                write!(f, "\t{}{}{}\t\t{},\t{}", op, cond, conv(s), ident, operand)
+                write!(f, "\t{}{}{}\t{},\t{}", op, cond, conv(s), ident, operand)
             }
             Stat::Cmp(op, cond, ident, operand) => {
-                write!(f, "\t{}{}\t\t{},\t{}", op, cond, ident, operand)
+                write!(f, "\t{}{}\t{},\t{}", op, cond, ident, operand)
             }
             Stat::SatOp(op, cond, dest, operand, operand2) => {
                 write!(
                     f,
-                    "\t{}{}\t\t{},\t{},\t{}",
+                    "\t{}{}\t{},\t{},\t{}",
                     op, cond, dest, operand, operand2
                 )
             }
@@ -283,7 +283,7 @@ impl Display for Stat {
             Stat::MemOp(op, cond, s, ident, operand) => {
                 write!(
                     f,
-                    "\t{}{}{}\t\t{},\t{}",
+                    "\t{}{}{}\t{},\t{}",
                     op,
                     cond,
                     if *s { "B" } else { "" },
@@ -291,12 +291,12 @@ impl Display for Stat {
                     operand
                 )
             }
-            Stat::Push(cond, ident) => write!(f, "\tPUSH{}\t\t{{{}}}", cond, ident,),
-            Stat::Pop(cond, ident) => write!(f, "\tPOP{}\t\t{{{}}}", cond, ident,),
-            Stat::Link(cond, link_to) => write!(f, "\tBL{}\t\t{}", cond, link_to),
+            Stat::Push(cond, ident) => write!(f, "\tPUSH{}\t{{{}}}", cond, ident,),
+            Stat::Pop(cond, ident) => write!(f, "\tPOP{}\t{{{}}}", cond, ident,),
+            Stat::Link(cond, link_to) => write!(f, "\tBL{}\t{}", cond, link_to),
             Stat::Call(fun_name, ret_temp, arg_temps) => write!(
                 f,
-                "\tINTERNAL OPERATION: CALL\t\t{}\t{}, ARGS({})",
+                "\tINTERNAL OPERATION: CALL\t{}\t{}, ARGS({})",
                 fun_name,
                 match ret_temp {
                     Some(t) => format!("{}", t),
@@ -321,8 +321,18 @@ fn display_routine(start_node: &ArmNode, name: &String, f: &mut std::fmt::Format
         // boolean describing if their code has been generated yet.
         let mut label_map: HashMap<ArmNode, (usize, bool)> = HashMap::new();
 
+        // Literal pools are already placed after unconditional jumps, we add in 
+        // extra literal pools where required using unconditional jumps.
+        //
+        // This is done by placing a pool every 2000 instructions (literal pools always <= 4000 bytes away). 
+        // Starts at 1000 since there are no literal pools at the start of the program.
+        let mut since_lit = 1000;
+        let mut lit_branch_ident = 0;
+
         // Label identifier conversion to strings.
         let label_conv = |id: &usize| format!("b_{}_{}",name, id);
+
+        let lit_label_conv = |id: &usize| format!("blit_{}_{}",name, id);
 
         let mut current = start_node.clone();
 
@@ -330,8 +340,17 @@ fn display_routine(start_node: &ArmNode, name: &String, f: &mut std::fmt::Format
 
         loop {
             loop {
+                if since_lit > 2000 {
+                    writeln!(f, "\tB\t{}", lit_label_conv(&lit_branch_ident))?;
+                    writeln!(f, "\t.ltorg")?;
+                    writeln!(f, "{}:", lit_label_conv(&lit_branch_ident))?;
+                    lit_branch_ident += 1;
+                    since_lit = 0;
+                }
+
                 match current.clone().get().deref() {
                     ControlFlow::Simple(_, stat, next) => {
+                        since_lit += 1;
                         // write the statement
                         writeln!(f, "{}", stat)?;
 
@@ -349,6 +368,7 @@ fn display_routine(start_node: &ArmNode, name: &String, f: &mut std::fmt::Format
                         }
                     }
                     ControlFlow::Branch(_, branch_next, cond, next) => {
+                        since_lit += 1;
                         if let Some((id, _)) = label_map.get(branch_next) {
                             writeln!(f, "\tB{}\t{}", cond, label_conv(id))?;
                         } else {
@@ -371,6 +391,7 @@ fn display_routine(start_node: &ArmNode, name: &String, f: &mut std::fmt::Format
                         }
                     }
                     ControlFlow::Ltorg(_) => {
+                        since_lit = 0;
                         writeln!(f, "\t.ltorg")?;
                         break;
                     }
