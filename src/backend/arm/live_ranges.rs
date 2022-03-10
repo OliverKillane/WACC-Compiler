@@ -7,8 +7,8 @@ use lazy_static::__Deref;
 use linked_hash_set::LinkedHashSet;
 
 use super::arm_repr::{
-    ArmCode, ArmNode, ControlFlow, FlexOffset, FlexOperand, Ident, MemOp, MemOperand, Stat,
-    Subroutine, Temporary, Cond,
+    ArmCode, ArmNode, Cond, ControlFlow, FlexOffset, FlexOperand, Ident, MemOp, MemOperand, Stat,
+    Subroutine, Temporary,
 };
 
 /// The identifier type for live range sets in the LiveRanges structure.
@@ -364,10 +364,10 @@ fn traverse_live_ranges(start_node: ArmNode, liveranges: &mut LiveRanges) {
     {}
 }
 
-/// Trait used to enforce all components of the arm representation can have 
+/// Trait used to enforce all components of the arm representation can have
 /// temporary definitions and uses found.
-/// 
-/// If an instruction is conditional, it does not define the temporary (uses 
+///
+/// If an instruction is conditional, it does not define the temporary (uses
 /// still need to be propagated).
 trait DefsUses {
     fn get_defs_and_uses(&self, defs: &mut Vec<Temporary>, uses: &mut Vec<Temporary>);
@@ -462,15 +462,17 @@ impl DefsUses for Stat {
                         if cond == &Cond::Al {
                             add_temps(ident, defs);
                         }
-                    },
+                    }
                     MemOp::Str => add_temps(ident, uses),
                 }
                 memop.get_defs_and_uses(defs, uses);
-            },
+            }
             Stat::Push(_, arg) => add_temps(arg, uses),
-            Stat::Pop(cond, dst) => if cond == &Cond::Al {
-                add_temps(dst, defs);
-            },
+            Stat::Pop(cond, dst) => {
+                if cond == &Cond::Al {
+                    add_temps(dst, defs);
+                }
+            }
             Stat::Link(_, _) => (),
             Stat::Call(_, dst, args) => {
                 if let Some(dst) = dst {

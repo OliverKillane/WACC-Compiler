@@ -4,20 +4,20 @@
 //! An allocation state is used to keep track of register usage, and
 //! create/maintain the stack frame.
 
-use std::{
-    collections::{HashMap, HashSet},
-    ops::DerefMut,
-};
 use super::{
     allocation_state::AllocationState,
     arm_graph_utils::{link_optional_chains, link_two_nodes, Chain},
     arm_repr::{
-        ArmCode, ArmNode, ControlFlow, FlexOffset, FlexOperand, Ident, MemOp, MemOperand, Stat,
-        Subroutine, Temporary, Cond,
+        ArmCode, ArmNode, Cond, ControlFlow, FlexOffset, FlexOperand, Ident, MemOp, MemOperand,
+        Stat, Subroutine, Temporary,
     },
     live_ranges::{get_live_ranges, LiveRanges},
 };
 use crate::graph::Graph;
+use std::{
+    collections::{HashMap, HashSet},
+    ops::DerefMut,
+};
 
 /// Update the program, allocating registers for every instruction.
 ///
@@ -104,7 +104,13 @@ fn allocate_for_routine(
 
     // while there are still nodes to be translated, translate the nodes using the appropriate state.
     while let Some((current_node, current_state)) = current {
-        translate_from_node(current_node, current_state, &mut state_map, live_ranges, graph);
+        translate_from_node(
+            current_node,
+            current_state,
+            &mut state_map,
+            live_ranges,
+            graph,
+        );
 
         current = get_next_node(&mut state_map);
     }
@@ -112,21 +118,22 @@ fn allocate_for_routine(
     new_start
 }
 
-/// Get the next node to translate from, using a translation map from nodes to 
+/// Get the next node to translate from, using a translation map from nodes to
 /// states & if they have already been translated.
-fn get_next_node(state_map: &mut HashMap<ArmNode, (AllocationState, bool)>) -> Option<(ArmNode, AllocationState)> {
+fn get_next_node(
+    state_map: &mut HashMap<ArmNode, (AllocationState, bool)>,
+) -> Option<(ArmNode, AllocationState)> {
     for (node, (state, translated)) in state_map.iter_mut() {
         if !*translated {
             *translated = true;
-            return Some((node.clone(), state.clone()))
+            return Some((node.clone(), state.clone()));
         }
     }
     None
 }
 
-
-/// Starting from a given node, translate all nodes connected linearly (direct 
-/// successors - for branch only the false-branch). Add indirect successors to 
+/// Starting from a given node, translate all nodes connected linearly (direct
+/// successors - for branch only the false-branch). Add indirect successors to
 /// the trans_map.
 fn translate_from_node(
     mut current_node: ArmNode,
@@ -257,8 +264,13 @@ fn translate_from_node(
                         alloc_state.update_live(&liveout);
 
                         // find and place the dst in a register
-                        let (dst_reg, dst_chain) =
-                            alloc_state.move_temp_into_reg(dst_t, load_dst(cond), &[arg_t], &liveout, graph);
+                        let (dst_reg, dst_chain) = alloc_state.move_temp_into_reg(
+                            dst_t,
+                            load_dst(cond),
+                            &[arg_t],
+                            &liveout,
+                            graph,
+                        );
 
                         *arg_ident = Ident::Reg(arg_reg);
                         *dst_ident = Ident::Reg(dst_reg);
@@ -374,7 +386,7 @@ fn translate_from_node(
                             alloc_state.move_temp_into_reg(dst_t, load_dst(cond), &[], &[], graph);
                         *dst_ident = Ident::Reg(reg);
                         chain
-                    },
+                    }
                     Stat::ReadCPSR(dst_ident) => {
                         // single destination
                         let dst_t = dst_ident.get_temp();
@@ -386,7 +398,7 @@ fn translate_from_node(
                             alloc_state.move_temp_into_reg(dst_t, false, &[], &[], graph);
                         *dst_ident = Ident::Reg(reg);
                         chain
-                    },
+                    }
                     Stat::MemOp(
                         MemOp::Str,
                         _,
@@ -487,8 +499,13 @@ fn translate_from_node(
                     Stat::Pop(cond, dst_ident) => {
                         // pop from the stack into some temporary
                         let dst_t = dst_ident.get_temp();
-                        let (dst_reg, dst_chain) =
-                            alloc_state.move_temp_into_reg(dst_t, load_dst(cond), &[], &livein, graph);
+                        let (dst_reg, dst_chain) = alloc_state.move_temp_into_reg(
+                            dst_t,
+                            load_dst(cond),
+                            &[],
+                            &livein,
+                            graph,
+                        );
 
                         *dst_ident = Ident::Reg(dst_reg);
 
@@ -536,10 +553,12 @@ fn translate_from_node(
 
                 if let Some((conform_state, _)) = state_map.get(branch_next) {
                     // if there is some state to conform to, then alter from the current alloc state, to the new one, insert instructions.
-                    if let Some(Chain(mut conform_start, mut conform_end)) = alloc_state.clone().match_state(conform_state, graph) {
+                    if let Some(Chain(mut conform_start, mut conform_end)) =
+                        alloc_state.clone().match_state(conform_state, graph)
+                    {
                         branch_next.replace_predecessor(current_node.clone(), conform_end.clone());
                         conform_end.set_successor(branch_next.clone());
-                        
+
                         conform_start.set_predecessor(current_node.clone());
                         *branch_next = conform_start
                     }
@@ -582,7 +601,6 @@ fn translate_from_node(
             }
             _ => panic!("No previous node, hence the function's invariant is broken"),
         };
-
 
         // check if the next node has a state associated, and needs to be translated in another pass.
         if let Some((conform_alloc_state, _)) = state_map.get(&next) {
