@@ -1,5 +1,6 @@
 mod arm;
 mod data_flow;
+mod inlining;
 mod same_branch;
 mod three_code;
 
@@ -20,7 +21,7 @@ pub struct Options {
     pub sethi_ullman_weights: bool,
     pub dead_code_removal: bool,
     pub propagation: PropagationOpt,
-    pub inlining: bool,
+    pub inlining: Option<usize>,
     pub tail_call: bool,
     pub hoisting: bool,
     pub strength_reduction: bool,
