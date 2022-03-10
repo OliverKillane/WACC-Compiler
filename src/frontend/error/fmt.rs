@@ -811,8 +811,8 @@ mod tests {
 
     #[test]
     fn test_code() {
-        assert_eq!(Summary::new(SummaryStage::Parser).code(), 100);
-        assert_eq!(Summary::new(SummaryStage::Semantic).code(), 200);
+        assert_eq!(Summary::new(SummaryStage::Parser).get_code(), 100);
+        assert_eq!(Summary::new(SummaryStage::Semantic).get_code(), 200);
     }
 
     #[test]
