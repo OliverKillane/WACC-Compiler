@@ -90,7 +90,7 @@ fn err_exit() -> ir::BlockEnding {
 /// Generates an array indexing helper function.
 fn array_indexing_function(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir::Function {
     ir::Function(
-        ir::Type::Ptr,
+        Some(ir::Type::Ptr),
         vec![
             (ir::Type::Ptr, 0),
             (ir::Type::Num(ir::NumSize::DWord), 1),
@@ -134,7 +134,7 @@ fn array_indexing_function(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -
             ir::Block(
                 vec![0],
                 vec![],
-                ir::BlockEnding::Return(ir::Expr::Ptr(ir::PtrExpr::Offset(
+                ir::BlockEnding::Return(Some(ir::Expr::Ptr(ir::PtrExpr::Offset(
                     box ir::PtrExpr::Var(0),
                     box ir::NumExpr::ArithOp(
                         box ir::NumExpr::ArithOp(
@@ -145,7 +145,7 @@ fn array_indexing_function(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -
                         ir::ArithOp::Add,
                         box ir::NumExpr::SizeOf(ir::Type::Num(ir::NumSize::DWord)),
                     ),
-                ))),
+                )))),
             ),
         ],
     )
@@ -154,7 +154,7 @@ fn array_indexing_function(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -
 /// Generates a null pointer checking helper function.
 fn null_check_function(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir::Function {
     ir::Function(
-        ir::Type::Ptr,
+        Some(ir::Type::Ptr),
         vec![(ir::Type::Ptr, 0)],
         HashMap::new(),
         vec![
@@ -177,7 +177,7 @@ fn null_check_function(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir
             ir::Block(
                 vec![0],
                 vec![],
-                ir::BlockEnding::Return(ir::Expr::Ptr(ir::PtrExpr::Var(0))),
+                ir::BlockEnding::Return(Some(ir::Expr::Ptr(ir::PtrExpr::Var(0)))),
             ),
         ],
     )
@@ -186,7 +186,7 @@ fn null_check_function(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir
 /// Generates a division by zero checking helper function.
 fn divide_modulo_check(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir::Function {
     ir::Function(
-        ir::Type::Num(ir::NumSize::DWord),
+        Some(ir::Type::Num(ir::NumSize::DWord)),
         vec![(ir::Type::Num(ir::NumSize::DWord), 0)],
         HashMap::new(),
         vec![
@@ -212,7 +212,7 @@ fn divide_modulo_check(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir
             ir::Block(
                 vec![0],
                 vec![],
-                ir::BlockEnding::Return(ir::Expr::Num(ir::NumExpr::Var(0))),
+                ir::BlockEnding::Return(Some(ir::Expr::Num(ir::NumExpr::Var(0)))),
             ),
         ],
     )
@@ -221,7 +221,7 @@ fn divide_modulo_check(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir
 /// Generates an integer overflow handler.
 fn overflow_handler(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir::Function {
     ir::Function(
-        ir::Type::Num(ir::NumSize::DWord),
+        Some(ir::Type::Num(ir::NumSize::DWord)),
         vec![],
         HashMap::new(),
         vec![ir::Block(

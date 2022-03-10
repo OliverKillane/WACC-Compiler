@@ -4,7 +4,10 @@ use super::{
     DataRefType, OpSrc, Size, StatCode, StatLine, StatType,
 };
 use crate::intermediate::{self as ir, DataRef, VarRepr};
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    iter::{successors, zip},
+};
 
 /// Converts the [intermediate representation type](ir::Type) to a
 /// [three code size](Size).
@@ -110,7 +113,7 @@ pub(super) fn translate_statement(
     read_ref: &mut bool,
     fmt_flags: &mut FmtDataRefFlags,
     vars: &HashMap<VarRepr, ir::Type>,
-    function_types: &HashMap<String, ir::Type>,
+    function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
 ) {
     match stat {
@@ -140,6 +143,21 @@ pub(super) fn translate_statement(
         ir::Stat::Free(ptr_expr) => {
             translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
             stat_line.add_stat(StatCode::VoidCall("free".to_string(), vec![free_var]));
+        }
+        ir::Stat::Call(name, args) => {
+            let stat_code = StatCode::VoidCall(
+                name,
+                zip(
+                    args,
+                    successors(Some(free_var), |arg_result| Some(*arg_result + 1)),
+                )
+                .map(|(expr, arg_result)| {
+                    translate_expr(expr, arg_result, stat_line, vars, function_types, options);
+                    arg_result
+                })
+                .collect(),
+            );
+            stat_line.add_stat(stat_code);
         }
         ir::Stat::ReadIntVar(var) => {
             *read_ref = true;
@@ -406,7 +424,7 @@ pub(super) mod tests {
         free_var: VarRepr,
         stats: Vec<StatCode>,
         vars: HashMap<VarRepr, ir::Type>,
-        function_types: HashMap<String, ir::Type>,
+        function_types: HashMap<String, Option<ir::Type>>,
         mut initial_data_refs: HashMap<DataRef, DataRefType>,
         final_data_refs: HashMap<DataRef, DataRefType>,
         has_read_ref: bool,
