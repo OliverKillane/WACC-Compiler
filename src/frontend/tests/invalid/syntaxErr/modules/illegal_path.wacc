@@ -1,0 +1,5 @@
+mod this/is/illegal�;
+
+begin
+    skip
+end

@@ -1,0 +1,29 @@
+begin
+  # Create a new node of a binary search tree having the given integer value 
+  # and points to the two given pairs.
+  pair(int, pair) createNewNode(int value, pair(int, pair) left, pair(int, pair) right) is
+    pair(pair, pair) p = newpair(left, right) ;
+    pair(int, pair) q = newpair(value, p) ;
+    return q
+  end
+
+  # Given a root of a binary search tree and an integer to insert, the function 
+  # inserts the integer into the tree and returns the new root of the tree.
+  pair(int, pair) insert(pair(int, pair) root, int n) is
+    if root == null then
+      root = call createNewNode(n, null, null)
+    else
+      pair(pair, pair) p = snd root ;
+      int current = fst root ;
+      pair(int, pair) q = null ;
+      if n < current then
+      	q = fst p ;
+        fst p = call insert(q, n)
+      else 
+      	q = snd p ;
+        snd p = call insert(q, n)
+      fi 
+    fi ;
+    return root
+  end
+end

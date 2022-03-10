@@ -10,7 +10,7 @@ lazy_static! {
             "if", "then", "else", "fi", "fst", "snd", "int", "bool", "char", "string", "pair",
             "newpair", "begin", "end", "is", "while", "do", "done", "exit", "return", "call",
             "println", "print", "skip", "read", "free", "chr", "ord", "len", "null", "false",
-            "true",
+            "true", "mod",
         ];
         HashSet::from_iter(arr)
     };
@@ -152,6 +152,8 @@ pub enum Lexer {
     Ord,
     /// "chr"
     Chr,
+    /// "mod"
+    Module,
 }
 
 impl Lexer {
@@ -224,6 +226,7 @@ impl Lexer {
             Self::Len => "len",
             Self::Ord => "ord",
             Self::Chr => "chr",
+            Self::Module => "mod",
         };
 
         move |input| match KEYWORD_HASHSET.get(literal) {

@@ -147,16 +147,30 @@ pub enum SummaryStage {
     Semantic = 200,
 }
 
+/// An association of an input file to its filepath.
+#[derive(Debug, Clone)]
+pub struct InputFile<'l> {
+    /// Input string for the file contents.
+    pub(super) input: &'l str,
+    /// Filepath to the file.
+    pub(super) filepath: String,
+}
+
+impl<'l> InputFile<'l> {
+    /// Constructs a new input file struct.
+    pub(super) fn new(input: &'l str, filepath: String) -> Self {
+        Self { input, filepath }
+    }
+}
+
 /// Full error summary. Contains the filepath to the file on which the error
 /// is printed, the input string for the code, the stage of compilation at which
 /// the error happened, a list of [error cells](SummaryCell) with the
 /// statement-specific errors and an optional separator between the cells.
 #[derive(Debug)]
 pub struct Summary<'l> {
-    /// Input filepath. Optionally displayed before the input cell location.
-    pub(super) filepath: Option<String>,
-    /// The text of the entire code.
-    pub(super) input: &'l str,
+    /// Input files that constitute the whole code compiled
+    pub(super) input_files: Vec<InputFile<'l>>,
     /// Summary stage. Displayed at the top of the summary. Determines the code
     /// of the summary.
     pub(super) stage: SummaryStage,
@@ -169,12 +183,10 @@ pub struct Summary<'l> {
 impl<'l> Summary<'l> {
     /// Creates a new error summary. Sets the input and stage of the summary to
     /// the values provided.
-    pub fn new(input: &'l str, stage: SummaryStage) -> Self {
+    pub fn new(stage: SummaryStage) -> Self {
         #[cfg(debug_assertions)]
-        assert!(!input.is_empty());
         Self {
-            filepath: None,
-            input,
+            input_files: vec![],
             stage,
             cells: vec![],
             sep: None,
@@ -182,8 +194,8 @@ impl<'l> Summary<'l> {
     }
 
     /// Sets the file path to the origin file of the input
-    pub fn set_filepath(&mut self, filepath: String) -> &mut Self {
-        self.filepath = Some(filepath);
+    pub fn add_input_file(&mut self, input: &'l str, filepath: String) -> &mut Self {
+        self.input_files.push(InputFile::new(input, filepath));
         self
     }
 
@@ -195,16 +207,6 @@ impl<'l> Summary<'l> {
 
     /// Adds a new error cell.
     pub fn add_cell(&mut self, cell: SummaryCell<'l>) -> &mut Self {
-        #[cfg(debug_assertions)]
-        {
-            get_relative_range(self.input, cell.span).expect("Cell span not within the input");
-            for component in &cell.components {
-                if let Some(declaration) = component.declaration {
-                    get_relative_range(self.input, declaration)
-                        .expect("Declaration not within the input");
-                }
-            }
-        }
         self.cells.push(cell);
         self
     }
@@ -219,8 +221,8 @@ impl<'l> Summary<'l> {
 }
 
 #[cfg(test)]
-mod test {
-    use super::{Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType};
+mod tests {
+    use super::{SummaryCell, SummaryComponent, SummaryType};
 
     #[test]
     #[should_panic(expected = "Component span not within the cell")]
@@ -233,26 +235,5 @@ mod test {
             &input[0..2],
             "message".to_string(),
         ));
-    }
-
-    #[test]
-    #[should_panic(expected = "Cell span not within the input")]
-    fn test_cell_not_within_input() {
-        let input = "abcdef";
-        let mut summary = Summary::new(&input[1..], SummaryStage::Parser);
-        summary.add_cell(SummaryCell::new(&input[0..2]));
-    }
-
-    #[test]
-    #[should_panic(expected = "Declaration not within the input")]
-    fn test_declaraton_not_within_input() {
-        let input = "abcdef";
-        let mut summary = Summary::new(&input[1..], SummaryStage::Parser);
-        let mut cell = SummaryCell::new(&input[1..]);
-        cell.add_component(
-            SummaryComponent::new(SummaryType::Error, 200, &input[1..], String::new())
-                .set_declaration(&input[0..]),
-        );
-        summary.add_cell(cell);
     }
 }
