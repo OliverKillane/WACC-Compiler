@@ -32,6 +32,7 @@ use std::{
     iter::zip,
     path::{Path, PathBuf},
 };
+use rayon::prelude::*;
 
 use lexer::{parse_int, str_delimited};
 
@@ -65,9 +66,9 @@ pub fn parse<'a>(
 ) -> Result<Program<&'a str, &'a str>, Summary<'a>> {
     let main_semantic_info = final_parser(parse_program)(main_input);
     let module_semantic_infos = module_inputs
-        .iter()
+        .par_iter()
         .cloned()
-        .map(final_parser(parse_module))
+        .map(|source| final_parser(parse_module)(source))
         .collect::<LinkedList<_>>();
     let mut error_trees = Vec::new();
     let ast = match main_semantic_info {
@@ -77,7 +78,6 @@ pub fn parse<'a>(
             None
         }
     };
-    #[allow(clippy::needless_collect)]
     let module_functions = zip(&module_inputs, module_semantic_infos)
         .map(
             |(module_input, module_semantic_info)| match module_semantic_info {
@@ -92,10 +92,10 @@ pub fn parse<'a>(
     if error_trees.is_empty() {
         let Program(functions, main_code) = ast.unwrap();
         let functions = vec![functions]
-            .into_iter()
+            .into_par_iter()
             .chain(
                 module_functions
-                    .into_iter()
+                    .into_par_iter()
                     .map(|module_semantic_info| module_semantic_info.unwrap()),
             )
             .flatten()

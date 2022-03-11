@@ -52,6 +52,7 @@ pub mod symbol_table;
 mod type_constraints;
 
 use std::collections::HashMap;
+use rayon::prelude::*;
 
 use self::{
     error_conversion::convert_errors,
@@ -90,25 +91,24 @@ pub fn analyse_semantics<'a>(
     // get function definitions
     let (fun_symb, filtered_fn_defs, fun_def_errs) = get_fn_symbols(fn_defs);
 
-    let mut errors = vec![];
-    let mut fun_symbol_tables = HashMap::with_capacity(filtered_fn_defs.len());
-    let mut functions = Vec::with_capacity(filtered_fn_defs.len());
-
     // traverse and analyse functions
-    for ASTWrapper(fun_name, fun) in filtered_fn_defs {
+    let (e, (fst, fs)): (Vec<_>, (Vec<_>, Vec<_>)) = filtered_fn_defs.into_par_iter().map(|ASTWrapper(fun_name, fun)| {
         match analyse_function(ASTWrapper(fun_name, fun), &fun_symb) {
             Ok((function, var_symb)) => {
                 let ASTWrapper(_, Function(_, ASTWrapper(_, fun_name), _, _)) = &function;
-                fun_symbol_tables.insert(fun_name.clone(), var_symb);
-                functions.push(function);
+                (None, (Some((fun_name.clone(), var_symb)), Some(function)))
             }
-            Err(fun_err) => errors.push(fun_err),
+            Err(fun_err) => (Some(fun_err), (None, None)),
         }
-    }
+    }).unzip();
+
+    let errors: Vec<_> = e.into_par_iter().filter_map(|x| x).collect();
+    let fun_symbol_tables: HashMap<_, _> = fst.into_par_iter().filter_map(|x| x).collect();
+    let functions: Vec<_> = fs.into_par_iter().filter_map(|x| x).collect();
 
     // analyse main code block
     let mut main_var_symb = VariableSymbolTable::new();
-    let mut main_errors = Vec::with_capacity(0);
+    let mut main_errors = Vec::new();
 
     match analyse_block(
         main_block,

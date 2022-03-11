@@ -184,7 +184,6 @@ impl<'l> Summary<'l> {
     /// Creates a new error summary. Sets the input and stage of the summary to
     /// the values provided.
     pub fn new(stage: SummaryStage) -> Self {
-        #[cfg(debug_assertions)]
         Self {
             input_files: vec![],
             stage,
