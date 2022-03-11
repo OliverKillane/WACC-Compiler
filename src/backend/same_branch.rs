@@ -82,6 +82,12 @@ pub(super) fn same_branch_optimization(
             },
         )
         .collect();
+    #[cfg(debug_assertions)]
+    for node in &graph {
+        if let StatType::Branch(_, _, true_node, false_node) = &*node.get() {
+            assert_ne!(true_node, false_node);
+        }
+    }
     ThreeCode {
         functions,
         data_refs,
