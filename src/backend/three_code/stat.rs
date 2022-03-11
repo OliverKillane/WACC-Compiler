@@ -133,7 +133,7 @@ pub(super) fn translate_statement(
                 function_types,
                 options,
             ));
-            let ptr_const = translate_ptr_expr(
+            translate_ptr_expr(
                 ptr_expr,
                 free_var + 1,
                 stat_line,

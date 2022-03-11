@@ -1,4 +1,4 @@
-#![allow(unused_variables)]
+mod data_flow;
 mod eval;
 mod expr;
 mod stat;
@@ -161,27 +161,27 @@ pub(super) struct ThreeCode {
 
 impl StatType {
     /// Creates a new simple statement with an empty list of incoming nodes.
-    fn new_simple(stat_code: StatCode, next: StatNode) -> Self {
+    pub(super) fn new_simple(stat_code: StatCode, next: StatNode) -> Self {
         StatType::Simple(vec![], stat_code, next)
     }
 
     /// Creates a new branch statement with an empty list of incoming nodes.
-    fn new_branch(cond: VarRepr, if_true: StatNode, if_false: StatNode) -> Self {
+    pub(super) fn new_branch(cond: VarRepr, if_true: StatNode, if_false: StatNode) -> Self {
         StatType::Branch(vec![], cond, if_true, if_false)
     }
 
     /// Creates a new loop statement with an empty list of incoming nodes.
-    fn new_loop() -> Self {
+    pub(super) fn new_loop() -> Self {
         StatType::Loop(vec![])
     }
 
     /// Creates a new return statement with an empty list of incoming nodes.
-    fn new_return(ret: Option<VarRepr>) -> Self {
+    pub(super) fn new_return(ret: Option<VarRepr>) -> Self {
         StatType::Return(vec![], ret)
     }
 
     /// Adds an incoming node to the list of incoming nodes.
-    fn add_incoming(&mut self, node: StatNode) {
+    pub(super) fn add_incoming(&mut self, node: StatNode) {
         match self {
             Self::Simple(incoming, _, _)
             | Self::Branch(incoming, _, _, _)
@@ -192,7 +192,7 @@ impl StatType {
     }
 
     /// Sets the list of incoming nodes.
-    fn set_incoming(&mut self, incoming: Vec<StatNode>) {
+    pub(super) fn set_incoming(&mut self, incoming: Vec<StatNode>) {
         match self {
             Self::Simple(old_incoming, _, _)
             | Self::Branch(old_incoming, _, _, _)
@@ -203,7 +203,7 @@ impl StatType {
     }
 
     /// Retreives the list of incoming nodes.
-    fn incoming(&self) -> Vec<StatNode> {
+    pub(super) fn incoming(&self) -> Vec<StatNode> {
         match self {
             Self::Simple(incoming, _, _)
             | Self::Branch(incoming, _, _, _)
@@ -213,9 +213,53 @@ impl StatType {
         }
     }
 
+    /// Constructs the list of successor nodes.
+    pub(super) fn successors(&self) -> Vec<StatNode> {
+        match self {
+            Self::Loop(_) | Self::Return(_, _) | Self::Dummy(_) => vec![],
+            Self::Simple(_, _, next_node) => vec![next_node.clone()],
+            Self::Branch(_, _, true_node, false_node) => {
+                vec![true_node.clone(), false_node.clone()]
+            }
+        }
+    }
+
+    /// Substitutes one child of a node for a new one
+    pub(super) fn substitute_child(&mut self, old_child: &StatNode, new_child: &StatNode) {
+        let mut tmp_node = Self::deleted();
+        mem::swap(self, &mut tmp_node);
+        let mut tmp_node = match tmp_node {
+            Self::Simple(incoming, stat_code, next_node) => Self::Simple(
+                incoming,
+                stat_code,
+                if &next_node == old_child {
+                    new_child.clone()
+                } else {
+                    next_node
+                },
+            ),
+            Self::Branch(incoming, var, true_node, false_node) => Self::Branch(
+                incoming,
+                var,
+                if &true_node == old_child {
+                    new_child.clone()
+                } else {
+                    true_node
+                },
+                if &false_node == old_child {
+                    new_child.clone()
+                } else {
+                    false_node
+                },
+            ),
+            tmp_node => tmp_node,
+        };
+        mem::swap(self, &mut tmp_node);
+    }
+
     /// If a node is a simple node, sets
     /// the next node as the given node and returns the old next node for removal.
-    fn append(&mut self, next_node: StatNode) -> StatNode {
+    pub(super) fn append(&mut self, next_node: StatNode) -> StatNode {
         let mut tmp_node = Self::deleted();
         mem::swap(self, &mut tmp_node);
         let (incoming, stat_code, old_next_node) =
@@ -363,7 +407,7 @@ impl StatLine {
             },
             Self::Line {
                 start_node,
-                end_node,
+                end_node: _,
                 graph,
             } => Self::Line {
                 start_node,
@@ -506,13 +550,13 @@ fn translate_block(
             }
             (vec![], None)
         }
-        ir::BlockEnding::CondJumps(conds, last) => {
+        ir::BlockEnding::CondJumps(conds, _) => {
             let mut outputs = vec![];
             outputs.reserve_exact(conds.len());
             let dummy_node = stat_graph.borrow_mut().new_node(StatType::deleted());
             stat_line.add_node(dummy_node);
 
-            for (bool_expr, block_id) in conds {
+            for (bool_expr, _) in conds {
                 let mut bool_stat_line = StatLine::new(stat_graph.clone());
                 translate_bool_expr(
                     bool_expr,
@@ -790,7 +834,7 @@ fn translate_function(
     let mut read_ref = false;
     let start_node = translate_block_graph(
         block_graph,
-        stat_graph.clone(),
+        stat_graph,
         free_var,
         free_data_ref,
         data_refs,
@@ -912,6 +956,7 @@ mod tests {
         graph::{Deleted, Graph},
         intermediate as ir,
     };
+    use std::mem;
     use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
     #[test]
@@ -1206,7 +1251,7 @@ mod tests {
     #[test]
     fn translate_program_test() {
         let ThreeCode {
-            functions,
+            functions: _,
             data_refs,
             graph: program_graph,
             read_ref,
@@ -1253,5 +1298,6 @@ mod tests {
             exit_node,
         ));
         match_graph(code, exit_assign_node);
+        mem::drop(program_graph);
     }
 }
