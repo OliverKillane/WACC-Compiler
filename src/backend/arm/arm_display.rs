@@ -315,12 +315,11 @@ impl Display for Stat {
 fn get_next_node(label_map: &HashMap<ArmNode, (usize, bool)>) -> Option<ArmNode> {
     for (node, (_, translated)) in label_map {
         if !*translated {
-            return Some(node.clone())
+            return Some(node.clone());
         }
     }
     None
 }
-
 
 fn display_routine(
     start_node: &ArmNode,
@@ -349,7 +348,6 @@ fn display_routine(
     writeln!(f, "{}:", name)?;
 
     while next.is_some() {
-
         while let Some(current) = next {
             if since_lit > 2000 {
                 writeln!(f, "\tB\t{}", lit_label_conv(&lit_branch_ident))?;
@@ -362,12 +360,12 @@ fn display_routine(
             match label_map.get_mut(&current) {
                 Some((id, true)) => {
                     writeln!(f, "\tB\t{}", label_conv(id))?;
-                    break
-                },
+                    break;
+                }
                 Some((id, l)) => {
                     writeln!(f, "{}:", label_conv(id))?;
                     *l = true
-                },
+                }
                 None => (),
             }
 
@@ -377,7 +375,7 @@ fn display_routine(
                     since_lit += 1;
                     writeln!(f, "{}", stat)?;
                     next.clone()
-                },
+                }
                 ControlFlow::Branch(_, branch_true, cond, branch_false) => {
                     let id = if let Some((id, _)) = label_map.get(branch_true) {
                         *id
@@ -389,11 +387,11 @@ fn display_routine(
 
                     writeln!(f, "\tB{}\t{}", cond, label_conv(&id))?;
                     branch_false.clone()
-                },
+                }
                 ControlFlow::Ltorg(_) => {
                     writeln!(f, "\t.ltorg")?;
                     None
-                },
+                }
                 ControlFlow::Return(_, ret) => {
                     writeln!(
                         f,
@@ -405,7 +403,7 @@ fn display_routine(
                         }
                     )?;
                     None
-                },
+                }
                 ControlFlow::Multi(_, next) => {
                     if label_map.get(&current).is_none() {
                         let new_id = label_map.len();
@@ -413,7 +411,7 @@ fn display_routine(
                         writeln!(f, "{}:", label_conv(&new_id))?;
                     }
                     next.clone()
-                },
+                }
                 ControlFlow::Removed => panic!("There should be no removed nodes"),
             };
         }
