@@ -18,7 +18,7 @@ fn translate_function_call(
     result: VarRepr,
     stat_line: &mut StatLine,
     vars: &HashMap<VarRepr, ir::Type>,
-    function_types: &HashMap<String, ir::Type>,
+    function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
 ) {
     let stat_code = StatCode::Call(
@@ -68,7 +68,7 @@ pub(super) fn translate_num_expr(
     result: VarRepr,
     stat_line: &mut StatLine,
     vars: &HashMap<VarRepr, ir::Type>,
-    function_types: &HashMap<String, ir::Type>,
+    function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
 ) -> ir::NumSize {
     match num_expr {
@@ -142,7 +142,7 @@ pub(super) fn translate_num_expr(
             size
         }
         ir::NumExpr::Call(name, args) => {
-            let size = if let ir::Type::Num(size) =
+            let size = if let Some(ir::Type::Num(size)) =
                 function_types.get(&name).expect("Function not found")
             {
                 *size
@@ -173,7 +173,7 @@ pub(super) fn translate_bool_expr(
     result: VarRepr,
     stat_line: &mut StatLine,
     vars: &HashMap<VarRepr, ir::Type>,
-    function_types: &HashMap<String, ir::Type>,
+    function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
 ) {
     match bool_expr {
@@ -193,22 +193,38 @@ pub(super) fn translate_bool_expr(
                 OpSrc::from(0x01),
             ));
         }
-        ir::BoolExpr::TestZero(num_expr) => {
-            translate_num_expr(num_expr, result, stat_line, vars, function_types, options);
+        ir::BoolExpr::NumEq(num_expr1, num_expr2) => {
+            translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
+            translate_num_expr(
+                num_expr2,
+                result + 1,
+                stat_line,
+                vars,
+                function_types,
+                options,
+            );
             stat_line.add_stat(StatCode::AssignOp(
                 result,
                 OpSrc::Var(result),
                 BinOp::Eq,
-                OpSrc::from(0x00),
+                OpSrc::Var(result + 1),
             ));
         }
-        ir::BoolExpr::TestPositive(num_expr) => {
-            translate_num_expr(num_expr, result, stat_line, vars, function_types, options);
+        ir::BoolExpr::NumLt(num_expr1, num_expr2) => {
+            translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
+            translate_num_expr(
+                num_expr2,
+                result + 1,
+                stat_line,
+                vars,
+                function_types,
+                options,
+            );
             stat_line.add_stat(StatCode::AssignOp(
                 result,
                 OpSrc::Var(result),
-                BinOp::Gt,
-                OpSrc::from(0x00),
+                BinOp::Lt,
+                OpSrc::Var(result + 1),
             ));
         }
         ir::BoolExpr::PtrEq(ptr_expr1, ptr_expr2) => {
@@ -245,6 +261,41 @@ pub(super) fn translate_bool_expr(
                 OpSrc::Var(result + 1),
             ));
         }
+        ir::BoolExpr::Not(box ir::BoolExpr::NumEq(num_expr1, num_expr2)) => {
+            translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
+            translate_num_expr(
+                num_expr2,
+                result + 1,
+                stat_line,
+                vars,
+                function_types,
+                options,
+            );
+            stat_line.add_stat(StatCode::AssignOp(
+                result,
+                OpSrc::Var(result),
+                BinOp::Ne,
+                OpSrc::Var(result + 1),
+            ));
+        }
+        ir::BoolExpr::Not(box ir::BoolExpr::NumLt(num_expr1, num_expr2)) => {
+            translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
+            translate_num_expr(
+                num_expr2,
+                result + 1,
+                stat_line,
+                vars,
+                function_types,
+                options,
+            );
+            stat_line.add_stat(StatCode::AssignOp(
+                result,
+                OpSrc::Var(result),
+                BinOp::Gte,
+                OpSrc::Var(result + 1),
+            ));
+        }
+
         ir::BoolExpr::Not(box bool_expr) => {
             let bool_const =
                 translate_bool_expr(bool_expr, result, stat_line, vars, function_types, options);
@@ -269,7 +320,7 @@ pub(super) fn translate_ptr_expr(
     result: VarRepr,
     stat_line: &mut StatLine,
     vars: &HashMap<VarRepr, ir::Type>,
-    function_types: &HashMap<String, ir::Type>,
+    function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
 ) {
     match ptr_expr {
@@ -336,7 +387,7 @@ pub(super) fn translate_ptr_expr(
                     )
                 })
                 .fold(
-                    (0, Vec::new()),
+                    (0, vec![]),
                     |(total_width, mut width_prefixes),
                      (mem_width, store_width, setting_stat_line)| {
                         width_prefixes.push((total_width, store_width, setting_stat_line));
@@ -382,7 +433,7 @@ pub(super) fn translate_expr(
     result: VarRepr,
     stat_line: &mut StatLine,
     vars: &HashMap<VarRepr, ir::Type>,
-    function_types: &HashMap<String, ir::Type>,
+    function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
 ) -> ir::Type {
     match expr {
@@ -416,14 +467,14 @@ mod tests {
         graph::Graph,
         intermediate::{self as ir, VarRepr},
     };
-    use std::{cell::RefCell, collections::HashMap, rc::Rc};
+    use std::{cell::RefCell, collections::HashMap, ops::Deref, rc::Rc};
 
     fn match_line_stat_vec(
         expr: ir::Expr,
         result: VarRepr,
         stats: Vec<StatCode>,
         vars: HashMap<VarRepr, ir::Type>,
-        function_types: HashMap<String, ir::Type>,
+        function_types: HashMap<String, Option<ir::Type>>,
         expr_type: ir::Type,
     ) {
         let graph = Rc::new(RefCell::new(Graph::new()));
@@ -444,7 +495,8 @@ mod tests {
                     hoisting: false,
                     strength_reduction: false,
                     loop_unrolling: false,
-                    common_expressions: false
+                    common_expressions: false,
+                    show_arm_temp_rep: false
                 }
             ),
             expr_type
@@ -452,18 +504,19 @@ mod tests {
         let mut node = stat_line.start_node().expect("No start node");
         let mut stats = stats.into_iter();
         while node != stat_line.end_node().expect("No end node") {
-            let next_node = if let StatType::Simple(_, node_stat_code, next_node) = &*node.get() {
-                assert_eq!(
-                    *node_stat_code,
-                    stats.next().expect("More statements than expected")
-                );
-                next_node.clone()
-            } else {
-                panic!("Expected a simple statement")
-            };
+            let next_node =
+                if let StatType::Simple(_, node_stat_code, next_node) = node.get().deref() {
+                    assert_eq!(
+                        *node_stat_code,
+                        stats.next().expect("More statements than expected")
+                    );
+                    next_node.clone()
+                } else {
+                    panic!("Expected a simple statement")
+                };
             node = next_node;
         }
-        if let StatType::Final(_, node_stat_code) = &*node.get() {
+        if let StatType::Simple(_, node_stat_code, _) = node.get().deref() {
             assert_eq!(
                 *node_stat_code,
                 stats.next().expect("More statements than expected")
@@ -591,7 +644,7 @@ mod tests {
                 StatCode::Call(0, "f".to_string(), vec![0, 1]),
             ],
             HashMap::new(),
-            HashMap::from([("f".to_string(), ir::Type::Num(ir::NumSize::Word))]),
+            HashMap::from([("f".to_string(), Some(ir::Type::Num(ir::NumSize::Word)))]),
             ir::Type::Num(ir::NumSize::Word),
         )
     }
@@ -637,16 +690,17 @@ mod tests {
     }
 
     #[test]
-    fn translate_test_zero_bool_expr() {
+    fn translate_num_eq_bool_expr() {
         match_line_stat_vec(
-            ir::Expr::Bool(ir::BoolExpr::TestZero(ir::NumExpr::Const(
-                ir::NumSize::Word,
-                0,
-            ))),
+            ir::Expr::Bool(ir::BoolExpr::NumEq(
+                ir::NumExpr::Const(ir::NumSize::Word, 420),
+                ir::NumExpr::Const(ir::NumSize::Word, 69),
+            )),
             0,
             vec![
-                StatCode::Assign(0, OpSrc::Const(0)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Eq, OpSrc::Const(0)),
+                StatCode::Assign(0, OpSrc::Const(420)),
+                StatCode::Assign(1, OpSrc::Const(69)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Eq, OpSrc::Var(1)),
             ],
             HashMap::new(),
             HashMap::new(),
@@ -655,16 +709,55 @@ mod tests {
     }
 
     #[test]
-    fn translate_test_positive_bool_expr() {
+    fn translate_num_lt_bool_expr() {
         match_line_stat_vec(
-            ir::Expr::Bool(ir::BoolExpr::TestPositive(ir::NumExpr::Const(
-                ir::NumSize::Word,
-                0,
+            ir::Expr::Bool(ir::BoolExpr::NumLt(
+                ir::NumExpr::Const(ir::NumSize::Word, 420),
+                ir::NumExpr::Const(ir::NumSize::Word, 69),
+            )),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::Const(420)),
+                StatCode::Assign(1, OpSrc::Const(69)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Lt, OpSrc::Var(1)),
+            ],
+            HashMap::new(),
+            HashMap::new(),
+            ir::Type::Bool,
+        )
+    }
+
+    #[test]
+    fn translate_not_num_eq_bool_expr() {
+        match_line_stat_vec(
+            ir::Expr::Bool(ir::BoolExpr::Not(box ir::BoolExpr::NumEq(
+                ir::NumExpr::Const(ir::NumSize::Word, 420),
+                ir::NumExpr::Const(ir::NumSize::Word, 69),
             ))),
             0,
             vec![
-                StatCode::Assign(0, OpSrc::Const(0)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Gt, OpSrc::Const(0)),
+                StatCode::Assign(0, OpSrc::Const(420)),
+                StatCode::Assign(1, OpSrc::Const(69)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Ne, OpSrc::Var(1)),
+            ],
+            HashMap::new(),
+            HashMap::new(),
+            ir::Type::Bool,
+        )
+    }
+
+    #[test]
+    fn translate_not_num_lt_bool_expr() {
+        match_line_stat_vec(
+            ir::Expr::Bool(ir::BoolExpr::Not(box ir::BoolExpr::NumLt(
+                ir::NumExpr::Const(ir::NumSize::Word, 420),
+                ir::NumExpr::Const(ir::NumSize::Word, 69),
+            ))),
+            0,
+            vec![
+                StatCode::Assign(0, OpSrc::Const(420)),
+                StatCode::Assign(1, OpSrc::Const(69)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Gte, OpSrc::Var(1)),
             ],
             HashMap::new(),
             HashMap::new(),
@@ -725,7 +818,7 @@ mod tests {
                 StatCode::Call(0, "f".to_string(), vec![0, 1]),
             ],
             HashMap::new(),
-            HashMap::from([("f".to_string(), ir::Type::Bool)]),
+            HashMap::from([("f".to_string(), Some(ir::Type::Bool))]),
             ir::Type::Bool,
         )
     }
@@ -869,7 +962,7 @@ mod tests {
                 StatCode::Call(0, "f".to_string(), vec![0, 1]),
             ],
             HashMap::new(),
-            HashMap::from([("f".to_string(), ir::Type::Ptr)]),
+            HashMap::from([("f".to_string(), Some(ir::Type::Ptr))]),
             ir::Type::Ptr,
         )
     }

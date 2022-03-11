@@ -93,7 +93,7 @@ impl<T: Deleted> NodeRef<T> {
 
 impl<T: Deleted + Debug> Debug for NodeRef<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "NodeRef{{{:?}}}", *self.0.borrow())
+        write!(f, "NodeRef{{{:?}}}", self.0.as_ptr())
     }
 }
 

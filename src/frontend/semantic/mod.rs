@@ -61,7 +61,7 @@ use self::{
 };
 
 use super::{
-    ast::{ASTWrapper, FunWrap, Program, StatWrap, Type},
+    ast::{ASTWrapper, Function, Program, Type},
     error::Summary,
 };
 
@@ -79,26 +79,28 @@ use super::{
 #[allow(clippy::type_complexity)]
 pub fn analyse_semantics<'a>(
     Program(fn_defs, main_block): Program<&'a str, &'a str>,
-    source_code: &'a str,
 ) -> Result<
     (
-        Vec<StatWrap<Option<Type>, usize>>,
+        Program<Option<Type>, usize>,
+        HashMap<String, VariableSymbolTable>,
         VariableSymbolTable,
-        HashMap<&'a str, (FunWrap<Option<Type>, usize>, VariableSymbolTable)>,
     ),
-    Vec<Summary<'a>>,
+    Summary<'a>,
 > {
     // get function definitions
     let (fun_symb, filtered_fn_defs, fun_def_errs) = get_fn_symbols(fn_defs);
 
-    let mut errors = Vec::new();
-    let mut correct = HashMap::with_capacity(filtered_fn_defs.len());
+    let mut errors = vec![];
+    let mut fun_symbol_tables = HashMap::with_capacity(filtered_fn_defs.len());
+    let mut functions = Vec::with_capacity(filtered_fn_defs.len());
 
     // traverse and analyse functions
     for ASTWrapper(fun_name, fun) in filtered_fn_defs {
         match analyse_function(ASTWrapper(fun_name, fun), &fun_symb) {
-            Ok(res) => {
-                correct.insert(fun_name, res);
+            Ok((function, var_symb)) => {
+                let ASTWrapper(_, Function(_, ASTWrapper(_, fun_name), _, _)) = &function;
+                fun_symbol_tables.insert(fun_name.clone(), var_symb);
+                functions.push(function);
             }
             Err(fun_err) => errors.push(fun_err),
         }
@@ -119,16 +121,15 @@ pub fn analyse_semantics<'a>(
     ) {
         Some(block_ast) => {
             if errors.is_empty() && fun_def_errs.is_empty() {
-                Ok((block_ast, main_var_symb, correct))
+                Ok((
+                    Program(functions, block_ast),
+                    fun_symbol_tables,
+                    main_var_symb,
+                ))
             } else {
-                Err(convert_errors(fun_def_errs, vec![], errors, source_code))
+                Err(convert_errors(fun_def_errs, vec![], errors))
             }
         }
-        None => Err(convert_errors(
-            fun_def_errs,
-            main_errors,
-            errors,
-            source_code,
-        )),
+        None => Err(convert_errors(fun_def_errs, main_errors, errors)),
     }
 }

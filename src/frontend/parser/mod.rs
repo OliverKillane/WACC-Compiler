@@ -14,10 +14,11 @@ use super::ast::{
 use lexer::{parse_ident, ws, Lexer};
 use nom::{
     branch::alt,
+    character::complete::{char, none_of, one_of},
     combinator::{cut, eof, map, opt, success, value},
     error::{context, ParseError},
     multi::{many0, many1, separated_list0},
-    sequence::{delimited, pair, preceded, separated_pair, tuple},
+    sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
     IResult,
 };
 use nom_supreme::{
@@ -26,7 +27,11 @@ use nom_supreme::{
     multi::collect_separated_terminated,
     ParserExt,
 };
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, LinkedList},
+    iter::zip,
+    path::{Path, PathBuf},
+};
 
 use lexer::{parse_int, str_delimited};
 
@@ -54,12 +59,107 @@ where
 /// Parses the input string into a [Program]. If the input string contains
 /// syntax errors, a [Vec<Summary>](Vec<Summary>) is produced instead to be used by the
 /// error handler.
-pub fn parse(input: &str) -> Result<Program<&str, &str>, Vec<Summary>> {
-    let semantic_info = final_parser(parse_program)(input);
-    match semantic_info {
-        Ok(ast) => Ok(ast),
-        Err(err) => Err(vec![convert_error_tree(input, err)]),
+pub fn parse<'a>(
+    main_input: &'a str,
+    module_inputs: Vec<&'a str>,
+) -> Result<Program<&'a str, &'a str>, Summary<'a>> {
+    let main_semantic_info = final_parser(parse_program)(main_input);
+    let module_semantic_infos = module_inputs
+        .iter()
+        .cloned()
+        .map(final_parser(parse_module))
+        .collect::<LinkedList<_>>();
+    let mut error_trees = Vec::new();
+    let ast = match main_semantic_info {
+        Ok(ast) => Some(ast),
+        Err(error_tree) => {
+            error_trees.push((main_input, error_tree));
+            None
+        }
+    };
+    #[allow(clippy::needless_collect)]
+    let module_functions = zip(&module_inputs, module_semantic_infos)
+        .map(
+            |(module_input, module_semantic_info)| match module_semantic_info {
+                Ok(functions) => Some(functions),
+                Err(error_tree) => {
+                    error_trees.push((module_input, error_tree));
+                    None
+                }
+            },
+        )
+        .collect::<LinkedList<_>>();
+    if error_trees.is_empty() {
+        let Program(functions, main_code) = ast.unwrap();
+        let functions = vec![functions]
+            .into_iter()
+            .chain(
+                module_functions
+                    .into_iter()
+                    .map(|module_semantic_info| module_semantic_info.unwrap()),
+            )
+            .flatten()
+            .collect();
+        Ok(Program(functions, main_code))
+    } else {
+        Err(error_trees.into_iter().fold(
+            Summary::new(SummaryStage::Parser),
+            |mut summary, (input, error_tree)| {
+                convert_error_tree(&mut summary, input, error_tree);
+                summary
+            },
+        ))
     }
+}
+
+/// Parses the mod declarations in the file.
+pub fn parse_imports(input: &str) -> Result<(&str, Vec<PathBuf>), &str> {
+    preceded(
+        ws(success(())),
+        many0(delimited(
+            Lexer::Module.parser(),
+            ws(parse_path),
+            Lexer::SemiColon.parser(),
+        )),
+    )(input)
+    .map_err(|err| {
+        if let nom::Err::Error(ErrorTree::Base { location, kind: _ }) = err {
+            location
+        } else {
+            panic!("Expected a base error only")
+        }
+    })
+}
+
+/// Parses a unix-style path.
+pub fn parse_path(input: &str) -> IResult<&str, PathBuf, ErrorTree<&str>> {
+    let path_component = many0(alt((
+        none_of("\0\\;/"),
+        preceded(char('\\'), one_of("\\;/")),
+    )));
+    let first_path_component = many0(alt((
+        none_of("\0\\;/"),
+        preceded(char('\\'), one_of("\\;/")),
+    )));
+    map(
+        tuple((
+            first_path_component,
+            many0(preceded(char('/'), path_component)),
+        )),
+        |(first_component, path)| {
+            Path::new(
+                &vec![first_component]
+                    .into_iter()
+                    .chain(path)
+                    .into_iter()
+                    .map(|component| component.into_iter().collect::<String>())
+                    .intersperse("/".to_string())
+                    .collect::<String>(),
+            )
+            .iter()
+            .collect::<PathBuf>()
+        },
+    )(input)
 }
 
 /// Parses an input string into a [Program].
@@ -89,10 +189,7 @@ pub fn parse(input: &str) -> Result<Program<&str, &str>, Vec<Summary>> {
 fn parse_program(input: &str) -> IResult<&str, Program<&str, &str>, ErrorTree<&str>> {
     map(
         delimited(
-            tuple((
-                ws(success(())),
-                Lexer::Begin.parser().context("Start of Program"),
-            )),
+            Lexer::Begin.parser().context("Start of Program"),
             tuple((
                 many0(span(parse_func)),
                 parse_stats(Lexer::End).context("End of Program"),
@@ -100,6 +197,47 @@ fn parse_program(input: &str) -> IResult<&str, Program<&str, &str>, ErrorTree<&s
             eof.context("End of File"),
         ),
         |(funcs, stats)| Program(funcs, stats),
+    )(input)
+}
+
+/// Parses an input string into a vector of [functions](Function).
+///
+/// Some examples of valid programs:
+/// ```text
+/// begin
+///     skip
+/// end
+/// ```
+///
+/// ```text
+/// begin
+///     int add(int a, int b) is
+///         return a + b
+///     end
+///     int ret = call add(5, 10);
+///     println ret
+/// end
+/// ```
+///
+/// Example of invalid program:
+/// ```text
+/// begin
+/// end
+/// ```
+#[allow(clippy::type_complexity)]
+fn parse_module(
+    input: &str,
+) -> IResult<&str, Vec<ASTWrapper<&str, Function<&str, &str>>>, ErrorTree<&str>> {
+    map(
+        terminated(
+            opt(delimited(
+                Lexer::Begin.parser().context("Start of Module"),
+                many0(span(parse_func)),
+                Lexer::End.parser().context("End of Module"),
+            )),
+            eof.context("End of File"),
+        ),
+        |funcs| funcs.unwrap_or_default(),
     )(input)
 }
 
@@ -119,7 +257,7 @@ fn parse_func(input: &str) -> IResult<&str, Function<&str, &str>, ErrorTree<&str
                         Lexer::Comma.parser(),
                         Lexer::CloseParen.parser(),
                     ),
-                    map(Lexer::CloseParen.parser(), |_| Vec::new()),
+                    map(Lexer::CloseParen.parser(), |_| vec![]),
                 ))
                 .cut()
                 .context("Argument List"),
@@ -635,14 +773,13 @@ pub fn collect_errors<'a>(
 
 /// Converts the [ErrorTree] into a [Summary] which allows for nice user-facing
 /// error printing.
-pub fn convert_error_tree<'a>(input: &'a str, err: ErrorTree<&'a str>) -> Summary<'a> {
+pub fn convert_error_tree<'a>(summary: &mut Summary<'a>, input: &'a str, err: ErrorTree<&'a str>) {
     let mut h = HashMap::new();
     collect_errors(err, &mut h, vec![]);
 
-    let mut summary = Summary::new(input, SummaryStage::Parser);
     for (k, v) in h {
         let k = match k {
-            "" => &input[input.len() - 2..],
+            "" => &input[input.len() - 1..],
             _ => &k[..1],
         };
 
@@ -670,11 +807,12 @@ pub fn convert_error_tree<'a>(input: &'a str, err: ErrorTree<&'a str>) -> Summar
         );
         summary.add_cell(summary_cell);
     }
-    summary
 }
 
 #[cfg(test)]
 mod unit_tests {
+    use indoc::indoc;
+
     use super::*;
 
     #[test]
@@ -714,5 +852,30 @@ mod unit_tests {
                 )
             )
         );
+    }
+
+    #[test]
+    fn mod_delcarations_parsed_correctly() {
+        let contents = indoc! {"
+                            mod a.wacc;
+            mod b/c.txt;
+            mod d////e/f/g.txt;
+            mod h/i\\;\\\\ .txt;
+        "};
+        if let Ok((_, mods)) = parse_imports(contents) {
+            assert_eq!(
+                mods.iter()
+                    .map(|path| path.as_os_str().to_str())
+                    .collect::<Vec<_>>(),
+                vec![
+                    Some("a.wacc"),
+                    Some("b/c.txt"),
+                    Some("d/e/f/g.txt"),
+                    Some("h/i;\\ .txt")
+                ]
+            )
+        } else {
+            panic!("Parsing should succeed")
+        }
     }
 }

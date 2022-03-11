@@ -32,7 +32,7 @@ pub fn analyse_block<'a, 'b>(
     errors: &mut Vec<StatementErrors<'a>>,
 ) -> Option<Vec<StatWrap<Option<Type>, usize>>> {
     let mut any_errors = false;
-    let mut correct: Vec<StatWrap<Option<Type>, usize>> = Vec::new();
+    let mut correct: Vec<StatWrap<Option<Type>, usize>> = vec![];
 
     let mut stat_iter = stats.into_iter().peekable();
     while let Some(stat) = stat_iter.next() {
@@ -134,7 +134,7 @@ fn analyse_statement<'a, 'b>(
         Stat::Def(var_type, name, rhs) => {
             match var_symb.def_var(name, &var_type, span, local_symb) {
                 Ok(rename) => {
-                    let mut rhs_errors = Vec::new();
+                    let mut rhs_errors = vec![];
                     match analyse_rhs(
                         &var_type,
                         rhs,
@@ -172,7 +172,7 @@ fn analyse_statement<'a, 'b>(
             }
         }
         Stat::Read(lhs) => {
-            let mut stat_errors = Vec::new();
+            let mut stat_errors = vec![];
             match analyse_lhs(lhs, var_symb, local_symb, &mut stat_errors) {
                 Some((lhs_type, lhs_ast)) => {
                     if can_coerce(&Type::Int, &lhs_type) || can_coerce(&Type::Char, &lhs_type) {
@@ -193,7 +193,7 @@ fn analyse_statement<'a, 'b>(
         // If an invalid expression or wrong expression type, add to errors
         // for statement.
         Stat::Free(expr @ ASTWrapper(expr_span, _)) => {
-            let mut stat_errors = Vec::new();
+            let mut stat_errors = vec![];
             match analyse_expression(expr, local_symb, var_symb, &mut stat_errors) {
                 Some(ASTWrapper(Some(expr_type), expr_ast)) => {
                     if can_coerce(&Type::Pair(box Type::Any, box Type::Any), &expr_type)
@@ -217,7 +217,7 @@ fn analyse_statement<'a, 'b>(
             }
         }
         Stat::Return(expr @ ASTWrapper(expr_span, _)) => {
-            let mut stat_errors = Vec::new();
+            let mut stat_errors = vec![];
             match analyse_expression(expr, local_symb, var_symb, &mut stat_errors) {
                 Some(ASTWrapper(Some(expr_type), expr_ast)) => match &ret_type {
                     Some(return_type) => {
@@ -249,7 +249,7 @@ fn analyse_statement<'a, 'b>(
             }
         }
         Stat::Exit(expr @ ASTWrapper(expr_span, _)) => {
-            let mut stat_errors = Vec::new();
+            let mut stat_errors = vec![];
             match analyse_expression(expr, local_symb, var_symb, &mut stat_errors) {
                 Some(ASTWrapper(Some(expr_type), expr_ast)) => {
                     if can_coerce(&Type::Int, &expr_type) {
@@ -271,7 +271,7 @@ fn analyse_statement<'a, 'b>(
             }
         }
         Stat::Print(expr) => {
-            let mut stat_errors = Vec::new();
+            let mut stat_errors = vec![];
             match analyse_expression(expr, local_symb, var_symb, &mut stat_errors) {
                 Some(expr_renamed) => {
                     // any type can be printed, so no coercion check
@@ -281,7 +281,7 @@ fn analyse_statement<'a, 'b>(
             }
         }
         Stat::PrintLn(expr) => {
-            let mut stat_errors = Vec::new();
+            let mut stat_errors = vec![];
             match analyse_expression(expr, local_symb, var_symb, &mut stat_errors) {
                 Some(expr_renamed) => {
                     // any type can be printed, so no coercion check
@@ -291,12 +291,12 @@ fn analyse_statement<'a, 'b>(
             }
         }
         Stat::If(cond @ ASTWrapper(cond_span, _), if_block, else_block) => {
-            let mut stat_errors = Vec::new();
+            let mut stat_errors = vec![];
             let cond_valid = match analyse_expression(cond, local_symb, var_symb, &mut stat_errors)
             {
                 Some(ASTWrapper(Some(cond_type), cond_ast)) => {
                     if can_coerce(&Type::Bool, &cond_type) {
-                        Some(ASTWrapper(None, cond_ast))
+                        Some(ASTWrapper(Some(Type::Bool), cond_ast))
                     } else {
                         errors.push(ASTWrapper(
                             span,
@@ -346,12 +346,12 @@ fn analyse_statement<'a, 'b>(
             }
         }
         Stat::While(cond @ ASTWrapper(cond_span, _), loop_block) => {
-            let mut stat_errors = Vec::new();
+            let mut stat_errors = vec![];
             let condition_valid =
                 match analyse_expression(cond, local_symb, var_symb, &mut stat_errors) {
                     Some(ASTWrapper(Some(cond_type), cond_ast)) => {
                         if can_coerce(&Type::Bool, &cond_type) {
-                            Some(ASTWrapper(None, cond_ast))
+                            Some(ASTWrapper(Some(Type::Bool), cond_ast))
                         } else {
                             errors.push(ASTWrapper(
                                 span,
@@ -520,7 +520,7 @@ fn analyse_rhs<'a, 'b>(
         AssignRhs::Call(ASTWrapper(fun_name, fun_name_string), args) => {
             match fun_symb.get_fun(fun_name) {
                 Some((ret_type, param_types)) => {
-                    let mut correct = Vec::new();
+                    let mut correct = vec![];
                     let args_len = args.len();
 
                     if !can_coerce(expected, &ret_type) {
@@ -569,6 +569,7 @@ fn analyse_rhs<'a, 'b>(
                     for expr in args.into_iter() {
                         analyse_expression(expr, local_symb, var_symb, errors);
                     }
+                    errors.push(SemanticError::UndefinedFunction(fun_name));
                     None
                 }
             }
@@ -602,7 +603,7 @@ fn analyse_lhs<'a, 'b>(
             }
         },
         AssignLhs::ArrayElem(var_name, index_exprs) => {
-            let mut correct = Vec::new();
+            let mut correct = vec![];
             let index_exprs_len = index_exprs.len();
             let dim = index_exprs.len();
 
@@ -727,7 +728,7 @@ mod tests {
                 &fun_symb,
                 &mut local_symb,
                 &mut var_symb,
-                &mut Vec::new()
+                &mut vec![]
             ),
             Some(AssignRhs::Call(
                 ASTWrapper(Some(Type::Int), String::from("fun1")),
@@ -744,7 +745,7 @@ mod tests {
                 &fun_symb,
                 &mut local_symb,
                 &mut var_symb,
-                &mut Vec::new()
+                &mut vec![]
             ),
             Some(AssignRhs::Call(
                 ASTWrapper(Some(Type::Int), String::from("fun2")),
@@ -768,7 +769,7 @@ mod tests {
                 &fun_symb,
                 &mut local_symb,
                 &mut var_symb,
-                &mut Vec::new()
+                &mut vec![]
             ),
             Some(AssignRhs::Call(
                 ASTWrapper(Some(Type::Char), String::from("fun3")),
@@ -803,7 +804,7 @@ mod tests {
                 &fun_symb,
                 &mut local_symb,
                 &mut var_symb,
-                &mut Vec::new()
+                &mut vec![]
             ),
             Some(AssignRhs::Call(
                 ASTWrapper(Some(Type::Char), String::from("fun3")),
@@ -826,7 +827,7 @@ mod tests {
                 &fun_symb,
                 &mut local_symb,
                 &mut var_symb,
-                &mut Vec::new()
+                &mut vec![]
             ),
             Some(AssignRhs::Call(
                 ASTWrapper(Some(Type::Int), String::from("fun4")),
@@ -875,7 +876,7 @@ mod tests {
         // Errors:
         // - The return type of fun1 is int (expects char)
         // - The number of parameters for fun1 is 2, there is only 1
-        let mut errors1 = Vec::new();
+        let mut errors1 = vec![];
         match analyse_rhs(
             &Type::Char,
             AssignRhs::Call(
@@ -905,7 +906,7 @@ mod tests {
         // Errors:
         // - The first argument is a pair(int,int) should be an int
         // - The second argument is a bool, should be an int
-        let mut errors2 = Vec::new();
+        let mut errors2 = vec![];
         match analyse_rhs(
             &Type::Int,
             AssignRhs::Call(
@@ -945,7 +946,7 @@ mod tests {
         // Errors:
         // - The first argument is a pair(int,int) should be an int
         // - The second argument is a bool, should be an int
-        let mut errors3 = Vec::new();
+        let mut errors3 = vec![];
         match analyse_rhs(
             &Type::Int,
             AssignRhs::Call(
@@ -1002,7 +1003,7 @@ mod tests {
                 &fun_symb,
                 &mut local_symb,
                 &mut var_symb,
-                &mut Vec::new()
+                &mut vec![]
             ),
             Some(AssignRhs::Array(ASTWrapper(
                 Some(Type::Array(box Type::Int, 1)),
@@ -1029,7 +1030,7 @@ mod tests {
                 &fun_symb,
                 &mut local_symb,
                 &mut var_symb,
-                &mut Vec::new()
+                &mut vec![]
             ),
             Some(AssignRhs::Array(ASTWrapper(
                 Some(Type::Array(box Type::Int, 1)),
@@ -1048,7 +1049,7 @@ mod tests {
                 &fun_symb,
                 &mut local_symb,
                 &mut var_symb,
-                &mut Vec::new()
+                &mut vec![]
             ),
             Some(AssignRhs::Array(ASTWrapper(
                 Some(Type::Array(box Type::Char, 1)),
@@ -1070,7 +1071,7 @@ mod tests {
             .expect("variable not yet defined");
 
         // the array is the wrong type
-        let mut errors1 = Vec::new();
+        let mut errors1 = vec![];
         match analyse_rhs(
             &Type::Int,
             AssignRhs::Array(ASTWrapper(
@@ -1098,7 +1099,7 @@ mod tests {
         }
 
         // variable b is a char not an int
-        let mut errors2 = Vec::new();
+        let mut errors2 = vec![];
         match analyse_rhs(
             &Type::Array(box Type::Int, 1),
             AssignRhs::Array(ASTWrapper(

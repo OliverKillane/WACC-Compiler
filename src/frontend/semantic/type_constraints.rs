@@ -172,8 +172,8 @@ pub fn binop_match(
     right_type: &Type,
 ) -> Result<Type, (BinOpPossibleTypes, Vec<&'static BinOp>)> {
     let mut generics = HashMap::with_capacity(0);
-    let mut possible_types = Vec::new();
-    let mut possible_binops = Vec::new();
+    let mut possible_types = vec![];
+    let mut possible_binops = vec![];
 
     for (op, output, left, right) in BINOPS.iter() {
         generics.clear();
@@ -200,8 +200,8 @@ pub fn binop_match(
 ///   potential operators for the input type.
 pub fn unop_match(unop: &UnOp, expr_type: &Type) -> Result<Type, (Vec<Type>, Vec<&'static UnOp>)> {
     let mut generics = HashMap::with_capacity(0);
-    let mut possible_types = Vec::new();
-    let mut possible_unops = Vec::new();
+    let mut possible_types = vec![];
+    let mut possible_unops = vec![];
     for (op, out, input) in UNOPS.iter() {
         generics.clear();
         if op == unop {
@@ -251,6 +251,14 @@ pub fn can_coerce(main_type: &Type, into_type: &Type) -> bool {
             Ordering::Greater => can_coerce(&Type::Array(box a.clone(), dim_a - dim_b), b),
         },
         (a, b) => a == b,
+    }
+}
+
+pub fn flatten_type(t: Type) -> Type {
+    if let Type::Array(box Type::Array(inner_t, d1), d2) = t {
+        flatten_type(Type::Array(inner_t, d1 + d2))
+    } else {
+        t
     }
 }
 

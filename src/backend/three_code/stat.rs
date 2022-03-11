@@ -3,8 +3,14 @@ use super::{
     expr::{translate_bool_expr, translate_expr, translate_num_expr, translate_ptr_expr},
     DataRefType, OpSrc, Size, StatCode, StatLine, StatType,
 };
-use crate::intermediate::{self as ir, DataRef, VarRepr};
-use std::collections::HashMap;
+use crate::{
+    graph::Deleted,
+    intermediate::{self as ir, DataRef, VarRepr},
+};
+use std::{
+    collections::HashMap,
+    iter::{successors, zip},
+};
 
 /// Converts the [intermediate representation type](ir::Type) to a
 /// [three code size](Size).
@@ -76,7 +82,7 @@ fn ensure_format(
 
 /// Adds a call to a flush function
 fn add_flush(free_var: VarRepr, stat_line: &mut StatLine) {
-    stat_line.add_stat(StatCode::Assign(free_var, OpSrc::Const(1)));
+    stat_line.add_stat(StatCode::Assign(free_var, OpSrc::Const(0)));
     stat_line.add_stat(StatCode::VoidCall("fflush".to_string(), vec![free_var]));
 }
 
@@ -110,7 +116,7 @@ pub(super) fn translate_statement(
     read_ref: &mut bool,
     fmt_flags: &mut FmtDataRefFlags,
     vars: &HashMap<VarRepr, ir::Type>,
-    function_types: &HashMap<String, ir::Type>,
+    function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
 ) {
     match stat {
@@ -140,6 +146,21 @@ pub(super) fn translate_statement(
         ir::Stat::Free(ptr_expr) => {
             translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
             stat_line.add_stat(StatCode::VoidCall("free".to_string(), vec![free_var]));
+        }
+        ir::Stat::Call(name, args) => {
+            let stat_code = StatCode::VoidCall(
+                name,
+                zip(
+                    args,
+                    successors(Some(free_var), |arg_result| Some(*arg_result + 1)),
+                )
+                .map(|(expr, arg_result)| {
+                    translate_expr(expr, arg_result, stat_line, vars, function_types, options);
+                    arg_result
+                })
+                .collect(),
+            );
+            stat_line.add_stat(stat_code);
         }
         ir::Stat::ReadIntVar(var) => {
             *read_ref = true;
@@ -226,14 +247,14 @@ pub(super) fn translate_statement(
             let false_format =
                 ensure_format(free_data_ref, data_refs, "false", &mut fmt_flags.bool_false);
 
-            let print_node =
-                stat_line
-                    .graph()
-                    .borrow_mut()
-                    .new_node(StatType::new_final(StatCode::VoidCall(
-                        "printf".to_string(),
-                        vec![free_var],
-                    )));
+            let dummy_node = stat_line.graph().borrow_mut().new_node(StatType::deleted());
+            let print_node = stat_line
+                .graph()
+                .borrow_mut()
+                .new_node(StatType::new_simple(
+                    StatCode::VoidCall("printf".to_string(), vec![free_var]),
+                    dummy_node.clone(),
+                ));
             let true_set = stat_line
                 .graph()
                 .borrow_mut()
@@ -248,6 +269,7 @@ pub(super) fn translate_statement(
                     StatCode::Assign(free_var, OpSrc::DataRef(false_format, 0)),
                     print_node.clone(),
                 ));
+            dummy_node.get_mut().add_incoming(print_node.clone());
             print_node.get_mut().add_incoming(true_set.clone());
             print_node.get_mut().add_incoming(false_set.clone());
 
@@ -331,10 +353,10 @@ pub(super) mod tests {
     use super::translate_statement;
     use crate::{
         backend::three_code::{stat::FmtDataRefFlags, StatLine},
-        graph::Graph,
+        graph::{Deleted, Graph},
         intermediate::{self as ir, DataRef, VarRepr},
     };
-    use std::{cell::RefCell, collections::HashMap, rc::Rc};
+    use std::{cell::RefCell, collections::HashMap, ops::Deref, rc::Rc};
 
     fn match_graph_dfs(
         exec_node: StatNode,
@@ -346,7 +368,7 @@ pub(super) mod tests {
             return;
         }
         visited_map.insert(exec_node.clone(), template_node.clone());
-        match (&*exec_node.get(), &*template_node.get()) {
+        match (exec_node.get().deref(), template_node.get().deref()) {
             (StatType::Dummy(_), StatType::Dummy(_)) => {}
             (
                 StatType::Simple(_, exec_stat_code, next_exec_node),
@@ -358,9 +380,6 @@ pub(super) mod tests {
                     next_template_node.clone(),
                     visited_map,
                 )
-            }
-            (StatType::Final(_, exec_stat_code), StatType::Final(_, template_stat_code)) => {
-                assert_eq!(exec_stat_code, template_stat_code);
             }
             (
                 StatType::Branch(_, exec_branch_var, next_true_exec_node, next_false_exec_node),
@@ -389,8 +408,8 @@ pub(super) mod tests {
             }
             _ => panic!(
                 "Stat type mismatch: expected {:?}, but got {:?}",
-                &*template_node.get(),
-                &*exec_node.get()
+                template_node.get().deref(),
+                exec_node.get().deref()
             ),
         }
     }
@@ -406,7 +425,7 @@ pub(super) mod tests {
         free_var: VarRepr,
         stats: Vec<StatCode>,
         vars: HashMap<VarRepr, ir::Type>,
-        function_types: HashMap<String, ir::Type>,
+        function_types: HashMap<String, Option<ir::Type>>,
         mut initial_data_refs: HashMap<DataRef, DataRefType>,
         final_data_refs: HashMap<DataRef, DataRefType>,
         has_read_ref: bool,
@@ -436,6 +455,7 @@ pub(super) mod tests {
                 strength_reduction: false,
                 loop_unrolling: false,
                 common_expressions: false,
+                show_arm_temp_rep: false,
             },
         );
 
@@ -445,18 +465,19 @@ pub(super) mod tests {
         let mut node = stat_line.start_node().expect("No start node");
         let mut stats = stats.into_iter();
         while node != stat_line.end_node().expect("No end node") {
-            let next_node = if let StatType::Simple(_, node_stat_code, next_node) = &*node.get() {
-                assert_eq!(
-                    *node_stat_code,
-                    stats.next().expect("More statements than expected")
-                );
-                next_node.clone()
-            } else {
-                panic!("Expected a simple statement")
-            };
+            let next_node =
+                if let StatType::Simple(_, node_stat_code, next_node) = node.get().deref() {
+                    assert_eq!(
+                        *node_stat_code,
+                        stats.next().expect("More statements than expected")
+                    );
+                    next_node.clone()
+                } else {
+                    panic!("Expected a simple statement")
+                };
             node = next_node;
         }
-        if let StatType::Final(_, node_stat_code) = &*node.get() {
+        if let StatType::Simple(_, node_stat_code, _) = node.get().deref() {
             assert_eq!(
                 *node_stat_code,
                 stats.next().expect("More statements than expected")
@@ -604,7 +625,7 @@ pub(super) mod tests {
                 StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::Assign(1, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("printf".to_string(), vec![1, 0]),
-                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::VoidCall("fflush".to_string(), vec![0]),
             ],
             HashMap::new(),
@@ -640,6 +661,7 @@ pub(super) mod tests {
                 strength_reduction: false,
                 loop_unrolling: false,
                 common_expressions: false,
+                show_arm_temp_rep: false,
             },
         );
 
@@ -652,12 +674,13 @@ pub(super) mod tests {
         );
 
         let mut template_graph = Graph::new();
-        let flush_node = template_graph.new_node(StatType::new_final(StatCode::VoidCall(
-            "fflush".to_string(),
-            vec![0],
-        )));
+        let dummy_node = template_graph.new_node(StatType::deleted());
+        let flush_node = template_graph.new_node(StatType::new_simple(
+            StatCode::VoidCall("fflush".to_string(), vec![0]),
+            dummy_node,
+        ));
         let stdout_set_node = template_graph.new_node(StatType::new_simple(
-            StatCode::Assign(0, OpSrc::Const(1)),
+            StatCode::Assign(0, OpSrc::Const(0)),
             flush_node,
         ));
         let call_node = template_graph.new_node(StatType::new_simple(
@@ -692,7 +715,7 @@ pub(super) mod tests {
                 StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::Assign(1, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("printf".to_string(), vec![1, 0]),
-                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::VoidCall("fflush".to_string(), vec![0]),
             ],
             HashMap::new(),
@@ -712,7 +735,7 @@ pub(super) mod tests {
                 StatCode::Assign(0, OpSrc::Const(1)),
                 StatCode::Assign(1, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("printf".to_string(), vec![1, 0]),
-                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::VoidCall("fflush".to_string(), vec![0]),
             ],
             HashMap::new(),
@@ -733,7 +756,7 @@ pub(super) mod tests {
                 StatCode::Assign(1, OpSrc::Const(4)),
                 StatCode::Assign(2, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("printf".to_string(), vec![2, 1, 0]),
-                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::VoidCall("fflush".to_string(), vec![0]),
             ],
             HashMap::new(),
@@ -752,7 +775,7 @@ pub(super) mod tests {
             vec![
                 StatCode::Assign(0, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("printf".to_string(), vec![0]),
-                StatCode::Assign(0, OpSrc::Const(1)),
+                StatCode::Assign(0, OpSrc::Const(0)),
                 StatCode::VoidCall("fflush".to_string(), vec![0]),
             ],
             HashMap::new(),

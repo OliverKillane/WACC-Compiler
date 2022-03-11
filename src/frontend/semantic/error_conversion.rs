@@ -50,10 +50,9 @@ pub fn convert_errors<'a>(
     def_errs: Vec<StatementErrors<'a>>,
     main_errs: Vec<StatementErrors<'a>>,
     fun_errs: Vec<(&str, Vec<StatementErrors<'a>>)>,
-    source_code: &'a str,
-) -> Vec<Summary<'a>> {
-    let mut semantic_errors = Summary::new(source_code, SummaryStage::Semantic);
-    let mut syntax_errors = Summary::new(source_code, SummaryStage::Parser);
+) -> Summary<'a> {
+    let mut semantic_errors = Summary::new(SummaryStage::Semantic);
+    let mut syntax_errors = Summary::new(SummaryStage::Parser);
 
     create_cells(
         String::from("In Function Declarations"),
@@ -76,18 +75,11 @@ pub fn convert_errors<'a>(
         )
     }
 
-    // syntax errors rare, generally expected to have a single semantics summary
-    let mut summaries = Vec::with_capacity(1);
-
     if !syntax_errors.is_empty() {
-        summaries.push(syntax_errors)
+        syntax_errors
+    } else {
+        semantic_errors
     }
-
-    if !semantic_errors.is_empty() {
-        summaries.push(semantic_errors)
-    }
-
-    summaries
 }
 
 /// Generates an error cell for each statement in the vector of [statement errors](StatementErrors)
