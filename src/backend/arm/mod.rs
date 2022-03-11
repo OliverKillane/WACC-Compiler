@@ -5,9 +5,8 @@
 //! temporary identifiers) assembly graph.
 
 use self::{
-    peephole_opts::remove_self_moves,
-    register_allocation::allocate_registers,
-    translation::{translate_threecode, validate_connections},
+    peephole_opts::remove_self_moves, register_allocation::allocate_registers,
+    translation::translate_threecode,
 };
 use super::{three_code::ThreeCode, Options};
 
@@ -32,7 +31,6 @@ impl From<(ThreeCode, &Options)> for ArmResult {
     fn from((three_code, options): (ThreeCode, &Options)) -> Self {
         if options.show_arm_temp_rep {
             let arm_temp = translate_threecode(three_code);
-            validate_connections(&arm_temp.cfg);
             let temp_string = arm_temp.to_string();
             ArmResult(
                 remove_self_moves(allocate_registers(arm_temp)),

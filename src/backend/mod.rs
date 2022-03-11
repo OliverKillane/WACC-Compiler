@@ -3,8 +3,7 @@ mod three_code;
 
 use crate::intermediate::Program;
 use arm::ArmResult;
-use std::ops::Deref;
-use three_code::{StatType, ThreeCode};
+use three_code::ThreeCode;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PropagationOpt {
