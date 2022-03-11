@@ -1,0 +1,18 @@
+# evaluating less-than-or-equal-to
+
+# Output:
+# true
+# false
+# true
+
+# Program:
+
+begin
+  int x = 2 ;
+  int y = 6 ;
+  int z = 4 ;
+  int a = 4 ;
+  println x <= y ;
+  println y <= z ;
+  println z <= a
+end

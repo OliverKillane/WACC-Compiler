@@ -1,0 +1,20 @@
+# tests whether the compiler can handle long expressions with several variables
+
+# Output:
+# 362880
+# 128
+
+# Exit:
+# 128
+
+begin
+
+  int x = 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10 + 11 + 12 + 13 + 14 + 15 + 16 + 17 ;
+  int y = -1 - 2 - 3 - 4 - 5 - 6 - 7 - 8 - 9 - 10 - 11 - 12 - 13 - 14 - 15 - 16 - 17 ;
+  int z = 1 * 2 * 3 * 4 * 5 * 6 * 7 * 8 * 9 * 10 ;
+  int div = 10 ;
+  println x + y + ( z / div ) ;
+  println (x + y + ( z / div )) % 256 ;
+  exit x + y + ( z / div )
+
+end

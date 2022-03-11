@@ -1,0 +1,17 @@
+# Simple conditional statement with boolen expression test
+
+# Output:
+# correct
+
+# Program:
+
+begin
+  bool b = true;
+  bool c = false;	
+  if b && c 
+  then 
+    println "incorrect"
+  else 
+    println "correct"
+  fi
+end

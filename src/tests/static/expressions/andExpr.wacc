@@ -1,0 +1,16 @@
+# evaluating and
+
+# Output:
+# false
+# true
+# false
+
+# Program:
+
+begin
+  bool a = true ;
+  bool b = false ;
+  println a && b ;
+  println a && true ;
+  println b && false
+end

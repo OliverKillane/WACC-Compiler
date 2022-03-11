@@ -1,0 +1,15 @@
+# Create and free a null pair
+
+# Output:
+# #runtime_error#
+
+# Exit:
+# 255
+
+# Program:
+
+begin
+  pair(pair, pair) a = null ;
+  free a
+end
+

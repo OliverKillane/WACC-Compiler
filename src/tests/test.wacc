@@ -1,0 +1,15 @@
+# simple input/output loop
+
+# Output:
+# counting... 5
+# counting... 4
+# counting... 3
+# counting... 2
+# counting... 1
+# 0 Boom!
+
+# Program:
+
+begin
+  string s = "Hello World!"
+end
