@@ -1,6 +1,7 @@
 mod arm;
 mod same_branch;
 mod three_code;
+mod ssa;
 
 use crate::intermediate::Program;
 use arm::ArmResult;
