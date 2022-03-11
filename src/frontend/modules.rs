@@ -110,7 +110,7 @@ pub fn gather_modules(
         .map_err(|_| GatherModulesError::MainFileNotPresent)?
         .into_owned();
     let (main_input_file, main_imports) = process_component(main_file_path)?;
-    if main_input_file.to_parse_contents().len() == 0 {
+    if main_input_file.to_parse_contents().is_empty() {
         return Err(GatherModulesError::MainFileNoCode);
     }
     let mut analyzed_modules = Vec::new();

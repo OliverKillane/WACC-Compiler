@@ -3,6 +3,7 @@
 use crate::backend::{compile, Options, PropagationOpt};
 use crate::frontend::{analyse, gather_modules};
 use glob::glob;
+use indoc::indoc;
 use lazy_static::lazy_static;
 use nom::{
     branch::alt,
@@ -43,7 +44,7 @@ fn parse_line(input: &str) -> IResult<&str, Vec<Tokens>> {
     many1(alt((
         map(is_not("#\n"), |s: &str| Tokens::String(s.to_string())),
         value(Tokens::Address, tag("#addrs#")),
-        value(Tokens::Address, tag("#runtime_error#")),
+        value(Tokens::RuntimeError, tag("#runtime_error#")),
     )))(input)
 }
 
@@ -87,7 +88,10 @@ impl PartialEq<&str> for Behaviour {
                         if iter.by_ref().take(2).collect::<String>() != "0x" {
                             return false;
                         }
-                        let _ = iter.by_ref().skip_while(|c| c.is_numeric());
+                        let mut peek = iter.clone();
+                        while peek.next().map(|c| c.is_numeric()) == Some(true) {
+                            let _ = iter.next();
+                        }
                     }
                     Tokens::Empty => return iter.next() == None,
                     Tokens::RuntimeError => {
@@ -108,6 +112,79 @@ impl PartialEq<&str> for Behaviour {
 
         true
     }
+}
+
+#[test]
+fn test_output_eq_behaviour() {
+    let input = include_str!("static/expressions/charComparisonExpr.wacc");
+
+    let expected_output = indoc! {
+        "false
+    true
+    true
+    true
+    false
+    false
+    "
+    };
+
+    assert_eq!(parse_behaviour(input).unwrap().1 .0, expected_output);
+
+    let input = include_str!("static/basic/skip/skip.wacc");
+
+    let expected_output = indoc! {
+        ""
+    };
+
+    assert_eq!(parse_behaviour(input).unwrap().1 .0, expected_output);
+
+    let input = include_str!("static/pairs/printPair.wacc");
+
+    let expected_output = indoc! {
+    "0x22150 = (10, a)
+    "
+    };
+
+    assert_eq!(parse_behaviour(input).unwrap().1 .0, expected_output);
+
+    let input = include_str!("static/array/printRef.wacc");
+
+    let expected_output = indoc! {
+    "Printing an array variable gives an address, such as 0x234234
+    "
+    };
+
+    assert_eq!(parse_behaviour(input).unwrap().1 .0, expected_output);
+
+    let input = include_str!("static/runtimeErr/integerOverflow/intmultOverflow.wacc");
+
+    let expected_output = indoc! {
+    "2147483
+    2147483000
+    OverflowError: the result is too small/large to store in a 4-byte signed-integer.
+    "
+    };
+
+    assert_eq!(parse_behaviour(input).unwrap().1 .0, expected_output);
+
+    let input = include_str!("static/runtimeErr/divideByZero/divZero.wacc");
+
+    let expected_output = indoc! {
+    "DivideByZeroError: divide or modulo by zero
+    "
+    };
+
+    assert_eq!(parse_behaviour(input).unwrap().1 .0, expected_output);
+}
+
+#[test]
+fn behaviour_comparison() {
+    // let source = "( [1, 2, 3] , [a, b, c] )\n[ 0x231f0 = (a, true), 0x23200 = (b, false) ]\n1, 2\narray, of, strings\ntrue, false, true\nxyz\n1, 2, 3\nthis is a string\ntrue\nx\n5\n";
+    let source = "0x23200\n";
+
+    let matching = Behaviour(vec![vec![Tokens::Address]]);
+
+    assert_eq!(matching, source);
 }
 
 #[rstest]

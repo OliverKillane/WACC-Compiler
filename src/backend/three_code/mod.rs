@@ -790,7 +790,7 @@ fn translate_function(
     let mut read_ref = false;
     let start_node = translate_block_graph(
         block_graph,
-        stat_graph.clone(),
+        stat_graph,
         free_var,
         free_data_ref,
         data_refs,
