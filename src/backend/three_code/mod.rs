@@ -605,14 +605,6 @@ fn clean_up_block_graph_dfs(
 /// and directly precede it in terms of execution, as well as blocks with just
 /// unconditional branches and no statements, unless they point to themselves.
 fn clean_up_block_graph(block_graph: &mut ir::BlockGraph) {
-    for ir::Block(_, _, block_ending) in block_graph.iter_mut() {
-        if let ir::BlockEnding::CondJumps(conds, else_id) = block_ending {
-            while let Some((_, true_id)) = conds.last() && *true_id == *else_id {
-                conds.pop();
-            }
-        }
-    }
-
     let mut edge_mappings = HashMap::new();
     for block_id in 0..block_graph.len() {
         clean_up_block_graph_dfs(block_graph, block_id, &mut edge_mappings);
@@ -641,7 +633,7 @@ fn clean_up_block_graph(block_graph: &mut ir::BlockGraph) {
         })
         .collect();
 
-    for ir::Block(incoming, _, ending) in block_graph {
+    for ir::Block(incoming, _, ending) in &mut *block_graph {
         for incoming_id in incoming {
             *incoming_id = new_block_graph_mappings[&edge_mappings[incoming_id]];
         }
