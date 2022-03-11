@@ -51,7 +51,7 @@ fn eval_num_expr(num_expr: ir::NumExpr) -> (ir::NumSize, i32) {
         ir::NumExpr::Const(size, num_const) => (size, num_const),
         ir::NumExpr::ArithOp(box num_expr1, arith_op, box num_expr2) => {
             let (size1, num_const1) = eval_num_expr(num_expr1);
-            let (size2, num_const2) = eval_num_expr(num_expr2);
+            let (_, num_const2) = eval_num_expr(num_expr2);
             (
                 size1,
                 trim_num_const(
