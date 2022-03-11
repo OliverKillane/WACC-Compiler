@@ -1,0 +1,10 @@
+# simple negative integer variable declaration
+
+# Output:
+# #empty#
+
+# Program:
+
+begin
+  int x = -1
+end

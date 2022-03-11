@@ -50,6 +50,7 @@ mod backend;
 mod frontend;
 mod graph;
 mod intermediate;
+mod tests;
 
 use backend::{compile, Options, PropagationOpt};
 use clap::Parser;

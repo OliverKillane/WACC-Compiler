@@ -1,0 +1,14 @@
+# evaluating not
+
+# Output:
+# false
+# true
+
+# Program:
+
+begin
+  bool a = true ;
+  bool b = false ;
+  println !a ;
+  println !b
+end

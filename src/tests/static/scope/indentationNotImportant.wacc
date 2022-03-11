@@ -1,0 +1,14 @@
+# consistent indentation is for readability purposes only
+
+# Output:
+# #empty#
+
+# Program:
+
+           begin
+ while 
+false 
+         do
+    skip
+done
+                    end

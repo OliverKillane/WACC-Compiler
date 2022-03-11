@@ -1,0 +1,15 @@
+# basic Boolean printing
+
+# Output:
+# True is true
+# False is false
+
+# Program:
+
+begin
+  print "True is " ;
+  println true ;
+
+  print "False is " ;
+  println false
+end

@@ -1,0 +1,10 @@
+# simple true boolean variable declaration
+
+# Output:
+# #empty#
+
+# Program:
+
+begin
+  bool b = true
+end
