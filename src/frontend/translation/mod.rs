@@ -322,7 +322,7 @@ fn translate_stat(
             });
         }
         Stat::Free(ASTWrapper(expr_type, expr)) => {
-            *helper_function_flags.check_null = true;
+            helper_function_flags.check_null = true;
             let expr_type = expr_type.expect("Expected a type for an expression");
             let ptr_expr = if let ir::Expr::Ptr(ptr_expr) = translate_expr(
                 expr,
