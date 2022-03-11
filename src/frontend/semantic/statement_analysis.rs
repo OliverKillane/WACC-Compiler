@@ -1,6 +1,8 @@
 //! Analyse a block of instructions to get all errors, return either a modified
 //! AST or the errors produced.
 
+use crate::frontend::ast::ExprWrap;
+
 use super::{
     super::ast::{ASTWrapper, AssignLhs, AssignRhs, Stat, StatWrap, Type},
     expression_analysis::analyse_expression,
@@ -396,6 +398,12 @@ fn analyse_statement<'a, 'b>(
             errors,
         )
         .map(|block_ast| ASTWrapper(None, Stat::Block(block_ast))),
+        Stat::VoidCall(ASTWrapper(fun_name, fun_name_string), args) => {
+            let mut stat_errors = vec![];
+            let void_call = analyse_call(fun_name, fun_name_string, args, &Type::Any, fun_symb, local_symb, var_symb, &mut stat_errors).map(|(t, exprs)| ASTWrapper(None, Stat::VoidCall(t, exprs)));
+            errors.push(ASTWrapper(span, stat_errors));
+            void_call
+        },
     }
 }
 
@@ -518,61 +526,69 @@ fn analyse_rhs<'a, 'b>(
             }
         }
         AssignRhs::Call(ASTWrapper(fun_name, fun_name_string), args) => {
-            match fun_symb.get_fun(fun_name) {
-                Some((ret_type, param_types)) => {
-                    let mut correct = vec![];
-                    let args_len = args.len();
+            analyse_call(fun_name, fun_name_string, args, expected, fun_symb, local_symb, var_symb, errors).map(|(t, exprs)| AssignRhs::Call(t, exprs))
+        }
+    }
+}
 
-                    if !can_coerce(expected, &ret_type) {
-                        errors.push(SemanticError::InvalidCallType(
-                            fun_name,
-                            expected.clone(),
-                            ret_type,
-                        ));
-                    }
+fn analyse_call<'a, 'b>(fun_name: &'a str, fun_name_string: String, args: Vec<ExprWrap<&'a str, &'a str>>, expected: &Type,
+    fun_symb: &FunctionSymbolTable<'a>,
+    local_symb: &LocalSymbolTable<'a, 'b>,
+    var_symb: &VariableSymbolTable,
+    errors: &mut Vec<SemanticError<'a>>,) -> Option<(ASTWrapper<Option<Type>, String>, Vec<ExprWrap<Option<Type>, usize>>)> {
+    match fun_symb.get_fun(fun_name) {
+        Some((ret_type, param_types)) => {
+            let mut correct = vec![];
+            let args_len = args.len();
 
-                    if param_types.len() != args_len {
-                        errors.push(SemanticError::FunctionParametersLengthMismatch(
-                            fun_name,
-                            param_types.len(),
-                            args_len,
-                        ));
-                    } else {
-                        for (expr @ ASTWrapper(param_span, _), (param_name, param_type)) in
-                            args.into_iter().zip(param_types.into_iter())
-                        {
-                            if let Some(ASTWrapper(Some(expr_type), param_ast)) =
-                                analyse_expression(expr, local_symb, var_symb, errors)
-                            {
-                                if can_coerce(&param_type, &expr_type) {
-                                    correct.push(ASTWrapper(Some(param_type.clone()), param_ast))
-                                } else {
-                                    errors.push(SemanticError::FunctionArgumentTypeInvalid(
-                                        param_span, param_name, param_type, expr_type,
-                                    ))
-                                }
-                            }
+            if !can_coerce(expected, &ret_type) {
+                errors.push(SemanticError::InvalidCallType(
+                    fun_name,
+                    expected.clone(),
+                    ret_type,
+                ));
+            }
+
+            if param_types.len() != args_len {
+                errors.push(SemanticError::FunctionParametersLengthMismatch(
+                    fun_name,
+                    param_types.len(),
+                    args_len,
+                ));
+            } else {
+                for (expr @ ASTWrapper(param_span, _), (param_name, param_type)) in
+                    args.into_iter().zip(param_types.into_iter())
+                {
+                    if let Some(ASTWrapper(Some(expr_type), param_ast)) =
+                        analyse_expression(expr, local_symb, var_symb, errors)
+                    {
+                        if can_coerce(&param_type, &expr_type) {
+                            correct.push(ASTWrapper(Some(param_type.clone()), param_ast))
+                        } else {
+                            errors.push(SemanticError::FunctionArgumentTypeInvalid(
+                                param_span, param_name, param_type, expr_type,
+                            ))
                         }
                     }
-
-                    if errors.is_empty() {
-                        Some(AssignRhs::Call(
-                            ASTWrapper(Some(expected.clone()), fun_name_string),
-                            correct,
-                        ))
-                    } else {
-                        None
-                    }
-                }
-                None => {
-                    // even if the function is undefined, we can find issues in its arguments
-                    for expr in args.into_iter() {
-                        analyse_expression(expr, local_symb, var_symb, errors);
-                    }
-                    errors.push(SemanticError::UndefinedFunction(fun_name));
-                    None
                 }
             }
+
+            if errors.is_empty() {
+                Some((
+                    ASTWrapper(Some(expected.clone()), fun_name_string),
+                    correct)
+                )
+            } else {
+                None
+            }
+        }
+        None => {
+            // even if the function is undefined, we can find issues in its arguments
+            for expr in args.into_iter() {
+                analyse_expression(expr, local_symb, var_symb, errors);
+            }
+            errors.push(SemanticError::UndefinedFunction(fun_name));
+            None
         }
     }
 }
