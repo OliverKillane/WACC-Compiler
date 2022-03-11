@@ -121,7 +121,7 @@ fn main() -> io::Result<()> {
                 GatherModulesError::MainFileNotPresent => (
                     format!(
                         "File \'{}\' not found",
-                        get_relative_path(&main_file_path.absolutize()?.into_owned())?.display()
+                        get_relative_path(&main_file_path.absolutize()?)?.display()
                     ),
                     FILE_FAILURE,
                 ),
