@@ -50,7 +50,7 @@ mod backend;
 mod frontend;
 mod graph;
 mod intermediate;
-
+use backend::{compile, Options, PropagationOpt};
 // #[cfg(test)]
 // mod tests;
 
