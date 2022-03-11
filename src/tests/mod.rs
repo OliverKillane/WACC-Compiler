@@ -78,6 +78,8 @@ impl PartialEq<&str> for Behaviour {
         let mut iter = other.chars();
         for line in self.0.iter() {
             for token in line {
+                println!("{:?}", iter.clone().collect::<String>());
+                println!("{:?}", token);
                 match token {
                     Tokens::String(s) => {
                         if &iter.by_ref().take(s.len()).collect::<String>() != s {
@@ -85,12 +87,23 @@ impl PartialEq<&str> for Behaviour {
                         }
                     }
                     Tokens::Address => {
-                        if iter.by_ref().take(2).collect::<String>() != "0x" {
-                            return false;
-                        }
-                        let mut peek = iter.clone();
-                        while peek.next().map(|c| c.is_numeric()) == Some(true) {
-                            let _ = iter.next();
+                        println!("{}", iter.clone().take(5).collect::<String>());
+                        if iter.clone().take(5).collect::<String>() == "(nil)" {
+                            let _ = iter.by_ref().take(5);
+                            println!("after:{:?}", iter.clone().collect::<String>());
+                            println!("Wow this worked");
+                        } else {
+                            if iter.by_ref().take(2).collect::<String>() != "0x" {
+                                return false;
+                            }
+                            let mut peek = iter.clone();
+                            while peek
+                                .next()
+                                .map(|c| c.is_numeric() || ('a'..='f').contains(&c))
+                                == Some(true)
+                            {
+                                let _ = iter.next();
+                            }
                         }
                     }
                     Tokens::Empty => return iter.next() == None,
@@ -106,6 +119,7 @@ impl PartialEq<&str> for Behaviour {
                 }
             }
             if iter.next() != Some('\n') {
+                println!("Failing here");
                 return false;
             }
         }
@@ -187,19 +201,44 @@ fn behaviour_comparison() {
     assert_eq!(matching, source);
 }
 
+#[test]
+fn all_types_test() {
+    let behaviour = Behaviour(vec![
+        vec![Tokens::String("( [1, 2, 3] , [a, b, c] )".to_string())],
+        vec![
+            Tokens::String("[ ".to_string()),
+            Tokens::Address,
+            Tokens::String(" = (a, true), ".to_string()),
+            Tokens::Address,
+            Tokens::String(" = (b, false) ]".to_string()),
+        ],
+        vec![Tokens::String("1, 2".to_string())],
+        vec![Tokens::String("array, of, strings".to_string())],
+        vec![Tokens::String("true, false, true".to_string())],
+        vec![Tokens::String("xyz".to_string())],
+        vec![Tokens::String("1, 2, 3".to_string())],
+        vec![Tokens::String("this is a string".to_string())],
+        vec![Tokens::String("true".to_string())],
+        vec![Tokens::String("x".to_string())],
+        vec![Tokens::String("5".to_string())],
+    ]);
+    let string = "( [1, 2, 3] , [a, b, c] )\n[ 0x231f0 = (a, true), 0x23200 = (b, false) ]\n1, 2\narray, of, strings\ntrue, false, true\nxyz\n1, 2, 3\nthis is a string\ntrue\nx\n5\n";
+    assert_eq!(behaviour, string);
+}
+
 #[rstest]
 #[case("static/basic")]
-// #[case("static/expressions")]
-// #[case("static/pairs")]
-// #[case("static/variables")]
-// #[case("static/if")]
-// #[case("static/array")]
-// #[case("static/function")]
-// #[case("static/runtimeErr")]
-// #[case("static/scope")]
+#[case("static/expressions")]
+#[case("static/pairs")]
+#[case("static/variables")]
+#[case("static/if")]
+#[case("static/array")]
+#[case("static/function")]
+#[case("static/runtimeErr")]
+#[case("static/scope")]
 #[case("static/sequence")]
 #[case("static/variables")]
-// #[case("static/while")]
+#[case("static/while")]
 fn examples_test(#[case] path: &str) {
     examples_dir_test(path).expect("Unable to test directory:");
 }
