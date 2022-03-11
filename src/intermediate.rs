@@ -584,7 +584,7 @@ impl BoolExpr {
             BoolExpr::NumEq(num_expr1, num_expr2) | BoolExpr::NumLt(num_expr1, num_expr2) => {
                 let size1 = num_expr1.validate(functions, vars, data_refs, const_eval)?;
                 let size2 = num_expr2.validate(functions, vars, data_refs, const_eval)?;
-                cond_result(size1 != size2)
+                cond_result(size1 == size2)
             }
             BoolExpr::PtrEq(ptr_expr1, ptr_expr2) => {
                 ptr_expr1.validate(functions, vars, data_refs, const_eval)?;

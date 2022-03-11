@@ -9,13 +9,12 @@
 //!
 //! Uses live ranges to determine when to spill values from registers.
 
+use crate::graph::Graph;
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
     fmt::Display,
 };
-
-use crate::graph::Graph;
 
 use super::{
     arm_graph_utils::{
@@ -130,8 +129,6 @@ impl AllocationState {
         for reg in 0..(args.len().min(4)) {
             registers[reg] = Alloc::Temp(args[reg])
         }
-        println!("---------------------------------");
-        println!("{:?}", args);
 
         // now put all other arguments onto the stack. These will be just
         // before the stack pointer in reverse order (were pushed and popped)
@@ -173,7 +170,6 @@ impl AllocationState {
             simple_node(Stat::Nop, graph)
         };
 
-        println!("alloc state after call \n{}", new_state);
         (new_state, chain)
     }
 
@@ -286,6 +282,7 @@ impl AllocationState {
         graph: &mut Graph<ControlFlow>,
     ) -> Chain {
         let sp_offset = self.get_alloc_sp_offset(alloc);
+        // println!("memop {}, Alloc: {:?}, sp_disp: {}, SP_Offset: {}",memop, alloc, self.sp_displacement, sp_offset);
 
         if -4095 <= sp_offset && sp_offset <= 4095 {
             // we can use a stack pointer offset to get the temporary
@@ -889,7 +886,6 @@ impl AllocationState {
                 }
             }
         }
-
         link_optional_chains(chain)
     }
 
