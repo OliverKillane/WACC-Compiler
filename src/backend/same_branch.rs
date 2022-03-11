@@ -2,6 +2,8 @@ use super::three_code::*;
 use crate::graph::Deleted;
 use std::collections::{HashMap, HashSet, LinkedList};
 
+/// Assuming the mapping is a relation, computes a finite closure on it.
+/// There should be no cycles in the mappings.
 fn map_closure(mapping: &mut HashMap<StatNode, StatNode>) {
     let mut visited = HashSet::new();
     let mapped_nodes = mapping.keys().cloned().collect::<LinkedList<_>>();
@@ -22,6 +24,8 @@ fn map_closure(mapping: &mut HashMap<StatNode, StatNode>) {
     }
 }
 
+/// Applies an optimization so that nodes pointing with both branches to the same
+/// successor node get removed.
 pub(super) fn same_branch_optimization(
     ThreeCode {
         functions,
