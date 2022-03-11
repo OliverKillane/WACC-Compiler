@@ -109,9 +109,6 @@ pub(super) enum StatType {
     Dummy(Vec<StatNode>),
     /// Simple data manipulaiton statement that has a superceding statement.
     Simple(Vec<StatNode>, StatCode, StatNode),
-    /// Data manipulation statement that is expected to finish the execution one
-    /// way or another.
-    Final(Vec<StatNode>, StatCode),
     /// A simple branch instruction that checks if the value in the variable is
     /// a boolean 1 or a 0.
     Branch(Vec<StatNode>, VarRepr, StatNode, StatNode),
@@ -163,11 +160,6 @@ pub(super) struct ThreeCode {
 }
 
 impl StatType {
-    /// Creates a new final statement with an empty list of incoming nodes.
-    fn new_final(stat_code: StatCode) -> Self {
-        StatType::Final(vec![], stat_code)
-    }
-
     /// Creates a new simple statement with an empty list of incoming nodes.
     fn new_simple(stat_code: StatCode, next: StatNode) -> Self {
         StatType::Simple(vec![], stat_code, next)
@@ -192,7 +184,6 @@ impl StatType {
     fn add_incoming(&mut self, node: StatNode) {
         match self {
             Self::Simple(incoming, _, _)
-            | Self::Final(incoming, _)
             | Self::Branch(incoming, _, _, _)
             | Self::Loop(incoming)
             | Self::Return(incoming, _)
@@ -204,7 +195,6 @@ impl StatType {
     fn set_incoming(&mut self, incoming: Vec<StatNode>) {
         match self {
             Self::Simple(old_incoming, _, _)
-            | Self::Final(old_incoming, _)
             | Self::Branch(old_incoming, _, _, _)
             | Self::Loop(old_incoming)
             | Self::Return(old_incoming, _)
@@ -216,7 +206,6 @@ impl StatType {
     fn incoming(&self) -> Vec<StatNode> {
         match self {
             Self::Simple(incoming, _, _)
-            | Self::Final(incoming, _)
             | Self::Branch(incoming, _, _, _)
             | Self::Loop(incoming)
             | Self::Return(incoming, _)
@@ -224,16 +213,20 @@ impl StatType {
         }
     }
 
-    /// If a node is final, converts it to a simple node with the next node as
-    /// the given node.
-    fn append(&mut self, node: StatNode) {
+    /// If a node is a simple node, sets
+    /// the next node as the given node and returns the old next node for removal.
+    fn append(&mut self, next_node: StatNode) -> StatNode {
         let mut tmp_node = Self::deleted();
         mem::swap(self, &mut tmp_node);
-        tmp_node = match tmp_node {
-            Self::Final(incoming, stat_code) => Self::Simple(incoming, stat_code, node),
-            _ => panic!("Node not final"),
-        };
+        let (incoming, stat_code, old_next_node) =
+            if let Self::Simple(incoming, stat_code, old_next_node) = tmp_node {
+                (incoming, stat_code, old_next_node)
+            } else {
+                panic!("Expected a simple node")
+            };
+        let mut tmp_node = Self::Simple(incoming, stat_code, next_node);
         mem::swap(self, &mut tmp_node);
+        old_next_node
     }
 }
 
@@ -259,11 +252,6 @@ impl Debug for StatType {
                 .field(&hashed_array(incoming))
                 .field(stat_code)
                 .field(&hashed(next_node))
-                .finish(),
-            Self::Final(incoming, stat_code) => f
-                .debug_tuple("Final")
-                .field(&hashed_array(incoming))
-                .field(stat_code)
                 .finish(),
             Self::Branch(incoming, var, true_node, false_node) => f
                 .debug_tuple("Branch")
@@ -291,6 +279,26 @@ impl Deleted for StatType {
     }
 }
 
+impl ThreeCode {
+    /// Makes sure there are no left-over dummy nodes in the graph
+    pub(super) fn check_dummy(&self) -> Result<(), ()> {
+        let Self {
+            functions: _,
+            data_refs: _,
+            graph,
+            read_ref: _,
+            code: _,
+            int_handler: _,
+        } = self;
+        for node in graph {
+            if let StatType::Dummy(_) = &*node.get() {
+                return Err(());
+            }
+        }
+        Ok(())
+    }
+}
+
 /// A line-like graph with a single start and end node.
 #[derive(Clone)]
 pub(self) enum StatLine {
@@ -310,11 +318,12 @@ impl StatLine {
 
     /// Appends the given statement into the statement line.
     fn add_stat(&mut self, stat_code: StatCode) {
-        self.add_node(
-            self.graph()
-                .borrow_mut()
-                .new_node(StatType::new_final(stat_code)),
-        );
+        let dummy_node = self.graph().borrow_mut().new_node(StatType::deleted());
+        let new_node = self
+            .graph()
+            .borrow_mut()
+            .new_node(StatType::new_simple(stat_code, dummy_node));
+        self.add_node(new_node);
     }
 
     /// Appends the given node into the statement line. Assumes that it is a
@@ -332,7 +341,9 @@ impl StatLine {
                 graph,
             } => {
                 new_node.get_mut().add_incoming(end_node.clone());
-                end_node.get_mut().append(new_node.clone());
+                graph
+                    .borrow_mut()
+                    .remove_node(end_node.get_mut().append(new_node.clone()));
                 Self::Line {
                     start_node,
                     end_node: new_node,
@@ -471,6 +482,8 @@ fn translate_block(
                 options,
             );
             stat_line.add_stat(StatCode::VoidCall("exit".to_string(), vec![free_var]));
+            let return_node = stat_graph.borrow_mut().new_node(StatType::new_return(None));
+            stat_line.add_node(return_node);
             (vec![], None)
         }
         ir::BlockEnding::Return(expr) => {
@@ -483,20 +496,21 @@ fn translate_block(
                     function_types,
                     options,
                 );
-                stat_line.add_node(
-                    stat_graph
-                        .borrow_mut()
-                        .new_node(StatType::new_return(Some(free_var))),
-                );
+                let return_node = stat_graph
+                    .borrow_mut()
+                    .new_node(StatType::new_return(Some(free_var)));
+                stat_line.add_node(return_node);
             } else {
-                stat_line.add_node(stat_graph.borrow_mut().new_node(StatType::new_return(None)));
+                let return_node = stat_graph.borrow_mut().new_node(StatType::new_return(None));
+                stat_line.add_node(return_node);
             }
             (vec![], None)
         }
         ir::BlockEnding::CondJumps(conds, last) => {
             let mut outputs = vec![];
             outputs.reserve_exact(conds.len());
-            stat_line.add_node(stat_graph.borrow_mut().new_node(StatType::deleted()));
+            let dummy_node = stat_graph.borrow_mut().new_node(StatType::deleted());
+            stat_line.add_node(dummy_node);
 
             for (bool_expr, block_id) in conds {
                 let mut bool_stat_line = StatLine::new(stat_graph.clone());
@@ -545,7 +559,8 @@ fn translate_block(
             let else_output = match &end_node.get_mut().incoming()[..] {
                 [] => {
                     stat_line = StatLine::new(stat_graph.clone());
-                    stat_line.add_node(stat_graph.borrow_mut().new_node(StatType::new_loop()));
+                    let loop_node = stat_graph.borrow_mut().new_node(StatType::new_loop());
+                    stat_line.add_node(loop_node);
                     None
                 }
                 [last_node] => Some(last_node.clone()),
@@ -949,10 +964,11 @@ mod tests {
         let mut graph = Rc::try_unwrap(graph)
             .expect("Multiple references to the graph")
             .into_inner();
-        let exit_node = graph.new_node(StatType::new_final(StatCode::VoidCall(
-            "exit".to_string(),
-            vec![1],
-        )));
+        let return_node = graph.new_node(StatType::new_return(None));
+        let exit_node = graph.new_node(StatType::new_simple(
+            StatCode::VoidCall("exit".to_string(), vec![1]),
+            return_node,
+        ));
         let exit_set_node = graph.new_node(StatType::new_simple(
             StatCode::Assign(1, OpSrc::Const(0)),
             exit_node,
@@ -1223,10 +1239,11 @@ mod tests {
         assert!(!read_ref);
 
         let mut graph = Graph::new();
-        let exit_node = graph.new_node(StatType::new_final(StatCode::VoidCall(
-            "exit".to_string(),
-            vec![0],
-        )));
+        let return_node = graph.new_node(StatType::new_return(None));
+        let exit_node = graph.new_node(StatType::new_simple(
+            StatCode::VoidCall("exit".to_string(), vec![0]),
+            return_node,
+        ));
         let exit_assign_node = graph.new_node(StatType::new_simple(
             StatCode::Assign(0, OpSrc::Const(0)),
             exit_node,

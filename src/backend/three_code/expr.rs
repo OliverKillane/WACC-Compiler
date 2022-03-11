@@ -516,7 +516,7 @@ mod tests {
                 };
             node = next_node;
         }
-        if let StatType::Final(_, node_stat_code) = node.get().deref() {
+        if let StatType::Simple(_, node_stat_code, _) = node.get().deref() {
             assert_eq!(
                 *node_stat_code,
                 stats.next().expect("More statements than expected")
