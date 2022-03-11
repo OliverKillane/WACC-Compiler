@@ -203,11 +203,11 @@ fn substitute_vars(
 }
 
 /// Returns the name of the function being called in a node, provided one exists.
-fn get_call_name(node: &StatNode) -> Option<String> {
+fn get_call_name(node: &StatNode, functions: &HashMap<String, Function>) -> Option<String> {
     if let StatType::Simple(_, StatCode::VoidCall(fname, _) | StatCode::Call(_, fname, _), _) =
-        node.get().clone()
+        &*node.get() && functions.contains_key(fname.as_str())
     {
-        Some(fname)
+        Some(fname.clone())
     } else {
         None
     }
@@ -223,6 +223,8 @@ fn inline_code_dfs(
     assigned_var: Option<VarRepr>,
     new_variable: &mut VarRepr,
     variable_mappings: &mut HashMap<VarRepr, VarRepr>,
+    functions: &HashMap<String, Function>,
+    sccs_group: Rc<HashSet<&str>>,
 ) -> StatNode {
     if mappings.contains_key(node) {
         return mappings[node].clone();
@@ -231,7 +233,7 @@ fn inline_code_dfs(
         StatType::Simple(_, stat_code, next_node) => {
             let new_node = new_graph.new_node(StatType::deleted());
             mappings.insert(node.clone(), new_node.clone());
-            if get_call_name(node).is_some() {
+            if let Some(fname) = get_call_name(node, functions) && !sccs_group.contains(fname.as_str()) {
                 new_call_nodes.push_back(new_node.clone());
             }
             let next_node = inline_code_dfs(
@@ -243,6 +245,8 @@ fn inline_code_dfs(
                 assigned_var,
                 new_variable,
                 variable_mappings,
+                functions,
+                sccs_group,
             );
             next_node.get_mut().add_incoming(new_node.clone());
             let incoming = new_node.get().incoming();
@@ -265,6 +269,8 @@ fn inline_code_dfs(
                 assigned_var,
                 new_variable,
                 variable_mappings,
+                functions,
+                sccs_group.clone(),
             );
             let false_node = inline_code_dfs(
                 new_call_nodes,
@@ -275,6 +281,8 @@ fn inline_code_dfs(
                 assigned_var,
                 new_variable,
                 variable_mappings,
+                functions,
+                sccs_group,
             );
             true_node.get_mut().add_incoming(new_node.clone());
             false_node.get_mut().add_incoming(new_node.clone());
@@ -321,6 +329,8 @@ fn copy_code_dfs(
     new_graph: &mut Graph<StatType>,
     new_variable: &mut VarRepr,
     variable_mappings: &mut HashMap<VarRepr, VarRepr>,
+    functions: &HashMap<String, Function>,
+    sccs_group: Rc<HashSet<&str>>,
 ) -> (StatNode, f64) {
     if mappings.contains_key(node) {
         return (mappings[node].clone(), 0.0);
@@ -330,7 +340,7 @@ fn copy_code_dfs(
         StatType::Simple(_, stat_code, next_node) => {
             let new_node = new_graph.new_node(StatType::deleted());
             mappings.insert(node.clone(), new_node.clone());
-            if get_call_name(node).is_some() {
+            if let Some(fname) = get_call_name(node, functions) && !sccs_group.contains(fname.as_str()) {
                 new_call_nodes.push_back(new_node.clone());
             }
             let (next_node, instruction_sum) = copy_code_dfs(
@@ -340,6 +350,8 @@ fn copy_code_dfs(
                 new_graph,
                 new_variable,
                 variable_mappings,
+                functions,
+                sccs_group,
             );
             next_node.get_mut().add_incoming(new_node.clone());
             let incoming = new_node.get().incoming();
@@ -360,6 +372,8 @@ fn copy_code_dfs(
                 new_graph,
                 new_variable,
                 variable_mappings,
+                functions,
+                sccs_group.clone(),
             );
             let (false_node, false_instruction_sum) = copy_code_dfs(
                 new_call_nodes,
@@ -368,6 +382,8 @@ fn copy_code_dfs(
                 new_graph,
                 new_variable,
                 variable_mappings,
+                functions,
+                sccs_group,
             );
             true_node.get_mut().add_incoming(new_node.clone());
             false_node.get_mut().add_incoming(new_node.clone());
@@ -409,26 +425,31 @@ fn inline_graph(
     args: &Vec<VarRepr>,
     functions: &HashMap<String, Function>,
     function_instruction_counts: &HashMap<&str, usize>,
-    sccs_group: &HashSet<&str>,
+    sccs_group: Rc<HashSet<&str>>,
+    sccs_groups: &HashMap<&str, Rc<HashSet<&str>>>,
 ) -> (StatNode, Vec<VarRepr>) {
     let mut call_nodes = LinkedList::new();
     let mut main_variable_mappings = HashMap::new();
-    let (new_code, code_instruction_count) = copy_code_dfs(
+    let mut new_variable = 0;
+    let (mut new_code, code_instruction_count) = copy_code_dfs(
         &mut call_nodes,
         code,
         &mut HashMap::new(),
         new_graph,
-        &mut 0,
+        &mut new_variable,
         &mut main_variable_mappings,
+        functions,
+        sccs_group,
     );
-    let args = args.iter().map(|arg| main_variable_mappings[arg]).collect();
+    let args = args
+        .iter()
+        .map(|&arg| get_mapping(arg, &mut new_variable, &mut main_variable_mappings))
+        .collect();
     let mut code_instruction_count = code_instruction_count.ceil() as usize;
     while let Some(call_node) = call_nodes.pop_front() {
-        let fname = get_call_name(&call_node).expect("Not a call node");
+        let fname = get_call_name(&call_node, functions).expect("Not a call node");
         let function_instruction_count = function_instruction_counts[fname.as_str()];
-        if sccs_group.contains(fname.as_str())
-            || code_instruction_count + function_instruction_count > instructions_limit
-        {
+        if code_instruction_count + function_instruction_count > instructions_limit {
             continue;
         }
         code_instruction_count += function_instruction_count;
@@ -451,6 +472,7 @@ fn inline_graph(
             }
             _ => panic!("Not a call node"),
         };
+        call_successor.get_mut().set_incoming(vec![]);
         let Function {
             args: function_args,
             code: function_code,
@@ -471,27 +493,21 @@ fn inline_graph(
                     assigned_var,
                     &mut new_variable,
                     &mut variable_mappings,
+                    functions,
+                    sccs_groups[fname.as_str()].clone(),
                 )
             })
             .unwrap_or(call_successor);
-        call_node.set(new_call_node.set(StatType::deleted()));
-        for call_successor in call_node.get().successors() {
-            let successor_incoming = call_successor.get().incoming();
-            call_successor.get_mut().set_incoming(
-                successor_incoming
-                    .into_iter()
-                    .map(|successor_incoming_node| {
-                        if successor_incoming_node == new_call_node {
-                            call_node.clone()
-                        } else {
-                            successor_incoming_node
-                        }
-                    })
-                    .collect(),
-            );
+        for incoming_node in incoming {
+            incoming_node
+                .get_mut()
+                .substitute_child(&call_node, &new_call_node);
+            new_call_node.get_mut().add_incoming(incoming_node);
         }
-        new_graph.remove_node(new_call_node);
-        call_node.get_mut().set_incoming(incoming);
+        if new_code == call_node {
+            new_code = new_call_node;
+        }
+        new_graph.remove_node(call_node);
     }
     (new_code, args)
 }
@@ -537,12 +553,24 @@ pub(super) fn inline(
 
     let call_graph = function_statistics
         .iter()
-        .map(|(&fname, (_, calls))| (fname, calls.iter().map(String::as_str).collect()))
+        .map(|(&fname, (_, calls))| {
+            (
+                fname,
+                calls
+                    .iter()
+                    .map(String::as_str)
+                    .filter(|&call_fname| functions.contains_key(call_fname))
+                    .collect(),
+            )
+        })
         .collect::<HashMap<&str, Vec<&str>>>();
-    let mut transpose_call_graph: HashMap<_, Vec<_>> = HashMap::new();
+    let mut transpose_call_graph: HashMap<_, Vec<_>> = functions
+        .keys()
+        .map(|fname| (fname.as_str(), Vec::new()))
+        .collect();
     for (&fname, calls) in &call_graph {
         for &call in calls {
-            transpose_call_graph.entry(call).or_default().push(fname);
+            transpose_call_graph.get_mut(call).unwrap().push(fname);
         }
     }
     let sccs = get_function_sccs(&call_graph, &transpose_call_graph);
@@ -555,7 +583,8 @@ pub(super) fn inline(
         &vec![],
         &functions,
         &function_instruction_counts,
-        &HashSet::new(),
+        Rc::new(HashSet::new()),
+        &sccs,
     );
     let new_functions = functions
         .iter()
@@ -579,7 +608,8 @@ pub(super) fn inline(
                                 args,
                                 &functions,
                                 &function_instruction_counts,
-                                &sccs[fname.as_str()],
+                                sccs[fname.as_str()].clone(),
+                                &sccs,
                             );
                             Function {
                                 args,
@@ -597,6 +627,7 @@ pub(super) fn inline(
         )
         .collect();
     drop(graph);
+
     ThreeCode {
         functions: new_functions,
         data_refs,
