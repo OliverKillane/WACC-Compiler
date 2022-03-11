@@ -15,7 +15,7 @@ fn get_stat_size_heuristic(stat: &StatType) -> f64 {
         StatType::Return(_, _) => 4.0,
         StatType::Loop(_) => 1.0,
         StatType::Branch(_, _, _, _) => 1.2,
-        StatType::Simple(_, _, _) | StatType::Final(_, _) => 2.7,
+        StatType::Simple(_, _, _) => 2.7,
         StatType::Dummy(_) => panic!("Dummy nodes not expected at this point"),
     }
 }
@@ -29,8 +29,7 @@ fn get_function_statistics_dfs(
         return 0.0;
     }
     used.insert(node.clone());
-    if let StatType::Simple(_, StatCode::Call(_, fname, _) | StatCode::VoidCall(fname, _), _)
-    | StatType::Final(_, StatCode::Call(_, fname, _) | StatCode::VoidCall(fname, _)) =
+    if let StatType::Simple(_, StatCode::Call(_, fname, _) | StatCode::VoidCall(fname, _), _) =
         &*node.get()
     {
         calls.push(fname.clone());
@@ -44,7 +43,7 @@ fn get_function_statistics_dfs(
         StatType::Simple(_, _, next_node) => {
             total_sum += get_function_statistics_dfs(calls, next_node, used);
         }
-        StatType::Return(_, _) | StatType::Loop(_) | StatType::Final(_, _) => {}
+        StatType::Return(_, _) | StatType::Loop(_) => {}
         StatType::Dummy(_) => panic!("Dummy nodes not expected at this point"),
     };
     return total_sum;
@@ -77,7 +76,7 @@ fn get_function_sccs_dfs<'l>(
         return;
     }
     visited.insert(fname);
-    for &call in &call_graph[fname].0 {
+    for &call in &call_graph[fname] {
         get_function_sccs_dfs(post_order, fname, visited, call_graph);
     }
     post_order.push(fname);
@@ -94,7 +93,7 @@ fn get_function_sccs_scc<'l>(
     }
     visited.insert(fname);
     group.insert(fname);
-    for &call in &transpose_call_graph[fname].0 {
+    for &call in &transpose_call_graph[fname] {
         get_function_sccs_scc(group, fname, visited, transpose_call_graph);
     }
 }
@@ -182,36 +181,32 @@ fn inline_code_dfs(
     node: &StatNode,
     mappings: &mut HashMap<StatNode, StatNode>,
     new_graph: &mut Graph<StatType>,
-    call_successor: Option<StatNode>,
+    call_successor: StatNode,
     assigned_var: Option<VarRepr>,
     variable_mappings: &mut HashMap<VarRepr, VarRepr>,
-) -> Option<StatNode> {
+) -> StatNode {
     if mappings.contains_key(node) {
-        return Some(mappings[node].clone());
+        return mappings[node].clone();
     };
     match &*node.get() {
         StatType::Simple(_, stat_code, next_node) => {
             let new_node = new_graph.new_node(StatType::deleted());
             mappings.insert(node.clone(), new_node.clone());
-            if let Some(next_node) = inline_code_dfs(
+            let next_node = inline_code_dfs(
                 next_node,
                 mappings,
                 new_graph,
                 call_successor,
                 assigned_var,
                 variable_mappings,
-            ) {
-                next_node.get().add_incoming(new_node.clone());
-                let incoming = new_node.get().incoming();
-                new_node.set(StatType::Simple(
-                    incoming,
-                    substitute_vars(stat_code, variable_mappings),
-                    next_node,
-                ));
-            } else {
-                let incoming = new_node.get().incoming();
-                new_node.set(StatType::Final(incoming, substitute_vars(stat_code, variable_mappings)));
-            }
+            );
+            next_node.get().add_incoming(new_node.clone());
+            let incoming = new_node.get().incoming();
+            new_node.set(StatType::Simple(
+                incoming,
+                substitute_vars(stat_code, variable_mappings),
+                next_node,
+            ));
             new_node
         }
         StatType::Branch(_, var, true_node, false_node) => {
@@ -221,7 +216,7 @@ fn inline_code_dfs(
                 true_node,
                 mappings,
                 new_graph,
-                call_successor,
+                call_successor.clone(),
                 assigned_var,
                 variable_mappings,
             );
@@ -244,17 +239,23 @@ fn inline_code_dfs(
             ));
             new_node
         }
-        StatType::Loop(_) => {
-            new_graph.new_node(StatType::new_loop())
-        }
+        StatType::Loop(_) => new_graph.new_node(StatType::new_loop()),
         StatType::Return(_, var) => {
-            let stat_code = if let Some(assigned_var) = assigned_var {
-                StatCode::Assign(assigned_var, OpSrc::Var(get_mapping(*var, variable_mappings)))
+            if let (Some(assigned_var), Some(var)) = (assigned_var, var) {
+                let new_node = new_graph.new_node(StatType::new_simple(
+                    StatCode::Assign(
+                        assigned_var,
+                        OpSrc::Var(get_mapping(*var, variable_mappings)),
+                    ),
+                    call_successor,
+                ));
+                call_successor.get().add_incoming(new_node.clone());
+                new_node
             } else {
-                return call_successor
-            };
-            let new_node = new_graph.new_node(StatType::)
+                call_successor
+            }
         }
+        StatType::Dummy(_) => panic!("Dummy nodes not expected at this point"),
     }
 }
 
