@@ -63,11 +63,6 @@ fn get_function_statistics(
         read_ref: _,
     }: &Function,
 ) -> (f64, Vec<String>) {
-    let code = if let Some(code) = code {
-        code
-    } else {
-        return (0.0, vec![]);
-    };
     let mut calls = Vec::new();
     let total_sum = get_function_statistics_dfs(&mut calls, code, &mut HashSet::new());
     (total_sum, calls)
@@ -478,26 +473,22 @@ fn inline_graph(
             code: function_code,
             read_ref: _,
         } = &functions[&fname];
-        let new_call_node = function_code
-            .as_ref()
-            .map(|function_code| {
-                let mut variable_mappings =
-                    zip(function_args.iter().cloned(), call_args).collect::<HashMap<_, _>>();
-                let mut new_variable = variable_mappings.keys().cloned().max().unwrap_or_default();
-                inline_code_dfs(
-                    &mut call_nodes,
-                    function_code,
-                    &mut HashMap::new(),
-                    new_graph,
-                    call_successor.clone(),
-                    assigned_var,
-                    &mut new_variable,
-                    &mut variable_mappings,
-                    functions,
-                    sccs_groups[fname.as_str()].clone(),
-                )
-            })
-            .unwrap_or(call_successor);
+        let mut variable_mappings =
+            zip(function_args.iter().cloned(), call_args).collect::<HashMap<_, _>>();
+        let mut new_variable = variable_mappings.keys().cloned().max().unwrap_or_default();
+        let new_call_node = inline_code_dfs(
+            &mut call_nodes,
+            function_code,
+            &mut HashMap::new(),
+            new_graph,
+            call_successor.clone(),
+            assigned_var,
+            &mut new_variable,
+            &mut variable_mappings,
+            functions,
+            sccs_groups[fname.as_str()].clone(),
+        );
+
         for incoming_node in incoming {
             incoming_node
                 .get_mut()
@@ -527,18 +518,6 @@ pub(super) fn inline(
     }: ThreeCode,
     instructions_limit: usize,
 ) -> ThreeCode {
-    let code = if let Some(code) = code {
-        code
-    } else {
-        return ThreeCode {
-            functions: HashMap::new(),
-            data_refs: HashMap::new(),
-            graph: Graph::new(),
-            read_ref: false,
-            code: None,
-            int_handler: None,
-        };
-    };
     let function_statistics = functions
         .iter()
         .map(|(fname, function)| (fname.as_ref(), get_function_statistics(function)))
@@ -597,31 +576,23 @@ pub(super) fn inline(
                     read_ref,
                 },
             )| {
+                let (code, args) = inline_graph(
+                    code,
+                    &mut new_graph,
+                    instructions_limit,
+                    args,
+                    &functions,
+                    &function_instruction_counts,
+                    sccs[fname.as_str()].clone(),
+                    &sccs,
+                );
                 (
                     fname.clone(),
-                    code.as_ref()
-                        .map(|code| {
-                            let (code, args) = inline_graph(
-                                code,
-                                &mut new_graph,
-                                instructions_limit,
-                                args,
-                                &functions,
-                                &function_instruction_counts,
-                                sccs[fname.as_str()].clone(),
-                                &sccs,
-                            );
-                            Function {
-                                args,
-                                code: Some(code),
-                                read_ref: *read_ref,
-                            }
-                        })
-                        .unwrap_or(Function {
-                            args: args.clone(),
-                            code: None,
-                            read_ref: *read_ref,
-                        }),
+                    Function {
+                        args,
+                        code: code,
+                        read_ref: *read_ref,
+                    },
                 )
             },
         )
@@ -644,7 +615,7 @@ pub(super) fn inline(
         data_refs,
         graph: new_graph,
         read_ref,
-        code: Some(code),
+        code: code,
         int_handler,
     }
 }
