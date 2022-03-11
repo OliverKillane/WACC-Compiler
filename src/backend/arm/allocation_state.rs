@@ -7,7 +7,8 @@
 //!
 //! Generates register mappings for temporaries on a per-instruction basis
 //!
-//! Uses live ranges to determine when to spill values from registers.
+//! Uses 'instructions till use' associated with live ranges to determine when 
+//! to spill values from registers.
 
 use crate::graph::Graph;
 use std::{
@@ -133,7 +134,7 @@ impl AllocationState {
         // now put all other arguments onto the stack. These will be just
         // before the stack pointer in reverse order (were pushed and popped)
         for (arg_ind, temp) in args.iter().enumerate().skip(4) {
-            alloc_map.insert(Alloc::Temp(*temp), (args.len() - arg_ind) as i32);
+            alloc_map.insert(Alloc::Temp(*temp), arg_ind as i32 - args.len() as i32 + 1);
         }
 
         // Now push all temporaries to the map to fill the frame. If it is
@@ -714,7 +715,8 @@ impl AllocationState {
             }
         }
         // now the sp_displacement is not valid (is off by max(0, args.len() - 4)
-
+        let old_sp = self.sp_displacement;
+        self.sp_displacement += max(0, args.len() as i32 - 4);
         // free link register
         chains.push(self.link(graph));
 
@@ -745,6 +747,8 @@ impl AllocationState {
                 self.move_stack_pointer(max(args.len() as i32 - 4, 0), graph),
             ));
         }
+
+        self.sp_displacement = old_sp;
 
         link_optional_chains(chains).expect("Several statements are 'Some' so must have be a chain")
     }

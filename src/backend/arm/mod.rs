@@ -1,8 +1,25 @@
-//! Convert the three code graph representation into an arm representation that
-//! is writable to a file.
-//!
-//! Optionally produces a string of the translated (but still containing
-//! temporary identifiers) assembly graph.
+//! Translate the [threecode](ThreeCode) representation of the program into 
+//! valid arm assembly.
+//! 
+//! Translation occurs in five stages:
+//! 1. Threecode is translated to arm representation with special nodes (call, 
+//!    return), and all registers as temporary identifiers.
+//! 2. Live range analysis is performed on the arm with temporaries, to get 
+//!    livein & liveout for all nodes, as well as the 'instructions till next use'
+//!    for each temporary to use in spilling.
+//! 3. The arm representation has register allocated (all temporaries replaced), 
+//!    all spilling/sipping from the stack frame is performed and special instructions
+//!    (call, return etc) are translated into series of arm instructions.
+//! 4. Apply peephole optimisations (removing self moves).
+//! 5. The final arm representation is traversed, and converted from a graph to a 
+//!    linear representation in text. Labels are added before nodes appropriately.
+//! 
+//! This approach allows for efficient register allocation, without having to do 
+//! full graph colouring. And allows for further analysis on the arm assembly as 
+//! a graph (e.g for peephole optimisations).
+//! 
+//! Furthermore every stage of this process is printable (temporaries, final 
+//! arm, and between), which makes it significantly easier to debug.
 
 use self::{
     peephole_opts::remove_self_moves, register_allocation::allocate_registers,

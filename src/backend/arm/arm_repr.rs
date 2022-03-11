@@ -6,9 +6,11 @@
 //! - A subset of arm [Statements](Stat) are contained in simple (1/0 in, 1/0
 //!   out) nodes. While many instruction options are not used by the current
 //!   implementation, it allows for extension.
-//! - Labels are used for nodes jumped to by more than one other node.
-//!
-//!
+//! - Multis are used for nodes jumped to by more than one node, they become 
+//!   labels in the assembly (as do some other nodes)
+//! - Some special nodes are considered (e.g return) which are converted into 
+//! many arm instructions during register allocation.
+
 use super::int_constraints::ConstrainedInt;
 use crate::graph::{Deleted, Graph, NodeRef};
 use std::collections::{HashMap, HashSet};

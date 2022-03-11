@@ -438,6 +438,9 @@ impl Display for DataType {
                         '\n' => write!(f, "\\n")?,
                         '\t' => write!(f, "\\t")?,
                         '"' => write!(f, "\\\"")?,
+                        '\r' => write!(f, "\\r")?,
+                        '\u{0008}' => write!(f, "\\b")?,
+                        '\u{0012}' => write!(f, "\\f")?,
                         c => write!(f, "{}", c)?,
                     }
                 }

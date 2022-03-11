@@ -7,7 +7,8 @@ use super::{
 };
 use std::ops::DerefMut;
 
-/// Remove all move instructions that are of form Mov Rn, Rn.
+/// Remove all redundant move instructions that are of form `Mov Rn, Rn` by 
+/// connecting the predecessor and successor nodes together.
 pub fn remove_self_moves(program: ArmCode) -> ArmCode {
     for node in program.cfg.iter() {
         if let ControlFlow::Simple(

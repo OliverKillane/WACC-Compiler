@@ -3,6 +3,9 @@
 //!
 //! An allocation state is used to keep track of register usage, and
 //! create/maintain the stack frame.
+//! 
+//! Register allocation makes use of live ranges to determine when temporaries 
+//! 'die' and hence free up registers.
 
 use super::{
     allocation_state::AllocationState,
