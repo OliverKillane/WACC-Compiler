@@ -203,11 +203,11 @@ fn substitute_vars(
 }
 
 /// Returns the name of the function being called in a node, provided one exists.
-fn get_call_name(node: &StatNode) -> Option<&str> {
+fn get_call_name(node: &StatNode) -> Option<String> {
     if let StatType::Simple(_, StatCode::VoidCall(fname, _) | StatCode::Call(_, fname, _), _) =
-        &*node.get()
+        node.get().clone()
     {
-        Some(fname.as_str())
+        Some(fname)
     } else {
         None
     }
@@ -425,8 +425,8 @@ fn inline_graph(
     let mut code_instruction_count = code_instruction_count.ceil() as usize;
     while let Some(call_node) = call_nodes.pop_front() {
         let fname = get_call_name(&call_node).expect("Not a call node");
-        let function_instruction_count = function_instruction_counts[fname];
-        if sccs_group.contains(fname)
+        let function_instruction_count = function_instruction_counts[fname.as_str()];
+        if sccs_group.contains(fname.as_str())
             || code_instruction_count + function_instruction_count > instructions_limit
         {
             continue;
