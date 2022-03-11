@@ -1,0 +1,15 @@
+# a simple function with two back-to-back returns at the end.
+
+# Output:
+# 3
+
+# Program:
+
+begin
+    int f() is 
+        return 3;
+        return 5
+    end
+    int ret = call f();
+    println ret
+end

@@ -1,0 +1,10 @@
+# simple print statement off a string with a backspace character
+
+# Output:
+# Hell World!
+
+# Program:
+
+begin  
+  print "Hello\b World!\n"
+end

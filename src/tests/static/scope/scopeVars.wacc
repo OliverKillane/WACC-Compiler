@@ -1,0 +1,19 @@
+# simple variable scoping test
+
+# Output:
+# 2
+# 4
+# 2
+
+# Program:
+
+begin
+  int x = 2 ;
+  println x ;
+  begin
+    int x = 4 ;
+    println x
+  end ;
+  println x 
+end
+

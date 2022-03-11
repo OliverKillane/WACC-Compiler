@@ -1,0 +1,24 @@
+# iterative calculation of the first 20 fibonacci numbers
+
+# Output:
+# The first 20 fibonacci numbers are:
+# 0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181, ...
+
+# Program:
+
+begin
+  int i = 0 ;
+  int f0 = 0 ;
+  int f1 = 1 ;
+  int save = 0;
+  println "The first 20 fibonacci numbers are:" ;
+  while i < 20 do
+    print f0 ;
+    print ", " ;
+    save = f0 ;
+    f0 = f1 ;
+    f1 = save + f1 ;
+    i = i + 1
+  done ;
+  println "..."
+end

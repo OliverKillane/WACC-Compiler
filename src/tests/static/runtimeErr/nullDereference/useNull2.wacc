@@ -1,0 +1,14 @@
+# attempt dereference of a null pair by using it
+
+# Output:
+# #runtime_error#
+
+# Exit:
+# 255
+
+# Program:
+
+begin
+	pair(int, int) p = null ;
+	int x = snd p
+end

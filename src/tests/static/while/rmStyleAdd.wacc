@@ -1,0 +1,23 @@
+# register machine style addition
+
+# Output:
+# initial value of x: 3
+# (+)(+)(+)(+)(+)(+)(+)
+# final value of x: 10
+
+# Program:
+
+begin
+  int x = 3 ;
+  int y = 7 ;
+  print "initial value of x: " ;
+  println x ;
+  while y > 0 do
+    print "(+)" ;
+    x = x + 1 ;
+    y = y - 1
+  done ;
+  println "" ;
+  print "final value of x: " ;
+  println x
+end
