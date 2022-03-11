@@ -1,0 +1,191 @@
+################ MATH FUNCTION LIBRARY ################
+
+begin
+
+    # Returns the minimum between num1 and num2
+    int min(int num1, int num2) is
+        if (num1 <= num2) then
+            return num1
+        else
+            return num2
+        fi
+    end
+
+    # Returns the maximum between num1 and num2
+    int max(int num1, int num2) is
+        if (num1 >= num2) then
+            return num1
+        else
+            return num2
+        fi
+    end
+
+    # Returns the absolute value of the given num
+    int abs(int num) is
+        if (num >= 0) then
+            return num
+        else 
+            return (- num)
+        fi
+    end
+
+    # Returns the value equal to the base raised to the exp
+    int pow(int base, int exp) is
+        if (base < 0 || exp < 0) then
+            print "Any or both of the given base ( " ;
+            print base ;
+            print " ) or the given exponent ( " ;
+            print exp ;
+            println " ) are negative!" ;
+            exit 255
+        else
+            if exp == 0 then
+                return 1
+            else
+                int temp = call pow(base, exp / 2) ; 
+                if (exp % 2 == 0) then
+                return temp * temp
+                else 
+                    return base * temp * temp
+                fi
+            fi
+        fi
+    end
+
+    # Provides the floored int square root of the given num
+    int floor_sqrt(int num) is
+        if (num < 0) then
+            print "The given number ( " ;
+            print num ;
+            println " ) whose floored square root were to be calculated is not positive!" ;
+            exit 255
+        else
+            if (num == 0 || num == 1) then
+                return num
+            else
+                int i = 1 ;
+                int temp = 1 ;
+                while (temp  <= num) do
+                    i = i + 1 ;
+                    temp = call pow(i, 2)
+                done ;
+                return i - 1
+            fi
+        fi
+    end
+
+    # Returns the floored log2 of the given num
+    int floor_log2(int num) is
+        if (num <= 0) then
+            print "The given number ( " ;
+            print num ;
+            println " ) whose floored log2 were to be calculated is not positive!" ;
+            exit 255
+        else
+            int hi = 0 ;
+            int temp_hi = call pow(2, hi) ;
+
+            while (temp_hi < num) do
+                hi = hi + 1 ;
+                temp_hi = call pow(2, hi)
+            done ;
+
+            if (temp_hi == num) then
+                return hi
+            else
+                int lo = hi - 1 ;
+                int l_bound = call pow(2, lo) ;
+                int r_bound = call pow(2, hi) ;
+                int temp_diff = call abs(l_bound - num) ;
+
+                int prev_mid_val = call floor_sqrt(l_bound * r_bound) ;
+                bool first = true ;
+
+                while (temp_diff >= 1) do
+                    int mid = (lo + hi) / 2 ;
+                    int mid_val = call floor_sqrt(l_bound * r_bound) ;
+                    if (mid_val > num) then
+                        hi = mid ;
+                        if (first == true) then
+                            r_bound = mid_val
+                        else
+                            if (prev_mid_val == mid_val) then
+                                r_bound = mid_val - 1
+                            else 
+                                r_bound = mid_val
+                            fi
+                        fi
+                    else
+                        lo = mid ;
+                        if (first == true) then
+                            l_bound = mid_val
+                        else
+                            if (prev_mid_val == mid_val) then
+                                l_bound = mid_val + 1
+                            else 
+                                l_bound = mid_val
+                            fi
+                        fi
+                    fi ;
+                    temp_diff = call abs(l_bound - num) ;
+                    prev_mid_val = mid_val ;
+                    first = false 
+                done ;
+
+                return lo
+            fi
+        fi
+    end
+
+    # Returns the sign of the sine trigonometric function for the given angle (in degrees)
+    int sin_sign(int angle) is
+        if (angle >= 0) then
+            angle = angle % 360
+        else
+            angle = 360 + (angle % 360)
+        fi ;
+        if (angle == 0 || angle == 180) then
+            return 0
+        else
+            if (angle > 0 && angle < 180) then
+                return 1
+            else
+                return (- 1)
+            fi
+        fi
+    end
+
+    # Returns the sign of the cosine trigonometric function for the given angle (in degrees)
+    int cos_sign(int angle) is
+        if (angle >= 0) then
+            angle = angle % 360
+        else
+            angle = 360 + (angle % 360)
+        fi ;
+        if (angle == 90 || angle == 270) then
+            return 0
+        else
+            if (angle > 270 || angle < 90) then
+                return 1
+            else
+                return (- 1)
+            fi
+        fi
+    end
+
+    # Returns the sign of the tangent trigonometric function for the given angle (in degrees)
+    int tan_sign(int angle) is
+        int sin_sign = call sin_sign(angle) ;
+        int cos_sign = call cos_sign(angle) ;
+        if (cos_sign == 0) then
+            print "The tangent trigonometric function is undefined for " ;
+            print angle ;
+            println " degrees!" ;
+            exit 255
+        else 
+            return sin_sign / cos_sign
+        fi
+    end
+    
+    skip
+end
