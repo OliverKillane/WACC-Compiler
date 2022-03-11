@@ -1,0 +1,10 @@
+# simple zero integer variable declaration
+
+# Output:
+# #empty#
+
+# Program:
+
+begin
+  int x = 0
+end

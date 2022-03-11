@@ -1,0 +1,16 @@
+# evaluating equality and boolean operator precedence
+
+# Output:
+# true
+# false
+
+# Program:
+
+begin
+  bool p = true ;
+  bool q = true ;
+  bool r = false ;
+  bool s = true ;
+  println p && q != r || s ;
+  println (p && q) != (r || s)
+end

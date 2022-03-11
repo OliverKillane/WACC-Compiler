@@ -1,0 +1,10 @@
+# create a pair (char, char)
+
+# Output:
+# #empty#
+
+# Program:
+
+begin
+  pair(char, char) p = newpair('a', 'b')
+end

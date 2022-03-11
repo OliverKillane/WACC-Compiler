@@ -1,0 +1,11 @@
+# basic sequential composition
+
+# Output:
+# #empty#
+
+# Program:
+
+begin 
+  skip;
+  skip 
+end

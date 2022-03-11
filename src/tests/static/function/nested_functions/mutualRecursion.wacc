@@ -1,0 +1,45 @@
+# a pair of mutually recursive functions
+
+# Output:
+# r1: sending 8
+# r2: received 8
+# r1: sending 7
+# r2: received 7
+# r1: sending 6
+# r2: received 6
+# r1: sending 5
+# r2: received 5
+# r1: sending 4
+# r2: received 4
+# r1: sending 3
+# r2: received 3
+# r1: sending 2
+# r2: received 2
+# r1: sending 1
+# r2: received 1
+
+# Program:
+
+begin
+  int r1(int x) is
+    if x == 0 
+    then
+      skip
+    else
+      print "r1: sending " ;
+      println x ;
+      int y = call r2(x)
+    fi ;
+    return 42  
+  end
+
+  int r2(int y) is
+    print "r2: received " ;
+    println y ;
+    int z = call r1(y - 1) ; 
+    return 44
+  end
+
+  int x = 0 ;
+  x = call r1(8)
+end
