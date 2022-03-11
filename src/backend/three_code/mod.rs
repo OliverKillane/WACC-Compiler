@@ -1073,7 +1073,16 @@ mod tests {
             StatCode::Assign(1, OpSrc::Var(0)),
             return_node,
         ));
-        let branch2_node = graph.new_node(StatType::new_branch(1, return_assign_node, loop_node));
+        let branch3_node = graph.new_node(StatType::new_branch(1, loop_node.clone(), loop_node));
+        let branch3_cond_set_node = graph.new_node(StatType::new_simple(
+            StatCode::Assign(1, OpSrc::Const(1)),
+            branch3_node,
+        ));
+        let branch2_node = graph.new_node(StatType::new_branch(
+            1,
+            return_assign_node,
+            branch3_cond_set_node,
+        ));
         let branch2_cond_set_node = graph.new_node(StatType::new_simple(
             StatCode::Assign(1, OpSrc::Var(0)),
             branch2_node,
