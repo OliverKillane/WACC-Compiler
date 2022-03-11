@@ -189,17 +189,17 @@ fn behaviour_comparison() {
 
 #[rstest]
 #[case("static/basic")]
-// #[case("static/expressions")]
-// #[case("static/pairs")]
-// #[case("static/variables")]
-// #[case("static/if")]
-// #[case("static/array")]
-// #[case("static/function")]
-// #[case("static/runtimeErr")]
-// #[case("static/scope")]
+#[case("static/expressions")]
+#[case("static/pairs")]
+#[case("static/variables")]
+#[case("static/if")]
+#[case("static/array")]
+#[case("static/function")]
+#[case("static/runtimeErr")]
+#[case("static/scope")]
 #[case("static/sequence")]
 #[case("static/variables")]
-// #[case("static/while")]
+#[case("static/while")]
 fn examples_test(#[case] path: &str) {
     examples_dir_test(path).expect("Unable to test directory:");
 }
