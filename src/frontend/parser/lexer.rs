@@ -19,11 +19,11 @@ lazy_static! {
 use core::fmt;
 use nom::{
     branch::alt,
-    bytes::complete::{is_not},
+    bytes::complete::is_not,
     character::complete::{alpha1, alphanumeric1, char, digit1, multispace1, none_of, one_of},
     combinator::{map, map_res, not, opt, recognize},
     multi::many0,
-    sequence::{delimited, pair, terminated, preceded},
+    sequence::{delimited, pair, preceded, terminated},
     IResult, Parser,
 };
 use nom_supreme::{error::ErrorTree, tag::complete::tag, ParserExt};
@@ -304,11 +304,17 @@ pub fn parse_int(input: &str) -> IResult<&str, i32, ErrorTree<&str>> {
 pub fn str_delimited<'a>(
     del: &'static str,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, String, ErrorTree<&str>> {
-    ws(map(delimited(
-        tag(del),
+    ws(map(
+        delimited(
+            tag(del),
             // escaped(none_of("\\\'\""), '\\', one_of("'0nt\"b\\rf\'").cut()),
-            many0(alt((none_of("\\\'\""), preceded(char('\\'), one_of("'0nt\"b\\rf\'")))))
-        .cut(),
-        tag(del).cut()), |s| s.into_iter().collect::<String>()),
-    )
+            many0(alt((
+                none_of("\\\'\""),
+                preceded(char('\\'), one_of("'0nt\"b\\rf\'")),
+            )))
+            .cut(),
+            tag(del).cut(),
+        ),
+        |s| s.into_iter().collect::<String>(),
+    ))
 }

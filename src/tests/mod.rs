@@ -1,6 +1,7 @@
 #![cfg(test)]
 
-use crate::{frontend::{analyse, gather_modules}};
+use crate::backend::{compile, Options, PropagationOpt};
+use crate::frontend::{analyse, gather_modules};
 use glob::glob;
 use lazy_static::lazy_static;
 use nom::{
@@ -16,12 +17,10 @@ use rstest::rstest;
 use std::{
     fs::{create_dir_all, read_to_string, write},
     io::prelude::*,
+    path::Path,
     process::Stdio,
-    sync::atomic::AtomicUsize, path::Path,
+    sync::atomic::AtomicUsize,
 };
-use crate::backend::{compile, Options, PropagationOpt};
-
-
 
 const FILE_FAILURE: i32 = 1;
 
@@ -144,12 +143,7 @@ lazy_static! {
     static ref FILE_SYSTEM_ID: AtomicUsize = AtomicUsize::new(0);
 }
 
-fn compiler_test(
-    filename: &str,
-    input: String,
-    output: Behaviour,
-    _exit_code: Option<i32>,
-) {
+fn compiler_test(filename: &str, input: String, output: Behaviour, _exit_code: Option<i32>) {
     let (main_file, module_files) = gather_modules(Path::new(filename)).unwrap();
 
     let options = Options {
@@ -164,7 +158,11 @@ fn compiler_test(
         common_expressions: false,
         show_arm_temp_rep: false,
     };
-    let assembly = compile(analyse(&main_file, module_files.iter().collect()).unwrap(), options).assembly;
+    let assembly = compile(
+        analyse(&main_file, module_files.iter().collect()).unwrap(),
+        options,
+    )
+    .assembly;
 
     let file_id = FILE_SYSTEM_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
@@ -181,7 +179,6 @@ fn compiler_test(
         ])
         .output()
         .expect("Unable to run program");
-
 
     assert!(stdout.status.success());
 
@@ -202,7 +199,8 @@ fn compiler_test(
         stdin
             .write_all(input.as_bytes())
             .expect("Failed to write to stdin");
-    }).join();
+    })
+    .join();
 
     let stdout = dbg!(child.wait_with_output().expect("Failed to read stdout"));
 

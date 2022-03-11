@@ -669,7 +669,7 @@ fn parse_expr_atom(input: &str) -> IResult<&str, Expr<&str, &str>, ErrorTree<&st
         })
         .context("Char Literal"),
         map(parse_int, Expr::Int),
-        map(str_delimited("\""), |s| Expr::String(s.to_string())).context("String Literal"),
+        map(str_delimited("\""), Expr::String).context("String Literal"),
         map(
             pair(parse_ident, opt(parse_array_elem)),
             |(id, arr)| match arr {
