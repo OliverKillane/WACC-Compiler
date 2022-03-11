@@ -70,11 +70,6 @@ fn process_component(filepath: PathBuf) -> Result<(InputFile, Vec<PathBuf>), Gat
         GatherModulesError::InvalidModDecl(filepath.to_owned(), line, column)
     })?;
     let (remaining_start_idx, _) = contents_locator.get_range(remaining);
-    println!(
-        "remaining idx {}, len {}",
-        remaining_start_idx,
-        contents.len()
-    );
     Ok((
         InputFile {
             filepath,

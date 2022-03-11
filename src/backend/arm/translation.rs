@@ -724,7 +724,7 @@ fn translate_statcode(
                 {
                     simple_node(
                         Stat::Call(
-                            String::from("__aeabi_idivmod"),
+                            String::from("__modsi3"),
                             Some(arm_dst_temp.get_temp()),
                             vec![left_reg.get_temp(), right_reg.get_temp()],
                         ),
