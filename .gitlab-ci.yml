@@ -23,7 +23,16 @@ test:
   stage: test
   script:
     - echo "Testing the compiler..."
+    - cargo test --verbose -- --skip tests::examples_test
+
+test-master:
+  stage: test
+  script:
+    - echo "Testing the compiler..."
+    - apt-get update && apt-get -y install qemu-user-static gcc-arm-linux-gnueabi
     - cargo test --verbose
+  only:
+    - master
 
 formatter:
   stage: lint
