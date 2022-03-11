@@ -127,7 +127,7 @@ pub(super) struct Function {
     /// Variables for function argumetns
     pub args: Vec<VarRepr>,
     /// First statement of the program
-    pub code: Option<StatNode>,
+    pub code: StatNode,
     /// Whether a [read ref operand source](OpSrc::ReadRef) is used in the function code
     pub read_ref: bool,
 }
@@ -153,7 +153,7 @@ pub(super) struct ThreeCode {
     /// Whether a [read ref operand source](OpSrc::ReadRef) is used in the main program code
     pub read_ref: bool,
     /// First statement of the program
-    pub code: Option<StatNode>,
+    pub code: StatNode,
     /// Function to call as an int overflow/underflow handler for checking for
     /// 32-bit overflows.
     pub int_handler: Option<String>,
@@ -677,7 +677,7 @@ fn translate_block_graph(
     vars: &HashMap<VarRepr, ir::Type>,
     function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
-) -> Option<StatNode> {
+) -> StatNode {
     clean_up_block_graph(&mut block_graph);
 
     let (start_nodes, block_cond_nodes): (Vec<_>, Vec<_>) = block_graph
@@ -748,7 +748,10 @@ fn translate_block_graph(
         }
     }
 
-    start_nodes.into_iter().next()
+    start_nodes
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| stat_graph.borrow_mut().new_node(StatType::new_return(None)))
 }
 
 /// Translates a function. Returns the function in a three-code representation.
@@ -787,7 +790,7 @@ fn translate_function(
     let mut read_ref = false;
     let start_node = translate_block_graph(
         block_graph,
-        stat_graph,
+        stat_graph.clone(),
         free_var,
         free_data_ref,
         data_refs,
@@ -1094,7 +1097,7 @@ mod tests {
             branch2_cond_set_node,
         ));
 
-        match_graph(start_node.expect("No start node"), tmp_var_set_node);
+        match_graph(start_node, tmp_var_set_node);
     }
 
     #[test]
@@ -1145,7 +1148,7 @@ mod tests {
             StatCode::Assign(2, OpSrc::Const(0)),
             return_node,
         ));
-        match_graph(code.expect("No code"), return_assign_node);
+        match_graph(code, return_assign_node);
     }
 
     #[test]
@@ -1188,7 +1191,7 @@ mod tests {
             .expect("Multiple references to the graph")
             .into_inner();
         let return_node = graph.new_node(StatType::new_return(None));
-        match_graph(code.expect("No code"), return_node);
+        match_graph(code, return_node);
     }
 
     #[test]
@@ -1240,6 +1243,6 @@ mod tests {
             StatCode::Assign(0, OpSrc::Const(0)),
             exit_node,
         ));
-        match_graph(code.expect("No code"), exit_assign_node);
+        match_graph(code, exit_assign_node);
     }
 }
