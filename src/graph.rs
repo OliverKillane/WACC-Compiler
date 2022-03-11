@@ -76,12 +76,12 @@ impl<T: Deleted> NodeRef<T> {
     }
 
     /// Gets a [ref cell](RefCell) reference to the node.
-    pub fn get(&self) -> Ref<'_, T> {
+    pub fn get<'l>(&'l self) -> Ref<'l, T> {
         self.0.borrow()
     }
 
     /// Gets a mutable [ref cell](RefCell) reference to the node.
-    pub fn get_mut(&self) -> RefMut<'_, T> {
+    pub fn get_mut<'l>(&'l self) -> RefMut<'l, T> {
         self.0.borrow_mut()
     }
 

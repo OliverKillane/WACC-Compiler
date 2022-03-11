@@ -6,6 +6,7 @@ mod three_code;
 
 use crate::intermediate::Program;
 use arm::ArmResult;
+use inlining::inline;
 use same_branch::same_branch_optimization;
 use three_code::ThreeCode;
 
@@ -38,6 +39,9 @@ pub struct BackendOutput {
 /// Compiles the given program into an arm32 assembly
 pub fn compile(program: Program, options: Options) -> BackendOutput {
     let three_code = same_branch_optimization(ThreeCode::from((program, &options)));
+    if let Some(instructions_limit) = options.inlining {
+        three_code = inline(three_code, instructions_limit);
+    }
     #[cfg(debug_assertions)]
     three_code
         .check_dummy()
