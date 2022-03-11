@@ -67,6 +67,7 @@ pub(super) fn translate_expr(
                 ir::Expr::Ptr(ir::PtrExpr::Var(var))
             }
             ast::Type::Generic(_) | ast::Type::Any => panic!("Expected a concrete type"),
+            ast::Type::Void => todo!()
         },
 
         Expr::ArrayElem(var, mut indices) => {
@@ -146,6 +147,7 @@ pub(super) fn translate_expr(
                     )))
                 }
                 ast::Type::Generic(_) | ast::Type::Any => panic!("Expected a concrete type"),
+                ast::Type::Void => todo!()
             }
         }
 
@@ -194,6 +196,7 @@ pub(super) fn translate_expr(
                         ast::Type::Generic(_) | ast::Type::Any => {
                             panic!("Expected a concrete type")
                         }
+                        ast::Type::Void => todo!()
                     }
                 }
                 (UnOp::Snd, expr @ ir::Expr::Ptr(_)) => {
@@ -216,6 +219,7 @@ pub(super) fn translate_expr(
                         ast::Type::Generic(_) | ast::Type::Any => {
                             panic!("Expected a concrete type")
                         }
+                        ast::Type::Void => todo!()
                     }
                 }
                 _ => panic!("Incompatible operator application"),

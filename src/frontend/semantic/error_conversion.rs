@@ -393,6 +393,7 @@ impl Display for Type {
             Type::Array(box t, n) => {
                 write!(f, "{}{}", t, (0..*n).map(|_| "[]").collect::<String>())
             }
+            Type::Void => write!(f, "void"),
         }
     }
 }

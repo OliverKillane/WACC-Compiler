@@ -7,6 +7,7 @@ use rstest::rstest;
 use std::path::Path;
 
 #[rstest]
+#[case("valid/voidCalls/voidBasic.wacc")]
 #[case("valid/scope/scopeRedefine.wacc")]
 #[case("valid/scope/scopeBasic.wacc")]
 #[case("valid/scope/ifNested1.wacc")]

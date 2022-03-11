@@ -313,6 +313,20 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str, &str>, ErrorTree<&str>> {
         .context("If Statement"),
     );
 
+    let call = context(
+        "Argument List",
+        delimited(
+            Lexer::Call.parser(),
+            separated_pair(
+                parse_ident,
+                Lexer::OpenParen.parser(),
+                separated_list0(Lexer::Comma.parser(), parse_expr).cut(),
+            )
+            .cut(),
+            Lexer::CloseParen.parser(),
+        ),
+    );
+
     context(
         "Statement",
         alt((
@@ -348,6 +362,9 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str, &str>, ErrorTree<&str>> {
                     |(lhs, rhs)| Stat::Assign(lhs, rhs),
                 ),
             ),
+            map(call, |(id, es)| {
+                Stat::VoidCall(ASTWrapper(id, id.into()), es)
+            }),
         )),
     )(input)
 }
@@ -450,6 +467,7 @@ fn parse_pair_elem_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
 /// Parser for the [Type] AST node.
 fn parse_base_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     ws(alt((
+        value(Type::Void, Lexer::Void.parser()),
         value(Type::Int, Lexer::Int.parser()),
         value(Type::Bool, Lexer::Bool.parser()),
         value(Type::Char, Lexer::Char.parser()),

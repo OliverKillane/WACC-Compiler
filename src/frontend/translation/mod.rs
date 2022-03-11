@@ -26,6 +26,7 @@ impl From<&Type> for ir::Type {
             ast::Type::Generic(_) | ast::Type::Any => {
                 panic!("Expected a concrete type")
             }
+            ast::Type::Void => todo!()
         }
     }
 }
@@ -80,6 +81,7 @@ fn translate_rhs(
                     ir::Expr::Ptr(ir::PtrExpr::Call(prefixed_name, args))
                 }
                 Type::Generic(_) | Type::Any => panic!("Expected a concrete type"),
+                Type::Void => todo!()
             }
         }
         AssignRhs::Array(ASTWrapper(_, fields)) => ir::Expr::Ptr(ir::PtrExpr::Malloc(
@@ -567,6 +569,8 @@ fn translate_stat(
             data_ref_map,
             helper_function_flags,
         ),
+        Stat::VoidCall(_, _) => todo!(),
+        
     }
 }
 
