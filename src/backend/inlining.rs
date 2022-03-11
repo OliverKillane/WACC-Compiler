@@ -121,7 +121,7 @@ fn get_function_sccs<'l>(
     }
     let mut sccs = HashMap::new();
     let mut visited = HashSet::new();
-    for &fname in call_graph.keys() {
+    for fname in post_order.into_iter().rev() {
         let mut group = HashSet::new();
         get_function_sccs_scc(&mut group, fname, &mut visited, transpose_call_graph);
         let group = Rc::new(group);
@@ -627,6 +627,17 @@ pub(super) fn inline(
         )
         .collect();
     drop(graph);
+
+    let mut called_functions = HashSet::new();
+    for node in &new_graph {
+        if let Some(fname) = get_call_name(&node, &new_functions) {
+            called_functions.insert(fname);
+        }
+    }
+    let new_functions: HashMap<_, _> = new_functions
+        .into_iter()
+        .filter(|(fname, _)| called_functions.contains(fname))
+        .collect();
 
     ThreeCode {
         functions: new_functions,

@@ -175,7 +175,7 @@ fn main() -> io::Result<()> {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: Some(usize::MAX),
+                inlining: Some(10000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
