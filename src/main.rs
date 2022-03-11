@@ -126,6 +126,13 @@ fn main() -> io::Result<()> {
                     ),
                     FILE_FAILURE,
                 ),
+                GatherModulesError::MainFileNoCode => (
+                    format!(
+                        "File \'{}\' does not contain any code besides imports",
+                        get_relative_path(&main_file_path.absolutize()?)?.display()
+                    ),
+                    FILE_FAILURE,
+                ),
                 GatherModulesError::InvalidEncoding(path) => (
                     format!(
                         "File \'{}\': unsupported file encoding",
