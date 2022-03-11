@@ -1,8 +1,10 @@
 mod arm;
+mod same_branch;
 mod three_code;
 
 use crate::intermediate::Program;
 use arm::ArmResult;
+use same_branch::same_branch_optimization;
 use three_code::ThreeCode;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -33,7 +35,7 @@ pub struct BackendOutput {
 
 /// Compiles the given program into an arm32 assembly
 pub fn compile(program: Program, options: Options) -> BackendOutput {
-    let three_code = ThreeCode::from((program, &options));
+    let three_code = same_branch_optimization(ThreeCode::from((program, &options)));
     #[cfg(debug_assertions)]
     three_code
         .check_dummy()
