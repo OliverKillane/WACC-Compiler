@@ -706,7 +706,7 @@ impl AllocationState {
             for arg in args.iter().skip(4) {
                 // note that registers R0-3 are protected as the first 4 args reside there and are to be 'left alone'
                 let (reg, move_chain) =
-                    self.move_temp_into_reg(*arg, true, &args[0..4], &[], graph);
+                    self.move_temp_into_reg(*arg, true, &args[0..4], live_after, graph);
                 chains.push(move_chain);
                 chains.push(Some(simple_node(
                     Stat::Push(Cond::Al, Ident::Reg(reg)),
