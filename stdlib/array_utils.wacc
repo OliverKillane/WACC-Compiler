@@ -330,6 +330,65 @@ begin
         return false
     end
 
+    ##### WILL NEED TO ADD NEW 'new' OPERATOR #####
+
+    # # Initialize integer array of given size with given integer
+    # int[] init_int_array(int elem, int size) is
+    #     int[] arr = new arr[size] ;
+    #     arr = call fill_int_array(elem, arr) ;
+    #     return arr
+    # end
+
+    # # Initialize boolean array of given size with given boolean
+    # bool[] init_bool_array(bool elem, int size) is
+    #     bool[] arr = new arr[size] ;
+    #     arr = call fill_bool_array(elem, arr) ;
+    #     return arr
+    # end
+
+    # # Initialize character array of given size with given character
+    # char[] init_char_array(char elem, int size) is
+    #     char[] arr = new arr[size] ;
+    #     arr = call fill_char_array(elem, arr) ;
+    #     return arr
+    # end
+
+    # # Reverse given integer array
+    # int[] reverse_int_array(int[] arr) is
+    #     int i = 0 ;
+    #     int arr_len = len arr ;
+    #     int[] rev_arr = new int[arr_len] ;
+    #     while (i < arr_len) do
+    #         rev_arr[arr_len - i - 1] = arr[i] ;
+    #         i = i + 1
+    #     done ;
+    #     return rev_arr
+    # end
+
+    # # Reverse given boolean array
+    # bool[] reverse_bool_array(bool[] arr) is
+    #     int i = 0 ;
+    #     int arr_len = len arr ;
+    #     bool[] rev_arr = new bool[arr_len] ;
+    #     while (i < arr_len) do
+    #         rev_arr[arr_len - i - 1] = arr[i] ;
+    #         i = i + 1
+    #     done ;
+    #     return rev_arr
+    # end
+
+    # # Reverse given character array
+    # char[] reverse_char_array(char[] arr) is
+    #     int i = 0 ;
+    #     int arr_len = len arr ;
+    #     char[] rev_arr = new char[arr_len] ;
+    #     while (i < arr_len) do
+    #         rev_arr[arr_len - i - 1] = arr[i] ;
+    #         i = i + 1
+    #     done ;
+    #     return rev_arr
+    # end
+
     skip
 
 end
