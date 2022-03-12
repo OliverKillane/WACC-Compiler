@@ -385,14 +385,27 @@ impl AllocationState {
 
     /// Move a temporary value into a register, without affecting the
     /// leave_alone temporaries, and considering the order of next uses for each
-    /// live temporary. If load_stack is true, loads the temporaries value from
-    /// the stack.
+    /// live temporary.
+    /// 
+    /// - If the temporary is already in a register, that register is returned 
+    ///   (with no instructions required).
+    /// - If there are free registers, a free register is used.
+    /// - If there are preserved registers, we push the preserved to its stack 
+    ///   location, and use its register (preserved will only be used just 
+    ///   before the final return)
+    /// - If there are other temporaries (not to be left alone), we push the one 
+    ///   with the furthest-away use to its stack frame location, and use its 
+    ///   register
+    /// 
+    /// If `stack_load` is true, then if using the temporary, we must load its 
+    /// value from the stack frame, to the register returned. There instructions 
+    /// are returned as a [chain](Chain).
     pub fn move_temp_into_reg(
         &mut self,
         temp: Temporary,
         load_stack: bool,
         leave_alone: &[Temporary],
-        used: &[Temporary],
+        live: &[Temporary],
         graph: &mut Graph<ControlFlow>,
     ) -> (Register, Option<Chain>) {
         let mut free_registers = Vec::new();
@@ -400,7 +413,7 @@ impl AllocationState {
         let mut temp_registers = HashMap::new();
 
         // iterate through all registers to get the free, preserved and the temporary registers
-        for (reg_ind, alloc) in self.registers.iter_mut().enumerate().rev() {
+        for (reg_ind, alloc) in self.registers.iter().enumerate().rev() {
             match alloc {
                 Alloc::Temp(t) => {
                     if *t == temp {
@@ -480,7 +493,7 @@ impl AllocationState {
             }
         } else {
             // Use current temporary (attempting to use one with the longest time till use)
-            for old_temp in used {
+            for old_temp in live {
                 if let Some(reg_ind) = temp_registers.get(old_temp) {
                     let dst_register = Register::from(*reg_ind);
 
@@ -552,7 +565,8 @@ impl AllocationState {
         None
     }
 
-    /// Mark a register as free, moving any contents to its place in the stack frame.
+    /// Mark a register as free, moving any contents to its place in the stack 
+    /// frame.
     fn free_register(
         &mut self,
         register: Register,
@@ -653,8 +667,8 @@ impl AllocationState {
         }
     }
 
-    /// Creates the preamble to a branch link, by placing the contents of register
-    /// 14 in an appropriate stack location.
+    /// Creates the preamble to a branch link, by placing the contents of the link 
+    /// register in an appropriate stack location.
     fn link(&mut self, graph: &mut Graph<ControlFlow>) -> Option<Chain> {
         let alloc = if let alloc @ Alloc::Temp(_) | alloc @ Alloc::Preserve(_) =
             &self.registers[Register::Lr as usize]
@@ -719,10 +733,11 @@ impl AllocationState {
                     Stat::Push(Cond::Al, Ident::Reg(reg)),
                     graph,
                 )));
-                self.sp_displacement += 1;
+                // move the sp-displacement to account for the new stack pointer 
+                // location.
+                self.push_sp();
             }
         }
-        // now the sp_displacement is not valid (is off by max(0, args.len() - 4)
 
         // free link register
         chains.push(self.link(graph));
@@ -748,13 +763,16 @@ impl AllocationState {
         self.registers[2] = Alloc::Free;
         self.registers[3] = Alloc::Free;
 
-        // decrement stack pointer by arguments placed on the stack
+        // if stack arguments were used, decrement stack pointer by arguments 
+        // move the stack pointer back to its original location.
         if args.len() > 4 {
             chains.push(Some(
                 self.move_stack_pointer(self.sp_displacement - old_sp, graph),
             ));
         }
 
+        // reset the sp_displacement for use in generating offsets for stack 
+        // frame slots.
         self.sp_displacement = old_sp;
 
         link_optional_chains(chains).expect("Several statements are 'Some' so must have be a chain")
