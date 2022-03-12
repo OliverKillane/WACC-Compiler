@@ -2,7 +2,7 @@
 
 begin
     
-    # Print the given int array
+    # Print the given integer array
     bool print_int_array(string ident, int[] arr) is
         int i = 0 ;
         print ident ;
@@ -18,7 +18,7 @@ begin
         return true
     end
 
-    # Print the given bool array
+    # Print the given boolean array
     bool print_bool_array(string ident, bool[] arr) is
         int i = 0 ;
         print ident ;
@@ -34,7 +34,7 @@ begin
         return true
     end
 
-    # Print the given char array
+    # Print the given characater array
     bool print_char_array(string ident, char[] arr) is
         int i = 0 ;
         print ident ;
@@ -50,6 +50,258 @@ begin
         return true
     end
 
+    # Fill given integer array with given integer
+    int[] fill_int_array(int elem, int[] arr) is
+        int i = 0 ;
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            arr[i] = elem ;
+            i = i + 1
+        done ;
+        return arr
+    end
+
+    # Fill given boolean array with given boolean
+    bool[] fill_bool_array(bool elem, bool[] arr) is
+        int i = 0 ;
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            arr[i] = elem ;
+            i = i + 1
+        done ;
+        return arr
+    end
+
+    # Fill given character array with given character
+    char[] fill_char_array(char elem, char[] arr) is
+        int i = 0 ;
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            arr[i] = elem ;
+            i = i + 1
+        done ;
+        return arr
+    end
+
+    # Returns the index of the nth appearance of given element in given integer array
+    # Returns -1 if given element is not present in given array n times
+    int find_nth_int_array(int elem, int n, int[] arr) is
+        int count = 0 ;
+        int i = 0 ;
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            if (arr[i] == elem) then
+                count = count + 1 ;
+                if (count == n) then
+                    return i
+                else 
+                    skip
+                fi
+            else
+                skip
+            fi ;
+            i = i + 1
+        done ;
+        return (- 1)
+    end
+
+    # Returns the index of the nth appearance of given element in given boolean array
+    # Returns -1 if given element is not present in given array n times
+    int find_nth_bool_array(bool elem, int n, bool[] arr) is
+        int count = 0 ;
+        int i = 0 ;
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            if (arr[i] == elem) then
+                count = count + 1 ;
+                if (count == n) then
+                    return i
+                else 
+                    skip
+                fi
+            else
+                skip
+            fi ;
+            i = i + 1
+        done ;
+        return (- 1)
+    end
+
+    # Returns the index of the nth appearance of given element in given character array
+    # Returns -1 if given element is not present in given array n times
+    int find_nth_char_array(char elem, int n, char[] arr) is
+        int count = 0 ;
+        int i = 0 ;
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            if (arr[i] == elem) then
+                count = count + 1 ;
+                if (count == n) then
+                    return i
+                else 
+                    skip
+                fi
+            else
+                skip
+            fi ;
+            i = i + 1
+        done ;
+        return (- 1)
+    end
+
+    # Returns the index of the 1st appearance of given element in given integer array
+    # Returns -1 if given element is not present in given array
+    int find_int_arr(int elem, int[] arr) is
+        int i = call find_nth_int_array(elem, 1, arr) ;
+        return i
+    end
+
+    # Returns the index of the 1st appearance of given element in given boolean array
+    # Returns -1 if given element is not present in given array
+    int find_bool_arr(bool elem, bool[] arr) is
+        int i = call find_nth_bool_array(elem, 1, arr) ;
+        return i
+    end
+
+    # Returns the index of the 1st appearance of given element in given character array
+    # Returns -1 if given element is not present in given array
+    int find_char_arr(char elem, char[] arr) is
+        int i = call find_nth_char_array(elem, 1, arr) ;
+        return i
+    end
+
+    # Returns a pair with the 1st element being the number of appearances of given element in given integer array
+    # and the 2nd element being the index of the last appearance of given element (or -1 if count is 0) 
+    pair(int, int) count_last_int_array(int elem, int[] arr) is
+        int count = 0 ;
+        int i = 0 ;
+        int arr_len = len arr ;
+        int last = (- 1) ;
+        while (i < arr_len) do
+            if (arr[i] == elem) then
+                count = count + 1 ;
+                last = i
+            else
+                skip
+            fi ;
+            i = i + 1
+        done ;
+        pair(int, int) count_last = newpair (count, last) ;
+        return count_last
+    end
+
+    # Returns a pair with the 1st element being the number of appearances of given element in given boolean array
+    # and the 2nd element being the index of the last appearance of given element (or -1 if count is 0) 
+    pair(int, int) count_last_bool_array(bool elem, bool[] arr) is
+        int count = 0 ;
+        int i = 0 ;
+        int arr_len = len arr ;
+        int last = (- 1) ;
+        while (i < arr_len) do
+            if (arr[i] == elem) then
+                count = count + 1 ;
+                last = i
+            else
+                skip
+            fi ;
+            i = i + 1
+        done ;
+        pair(int, int) count_last = newpair (count, last) ;
+        return count_last
+    end
+
+    # Returns a pair with the 1st element being the number of appearances of given element in given character array
+    # and the 2nd element being the index of the last appearance of given element (or -1 if count is 0) 
+    pair(int, int) count_last_char_array(char elem, char[] arr) is
+        int count = 0 ;
+        int i = 0 ;
+        int arr_len = len arr ;
+        int last = (- 1) ;
+        while (i < arr_len) do
+            if (arr[i] == elem) then
+                count = count + 1 ;
+                last = i
+            else
+                skip
+            fi ;
+            i = i + 1
+        done ;
+        pair(int, int) count_last = newpair (count, last) ;
+        return count_last
+    end
+
+    # Returns the number of appearances of given element in given integer array
+    int count_int_array(int elem, int[] arr) is
+        pair(int, int) count_last = call count_last_int_array(elem, arr) ;
+        int count = fst count_last ;
+        return count
+    end
+
+    # Returns the number of appearances of given element in given boolean array
+    int count_bool_array(bool elem, bool[] arr) is
+    pair(int, int) count_last = call count_last_bool_array(elem, arr) ;
+    int count = fst count_last ;
+    return count
+    end
+
+    # Returns the index of the appearance of given element in given character array
+    int count_char_array(char elem, char[] arr) is
+    pair(int, int) count_last = call count_last_char_array(elem, arr) ;
+    int count = fst count_last ;
+    return count
+    end
+
+    # Returns the index of the appearance of given element in given integer array
+    int last_int_array(int elem, int[] arr) is
+        pair(int, int) count_last = call count_last_int_array(elem, arr) ;
+        int last = snd count_last ;
+        return last
+    end
+
+    # Returns the index of the appearance of given element in given boolean array
+    int last_bool_array(bool elem, bool[] arr) is
+        pair(int, int) count_last = call count_last_bool_array(elem, arr) ;
+        int last = snd count_last ;
+        return last
+    end
+
+    # Returns the number of appearances of given element in given character array
+    int last_char_array(char elem, char[] arr) is
+        pair(int, int) count_last = call count_last_char_array(elem, arr) ;
+        int last = snd count_last ;
+        return last
+    end
+
+    # Returns true if given element exists in given integer array
+    bool contains_int_array(int elem, int[] arr) is
+        int count = call count_int_array(elem, arr) ;
+        if (count > 0) then
+            return true
+        else
+            return false
+        fi
+    end
+
+    # Returns true if given element exists in given boolean array
+    bool contains_bool_array(bool elem, bool[] arr) is
+        int count = call count_bool_array(elem, arr) ;
+        if (count > 0) then
+            return true
+        else
+            return false
+        fi
+    end
+
+    # Returns true if given element exists in given character array
+    bool contains_char_array(char elem, char[] arr) is
+        int count = call count_char_array(elem, arr) ;
+        if (count > 0) then
+            return true
+        else
+            return false
+        fi
+    end
+
     skip
-    
+
 end
