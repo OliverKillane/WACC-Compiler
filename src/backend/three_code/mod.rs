@@ -2,6 +2,7 @@ mod eval;
 mod expr;
 mod stat;
 
+use super::data_flow::DataflowNode;
 use super::Options;
 use crate::graph::{Deleted, Graph, NodeRef};
 use crate::intermediate::{self as ir, DataRef, VarRepr};
@@ -201,28 +202,6 @@ impl StatType {
         }
     }
 
-    /// Retreives the list of incoming nodes.
-    pub(super) fn incoming(&self) -> Vec<StatNode> {
-        match self {
-            Self::Simple(incoming, _, _)
-            | Self::Branch(incoming, _, _, _)
-            | Self::Loop(incoming)
-            | Self::Return(incoming, _)
-            | Self::Dummy(incoming) => incoming.clone(),
-        }
-    }
-
-    /// Constructs the list of successor nodes.
-    pub(super) fn successors(&self) -> Vec<StatNode> {
-        match self {
-            Self::Loop(_) | Self::Return(_, _) | Self::Dummy(_) => vec![],
-            Self::Simple(_, _, next_node) => vec![next_node.clone()],
-            Self::Branch(_, _, true_node, false_node) => {
-                vec![true_node.clone(), false_node.clone()]
-            }
-        }
-    }
-
     /// Substitutes one child of a node for a new one
     pub(super) fn substitute_child(&mut self, old_child: &StatNode, new_child: &StatNode) {
         let mut tmp_node = Self::deleted();
@@ -270,6 +249,28 @@ impl StatType {
         let mut tmp_node = Self::Simple(incoming, stat_code, next_node);
         mem::swap(self, &mut tmp_node);
         old_next_node
+    }
+}
+
+impl DataflowNode for StatType {
+    fn incoming(&self) -> Vec<&StatNode> {
+        match self {
+            Self::Simple(incoming, _, _)
+            | Self::Branch(incoming, _, _, _)
+            | Self::Loop(incoming)
+            | Self::Return(incoming, _)
+            | Self::Dummy(incoming) => incoming.iter().collect(),
+        }
+    }
+
+    fn outgoing(&self) -> Vec<&StatNode> {
+        match self {
+            Self::Loop(_) | Self::Return(_, _) | Self::Dummy(_) => vec![],
+            Self::Simple(_, _, next_node) => vec![next_node],
+            Self::Branch(_, _, true_node, false_node) => {
+                vec![true_node, false_node]
+            }
+        }
     }
 }
 
@@ -599,7 +600,7 @@ fn translate_block(
             }
 
             let end_node = stat_line.end_node().unwrap();
-            let else_output = match &end_node.get_mut().incoming()[..] {
+            let else_output = match end_node.get_mut().incoming()[..] {
                 [] => {
                     stat_line = StatLine::new(stat_graph.clone());
                     let loop_node = stat_graph.borrow_mut().new_node(StatType::new_loop());
