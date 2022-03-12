@@ -688,7 +688,7 @@ impl AllocationState {
                 chains.push(self.backup_alloc_to_frame(Alloc::Temp(*arg), graph))
             }
         }
-
+        let old_sp = self.sp_displacement;
         // place arguments in registers
         if args.len() < 4 {
             for (reg_ind, arg) in args.iter().enumerate() {
@@ -703,20 +703,28 @@ impl AllocationState {
                 chains.push(self.alloc_to_reg(Alloc::Temp(*arg), Register::from(reg_ind), graph))
             }
 
+            let mut usable_temps = Vec::from(live_after);
+            for arg in args[4..].iter() {
+                if !usable_temps.contains(arg) {
+                    usable_temps.push(*arg)
+                }
+            }
+
             for arg in args.iter().skip(4) {
                 // note that registers R0-3 are protected as the first 4 args reside there and are to be 'left alone'
                 let (reg, move_chain) =
-                    self.move_temp_into_reg(*arg, true, &args[0..4], live_after, graph);
+                    self.move_temp_into_reg(*arg, true, &args[0..4], &usable_temps, graph);
+                self.registers[reg as usize] = Alloc::Free;
                 chains.push(move_chain);
                 chains.push(Some(simple_node(
                     Stat::Push(Cond::Al, Ident::Reg(reg)),
                     graph,
                 )));
+                self.sp_displacement += 1;
             }
         }
         // now the sp_displacement is not valid (is off by max(0, args.len() - 4)
-        let old_sp = self.sp_displacement;
-        self.sp_displacement += max(0, args.len() as i32 - 4);
+
         // free link register
         chains.push(self.link(graph));
 
@@ -744,7 +752,7 @@ impl AllocationState {
         // decrement stack pointer by arguments placed on the stack
         if args.len() > 4 {
             chains.push(Some(
-                self.move_stack_pointer(max(args.len() as i32 - 4, 0), graph),
+                self.move_stack_pointer(self.sp_displacement - old_sp, graph),
             ));
         }
 
