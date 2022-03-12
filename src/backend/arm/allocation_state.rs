@@ -7,7 +7,7 @@
 //!
 //! Generates register mappings for temporaries on a per-instruction basis
 //!
-//! Uses 'instructions till use' associated with live ranges to determine when 
+//! Uses 'instructions till use' associated with live ranges to determine when
 //! to spill values from registers.
 
 use crate::graph::Graph;
