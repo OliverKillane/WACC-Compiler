@@ -1,17 +1,17 @@
 //! Creates a graph of live ranges for every node in the control flow graph of
-//! the arm representation. 
-//! 
+//! the arm representation.
+//!
 //! These are then used for register allocation.
-//! 
+//!
 //! This implementation makes use of set-sharing, i.e, when the only one
 //! livein-set contributes to a livein, they share the same memory/set.
-//! 
-//! This pass also determines the distance till next use for the temporaries in 
-//! the live-range sets for use in spilling (always spill furthest away if 
+//!
+//! This pass also determines the distance till next use for the temporaries in
+//! the live-range sets for use in spilling (always spill furthest away if
 //! necessary).
-//! 
-//! Live ranges consider all basic instruction types in the arm representation 
-//! (as well as special nodes such as call and return). They also consider 
+//!
+//! Live ranges consider all basic instruction types in the arm representation
+//! (as well as special nodes such as call and return). They also consider
 //! conditional instructions (where destination is not always overwritten)
 
 use std::{cmp::min, collections::HashMap};
