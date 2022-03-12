@@ -50,7 +50,7 @@ fn get_function_statistics_dfs(
         StatType::Return(_, _) | StatType::Loop(_) => {}
         StatType::Dummy(_) => panic!("Dummy nodes not expected at this point"),
     };
-    return total_sum;
+    total_sum
 }
 
 /// Returns the function size heuristic and the calls that it makes to other
@@ -212,6 +212,7 @@ fn get_call_name(node: &StatNode, functions: &HashMap<String, Function>) -> Opti
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 /// Copies a function code graph so that it gets connected into the inlined spot.
 fn inline_code_dfs(
     new_call_nodes: &mut LinkedList<StatNode>,
@@ -319,6 +320,7 @@ fn inline_code_dfs(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 /// Simply copis a code graph. Returns the root of the new graph and the heuristic for the
 /// size of the copied graph.
 fn copy_code_dfs(
@@ -414,6 +416,7 @@ fn copy_code_dfs(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 /// Performs a general breadth-first-search inlining optimization of a code graph.
 /// Returns the new code graph and the new argument identifiers after the remapping of
 /// internal variables.
@@ -421,7 +424,7 @@ fn inline_graph(
     code: &StatNode,
     new_graph: &mut Graph<StatType>,
     instructions_limit: usize,
-    args: &Vec<VarRepr>,
+    args: &[VarRepr],
     functions: &HashMap<String, Function>,
     function_instruction_counts: &HashMap<&str, usize>,
     sccs_group: Rc<HashSet<&str>>,
@@ -576,7 +579,7 @@ pub(super) fn inline(
         &code,
         &mut new_graph,
         instructions_limit,
-        &vec![],
+        &[],
         &functions,
         &function_instruction_counts,
         Rc::new(HashSet::new()),
@@ -608,7 +611,7 @@ pub(super) fn inline(
                     fname.clone(),
                     Function {
                         args,
-                        code: code,
+                        code,
                         read_ref: *read_ref,
                     },
                 )
@@ -636,7 +639,7 @@ pub(super) fn inline(
         data_refs,
         graph: new_graph,
         read_ref,
-        code: code,
+        code,
         int_handler,
     }
 }
