@@ -31,12 +31,10 @@ begin
 
     # Returns the value equal to the base raised to the exp
     int pow(int base, int exp) is
-        if (base < 0 || exp < 0) then
-            print "Any or both of the given base ( " ;
-            print base ;
-            print " ) or the given exponent ( " ;
+        if (exp < 0) then
+            print "The given exponent ( " ;
             print exp ;
-            println " ) are negative!" ;
+            println " ) is negative!" ;
             exit 255
         else
             if exp == 0 then
@@ -193,18 +191,20 @@ begin
         int i = 0 ; 
         int arr_len = len arr ;
         while (i < arr_len) do
-            sum = sum + arr[i]
+            sum = sum + arr[i] ;
+            i = i + 1
         done ;
         return sum
     end
 
     # Returns the product of all elements in integer array
-    int sum_prod_arr(int[] arr) is
+    int prod_int_arr(int[] arr) is
         int prod = 1 ;
         int i = 0 ; 
         int arr_len = len arr ;
         while (i < arr_len) do
-            prod = prod * arr[i]
+            prod = prod * arr[i] ;
+            i = i + 1
         done ;
         return prod
     end
@@ -225,7 +225,8 @@ begin
         int curr_diff_sum_sq = 0 ;
         while (i < arr_len) do
             curr_diff_sum_sq = call pow((arr[i] - avg), 2) ;
-            diff_sum = diff_sum + curr_diff_sum_sq
+            diff_sum = diff_sum + curr_diff_sum_sq ;
+            i = i + 1
         done ;
         return (diff_sum / arr_len)
     end
@@ -246,7 +247,8 @@ begin
         int curr_diff_sum_sq = 0 ;
         while (i < arr_len) do
             curr_diff_sum_sq = call pow((arr[i] - avg), 2) ;
-            diff_sum = diff_sum + curr_diff_sum_sq
+            diff_sum = diff_sum + curr_diff_sum_sq ;
+            i = i + 1
         done ;
         return (diff_sum / (arr_len - 1))
     end
@@ -257,7 +259,7 @@ begin
         int sd = call floor_sqrt(var) ;
         return sd
     end
-    
+        
     skip
 
 end
