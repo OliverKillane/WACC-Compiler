@@ -24,13 +24,13 @@
 //! wacc_33 0.6.9
 //! Jordan Hall, Bartłomiej Cieślar, Panayiotis Gavriil and Oliver Killane
 //! WACC compiler
-//! 
+//!
 //! USAGE:
 //!     compile [OPTIONS] <FILE>
-//! 
+//!
 //! ARGS:
 //!     <FILE>    
-//! 
+//!
 //! OPTIONS:
 //!     -b, --backend-temps        print the backend representations (arm with temporaries)
 //!     -h, --help                 Print help information
@@ -90,10 +90,10 @@ struct Args {
     ir_print: bool,
 
     #[clap(
-        long, 
-        arg_enum, 
-        default_value_t = InlineMode::Off, 
-        help = "Set the function inlining mode", 
+        long,
+        arg_enum,
+        default_value_t = InlineMode::Off,
+        help = "Set the function inlining mode",
         value_name = "MODE"
     )]
     inlining: InlineMode,
