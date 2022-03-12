@@ -144,15 +144,15 @@ pub(super) enum DataRefType {
 #[derive(Debug, Clone)]
 /// The entire program in the three-code representation.
 pub(super) struct ThreeCode {
-    /// All functions in the program
+    /// All functions in the program.
     pub functions: HashMap<String, Function>,
-    /// Static data references in the program
+    /// Static data references in the program.
     pub data_refs: HashMap<DataRef, DataRefType>,
-    /// Graph of all statement nodes in the program
+    /// Graph of all statement nodes in the program.
     pub graph: Graph<StatType>,
-    /// Whether a [read ref operand source](OpSrc::ReadRef) is used in the main program code
+    /// Whether a [read ref operand source](OpSrc::ReadRef) is used in the main program code.
     pub read_ref: bool,
-    /// First statement of the program
+    /// First statement of the program.
     pub code: StatNode,
     /// Function to call as an int overflow/underflow handler for checking for
     /// 32-bit overflows.
@@ -226,40 +226,27 @@ impl StatType {
 
     /// Substitutes one child of a node for a new one
     pub(super) fn substitute_child(&mut self, old_child: &StatNode, new_child: &StatNode) {
-        let mut tmp_node = Self::deleted();
-        mem::swap(self, &mut tmp_node);
-        let mut tmp_node = match tmp_node {
-            Self::Simple(incoming, stat_code, next_node) => Self::Simple(
-                incoming,
-                stat_code,
-                if &next_node == old_child {
-                    new_child.clone()
-                } else {
-                    next_node
-                },
-            ),
-            Self::Branch(incoming, var, true_node, false_node) => Self::Branch(
-                incoming,
-                var,
-                if &true_node == old_child {
-                    new_child.clone()
-                } else {
-                    true_node
-                },
-                if &false_node == old_child {
-                    new_child.clone()
-                } else {
-                    false_node
-                },
-            ),
-            tmp_node => tmp_node,
+        match self {
+            Self::Simple(_, _, next_node) => {
+                if &*next_node == old_child {
+                    *next_node = new_child.clone()
+                }
+            }
+            Self::Branch(_, _, true_node, false_node) => {
+                if &*true_node == old_child {
+                    *true_node = new_child.clone()
+                }
+                if &*false_node == old_child {
+                    *false_node = new_child.clone()
+                }
+            }
+            _ => {}
         };
-        mem::swap(self, &mut tmp_node);
     }
 
     /// If a node is a simple node, sets
     /// the next node as the given node and returns the old next node for removal.
-    pub(super) fn append(&mut self, next_node: StatNode) -> StatNode {
+    fn append(&mut self, next_node: StatNode) -> StatNode {
         let mut tmp_node = Self::deleted();
         mem::swap(self, &mut tmp_node);
         let (incoming, stat_code, old_next_node) =
