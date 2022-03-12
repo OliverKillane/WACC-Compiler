@@ -246,39 +246,6 @@ impl StatType {
         }
     }
 
-    /// Substitutes one child of a node for a new one
-    pub(super) fn substitute_child(&mut self, old_child: &StatNode, new_child: &StatNode) {
-        let mut tmp_node = Self::deleted();
-        mem::swap(self, &mut tmp_node);
-        let mut tmp_node = match tmp_node {
-            Self::Simple(incoming, stat_code, next_node) => Self::Simple(
-                incoming,
-                stat_code,
-                if &next_node == old_child {
-                    new_child.clone()
-                } else {
-                    next_node
-                },
-            ),
-            Self::Branch(incoming, var, true_node, false_node) => Self::Branch(
-                incoming,
-                var,
-                if &true_node == old_child {
-                    new_child.clone()
-                } else {
-                    true_node
-                },
-                if &false_node == old_child {
-                    new_child.clone()
-                } else {
-                    false_node
-                },
-            ),
-            tmp_node => tmp_node,
-        };
-        mem::swap(self, &mut tmp_node);
-    }
-
     /// If a node is a simple node, sets
     /// the next node as the given node and returns the old next node for removal.
     pub(super) fn append(&mut self, next_node: StatNode) -> StatNode {
@@ -1029,7 +996,7 @@ mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: None,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
@@ -1143,7 +1110,7 @@ mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: None,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
@@ -1226,7 +1193,7 @@ mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: None,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
@@ -1273,7 +1240,7 @@ mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: None,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
@@ -1317,7 +1284,7 @@ mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: None,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,

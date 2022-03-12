@@ -38,7 +38,7 @@ pub struct BackendOutput {
 
 /// Compiles the given program into an arm32 assembly
 pub fn compile(program: Program, options: Options) -> BackendOutput {
-    let three_code = same_branch_optimization(ThreeCode::from((program, &options)));
+    let mut three_code = same_branch_optimization(ThreeCode::from((program, &options)));
     if let Some(instructions_limit) = options.inlining {
         three_code = inline(three_code, instructions_limit);
     }

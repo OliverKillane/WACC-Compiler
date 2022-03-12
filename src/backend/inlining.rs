@@ -1,16 +1,15 @@
+use super::data_flow::DataflowNode;
+use super::three_code::*;
+use crate::{
+    graph::{Deleted, Graph},
+    intermediate::VarRepr,
+};
 use std::{
     collections::{HashMap, HashSet, LinkedList},
     iter::zip,
     mem::drop,
     rc::Rc,
 };
-
-use crate::{
-    graph::{Deleted, Graph},
-    intermediate::VarRepr,
-};
-
-use super::three_code::*;
 
 /// Heuristic for how many instructions more or less a [stat type](StatType) is
 /// converted to in the assembly conversion.
@@ -244,7 +243,7 @@ fn inline_code_dfs(
                 sccs_group,
             );
             next_node.get_mut().add_incoming(new_node.clone());
-            let incoming = new_node.get().incoming();
+            let incoming = (&*new_node.get()).incoming().into_iter().cloned().collect();
             new_node.set(StatType::Simple(
                 incoming,
                 substitute_vars(stat_code, new_variable, variable_mappings),
@@ -281,7 +280,7 @@ fn inline_code_dfs(
             );
             true_node.get_mut().add_incoming(new_node.clone());
             false_node.get_mut().add_incoming(new_node.clone());
-            let incoming = new_node.get().incoming();
+            let incoming = (&*new_node.get()).incoming().into_iter().cloned().collect();
             new_node.set(StatType::Branch(
                 incoming,
                 get_mapping(*var, new_variable, variable_mappings),
@@ -349,7 +348,7 @@ fn copy_code_dfs(
                 sccs_group,
             );
             next_node.get_mut().add_incoming(new_node.clone());
-            let incoming = new_node.get().incoming();
+            let incoming = (&*new_node.get()).incoming().into_iter().cloned().collect();
             new_node.set(StatType::Simple(
                 incoming,
                 substitute_vars(stat_code, new_variable, variable_mappings),
@@ -382,7 +381,7 @@ fn copy_code_dfs(
             );
             true_node.get_mut().add_incoming(new_node.clone());
             false_node.get_mut().add_incoming(new_node.clone());
-            let incoming = new_node.get().incoming();
+            let incoming = (&*new_node.get()).incoming().into_iter().cloned().collect();
             new_node.set(StatType::Branch(
                 incoming,
                 get_mapping(*var, new_variable, variable_mappings),
