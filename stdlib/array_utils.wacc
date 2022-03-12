@@ -429,7 +429,7 @@ begin
     bool move_int_array(int[] arr, int[] buff, bool reverse) is
         bool copied = call copy_int_array(arr, buff, reverse) ;
         free arr ;
-        return true
+        return copied
     end
 
     # Copies the given boolean array 'arr' into the given buffer array 'buff' and frees 'arr'
@@ -438,7 +438,7 @@ begin
     bool move_bool_array(bool[] arr, bool[] buff, bool reverse) is
         bool copied = call copy_bool_array(arr, buff, reverse) ;
         free arr ;
-        return true
+        return copied
     end
 
     # Copies the given character array 'arr' into the given buffer array 'buff' and frees 'arr'
@@ -447,7 +447,7 @@ begin
     bool move_char_array(char[] arr, char[] buff, bool reverse) is
         bool copied = call copy_char_array(arr, buff, reverse) ;
         free arr ;
-        return true
+        return copied
     end
 
     # Concatenates the two given integer arrays, 'arr1' and 'arr2', and stores the result in
