@@ -302,6 +302,34 @@ begin
         fi
     end
 
+    # Folds the given boolean array using bitwise AND operation
+    bool fold_and_bool_arr(bool[] arr) is
+        int i = 0 ; 
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            if (arr[i] == false) then
+                return false
+            else
+                skip
+            fi
+        done ;
+        return true
+    end
+
+    # Folds the given boolean array using bitwise OR operation
+    bool fold_or_bool_arr(bool[] arr) is
+        int i = 0 ; 
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            if (arr[i] == true) then
+                return true
+            else
+                skip
+            fi
+        done ;
+        return false
+    end
+
     skip
 
 end
