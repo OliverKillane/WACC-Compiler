@@ -1,0 +1,55 @@
+################ ARRAY UTILITIES LIBRARY ################
+
+begin
+    
+    # Print the given int array
+    bool print_int_array(string ident, int[] arr) is
+        int i = 0 ;
+        print ident ;
+        print " = [" ;
+        int arr_len = len arr ;
+        while (i < arr_len - 1) do
+            print arr[i] ;
+            i = i + 1 ;
+            print ", "
+        done ;
+        print arr[i] ;
+        println "]" ;
+        return true
+    end
+
+    # Print the given bool array
+    bool print_bool_array(string ident, bool[] arr) is
+        int i = 0 ;
+        print ident ;
+        print " = [" ;
+        int arr_len = len arr ;
+        while (i < arr_len - 1) do
+            print arr[i] ;
+            i = i + 1 ;
+            print ", "
+        done ;
+        print arr[i] ;
+        println "]" ;
+        return true
+    end
+
+    # Print the given char array
+    bool print_char_array(string ident, char[] arr) is
+        int i = 0 ;
+        print ident ;
+        print " = [" ;
+        int arr_len = len arr ;
+        while (i < arr_len - 1) do
+            print arr[i] ;
+            i = i + 1 ;
+            print ", "
+        done ;
+        print arr[i] ;
+        println "]" ;
+        return true
+    end
+
+    skip
+    
+end
