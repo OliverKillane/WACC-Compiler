@@ -7,51 +7,75 @@ begin
     # Print the given integer array
     # Change return type to void
     bool print_int_array(string ident, int[] arr) is
-        int i = 0 ;
-        print ident ;
-        print " = [" ;
+
         int arr_len = len arr ;
-        while (i < arr_len - 1) do
+        if (arr_len == 0) then 
+            print "Given array (with identifier: \'" ;
+            print ident;
+            println "\') is empty!" 
+        else
+            int i = 0 ;
+            print ident ;
+            print " = [" ;
+            while (i < arr_len - 1) do
+                print arr[i] ;
+                i = i + 1 ;
+                print ", "
+            done ;
             print arr[i] ;
-            i = i + 1 ;
-            print ", "
-        done ;
-        print arr[i] ;
-        println "]" ;
+            println "]"
+        fi ;
+
         return true
     end
 
     # Print the given boolean array
     # Change return type to void
     bool print_bool_array(string ident, bool[] arr) is
-        int i = 0 ;
-        print ident ;
-        print " = [" ;
+        
         int arr_len = len arr ;
-        while (i < arr_len - 1) do
+        if (arr_len == 0) then 
+            print "Given array (with identifier: \'" ;
+            print ident;
+            println "\') is empty!" 
+        else
+            int i = 0 ;
+            print ident ;
+            print " = [" ;
+            while (i < arr_len - 1) do
+                print arr[i] ;
+                i = i + 1 ;
+                print ", "
+            done ;
             print arr[i] ;
-            i = i + 1 ;
-            print ", "
-        done ;
-        print arr[i] ;
-        println "]" ;
+            println "]"
+        fi ;
+
         return true
     end
 
     # Print the given characater array
     # Change return type to void
     bool print_char_array(string ident, char[] arr) is
-        int i = 0 ;
-        print ident ;
-        print " = [" ;
+        
         int arr_len = len arr ;
-        while (i < arr_len - 1) do
+        if (arr_len == 0) then 
+            print "Given array (with identifier: \'" ;
+            print ident;
+            println "\') is empty!" 
+        else
+            int i = 0 ;
+            print ident ;
+            print " = [" ;
+            while (i < arr_len - 1) do
+                print arr[i] ;
+                i = i + 1 ;
+                print ", "
+            done ;
             print arr[i] ;
-            i = i + 1 ;
-            print ", "
-        done ;
-        print arr[i] ;
-        println "]" ;
+            println "]"
+        fi ;
+
         return true
     end
 
