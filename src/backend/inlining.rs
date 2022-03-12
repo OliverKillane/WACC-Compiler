@@ -429,30 +429,22 @@ fn inline_graph(
 ) -> (StatNode, Vec<VarRepr>) {
     let mut call_nodes = LinkedList::new();
     let mut main_variable_mappings = HashMap::new();
-    let mut new_main_variable = 0;
+    let mut new_variable = 0;
     let (mut new_code, code_instruction_count) = copy_code_dfs(
         &mut call_nodes,
         code,
         &mut HashMap::new(),
         new_graph,
-        &mut new_main_variable,
+        &mut new_variable,
         &mut main_variable_mappings,
         functions,
         sccs_group,
     );
     let args = args
         .iter()
-        .map(|&arg| get_mapping(arg, &mut new_main_variable, &mut main_variable_mappings))
+        .map(|&arg| get_mapping(arg, &mut new_variable, &mut main_variable_mappings))
         .collect();
     let mut code_instruction_count = code_instruction_count.ceil() as usize;
-    println!("{}", new_main_variable);
-    println!(
-        "{}",
-        main_variable_mappings
-            .iter()
-            .map(|m| format!("{:?}", m))
-            .collect::<String>()
-    );
     while let Some(call_node) = call_nodes.pop_front() {
         let fname = get_call_name(&call_node, functions).expect("Not a call node");
         let function_instruction_count = function_instruction_counts[fname.as_str()];
@@ -486,7 +478,6 @@ fn inline_graph(
             read_ref: _,
         } = &functions[&fname];
         let mut variable_mappings = HashMap::new();
-        let mut new_variable = new_main_variable;
         let mut new_call_node = inline_code_dfs(
             &mut call_nodes,
             function_code,
@@ -515,7 +506,6 @@ fn inline_graph(
                 .add_incoming(arg_assign_node.clone());
             new_call_node = arg_assign_node;
         }
-
         for incoming_node in incoming {
             incoming_node
                 .get_mut()
@@ -603,6 +593,7 @@ pub(super) fn inline(
                     read_ref,
                 },
             )| {
+                println!("fname: {}", fname);
                 let (code, args) = inline_graph(
                     code,
                     &mut new_graph,
