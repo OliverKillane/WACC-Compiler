@@ -604,6 +604,9 @@ pub(super) fn inline(
             called_functions.insert(fname);
         }
     }
+    if let Some(int_handler) = &int_handler {
+        called_functions.insert(int_handler.clone());
+    }
     let new_functions: HashMap<_, _> = new_functions
         .into_iter()
         .filter(|(fname, _)| called_functions.contains(fname))
