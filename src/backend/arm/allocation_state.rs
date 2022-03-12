@@ -386,19 +386,19 @@ impl AllocationState {
     /// Move a temporary value into a register, without affecting the
     /// leave_alone temporaries, and considering the order of next uses for each
     /// live temporary.
-    /// 
-    /// - If the temporary is already in a register, that register is returned 
+    ///
+    /// - If the temporary is already in a register, that register is returned
     ///   (with no instructions required).
     /// - If there are free registers, a free register is used.
-    /// - If there are preserved registers, we push the preserved to its stack 
-    ///   location, and use its register (preserved will only be used just 
+    /// - If there are preserved registers, we push the preserved to its stack
+    ///   location, and use its register (preserved will only be used just
     ///   before the final return)
-    /// - If there are other temporaries (not to be left alone), we push the one 
-    ///   with the furthest-away use to its stack frame location, and use its 
+    /// - If there are other temporaries (not to be left alone), we push the one
+    ///   with the furthest-away use to its stack frame location, and use its
     ///   register
-    /// 
-    /// If `stack_load` is true, then if using the temporary, we must load its 
-    /// value from the stack frame, to the register returned. There instructions 
+    ///
+    /// If `stack_load` is true, then if using the temporary, we must load its
+    /// value from the stack frame, to the register returned. There instructions
     /// are returned as a [chain](Chain).
     pub fn move_temp_into_reg(
         &mut self,
@@ -565,7 +565,7 @@ impl AllocationState {
         None
     }
 
-    /// Mark a register as free, moving any contents to its place in the stack 
+    /// Mark a register as free, moving any contents to its place in the stack
     /// frame.
     fn free_register(
         &mut self,
@@ -667,7 +667,7 @@ impl AllocationState {
         }
     }
 
-    /// Creates the preamble to a branch link, by placing the contents of the link 
+    /// Creates the preamble to a branch link, by placing the contents of the link
     /// register in an appropriate stack location.
     fn link(&mut self, graph: &mut Graph<ControlFlow>) -> Option<Chain> {
         let alloc = if let alloc @ Alloc::Temp(_) | alloc @ Alloc::Preserve(_) =
@@ -733,7 +733,7 @@ impl AllocationState {
                     Stat::Push(Cond::Al, Ident::Reg(reg)),
                     graph,
                 )));
-                // move the sp-displacement to account for the new stack pointer 
+                // move the sp-displacement to account for the new stack pointer
                 // location.
                 self.push_sp();
             }
@@ -763,7 +763,7 @@ impl AllocationState {
         self.registers[2] = Alloc::Free;
         self.registers[3] = Alloc::Free;
 
-        // if stack arguments were used, decrement stack pointer by arguments 
+        // if stack arguments were used, decrement stack pointer by arguments
         // move the stack pointer back to its original location.
         if args.len() > 4 {
             chains.push(Some(
@@ -771,7 +771,7 @@ impl AllocationState {
             ));
         }
 
-        // reset the sp_displacement for use in generating offsets for stack 
+        // reset the sp_displacement for use in generating offsets for stack
         // frame slots.
         self.sp_displacement = old_sp;
 
