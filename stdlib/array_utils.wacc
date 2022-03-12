@@ -12,7 +12,8 @@ begin
         if (arr_len == 0) then 
             print "Given array (with identifier: \'" ;
             print ident;
-            println "\') is empty!" 
+            println "\') is empty!" ;
+            return false
         else
             int i = 0 ;
             print ident ;
@@ -23,10 +24,10 @@ begin
                 print ", "
             done ;
             print arr[i] ;
-            println "]"
-        fi ;
+            println "]" ;
+            return true
+        fi 
 
-        return true
     end
 
     # Print the given boolean array
@@ -37,7 +38,8 @@ begin
         if (arr_len == 0) then 
             print "Given array (with identifier: \'" ;
             print ident;
-            println "\') is empty!" 
+            println "\') is empty!" ;
+            return false
         else
             int i = 0 ;
             print ident ;
@@ -48,10 +50,10 @@ begin
                 print ", "
             done ;
             print arr[i] ;
-            println "]"
-        fi ;
+            println "]" ;
+            return true
+        fi 
 
-        return true
     end
 
     # Print the given characater array
@@ -62,7 +64,8 @@ begin
         if (arr_len == 0) then 
             print "Given array (with identifier: \'" ;
             print ident;
-            println "\') is empty!" 
+            println "\') is empty!" ;
+            return false
         else
             int i = 0 ;
             print ident ;
@@ -73,10 +76,10 @@ begin
                 print ", "
             done ;
             print arr[i] ;
-            println "]"
-        fi ;
+            println "]" ;
+            return true
+        fi 
 
-        return true
     end
 
     ##### ARRAY FILL FUNCTIONS #####
@@ -353,59 +356,71 @@ begin
 
     # Copies the elements of given integer array 'arr' into the given buffer array 'buff'
     # If the 'rev' flag is set, then the order is reversed
-    # Change return type to void ?
     bool copy_int_array(int[] arr, int[] buff, bool rev) is
-        int i = 0 ;
-        int j = 0 ;
         int arr_len = len arr ;
-        while (i < arr_len) do
-            if (!rev) then
-                j = i 
-            else
-                j = arr_len - i - 1
-            fi ;
-            buff[j] = arr[i] ;
-            i = i + 1
-        done ;
-        return true
+        int buff_len = len buff ;
+        if (buff_len != arr_len) then
+            return false
+        else
+            int i = 0 ;
+            int j = 0 ;
+            while (i < arr_len) do
+                if (!rev) then
+                    j = i 
+                else
+                    j = arr_len - i - 1
+                fi ;
+                buff[j] = arr[i] ;
+                i = i + 1
+            done ;
+            return true
+        fi
     end
 
     # Copies the elements of given boolean array 'arr' into the given buffer array 'buff'
     # If the 'rev' flag is set, then the order is reversed
-    # Change return type to void ?
     bool copy_bool_array(bool[] arr, bool[] buff, bool rev) is
-        int i = 0 ;
-        int j = 0 ;
         int arr_len = len arr ;
-        while (i < arr_len) do
-            if (!rev) then
-                j = i 
-            else
-                j = arr_len - i - 1
-            fi ;
-            buff[j] = arr[i] ;
-            i = i + 1
-        done ;
-        return true
+        int buff_len = len buff ;
+        if (buff_len != arr_len) then
+            return false
+        else
+            int i = 0 ;
+            int j = 0 ;
+            while (i < arr_len) do
+                if (!rev) then
+                    j = i 
+                else
+                    j = arr_len - i - 1
+                fi ;
+                buff[j] = arr[i] ;
+                i = i + 1
+            done ;
+            return true
+        fi
     end
 
     # Copies the elements of given character array 'arr' into the given buffer array 'buff'
     # If the 'rev' flag is set, then the order is reversed
-    # Change return type to void ?
     bool copy_char_array(char[] arr, char[] buff, bool rev) is
-        int i = 0 ;
-        int j = 0 ;
         int arr_len = len arr ;
-        while (i < arr_len) do
-            if (!rev) then
-                j = i 
-            else
-                j = arr_len - i - 1
-            fi ;
-            buff[j] = arr[i] ;
-            i = i + 1
-        done ;
-        return true
+        int buff_len = len buff ;
+        if (buff_len != arr_len) then
+            return false
+        else
+            int i = 0 ;
+            int j = 0 ;
+            while (i < arr_len) do
+                if (!rev) then
+                    j = i 
+                else
+                    j = arr_len - i - 1
+                fi ;
+                buff[j] = arr[i] ;
+                i = i + 1
+            done ;
+            return true
+        fi
     end
 
     # Copies the given integer array 'arr' into the given buffer array 'buff' and frees 'arr'
@@ -435,7 +450,76 @@ begin
         return true
     end
 
-    ##### ARRAY FOLD FUNCTIONS ####
+    # Concatenates the two given integer arrays, 'arr1' and 'arr2', and stores the result in
+    # the given buffer array 'buff'
+    bool concat_int_arrays(int[] arr1, int[] arr2, int[] buff) is
+        int arr1_len = len arr1 ;
+        int arr2_len = len arr2 ;
+        int buff_len = len buff ;
+
+        if (arr1_len + arr2_len != buff_len) then
+            return false 
+        else    
+            int i = 0 ;
+            while (i < arr1_len) do
+                buff[i] = arr1[i] ;
+                i = i + 1
+            done ;
+            while (i < (arr1_len + arr2_len)) do
+                buff[i] = arr2[i - arr1_len] ;
+                i = i + 1
+            done ;
+            return true
+        fi
+    end
+
+    # Concatenates the two given boolean arrays, 'arr1' and 'arr2', and stores the result in
+    # the given buffer array 'buff'
+    bool concat_bool_arrays(bool[] arr1, bool[] arr2, bool[] buff) is
+        int arr1_len = len arr1 ;
+        int arr2_len = len arr2 ;
+        int buff_len = len buff ;
+
+        if (arr1_len + arr2_len != buff_len) then
+            return false 
+        else    
+            int i = 0 ;
+            while (i < arr1_len) do
+                buff[i] = arr1[i] ;
+                i = i + 1
+            done ;
+            while (i < (arr1_len + arr2_len)) do
+                buff[i] = arr2[i - arr1_len] ;
+                i = i + 1
+            done ;
+            return true
+        fi
+    end
+
+    # Concatenates the two given character arrays, 'arr1' and 'arr2', and stores the result in
+    # the given buffer array 'buff'
+    bool concat_char_arrays(char[] arr1, char[] arr2, char[] buff) is
+        int arr1_len = len arr1 ;
+        int arr2_len = len arr2 ;
+        int buff_len = len buff ;
+
+        if (arr1_len + arr2_len != buff_len) then
+            return false 
+        else    
+            int i = 0 ;
+            while (i < arr1_len) do
+                buff[i] = arr1[i] ;
+                i = i + 1
+            done ;
+            while (i < (arr1_len + arr2_len)) do
+                buff[i] = arr2[i - arr1_len] ;
+                i = i + 1
+            done ;
+            return true
+        fi
+    end
+
+    ##### ARRAY FOLD FUNCTIONS #####
 
     # Folds the given boolean array using bitwise AND operation
     bool fold_and_bool_arr(bool[] arr) is
