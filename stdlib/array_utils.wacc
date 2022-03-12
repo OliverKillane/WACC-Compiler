@@ -327,7 +327,8 @@ begin
                 return false
             else
                 skip
-            fi
+            fi ;
+            i = i + 1
         done ;
         return true
     end
@@ -341,7 +342,8 @@ begin
                 return true
             else
                 skip
-            fi
+            fi ;
+            i = i + 1
         done ;
         return false
     end
