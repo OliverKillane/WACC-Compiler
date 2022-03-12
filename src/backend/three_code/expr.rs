@@ -489,7 +489,7 @@ mod tests {
                     sethi_ullman_weights: false,
                     dead_code_removal: false,
                     propagation: PropagationOpt::None,
-                    inlining: false,
+                    inlining: Some(1000),
                     tail_call: false,
                     hoisting: false,
                     strength_reduction: false,

@@ -21,26 +21,24 @@
 //!
 //! for example `./compile --help`:
 //! ```text
-//! wacc_33 0.5.1
+//! wacc_33 0.6.9
 //! Jordan Hall, Bartłomiej Cieślar, Panayiotis Gavriil and Oliver Killane
-//! A wacc compiler written is rust targeting 32 bit ARM systems
+//! WACC compiler
 //!
 //! USAGE:
-//!     compile [OPTIONS] <INPUT FILE>
+//!     compile [OPTIONS] <FILE>
 //!
 //! ARGS:
-//!     <INPUT FILE>
-//!
+//!     <FILE>    
 //!
 //! OPTIONS:
-//!     -h, --help
-//!             Print help information
-//!
-//!     -o, --outputpath <OUTPUT FILE>
-//!             The name of the output file
-//!
-//!     -V, --version
-//!             Print version information
+//!     -b, --backend-temps        print the backend representations (arm with temporaries)
+//!     -h, --help                 Print help information
+//!     -i, --ir-print             print the intermediate representation generated
+//!         --inlining <MODE>      Set the function inlining mode [default: off] [possible values: off,
+//!                                low, medium, high]
+//!     -o, --outputpath <FILE>    The name of the output file
+//!     -V, --version              Print version information
 //! ```
 
 #[macro_use]
@@ -53,7 +51,7 @@ mod intermediate;
 mod tests;
 
 use backend::{compile, Options, PropagationOpt};
-use clap::Parser;
+use clap::{ArgEnum, Parser};
 use frontend::{analyse, gather_modules, GatherModulesError};
 use path_absolutize::Absolutize;
 use pathdiff::diff_paths;
@@ -66,17 +64,17 @@ use std::{
 };
 
 /// Command line interface
-#[derive(Parser, Debug)]
-#[clap(author = "Jordan Hall, Bartłomiej Cieślar, Panayiotis Gavriil and Oliver Killane", about = "WACC compiler" , long_about = Some("A wacc compiler written is rust targeting 32 bit ARM systems"), version = "0.5.1")]
+#[derive(Parser)]
+#[clap(author = "Jordan Hall, Bartłomiej Cieślar, Panayiotis Gavriil and Oliver Killane", about = "WACC compiler" , long_about = Some("A wacc compiler written is rust targeting 32 bit ARM systems"), version = "0.6.9")]
 struct Args {
-    #[clap(parse(from_os_str), value_name = "INPUT FILE")]
+    #[clap(parse(from_os_str), value_name = "FILE")]
     filepath: PathBuf,
 
     #[clap(
         short,
         long,
         parse(from_os_str),
-        value_name = "OUTPUT FILE",
+        value_name = "FILE",
         help = "The name of the output file"
     )]
     outputpath: Option<PathBuf>,
@@ -90,6 +88,35 @@ struct Args {
 
     #[clap(short, long, help = "print the intermediate representation generated")]
     ir_print: bool,
+
+    #[clap(
+        long,
+        arg_enum,
+        default_value_t = InlineMode::Off,
+        help = "Set the function inlining mode",
+        value_name = "MODE"
+    )]
+    inlining: InlineMode,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
+enum InlineMode {
+    Off,
+    Low,
+    Medium,
+    High,
+}
+
+impl From<InlineMode> for Option<usize> {
+    /// Convert the inlining mode into an option of the inlining limit.
+    fn from(mode: InlineMode) -> Self {
+        match mode {
+            InlineMode::Off => None,
+            InlineMode::Low => Some(100),
+            InlineMode::Medium => Some(2000),
+            InlineMode::High => Some(100000),
+        }
+    }
 }
 
 /// Exit code for a file open failure.
@@ -113,6 +140,7 @@ fn main() -> io::Result<()> {
         outputpath,
         backend_temps: temp_arm,
         ir_print,
+        inlining,
     } = Args::parse();
 
     let (main_file, module_files) = match gather_modules(&main_file_path) {
@@ -175,7 +203,7 @@ fn main() -> io::Result<()> {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: false,
+                inlining: inlining.into(),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,

@@ -235,6 +235,17 @@ impl StatType {
         mem::swap(self, &mut tmp_node);
     }
 
+    /// Constructs the list of successor nodes.
+    pub(super) fn successors(&self) -> Vec<StatNode> {
+        match self {
+            Self::Loop(_) | Self::Return(_, _) | Self::Dummy(_) => vec![],
+            Self::Simple(_, _, next_node) => vec![next_node.clone()],
+            Self::Branch(_, _, true_node, false_node) => {
+                vec![true_node.clone(), false_node.clone()]
+            }
+        }
+    }
+
     /// If a node is a simple node, sets
     /// the next node as the given node and returns the old next node for removal.
     pub(super) fn append(&mut self, next_node: StatNode) -> StatNode {
@@ -985,7 +996,7 @@ mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: false,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
@@ -1099,7 +1110,7 @@ mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: false,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
@@ -1182,7 +1193,7 @@ mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: false,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
@@ -1229,7 +1240,7 @@ mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: false,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
@@ -1273,7 +1284,7 @@ mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: false,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
