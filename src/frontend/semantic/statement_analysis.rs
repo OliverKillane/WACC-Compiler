@@ -400,9 +400,10 @@ fn analyse_statement<'a, 'b>(
         .map(|block_ast| ASTWrapper(None, Stat::Block(block_ast))),
         Stat::VoidCall(ASTWrapper(fun_name, fun_name_string), args) => {
             let mut stat_errors = vec![];
-            let void_call = analyse_call(fun_name, fun_name_string, args, &Type::Any, fun_symb, local_symb, var_symb, &mut stat_errors).map(|(t, exprs)| ASTWrapper(None, Stat::VoidCall(t, exprs)));
-            errors.push(ASTWrapper(span, stat_errors));
-            void_call
+            match analyse_call(fun_name, fun_name_string, args, &Type::Any, fun_symb, local_symb, var_symb, &mut stat_errors) {
+                Some((t, exprs)) => Some(ASTWrapper(None, Stat::VoidCall(t, exprs))),
+                None =>  add_error(ASTWrapper(span, stat_errors))
+            }
         },
     }
 }

@@ -6,6 +6,7 @@ use rstest::rstest;
 
 #[rstest]
 #[case("../tests/valid/voidCalls/voidBasic.wacc")]
+#[case("../tests/valid/voidCalls/voidCallInFunction.wacc")]
 #[case("../tests/valid/scope/scopeRedefine.wacc")]
 #[case("../tests/valid/scope/scopeBasic.wacc")]
 #[case("../tests/valid/scope/ifNested1.wacc")]
