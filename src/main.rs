@@ -53,7 +53,7 @@ mod intermediate;
 mod tests;
 
 use backend::{compile, Options, PropagationOpt};
-use clap::Parser;
+use clap::{Parser, ArgEnum};
 use frontend::{analyse, gather_modules, GatherModulesError};
 use path_absolutize::Absolutize;
 use pathdiff::diff_paths;
@@ -66,17 +66,17 @@ use std::{
 };
 
 /// Command line interface
-#[derive(Parser, Debug)]
+#[derive(Parser)]
 #[clap(author = "Jordan Hall, Bartłomiej Cieślar, Panayiotis Gavriil and Oliver Killane", about = "WACC compiler" , long_about = Some("A wacc compiler written is rust targeting 32 bit ARM systems"), version = "0.5.1")]
 struct Args {
-    #[clap(parse(from_os_str), value_name = "INPUT FILE")]
+    #[clap(parse(from_os_str), value_name = "FILE")]
     filepath: PathBuf,
 
     #[clap(
         short,
         long,
         parse(from_os_str),
-        value_name = "OUTPUT FILE",
+        value_name = "FILE",
         help = "The name of the output file"
     )]
     outputpath: Option<PathBuf>,
@@ -88,8 +88,41 @@ struct Args {
     )]
     backend_temps: bool,
 
-    #[clap(short, long, help = "print the intermediate representation generated")]
+    #[clap(
+        short, 
+        long, 
+        help = "print the intermediate representation generated"
+    )]
     ir_print: bool,
+
+    #[clap(
+        long, 
+        arg_enum, 
+        default_value_t = InlineMode::Off, 
+        help = "Set the function inlining mode", 
+        value_name = "MODE"
+    )]
+    inlining: InlineMode
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
+enum InlineMode {
+    Off,
+    Low,
+    Medium, 
+    High,
+}
+
+impl Into<Option<usize>> for InlineMode {
+    /// Convert the inlining mode into an option of the inlining limit.
+    fn into(self) -> Option<usize> {
+        match self {
+            InlineMode::Off => None,
+            InlineMode::Low => Some(100),
+            InlineMode::Medium => Some(2000),
+            InlineMode::High => Some(100000),
+        }
+    }
 }
 
 /// Exit code for a file open failure.
@@ -113,6 +146,7 @@ fn main() -> io::Result<()> {
         outputpath,
         backend_temps: temp_arm,
         ir_print,
+        inlining
     } = Args::parse();
 
     let (main_file, module_files) = match gather_modules(&main_file_path) {
@@ -175,7 +209,7 @@ fn main() -> io::Result<()> {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: Some(10000),
+                inlining: inlining.into(),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
