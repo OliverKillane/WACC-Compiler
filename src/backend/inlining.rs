@@ -424,20 +424,20 @@ fn inline_graph(
 ) -> (StatNode, Vec<VarRepr>) {
     let mut call_nodes = LinkedList::new();
     let mut main_variable_mappings = HashMap::new();
-    let mut new_variable = 0;
+    let mut new_main_variable = 0;
     let (mut new_code, code_instruction_count) = copy_code_dfs(
         &mut call_nodes,
         code,
         &mut HashMap::new(),
         new_graph,
-        &mut new_variable,
+        &mut new_main_variable,
         &mut main_variable_mappings,
         functions,
         sccs_group,
     );
     let args = args
         .iter()
-        .map(|&arg| get_mapping(arg, &mut new_variable, &mut main_variable_mappings))
+        .map(|&arg| get_mapping(arg, &mut new_main_variable, &mut main_variable_mappings))
         .collect();
     let mut code_instruction_count = code_instruction_count.ceil() as usize;
     while let Some(call_node) = call_nodes.pop_front() {
@@ -472,10 +472,9 @@ fn inline_graph(
             code: function_code,
             read_ref: _,
         } = &functions[&fname];
-        let mut variable_mappings =
-            zip(function_args.iter().cloned(), call_args).collect::<HashMap<_, _>>();
-        let mut new_variable = variable_mappings.keys().cloned().max().unwrap_or_default();
-        let new_call_node = inline_code_dfs(
+        let mut variable_mappings = HashMap::new();
+        let mut new_variable = new_main_variable;
+        let mut new_call_node = inline_code_dfs(
             &mut call_nodes,
             function_code,
             &mut HashMap::new(),
@@ -487,6 +486,12 @@ fn inline_graph(
             functions,
             sccs_groups[fname.as_str()].clone(),
         );
+        for (call_arg, function_arg) in zip(call_args, function_args) {
+            new_call_node = new_graph.new_node(StatType::new_simple(
+                StatCode::Assign(variable_mappings[function_arg], OpSrc::Var(call_arg)),
+                new_call_node,
+            ));
+        }
 
         for incoming_node in incoming {
             incoming_node
