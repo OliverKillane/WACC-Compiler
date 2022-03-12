@@ -1,7 +1,11 @@
 //! Translates the three code representation of a graph into an arm
 //! representation, with temporaries instead of registers.
-use lazy_static::__Deref;
+//! 
+//! Several special nodes are created, for calls, returns and assignment of the 
+//! reserved stack space for functions. These are translated into arm instructions
+//! during register allocation.
 
+use lazy_static::__Deref;
 use crate::{
     graph::Graph,
     intermediate::{DataRef, VarRepr},
