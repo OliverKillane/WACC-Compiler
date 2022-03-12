@@ -12,7 +12,6 @@
 
 use crate::graph::Graph;
 use std::{
-    cmp::max,
     collections::{HashMap, HashSet},
     fmt::Display,
 };

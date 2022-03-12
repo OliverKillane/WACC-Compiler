@@ -185,7 +185,7 @@ fn translate_from_node(
 
                 start.set_predecessor(prev.clone());
                 prev.replace_successor(current_node.clone(), start);
-                
+
                 alloc_state.update_live(&liveout);
 
                 // as we entirely replace the 'call' node, we set the successors and
