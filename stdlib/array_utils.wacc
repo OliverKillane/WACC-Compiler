@@ -353,7 +353,8 @@ begin
     ### BUBBLE SORT ###
 
     # Performs BubbleSort on given integer array
-    bool bubble_sort(int[] arr) is
+    # If the 'desc' flag is set, then the algorithm follows descending order
+    bool bubble_sort(int[] arr, bool desc) is
         int i = 0 ;
         int j = 0 ;
         int arr_len = len arr ;
@@ -361,10 +362,18 @@ begin
 
         while (i < arr_len - 1) do
             while (j < arr_len - i - 1) do
-                if (arr[j] > arr[j + 1]) then
-                    swapped = call swap(j, j + 1, arr)
+                if (!desc) then
+                    if (arr[j] > arr[j + 1]) then
+                        swapped = call swap(j, j + 1, arr)
+                    else
+                        skip
+                    fi
                 else
-                    skip
+                    if (arr[j] < arr[j + 1]) then
+                        swapped = call swap(j, j + 1, arr)
+                    else
+                        skip
+                    fi
                 fi ;
                 j = j + 1
             done ;
@@ -375,30 +384,116 @@ begin
         return true
     end
 
-    ### MERGE SORT ###
+    ### HEAP SORT ###
 
-    ## NEED 'init_int_array' TO BE IMPLEMENTED
+    # Creates maxHeap if desc is not set
+    # Creates minHeap if desc is set
+    bool heapify(int[] arr, int size, int root, bool desc) is
+        int comp = root ;
+        int left = 2 * root + 1 ;
+        int right = 2 * root + 2 ;
+
+        if (left < size) then
+            if (!desc) then
+                if (arr[left] > arr[comp]) then
+                    comp = left
+                else 
+                    skip
+                fi
+            else
+                if (arr[left] < arr[comp]) then
+                    comp = left
+                else 
+                    skip
+                fi
+            fi 
+        else
+            skip
+        fi ;
+
+        if (right < size) then
+            if (!desc) then
+                if (arr[right] > arr[comp]) then
+                    comp = right
+                else 
+                    skip
+                fi
+            else
+                if (arr[right] < arr[comp]) then
+                    comp = right
+                else 
+                    skip
+                fi
+            fi 
+        else
+            skip
+        fi ;
+
+        bool swapped = false ;
+        bool heapified = false ;
+
+        if (comp != root) then
+            swapped = call swap(root, comp, arr) ;
+            heapified = call heapify(arr, size, comp, desc)
+        else
+            skip
+        fi ;
+
+        return true
+    end
+
+    # Main HeapSort function
+    bool heap_sort(int[] arr, bool desc) is
+        int arr_len = len arr ;
+        int i = (arr_len / 2) - 1 ;
+        bool heapified = false ;
+                
+        while (i >= 0) do
+            heapified = call heapify(arr, arr_len, i, desc) ;
+            i = i - 1
+        done ;
+
+        i = arr_len - 1 ;
+        bool swapped = false ;
+
+        while (i > 0) do
+            swapped = call swap(0, i, arr) ;
+            heapified = call heapify(arr, i, 0, desc) ;
+            i = i - 1
+        done ;
+
+        return true
+    end
 
     ### QUICK SORT ###
 
     # Uses the element at index 'hi' as the pivot
     # the pivot will be placed at its final position in the sorted array
     # the rest of the elements will be swapped such that
-    # all the elements to the left are less than the pivot
-    # all the elements to the right are greater than the pivot
+    # all the elements to the left are less than the pivot     | VICE-VERSA IF
+    # all the elements to the right are greater than the pivot | 'desc' is 'true'
     # returns the so-called partitioning index
-    int partition(int lo, int hi, int[] arr) is
+    int partition(int lo, int hi, int[] arr, bool desc) is
         int pivot = arr[hi] ;
         int i = (lo - 1) ;
         
         int j = lo ;
         bool swapped = false ;
         while (j < hi) do
-            if (arr[j] < pivot) then
-                i = i + 1 ;
-                swapped = call swap(i, j, arr)
+            if (!desc) then
+                if (arr[j] < pivot) then
+                    i = i + 1 ;
+                    swapped = call swap(i, j, arr)
+                else
+                    skip
+                fi
             else
-                skip
+                if (arr[j] > pivot) then
+                    i = i + 1 ;
+                    swapped = call swap(i, j, arr)
+                else
+                    skip
+                fi
             fi ;
             j = j + 1
         done ;
@@ -410,12 +505,12 @@ begin
 
     # QuickSort helper function
     # Change return type to void
-    bool quick_sort_helper(int lo, int hi, int[] arr) is
+    bool quick_sort_helper(int lo, int hi, int[] arr, bool desc) is
         bool sort = false ;
         if (lo < hi) then
-            int par_index = call partition(lo, hi, arr) ;
-            sort = call quick_sort_helper(lo, par_index - 1, arr) ;
-            sort = call quick_sort_helper(par_index + 1, hi, arr)
+            int par_index = call partition(lo, hi, arr, desc) ;
+            sort = call quick_sort_helper(lo, par_index - 1, arr, desc) ;
+            sort = call quick_sort_helper(par_index + 1, hi, arr, desc)
         else
             skip
         fi ;
@@ -423,11 +518,12 @@ begin
     end
 
     # Main QuickSort function - performs Quick Sort on given integer array
+    # If the 'desc' flag is set, then the algorithm follows descending order
     # Change return type to void
-    bool quick_sort(int[] arr) is
+    bool quick_sort(int[] arr, bool desc) is
         int lo = 0 ;
         int hi = (len arr) - 1;
-        bool sort = call quick_sort_helper(lo, hi, arr) ;
+        bool sort = call quick_sort_helper(lo, hi, arr, desc) ;
         return sort
     end
 
@@ -439,6 +535,90 @@ begin
         int temp = arr[i1] ;
         arr[i1] = arr[i2] ;
         arr[i2] = temp ;
+        return true
+    end
+
+    # Copies the elements of given integer array 'arr' into the given buffer array 'buff'
+    # If the 'rev' flag is set, then the order is reversed
+    # Change return type to void ?
+    bool copy_int_array(int[] arr, int[] buff, bool rev) is
+        int i = 0 ;
+        int j = 0 ;
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            if (!rev) then
+                j = i 
+            else
+                j = arr_len - i - 1
+            fi ;
+            buff[j] = arr[i] ;
+            i = i + 1
+        done ;
+        return true
+    end
+
+    # Copies the elements of given boolean array 'arr' into the given buffer array 'buff'
+    # If the 'rev' flag is set, then the order is reversed
+    # Change return type to void ?
+    bool copy_bool_array(bool[] arr, bool[] buff, bool rev) is
+        int i = 0 ;
+        int j = 0 ;
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            if (!rev) then
+                j = i 
+            else
+                j = arr_len - i - 1
+            fi ;
+            buff[j] = arr[i] ;
+            i = i + 1
+        done ;
+        return true
+    end
+
+    # Copies the elements of given character array 'arr' into the given buffer array 'buff'
+    # If the 'rev' flag is set, then the order is reversed
+    # Change return type to void ?
+    bool copy_char_array(char[] arr, char[] buff, bool rev) is
+        int i = 0 ;
+        int j = 0 ;
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            if (!rev) then
+                j = i 
+            else
+                j = arr_len - i - 1
+            fi ;
+            buff[j] = arr[i] ;
+            i = i + 1
+        done ;
+        return true
+    end
+
+    # Copies the given integer array 'arr' into the given buffer array 'buff' and frees 'arr'
+    # If the 'rev' flag is set, then the order is reversed
+    # Change return type to void ?
+    bool move_int_array(int[] arr, int[] buff, bool reverse) is
+        bool copied = call copy_int_array(arr, buff, reverse) ;
+        free arr ;
+        return true
+    end
+
+    # Copies the given boolean array 'arr' into the given buffer array 'buff' and frees 'arr'
+    # If the 'rev' flag is set, then the order is reversed
+    # Change return type to void ?
+    bool move_bool_array(bool[] arr, bool[] buff, bool reverse) is
+        bool copied = call copy_bool_array(arr, buff, reverse) ;
+        free arr ;
+        return true
+    end
+
+    # Copies the given character array 'arr' into the given buffer array 'buff' and frees 'arr'
+    # If the 'rev' flag is set, then the order is reversed
+    # Change return type to void ?
+    bool move_char_array(char[] arr, char[] buff, bool reverse) is
+        bool copied = call copy_char_array(arr, buff, reverse) ;
+        free arr ;
         return true
     end
 
@@ -463,51 +643,6 @@ begin
     #     char[] arr = new arr[size] ;
     #     arr = call fill_char_array(elem, arr) ;
     #     return arr
-    # end
-
-    # # Reverse given integer array
-    # # Change return type to void ?
-    # # Will need to also have array copy function to copy the original array
-    # # into a temp array so that the original array could be reversed off of that
-    # int[] reverse_int_array(int[] arr) is
-    #     int i = 0 ;
-    #     int arr_len = len arr ;
-    #     int[] rev_arr = new int[arr_len] ;
-    #     while (i < arr_len) do
-    #         rev_arr[arr_len - i - 1] = arr[i] ;
-    #         i = i + 1
-    #     done ;
-    #     return rev_arr
-    # end
-
-    # # Reverse given boolean array
-    # # Change return type to void ?
-    # # Will need to also have array copy function to copy the original array
-    # # into a temp array so that the original array could be reversed off of that
-    # bool[] reverse_bool_array(bool[] arr) is
-    #     int i = 0 ;
-    #     int arr_len = len arr ;
-    #     bool[] rev_arr = new bool[arr_len] ;
-    #     while (i < arr_len) do
-    #         rev_arr[arr_len - i - 1] = arr[i] ;
-    #         i = i + 1
-    #     done ;
-    #     return rev_arr
-    # end
-
-    # # Reverse given character array
-    # # Change return type to void ?
-    # # Will need to also have array copy function to copy the original array
-    # # into a temp array so that the original array could be reversed off of that
-    # char[] reverse_char_array(char[] arr) is
-    #     int i = 0 ;
-    #     int arr_len = len arr ;
-    #     char[] rev_arr = new char[arr_len] ;
-    #     while (i < arr_len) do
-    #         rev_arr[arr_len - i - 1] = arr[i] ;
-    #         i = i + 1
-    #     done ;
-    #     return rev_arr
     # end
 
     skip
