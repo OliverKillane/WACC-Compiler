@@ -238,6 +238,8 @@ fn semantic_anal_pass(#[case] file_name: &str) {
 }
 
 #[rstest]
+#[case("invalid/semanticErr/voidCalls/returnInVoid.wacc")]
+#[case("invalid/semanticErr/voidCalls/assignVoidFunction.wacc")]
 #[case("invalid/syntaxErr/function/funcExpr2.wacc")]
 #[case("invalid/syntaxErr/function/functionMissingCall.wacc")]
 #[case("invalid/syntaxErr/function/functionEndingNotReturn.wacc")]
