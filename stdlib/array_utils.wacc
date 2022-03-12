@@ -348,6 +348,10 @@ begin
 
     ##### ARRAY SORT FUNCTIONS #####
 
+    ### MERGE SORT ###
+
+    ## NEED 'init_int_array' TO BE IMPLEMENTED
+
     ### QUICK SORT ###
 
     # Swaps the values of the two given indices
