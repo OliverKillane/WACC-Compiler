@@ -340,6 +340,101 @@ begin
         fi
     end
 
+    ##### ARRAY MEMORY MANIPULATION #####
+
+    # Swaps the values of the two given indices
+    # Change return type to void
+    bool swap(int i1, int i2, int[] arr) is
+        int temp = arr[i1] ;
+        arr[i1] = arr[i2] ;
+        arr[i2] = temp ;
+        return true
+    end
+
+    # Copies the elements of given integer array 'arr' into the given buffer array 'buff'
+    # If the 'rev' flag is set, then the order is reversed
+    # Change return type to void ?
+    bool copy_int_array(int[] arr, int[] buff, bool rev) is
+        int i = 0 ;
+        int j = 0 ;
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            if (!rev) then
+                j = i 
+            else
+                j = arr_len - i - 1
+            fi ;
+            buff[j] = arr[i] ;
+            i = i + 1
+        done ;
+        return true
+    end
+
+    # Copies the elements of given boolean array 'arr' into the given buffer array 'buff'
+    # If the 'rev' flag is set, then the order is reversed
+    # Change return type to void ?
+    bool copy_bool_array(bool[] arr, bool[] buff, bool rev) is
+        int i = 0 ;
+        int j = 0 ;
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            if (!rev) then
+                j = i 
+            else
+                j = arr_len - i - 1
+            fi ;
+            buff[j] = arr[i] ;
+            i = i + 1
+        done ;
+        return true
+    end
+
+    # Copies the elements of given character array 'arr' into the given buffer array 'buff'
+    # If the 'rev' flag is set, then the order is reversed
+    # Change return type to void ?
+    bool copy_char_array(char[] arr, char[] buff, bool rev) is
+        int i = 0 ;
+        int j = 0 ;
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            if (!rev) then
+                j = i 
+            else
+                j = arr_len - i - 1
+            fi ;
+            buff[j] = arr[i] ;
+            i = i + 1
+        done ;
+        return true
+    end
+
+    # Copies the given integer array 'arr' into the given buffer array 'buff' and frees 'arr'
+    # If the 'rev' flag is set, then the order is reversed
+    # Change return type to void ?
+    bool move_int_array(int[] arr, int[] buff, bool reverse) is
+        bool copied = call copy_int_array(arr, buff, reverse) ;
+        free arr ;
+        return true
+    end
+
+    # Copies the given boolean array 'arr' into the given buffer array 'buff' and frees 'arr'
+    # If the 'rev' flag is set, then the order is reversed
+    # Change return type to void ?
+    bool move_bool_array(bool[] arr, bool[] buff, bool reverse) is
+        bool copied = call copy_bool_array(arr, buff, reverse) ;
+        free arr ;
+        return true
+    end
+
+    # Copies the given character array 'arr' into the given buffer array 'buff' and frees 'arr'
+    # If the 'rev' flag is set, then the order is reversed
+    # Change return type to void ?
+    bool move_char_array(char[] arr, char[] buff, bool reverse) is
+        bool copied = call copy_char_array(arr, buff, reverse) ;
+        free arr ;
+        return true
+    end
+
     ##### ARRAY FOLD FUNCTIONS ####
 
     # Folds the given boolean array using bitwise AND operation
@@ -549,101 +644,6 @@ begin
         int hi = (len arr) - 1;
         bool sort = call quick_sort_helper(lo, hi, arr, desc) ;
         return sort
-    end
-
-    ##### ARRAY MEMORY MANIPULATION #####
-
-    # Swaps the values of the two given indices
-    # Change return type to void
-    bool swap(int i1, int i2, int[] arr) is
-        int temp = arr[i1] ;
-        arr[i1] = arr[i2] ;
-        arr[i2] = temp ;
-        return true
-    end
-
-    # Copies the elements of given integer array 'arr' into the given buffer array 'buff'
-    # If the 'rev' flag is set, then the order is reversed
-    # Change return type to void ?
-    bool copy_int_array(int[] arr, int[] buff, bool rev) is
-        int i = 0 ;
-        int j = 0 ;
-        int arr_len = len arr ;
-        while (i < arr_len) do
-            if (!rev) then
-                j = i 
-            else
-                j = arr_len - i - 1
-            fi ;
-            buff[j] = arr[i] ;
-            i = i + 1
-        done ;
-        return true
-    end
-
-    # Copies the elements of given boolean array 'arr' into the given buffer array 'buff'
-    # If the 'rev' flag is set, then the order is reversed
-    # Change return type to void ?
-    bool copy_bool_array(bool[] arr, bool[] buff, bool rev) is
-        int i = 0 ;
-        int j = 0 ;
-        int arr_len = len arr ;
-        while (i < arr_len) do
-            if (!rev) then
-                j = i 
-            else
-                j = arr_len - i - 1
-            fi ;
-            buff[j] = arr[i] ;
-            i = i + 1
-        done ;
-        return true
-    end
-
-    # Copies the elements of given character array 'arr' into the given buffer array 'buff'
-    # If the 'rev' flag is set, then the order is reversed
-    # Change return type to void ?
-    bool copy_char_array(char[] arr, char[] buff, bool rev) is
-        int i = 0 ;
-        int j = 0 ;
-        int arr_len = len arr ;
-        while (i < arr_len) do
-            if (!rev) then
-                j = i 
-            else
-                j = arr_len - i - 1
-            fi ;
-            buff[j] = arr[i] ;
-            i = i + 1
-        done ;
-        return true
-    end
-
-    # Copies the given integer array 'arr' into the given buffer array 'buff' and frees 'arr'
-    # If the 'rev' flag is set, then the order is reversed
-    # Change return type to void ?
-    bool move_int_array(int[] arr, int[] buff, bool reverse) is
-        bool copied = call copy_int_array(arr, buff, reverse) ;
-        free arr ;
-        return true
-    end
-
-    # Copies the given boolean array 'arr' into the given buffer array 'buff' and frees 'arr'
-    # If the 'rev' flag is set, then the order is reversed
-    # Change return type to void ?
-    bool move_bool_array(bool[] arr, bool[] buff, bool reverse) is
-        bool copied = call copy_bool_array(arr, buff, reverse) ;
-        free arr ;
-        return true
-    end
-
-    # Copies the given character array 'arr' into the given buffer array 'buff' and frees 'arr'
-    # If the 'rev' flag is set, then the order is reversed
-    # Change return type to void ?
-    bool move_char_array(char[] arr, char[] buff, bool reverse) is
-        bool copied = call copy_char_array(arr, buff, reverse) ;
-        free arr ;
-        return true
     end
 
     ##### WILL NEED TO ADD NEW 'new' OPERATOR #####
