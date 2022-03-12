@@ -487,10 +487,20 @@ fn inline_graph(
             sccs_groups[fname.as_str()].clone(),
         );
         for (call_arg, function_arg) in zip(call_args, function_args) {
-            new_call_node = new_graph.new_node(StatType::new_simple(
-                StatCode::Assign(variable_mappings[function_arg], OpSrc::Var(call_arg)),
-                new_call_node,
+            let new_function_arg =
+                if let Some(&new_function_arg) = variable_mappings.get(function_arg) {
+                    new_function_arg
+                } else {
+                    continue;
+                };
+            let arg_assign_node = new_graph.new_node(StatType::new_simple(
+                StatCode::Assign(new_function_arg, OpSrc::Var(call_arg)),
+                new_call_node.clone(),
             ));
+            new_call_node
+                .get_mut()
+                .add_incoming(arg_assign_node.clone());
+            new_call_node = arg_assign_node;
         }
 
         for incoming_node in incoming {
