@@ -139,7 +139,7 @@ impl AllocationState {
 
         // Now push all temporaries to the map to fill the frame. If it is
         // already in the map (it is a stack argument) we ignore.
-        let mut sp_displacement = 0;
+        let mut sp_displacement = 1;
         for temp in temps_set {
             let temp_alloc = Alloc::Temp(*temp);
             if alloc_map.try_insert(temp_alloc, sp_displacement).is_ok() {
