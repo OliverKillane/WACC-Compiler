@@ -2,7 +2,10 @@
 
 begin
     
+    ##### ARRAY PRINTING FUNCTIONS #####
+
     # Print the given integer array
+    # Change return type to void
     bool print_int_array(string ident, int[] arr) is
         int i = 0 ;
         print ident ;
@@ -19,6 +22,7 @@ begin
     end
 
     # Print the given boolean array
+    # Change return type to void
     bool print_bool_array(string ident, bool[] arr) is
         int i = 0 ;
         print ident ;
@@ -35,6 +39,7 @@ begin
     end
 
     # Print the given characater array
+    # Change return type to void
     bool print_char_array(string ident, char[] arr) is
         int i = 0 ;
         print ident ;
@@ -50,38 +55,45 @@ begin
         return true
     end
 
+    ##### ARRAY FILL FUNCTIONS #####
+
     # Fill given integer array with given integer
-    int[] fill_int_array(int elem, int[] arr) is
+    # Change return type to void
+    bool fill_int_array(int elem, int[] arr) is
         int i = 0 ;
         int arr_len = len arr ;
         while (i < arr_len) do
             arr[i] = elem ;
             i = i + 1
         done ;
-        return arr
+        return true
     end
 
     # Fill given boolean array with given boolean
-    bool[] fill_bool_array(bool elem, bool[] arr) is
+    # Change return type to void
+    bool fill_bool_array(bool elem, bool[] arr) is
         int i = 0 ;
         int arr_len = len arr ;
         while (i < arr_len) do
             arr[i] = elem ;
             i = i + 1
         done ;
-        return arr
+        return true
     end
 
     # Fill given character array with given character
-    char[] fill_char_array(char elem, char[] arr) is
+    # Change return type to void
+    bool fill_char_array(char elem, char[] arr) is
         int i = 0 ;
         int arr_len = len arr ;
         while (i < arr_len) do
             arr[i] = elem ;
             i = i + 1
         done ;
-        return arr
+        return true
     end
+
+    ##### ARRAY FIND AND COUNT FUNCTIONS #####
 
     # Returns the index of the nth appearance of given element in given integer array
     # Returns -1 if given element is not present in given array n times
@@ -272,6 +284,8 @@ begin
         return last
     end
 
+    ##### ARRAY CONTAINS FUNCTIONS #####
+
     # Returns true if given element exists in given integer array
     bool contains_int_array(int elem, int[] arr) is
         int count = call count_int_array(elem, arr) ;
@@ -302,6 +316,8 @@ begin
         fi
     end
 
+    ##### ARRAY FOLD FUNCTIONS ####
+
     # Folds the given boolean array using bitwise AND operation
     bool fold_and_bool_arr(bool[] arr) is
         int i = 0 ; 
@@ -330,6 +346,69 @@ begin
         return false
     end
 
+    ##### ARRAY SORT FUNCTIONS #####
+
+    ### QUICK SORT ###
+
+    # Swaps the values of the two given indices
+    # Change return type to void
+    bool swap(int i1, int i2, int[] arr) is
+        int temp = arr[i1] ;
+        arr[i1] = arr[i2] ;
+        arr[i2] = temp ;
+        return true
+    end
+
+    # Uses the element at index 'hi' as the pivot
+    # the pivot will be placed at its final position in the sorted array
+    # the rest of the elements will be swapped such that
+    # all the elements to the left are less than the pivot
+    # all the elements to the right are greater than the pivot
+    # returns the so-called partitioning index
+    int partition(int lo, int hi, int[] arr) is
+        int pivot = arr[hi] ;
+        int i = (lo - 1) ;
+        
+        int j = lo ;
+        bool swapped = false ;
+        while (j < hi) do
+            if (arr[j] < pivot) then
+                i = i + 1 ;
+                swapped = call swap(i, j, arr)
+            else
+                skip
+            fi ;
+            j = j + 1
+        done ;
+
+        swapped = call swap(i + 1, hi, arr) ;
+
+        return i + 1
+    end
+
+    # QuickSort helper function
+    # Change return type to void
+    bool quick_sort_helper(int lo, int hi, int[] arr) is
+        bool sort = false ;
+        if (lo < hi) then
+            int par_index = call partition(lo, hi, arr) ;
+            sort = call quick_sort_helper(lo, par_index - 1, arr) ;
+            sort = call quick_sort_helper(par_index + 1, hi, arr)
+        else
+            skip
+        fi ;
+        return true
+    end
+
+    # Main QuickSort function
+    # Change return type to void
+    bool quick_sort(int[] arr) is
+        int lo = 0 ;
+        int hi = (len arr) - 1;
+        bool sort = call quick_sort_helper(lo, hi, arr) ;
+        return sort
+    end
+
     ##### WILL NEED TO ADD NEW 'new' OPERATOR #####
 
     # # Initialize integer array of given size with given integer
@@ -354,6 +433,9 @@ begin
     # end
 
     # # Reverse given integer array
+    # # Change return type to void ?
+    # # Will need to also have array copy function to copy the original array
+    # # into a temp array so that the original array could be reversed off of that
     # int[] reverse_int_array(int[] arr) is
     #     int i = 0 ;
     #     int arr_len = len arr ;
@@ -366,6 +448,9 @@ begin
     # end
 
     # # Reverse given boolean array
+    # # Change return type to void ?
+    # # Will need to also have array copy function to copy the original array
+    # # into a temp array so that the original array could be reversed off of that
     # bool[] reverse_bool_array(bool[] arr) is
     #     int i = 0 ;
     #     int arr_len = len arr ;
@@ -378,6 +463,9 @@ begin
     # end
 
     # # Reverse given character array
+    # # Change return type to void ?
+    # # Will need to also have array copy function to copy the original array
+    # # into a temp array so that the original array could be reversed off of that
     # char[] reverse_char_array(char[] arr) is
     #     int i = 0 ;
     #     int arr_len = len arr ;
@@ -388,6 +476,11 @@ begin
     #     done ;
     #     return rev_arr
     # end
+
+    int[] arr = [2, 3, 1, -2, -5, 10, 9, 11, 13, 14, 15] ;
+    bool print_arr = call print_int_array("unsorted arr", arr) ;
+    bool sort = call quick_sort(arr) ;
+    print_arr = call print_int_array("sorted arr", arr) ;
 
     skip
 
