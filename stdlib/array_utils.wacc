@@ -264,21 +264,21 @@ begin
     end
 
     # Returns the index of the appearance of given element in given integer array
-    int last_int_array(int elem, int[] arr) is
+    int find_last_int_array(int elem, int[] arr) is
         pair(int, int) count_last = call count_last_int_array(elem, arr) ;
         int last = snd count_last ;
         return last
     end
 
     # Returns the index of the appearance of given element in given boolean array
-    int last_bool_array(bool elem, bool[] arr) is
+    int find_last_bool_array(bool elem, bool[] arr) is
         pair(int, int) count_last = call count_last_bool_array(elem, arr) ;
         int last = snd count_last ;
         return last
     end
 
     # Returns the number of appearances of given element in given character array
-    int last_char_array(char elem, char[] arr) is
+    int find_last_char_array(char elem, char[] arr) is
         pair(int, int) count_last = call count_last_char_array(elem, arr) ;
         int last = snd count_last ;
         return last
@@ -348,20 +348,36 @@ begin
 
     ##### ARRAY SORT FUNCTIONS #####
 
+    ### BUBBLE SORT ###
+
+    # Performs BubbleSort on given integer array
+    bool bubble_sort(int[] arr) is
+        int i = 0 ;
+        int j = 0 ;
+        int arr_len = len arr ;
+        bool swapped = false ;
+
+        while (i < arr_len - 1) do
+            while (j < arr_len - i - 1) do
+                if (arr[j] > arr[j + 1]) then
+                    swapped = call swap(j, j + 1, arr)
+                else
+                    skip
+                fi ;
+                j = j + 1
+            done ;
+            j = 0 ;
+            i = i + 1
+        done ;
+
+        return true
+    end
+
     ### MERGE SORT ###
 
     ## NEED 'init_int_array' TO BE IMPLEMENTED
 
     ### QUICK SORT ###
-
-    # Swaps the values of the two given indices
-    # Change return type to void
-    bool swap(int i1, int i2, int[] arr) is
-        int temp = arr[i1] ;
-        arr[i1] = arr[i2] ;
-        arr[i2] = temp ;
-        return true
-    end
 
     # Uses the element at index 'hi' as the pivot
     # the pivot will be placed at its final position in the sorted array
@@ -404,13 +420,24 @@ begin
         return true
     end
 
-    # Main QuickSort function
+    # Main QuickSort function - performs Quick Sort on given integer array
     # Change return type to void
     bool quick_sort(int[] arr) is
         int lo = 0 ;
         int hi = (len arr) - 1;
         bool sort = call quick_sort_helper(lo, hi, arr) ;
         return sort
+    end
+
+    ##### ARRAY MEMORY MANIPULATION #####
+
+    # Swaps the values of the two given indices
+    # Change return type to void
+    bool swap(int i1, int i2, int[] arr) is
+        int temp = arr[i1] ;
+        arr[i1] = arr[i2] ;
+        arr[i2] = temp ;
+        return true
     end
 
     ##### WILL NEED TO ADD NEW 'new' OPERATOR #####
@@ -480,11 +507,6 @@ begin
     #     done ;
     #     return rev_arr
     # end
-
-    int[] arr = [2, 3, 1, -2, -5, 10, 9, 11, 13, 14, 15] ;
-    bool print_arr = call print_int_array("unsorted arr", arr) ;
-    bool sort = call quick_sort(arr) ;
-    print_arr = call print_int_array("sorted arr", arr) ;
 
     skip
 
