@@ -133,9 +133,14 @@ fn get_mapping(
     new_variable: &mut VarRepr,
     variable_mappings: &mut HashMap<VarRepr, VarRepr>,
 ) -> VarRepr {
-    let mapping = *variable_mappings.entry(var).or_insert(*new_variable);
-    *new_variable += 1;
-    mapping
+    if let Some(&mapping) = variable_mappings.get(&var) {
+        mapping
+    } else {
+        let new_mapping = *new_variable;
+        variable_mappings.insert(var, new_mapping);
+        *new_variable += 1;
+        new_mapping
+    }
 }
 
 /// Substitutes the variable identifier from the old three code graph to the new
@@ -440,6 +445,14 @@ fn inline_graph(
         .map(|&arg| get_mapping(arg, &mut new_main_variable, &mut main_variable_mappings))
         .collect();
     let mut code_instruction_count = code_instruction_count.ceil() as usize;
+    println!("{}", new_main_variable);
+    println!(
+        "{}",
+        main_variable_mappings
+            .iter()
+            .map(|m| format!("{:?}", m))
+            .collect::<String>()
+    );
     while let Some(call_node) = call_nodes.pop_front() {
         let fname = get_call_name(&call_node, functions).expect("Not a call node");
         let function_instruction_count = function_instruction_counts[fname.as_str()];
