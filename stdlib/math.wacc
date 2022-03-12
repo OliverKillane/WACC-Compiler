@@ -186,7 +186,78 @@ begin
             return sin_sign / cos_sign
         fi
     end
+
+    # Returns the sum of all elements in integer array
+    int sum_int_arr(int[] arr) is
+        int sum = 0 ;
+        int i = 0 ; 
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            sum = sum + arr[i]
+        done ;
+        return sum
+    end
+
+    # Returns the product of all elements in integer array
+    int sum_prod_arr(int[] arr) is
+        int prod = 1 ;
+        int i = 0 ; 
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            prod = prod * arr[i]
+        done ;
+        return prod
+    end
+
+    # Returns the floored mean of all elements in integer array
+    int floor_avg_int_arr(int[] arr) is
+        int sum = call sum_int_arr(arr);
+        int arr_len = len arr ;
+        return (sum / arr_len)
+    end
+
+    # Returns the floored population variance of all elements in integer array
+    int floor_pop_var_int_arr(int[] arr) is
+        int avg = call floor_avg_int_arr(arr) ;
+        int i = 0 ; 
+        int arr_len = len arr ;
+        int diff_sum = 0 ;
+        int curr_diff_sum_sq = 0 ;
+        while (i < arr_len) do
+            curr_diff_sum_sq = call pow((arr[i] - avg), 2) ;
+            diff_sum = diff_sum + curr_diff_sum_sq
+        done ;
+        return (diff_sum / arr_len)
+    end
+
+    # Returns the floored population standard deviation of all elements in integer array
+    int floor_pop_sd_int_arr(int[] arr) is
+        int var = call floor_pop_var_int_arr(arr) ;
+        int sd = call floor_sqrt(var) ;
+        return sd
+    end
+
+    # Returns the floored sample variance of all elements in integer array
+    int floor_sam_var_int_arr(int[] arr) is
+        int avg = call floor_avg_int_arr(arr) ;
+        int i = 0 ; 
+        int arr_len = len arr ;
+        int diff_sum = 0 ;
+        int curr_diff_sum_sq = 0 ;
+        while (i < arr_len) do
+            curr_diff_sum_sq = call pow((arr[i] - avg), 2) ;
+            diff_sum = diff_sum + curr_diff_sum_sq
+        done ;
+        return (diff_sum / (arr_len - 1))
+    end
+
+    # Returns the floored sample standard deviation of all elements in integer array
+    int floor_sam_sd_int_arr(int[] arr) is
+        int var = call floor_sam_var_int_arr(arr) ;
+        int sd = call floor_sqrt(var) ;
+        return sd
+    end
     
     skip
-    
+
 end
