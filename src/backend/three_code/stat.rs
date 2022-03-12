@@ -563,7 +563,7 @@ pub(super) mod tests {
             HashMap::from([(0, ir::Type::Num(ir::NumSize::Byte))]),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%c\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String(" %c\0".as_bytes().to_vec()))]),
             true,
         )
     }
@@ -599,7 +599,7 @@ pub(super) mod tests {
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%c\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String(" %c\0".as_bytes().to_vec()))]),
             false,
         )
     }
