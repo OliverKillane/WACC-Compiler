@@ -2,6 +2,7 @@ mod arm;
 mod data_flow;
 mod inlining;
 mod same_branch;
+mod tail_call_optimisation;
 mod three_code;
 
 use crate::intermediate::Program;
