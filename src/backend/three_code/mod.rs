@@ -128,6 +128,8 @@ pub(super) struct Function {
     pub args: Vec<VarRepr>,
     /// First statement of the program
     pub code: StatNode,
+    /// Graph of all statement nodes in the function
+    pub graph: Graph<StatType>,
     /// Whether a [read ref operand source](OpSrc::ReadRef) is used in the function code
     pub read_ref: bool,
 }
@@ -148,7 +150,7 @@ pub(super) struct ThreeCode {
     pub functions: HashMap<String, Function>,
     /// Static data references in the program
     pub data_refs: HashMap<DataRef, DataRefType>,
-    /// Graph of all statement nodes in the program
+    /// Graph of all statement nodes in the main program body
     pub graph: Graph<StatType>,
     /// Whether a [read ref operand source](OpSrc::ReadRef) is used in the main program code
     pub read_ref: bool,
@@ -824,7 +826,6 @@ fn translate_block_graph(
 ///  - [Compilation options](Options).
 fn translate_function(
     ir::Function(_, args, mut local_vars, block_graph): ir::Function,
-    stat_graph: Rc<RefCell<Graph<StatType>>>,
     free_data_ref: &mut DataRef,
     data_refs: &mut HashMap<DataRef, DataRefType>,
     fmt_flags: &mut FmtDataRefFlags,
@@ -843,9 +844,11 @@ fn translate_function(
         .map(|var| var + 1)
         .unwrap_or(0);
     let mut read_ref = false;
+    let stat_graph: Rc<RefCell<Graph<StatType>>> = Rc::new(RefCell::new(Graph::new()));
+
     let start_node = translate_block_graph(
         block_graph,
-        stat_graph,
+        stat_graph.clone(),
         free_var,
         free_data_ref,
         data_refs,
@@ -858,6 +861,9 @@ fn translate_function(
     Function {
         args: three_code_args,
         code: start_node,
+        graph: Rc::try_unwrap(stat_graph)
+            .expect("Graphs exists in more than one place")
+            .into_inner(),
         read_ref,
     }
 }
@@ -918,7 +924,6 @@ impl From<(ir::Program, &Options)> for ThreeCode {
                     name,
                     translate_function(
                         function,
-                        stat_graph.clone(),
                         &mut free_data_ref,
                         &mut data_refs,
                         &mut fmt_flags,
@@ -1167,11 +1172,11 @@ mod tests {
 
     #[test]
     fn translate_function_test() {
-        let graph = Rc::new(RefCell::new(Graph::new()));
         let mut data_refs = HashMap::new();
         let Function {
             args,
             code,
+            mut graph,
             read_ref,
         } = translate_function(
             ir::Function(
@@ -1184,7 +1189,6 @@ mod tests {
                     ir::BlockEnding::Return(Some(ir::Expr::Bool(ir::BoolExpr::Const(false)))),
                 )],
             ),
-            graph.clone(),
             &mut 0,
             &mut data_refs,
             &mut FmtDataRefFlags::default(),
@@ -1205,9 +1209,6 @@ mod tests {
         assert_eq!(args, vec![0]);
         assert!(!read_ref);
 
-        let mut graph = Rc::try_unwrap(graph)
-            .expect("Multiple references to the graph")
-            .into_inner();
         let return_node = graph.new_node(StatType::new_return(Some(2)));
         let return_assign_node = graph.new_node(StatType::new_simple(
             StatCode::Assign(2, OpSrc::Const(0)),
@@ -1218,11 +1219,11 @@ mod tests {
 
     #[test]
     fn translate_void_function_test() {
-        let graph = Rc::new(RefCell::new(Graph::new()));
         let mut data_refs = HashMap::new();
         let Function {
             args,
             code,
+            mut graph,
             read_ref,
         } = translate_function(
             ir::Function(
@@ -1231,7 +1232,6 @@ mod tests {
                 HashMap::from([(1, ir::Type::Num(ir::NumSize::Byte))]),
                 vec![ir::Block(vec![], vec![], ir::BlockEnding::Return(None))],
             ),
-            graph.clone(),
             &mut 0,
             &mut data_refs,
             &mut FmtDataRefFlags::default(),
@@ -1252,9 +1252,6 @@ mod tests {
         assert_eq!(args, vec![0]);
         assert!(!read_ref);
 
-        let mut graph = Rc::try_unwrap(graph)
-            .expect("Multiple references to the graph")
-            .into_inner();
         let return_node = graph.new_node(StatType::new_return(None));
         match_graph(code, return_node);
     }

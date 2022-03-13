@@ -7,7 +7,6 @@ use crate::{
 use std::{
     collections::{HashMap, HashSet, LinkedList},
     iter::zip,
-    mem::drop,
     rc::Rc,
 };
 
@@ -59,6 +58,7 @@ fn get_function_statistics(
     Function {
         args: _,
         code,
+        graph: _,
         read_ref: _,
     }: &Function,
 ) -> (f64, Vec<String>) {
@@ -478,6 +478,7 @@ fn inline_graph(
         let Function {
             args: function_args,
             code: function_code,
+            graph: _,
             read_ref: _,
         } = &functions[&fname];
         let mut variable_mappings = HashMap::new();
@@ -531,7 +532,7 @@ pub(super) fn inline(
     ThreeCode {
         functions,
         data_refs,
-        graph,
+        graph: _,
         read_ref,
         code,
         int_handler,
@@ -593,13 +594,14 @@ pub(super) fn inline(
                 Function {
                     args,
                     code,
+                    graph: _,
                     read_ref,
                 },
             )| {
-                println!("fname: {}", fname);
+                let mut new_function_graph = Graph::new();
                 let (code, args) = inline_graph(
                     code,
-                    &mut new_graph,
+                    &mut new_function_graph,
                     instructions_limit,
                     args,
                     &functions,
@@ -612,22 +614,35 @@ pub(super) fn inline(
                     Function {
                         args,
                         code,
+                        graph: new_function_graph,
                         read_ref: *read_ref,
                     },
                 )
             },
         )
         .collect();
-    drop(graph);
 
     let mut called_functions = HashSet::new();
+    if let Some(int_handler) = &int_handler {
+        called_functions.insert(int_handler.clone());
+    }
     for node in &new_graph {
         if let Some(fname) = get_call_name(&node, &new_functions) {
             called_functions.insert(fname);
         }
     }
-    if let Some(int_handler) = &int_handler {
-        called_functions.insert(int_handler.clone());
+    for Function {
+        graph: new_function_graph,
+        args: _,
+        code: _,
+        read_ref: _,
+    } in new_functions.values()
+    {
+        for node in new_function_graph {
+            if let Some(fname) = get_call_name(&node, &new_functions) {
+                called_functions.insert(fname);
+            }
+        }
     }
     let new_functions: HashMap<_, _> = new_functions
         .into_iter()

@@ -57,6 +57,7 @@ pub fn allocate_registers(program: ArmCode) -> ArmCode {
                         start_node,
                         temps,
                         reserved_stack,
+                        mut cfg,
                     },
                 )| {
                     let start_node = allocate_for_routine(
@@ -74,6 +75,7 @@ pub fn allocate_registers(program: ArmCode) -> ArmCode {
                             start_node,
                             temps,
                             reserved_stack,
+                            cfg,
                         },
                     )
                 },
@@ -147,11 +149,10 @@ fn translate_from_node(
 ) {
     loop {
         // get the live in and live out
-        let livein = live_ranges.get_livein(&current_node.clone());
-        let liveout = live_ranges.get_liveout(&current_node.clone());
+        let (livein, liveout) = &live_ranges[&current_node];
 
         // update the registers for current live_in
-        alloc_state.update_live(&livein);
+        alloc_state.update_live(livein);
 
         // a helper closure for checking conditions
         let load_dst = |cond: &Cond| cond != &Cond::Al;
@@ -166,12 +167,12 @@ fn translate_from_node(
         {
             ControlFlow::Simple(Some(prev), Stat::Call(fun_name, ret, args), next) => {
                 let Chain(mut start, mut end) =
-                    alloc_state.call(fun_name.clone(), ret, args, &liveout, graph);
+                    alloc_state.call(fun_name.clone(), ret, args, liveout, graph);
 
                 start.set_predecessor(prev.clone());
                 prev.replace_successor(current_node.clone(), start);
 
-                alloc_state.update_live(&liveout);
+                alloc_state.update_live(liveout);
 
                 // as we entirely replace the 'call' node, we set the successors and
                 // predecessors to point to the ends of our chain of statements
@@ -187,9 +188,9 @@ fn translate_from_node(
                 // single destination, this node is removed from the graph and replaced with assignment
 
                 let dst_t = dst_ident.get_temp();
-                alloc_state.update_live(&liveout);
+                alloc_state.update_live(liveout);
                 let (reg, get_reg_chain) =
-                    alloc_state.move_temp_into_reg(dst_t, false, &[], &liveout, graph);
+                    alloc_state.move_temp_into_reg(dst_t, false, &[], liveout, graph);
                 let set_address_chain = alloc_state.assign_stack_reserved(reg, graph);
 
                 let Chain(mut start, mut end) =
@@ -234,21 +235,21 @@ fn translate_from_node(
                         // ensure both arguments are in registers, and leave
                         // the arguments alone if they are already in a register.
                         let (arg1_reg, arg1_chain) =
-                            alloc_state.move_temp_into_reg(arg1_t, true, &[arg2_t], &livein, graph);
+                            alloc_state.move_temp_into_reg(arg1_t, true, &[arg2_t], livein, graph);
                         let (arg2_reg, arg2_chain) =
-                            alloc_state.move_temp_into_reg(arg2_t, true, &[arg1_t], &livein, graph);
+                            alloc_state.move_temp_into_reg(arg2_t, true, &[arg1_t], livein, graph);
 
                         // update the live temps, this means that if either argument
                         // dies after this statement, their register can be used as
                         // the destination register.
-                        alloc_state.update_live(&liveout);
+                        alloc_state.update_live(liveout);
 
                         // Use any free register, if arg1 or arg2 are live after the instruction, we do not want to use their register.
                         let (dst_reg, dst_chain) = alloc_state.move_temp_into_reg(
                             dst_t,
                             load_dst(cond),
                             &[arg1_t, arg2_t],
-                            &liveout,
+                            liveout,
                             graph,
                         );
 
@@ -275,18 +276,18 @@ fn translate_from_node(
 
                         // place the arg in a register
                         let (arg_reg, arg_chain) =
-                            alloc_state.move_temp_into_reg(arg_t, true, &[], &livein, graph);
+                            alloc_state.move_temp_into_reg(arg_t, true, &[], livein, graph);
 
                         // update the live temps, this means that if the argument
                         // dies after this statement, its register can be used.
-                        alloc_state.update_live(&liveout);
+                        alloc_state.update_live(liveout);
 
                         // find and place the dst in a register
                         let (dst_reg, dst_chain) = alloc_state.move_temp_into_reg(
                             dst_t,
                             load_dst(cond),
                             &[arg_t],
-                            &liveout,
+                            liveout,
                             graph,
                         );
 
@@ -308,33 +309,33 @@ fn translate_from_node(
                             arg1_t,
                             true,
                             &[arg2_t, arg3_t],
-                            &livein,
+                            livein,
                             graph,
                         );
                         let (arg2_reg, arg2_chain) = alloc_state.move_temp_into_reg(
                             arg2_t,
                             true,
                             &[arg1_t, arg3_t],
-                            &livein,
+                            livein,
                             graph,
                         );
                         let (arg3_reg, arg3_chain) = alloc_state.move_temp_into_reg(
                             arg3_t,
                             true,
                             &[arg1_t, arg2_t],
-                            &livein,
+                            livein,
                             graph,
                         );
 
                         // update with the liveout range
-                        alloc_state.update_live(&liveout);
+                        alloc_state.update_live(liveout);
 
                         // find a destination, assign register
                         let (dst_reg, dst_chain) = alloc_state.move_temp_into_reg(
                             dst_t,
                             load_dst(cond),
                             &[arg1_t, arg2_t, arg3_t],
-                            &liveout,
+                            liveout,
                             graph,
                         );
 
@@ -355,26 +356,26 @@ fn translate_from_node(
 
                         // assign the argument registers
                         let (arg1_reg, arg1_chain) =
-                            alloc_state.move_temp_into_reg(arg1_t, true, &[arg2_t], &livein, graph);
+                            alloc_state.move_temp_into_reg(arg1_t, true, &[arg2_t], livein, graph);
                         let (arg2_reg, arg2_chain) =
-                            alloc_state.move_temp_into_reg(arg2_t, true, &[arg1_t], &livein, graph);
+                            alloc_state.move_temp_into_reg(arg2_t, true, &[arg1_t], livein, graph);
 
                         // update with the liveout range
-                        alloc_state.update_live(&liveout);
+                        alloc_state.update_live(liveout);
 
                         // assign the argument registers
                         let (dst1_reg, dst1_chain) = alloc_state.move_temp_into_reg(
                             dst1_t,
                             load_dst(cond),
                             &[arg1_t, arg2_t],
-                            &liveout,
+                            liveout,
                             graph,
                         );
                         let (dst2_reg, dst2_chain) = alloc_state.move_temp_into_reg(
                             dst2_t,
                             load_dst(cond),
                             &[arg1_t, arg2_t, dst1_t],
-                            &liveout,
+                            liveout,
                             graph,
                         );
 
@@ -398,13 +399,13 @@ fn translate_from_node(
                         let dst_t = dst_ident.get_temp();
 
                         // kill unused variables before determining destination
-                        alloc_state.update_live(&liveout);
+                        alloc_state.update_live(liveout);
 
                         let (reg, chain) = alloc_state.move_temp_into_reg(
                             dst_t,
                             load_dst(cond),
                             &[],
-                            &liveout,
+                            liveout,
                             graph,
                         );
                         *dst_ident = Ident::Reg(reg);
@@ -415,10 +416,10 @@ fn translate_from_node(
                         let dst_t = dst_ident.get_temp();
 
                         // kill unused variables before determining destination
-                        alloc_state.update_live(&liveout);
+                        alloc_state.update_live(liveout);
 
                         let (reg, chain) =
-                            alloc_state.move_temp_into_reg(dst_t, false, &[], &liveout, graph);
+                            alloc_state.move_temp_into_reg(dst_t, false, &[], liveout, graph);
                         *dst_ident = Ident::Reg(reg);
                         chain
                     }
@@ -437,11 +438,11 @@ fn translate_from_node(
 
                         // assign the argument registers
                         let (arg1_reg, arg1_chain) =
-                            alloc_state.move_temp_into_reg(arg1_t, true, &[arg2_t], &livein, graph);
+                            alloc_state.move_temp_into_reg(arg1_t, true, &[arg2_t], livein, graph);
                         let (arg2_reg, arg2_chain) =
-                            alloc_state.move_temp_into_reg(arg2_t, true, &[arg1_t], &livein, graph);
+                            alloc_state.move_temp_into_reg(arg2_t, true, &[arg1_t], livein, graph);
 
-                        alloc_state.update_live(&liveout);
+                        alloc_state.update_live(liveout);
 
                         *arg1_ident = Ident::Reg(arg1_reg);
                         *arg2_ident = Ident::Reg(arg2_reg);
@@ -465,21 +466,21 @@ fn translate_from_node(
                             arg1_t,
                             true,
                             &[arg2_t, arg3_t],
-                            &livein,
+                            livein,
                             graph,
                         );
                         let (arg2_reg, arg2_chain) = alloc_state.move_temp_into_reg(
                             arg2_t,
                             true,
                             &[arg1_t, arg3_t],
-                            &livein,
+                            livein,
                             graph,
                         );
                         let (arg3_reg, arg3_chain) = alloc_state.move_temp_into_reg(
                             arg3_t,
                             true,
                             &[arg1_t, arg2_t],
-                            &livein,
+                            livein,
                             graph,
                         );
 
@@ -487,7 +488,7 @@ fn translate_from_node(
                         *arg2_ident = Ident::Reg(arg2_reg);
                         *arg3_ident = Ident::Reg(arg3_reg);
 
-                        alloc_state.update_live(&liveout);
+                        alloc_state.update_live(liveout);
 
                         link_optional_chains(vec![arg1_chain, arg2_chain, arg3_chain])
                     }
@@ -503,9 +504,9 @@ fn translate_from_node(
                         let arg_t = arg_ident.get_temp();
 
                         let (arg1_reg, arg_chain) =
-                            alloc_state.move_temp_into_reg(arg_t, true, &[], &livein, graph);
+                            alloc_state.move_temp_into_reg(arg_t, true, &[], livein, graph);
 
-                        alloc_state.update_live(&liveout);
+                        alloc_state.update_live(liveout);
 
                         *arg_ident = Ident::Reg(arg1_reg);
 
@@ -517,11 +518,11 @@ fn translate_from_node(
                         let arg_t = arg_ident.get_temp();
 
                         let (arg1_reg, arg_chain) =
-                            alloc_state.move_temp_into_reg(arg_t, true, &[], &livein, graph);
+                            alloc_state.move_temp_into_reg(arg_t, true, &[], livein, graph);
 
                         *arg_ident = Ident::Reg(arg1_reg);
 
-                        alloc_state.update_live(&liveout);
+                        alloc_state.update_live(liveout);
 
                         alloc_state.push_sp();
 
@@ -530,12 +531,12 @@ fn translate_from_node(
                     Stat::Pop(cond, dst_ident) => {
                         // pop from the stack into some temporary
                         let dst_t = dst_ident.get_temp();
-                        alloc_state.update_live(&liveout);
+                        alloc_state.update_live(liveout);
                         let (dst_reg, dst_chain) = alloc_state.move_temp_into_reg(
                             dst_t,
                             load_dst(cond),
                             &[],
-                            &liveout,
+                            liveout,
                             graph,
                         );
 
