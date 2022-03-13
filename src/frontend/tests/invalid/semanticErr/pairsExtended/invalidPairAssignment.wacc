@@ -1,0 +1,6 @@
+# checks for invalid type assignments in pairs.
+
+begin
+    pair(int, pair(int, int)) a = null;
+    pair(int, int) b = a
+end

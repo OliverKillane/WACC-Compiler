@@ -1,0 +1,5 @@
+# Check that inner pairs are correctly parsed
+
+begin
+    pair(pair(pair, nonsense), pair(int, a)) a = null
+end

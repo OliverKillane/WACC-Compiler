@@ -238,6 +238,7 @@ fn all_types_test() {
 #[case("static/scope")]
 #[case("static/sequence")]
 #[case("static/variables")]
+#[case("static/pairsExtended")]
 #[case("static/while")]
 fn examples_test(#[case] path: &str) {
     examples_dir_test(path).expect("Unable to test directory:");
