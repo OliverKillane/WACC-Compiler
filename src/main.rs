@@ -7,6 +7,7 @@
 #![feature(backtrace)]
 #![feature(map_try_insert)]
 #![feature(iter_intersperse)]
+#![feature(cow_is_borrowed)]
 #![allow(dead_code)]
 #![feature(cow_is_borrowed)]
 //! # The group 33 WACC Compiler project.

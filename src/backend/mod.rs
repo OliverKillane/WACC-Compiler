@@ -1,4 +1,5 @@
 mod arm;
+mod const_prop;
 mod data_flow;
 mod inlining;
 mod same_branch;
