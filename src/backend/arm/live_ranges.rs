@@ -56,7 +56,7 @@ fn live_update(
 ) -> (LiveAnalysis, LiveAnalysis, bool) {
     let (new_live_in, new_live_out) = if succ_live_in.len() == 1 {
         if succ_live_in[0] == &live_out {
-            return (live_in.clone(), live_out.clone(), false);
+            return (live_in, live_out, false);
         } else {
             let new_live_out = succ_live_in[0].clone();
             (construct_live_in(node, new_live_out.clone()), new_live_out)
@@ -84,16 +84,9 @@ pub type LiveRanges = HashMap<ArmNode, (Vec<Temporary>, Vec<Temporary>)>;
 pub fn get_live_ranges(arm_code: &ArmCode) -> LiveRanges {
     dataflow_analysis(&arm_code.main, live_init, live_update, false)
         .into_iter()
-        .chain(
-            arm_code
-                .subroutines
-                .values()
-                .map(|subroutine| {
-                    dataflow_analysis(&subroutine.start_node, live_init, live_update, false)
-                        .into_iter()
-                })
-                .flatten(),
-        )
+        .chain(arm_code.subroutines.values().flat_map(|subroutine| {
+            dataflow_analysis(&subroutine.start_node, live_init, live_update, false).into_iter()
+        }))
         .map(|(node, (live_in, live_out))| {
             let mut live_in = live_in
                 .iter()

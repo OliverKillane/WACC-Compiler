@@ -58,7 +58,7 @@ fn get_function_statistics(
     Function {
         args: _,
         code,
-        graph,
+        graph: _,
         read_ref: _,
     }: &Function,
 ) -> (f64, Vec<String>) {
@@ -532,7 +532,7 @@ pub(super) fn inline(
     ThreeCode {
         functions,
         data_refs,
-        graph,
+        graph: _,
         read_ref,
         code,
         int_handler,
@@ -594,7 +594,7 @@ pub(super) fn inline(
                 Function {
                     args,
                     code,
-                    graph,
+                    graph: _,
                     read_ref,
                 },
             )| {

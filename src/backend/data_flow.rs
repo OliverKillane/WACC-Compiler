@@ -1,6 +1,5 @@
 use crate::graph::{Deleted, NodeRef};
 use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
 
 pub(super) trait DataflowNode: Deleted + Sized {
     fn incoming(&self) -> Vec<&NodeRef<Self>>;
