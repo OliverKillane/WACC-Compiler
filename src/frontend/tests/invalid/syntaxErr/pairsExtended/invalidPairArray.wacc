@@ -1,0 +1,5 @@
+# Check that arrays of just pair are syntactically invalid
+
+begin
+    pair(pair[], int) a = null
+end

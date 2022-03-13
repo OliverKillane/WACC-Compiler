@@ -1,0 +1,5 @@
+# checks for invalid newpair assignment (fst must be an int)
+
+begin
+    pair(int, pair(int, int)) a = newpair(null, null)
+end
