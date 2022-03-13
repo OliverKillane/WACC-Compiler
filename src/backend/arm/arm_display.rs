@@ -312,6 +312,15 @@ impl Display for Stat {
     }
 }
 
+fn get_next_node(label_map: &HashMap<ArmNode, (usize, bool)>) -> Option<ArmNode> {
+    for (node, (_, translated)) in label_map {
+        if !*translated {
+            return Some(node.clone());
+        }
+    }
+    None
+}
+
 fn display_routine(
     start_node: &ArmNode,
     name: &str,
@@ -334,12 +343,12 @@ fn display_routine(
 
     let lit_label_conv = |id: &usize| format!("blit_{}_{}", name, id);
 
-    let mut current = start_node.clone();
+    let mut next = Some(start_node.clone());
 
     writeln!(f, "{}:", name)?;
 
-    loop {
-        loop {
+    while next.is_some() {
+        while let Some(current) = next {
             if since_lit > 2000 {
                 writeln!(f, "\tB\t{}", lit_label_conv(&lit_branch_ident))?;
                 writeln!(f, "\t.ltorg")?;
@@ -348,52 +357,40 @@ fn display_routine(
                 since_lit = 0;
             }
 
-            match current.clone().get().deref() {
+            match label_map.get_mut(&current) {
+                Some((id, true)) => {
+                    writeln!(f, "\tB\t{}", label_conv(id))?;
+                    break;
+                }
+                Some((id, l)) => {
+                    writeln!(f, "{}:", label_conv(id))?;
+                    *l = true
+                }
+                None => (),
+            }
+
+            // print out
+            next = match current.get().deref() {
                 ControlFlow::Simple(_, stat, next) => {
                     since_lit += 1;
-                    // write the statement
                     writeln!(f, "{}", stat)?;
-
-                    // check next:
-                    if let Some(next_node) = next {
-                        if let Some((id, _)) = label_map.get(next_node) {
-                            // next node already translated, so place a branch break
-                            writeln!(f, "\tB\t{}", label_conv(id))?;
-                            break;
-                        } else {
-                            current = next_node.clone();
-                        }
-                    } else {
-                        break;
-                    }
+                    next.clone()
                 }
-                ControlFlow::Branch(_, branch_next, cond, next) => {
-                    since_lit += 1;
-                    if let Some((id, _)) = label_map.get(branch_next) {
-                        writeln!(f, "\tB{}\t{}", cond, label_conv(id))?;
+                ControlFlow::Branch(_, branch_true, cond, branch_false) => {
+                    let id = if let Some((id, _)) = label_map.get(branch_true) {
+                        *id
                     } else {
                         let new_id = label_map.len();
-                        label_map.insert(branch_next.clone(), (new_id, false));
-                        writeln!(f, "\tB{}\t{}", cond, label_conv(&new_id))?;
-                    }
+                        label_map.insert(branch_true.clone(), (new_id, false));
+                        new_id
+                    };
 
-                    // check next:
-                    if let Some(next_node) = next {
-                        if let Some((id, _)) = label_map.get(next_node) {
-                            // next node already translated, so place a branch break
-                            writeln!(f, "\tB\t{}", label_conv(id))?;
-                            break;
-                        } else {
-                            current = next_node.clone();
-                        }
-                    } else {
-                        break;
-                    }
+                    writeln!(f, "\tB{}\t{}", cond, label_conv(&id))?;
+                    branch_false.clone()
                 }
                 ControlFlow::Ltorg(_) => {
-                    since_lit = 0;
                     writeln!(f, "\t.ltorg")?;
-                    break;
+                    None
                 }
                 ControlFlow::Return(_, ret) => {
                     writeln!(
@@ -405,57 +402,20 @@ fn display_routine(
                             "no value returned".to_string()
                         }
                     )?;
-                    break;
+                    None
                 }
                 ControlFlow::Multi(_, next) => {
-                    match label_map.get_mut(&current) {
-                        Some((id, t @ false)) => {
-                            writeln!(f, "{}:", label_conv(id))?;
-                            *t = true;
-                        }
-                        Some((_, true)) => break,
-                        None => {
-                            let new_id = label_map.len();
-                            label_map.insert(current.clone(), (new_id, true));
-                            writeln!(f, "{}:", label_conv(&new_id))?;
-                        }
+                    if label_map.get(&current).is_none() {
+                        let new_id = label_map.len();
+                        label_map.insert(current.clone(), (new_id, true));
+                        writeln!(f, "{}:", label_conv(&new_id))?;
                     }
-
-                    // check next:
-                    if let Some(next_node) = next {
-                        if let Some((id, _)) = label_map.get(next_node) {
-                            // next node already translated, so place a branch break
-                            writeln!(f, "\tB\t{}", label_conv(id))?;
-                            break;
-                        } else {
-                            current = next_node.clone();
-                        }
-                    } else {
-                        break;
-                    }
+                    next.clone()
                 }
-                ControlFlow::Removed => panic!("Cannot display removed nodes"),
-            }
+                ControlFlow::Removed => panic!("There should be no removed nodes"),
+            };
         }
-
-        // find the next node to write from, and place label
-        current = {
-            let mut next_node = None;
-            for (node, (id, created)) in label_map.iter_mut() {
-                if !*created {
-                    *created = true;
-                    writeln!(f, "{}:", label_conv(id))?;
-                    next_node = Some(node.clone());
-                    break;
-                }
-            }
-
-            if let Some(node) = next_node {
-                node
-            } else {
-                break;
-            }
-        };
+        next = get_next_node(&label_map);
     }
 
     writeln!(f)
@@ -476,6 +436,11 @@ impl Display for DataType {
                     match char {
                         '\0' => write!(f, "\\0")?,
                         '\n' => write!(f, "\\n")?,
+                        '\t' => write!(f, "\\t")?,
+                        '"' => write!(f, "\\\"")?,
+                        '\r' => write!(f, "\\r")?,
+                        '\u{0008}' => write!(f, "\\b")?,
+                        '\u{0012}' => write!(f, "\\f")?,
                         c => write!(f, "{}", c)?,
                     }
                 }

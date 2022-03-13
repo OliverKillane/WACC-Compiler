@@ -1,8 +1,8 @@
-#![allow(unused_variables)]
 mod eval;
 mod expr;
 mod stat;
 
+use super::data_flow::DataflowNode;
 use super::Options;
 use crate::graph::{Deleted, Graph, NodeRef};
 use crate::intermediate::{self as ir, DataRef, VarRepr};
@@ -127,7 +127,7 @@ pub(super) struct Function {
     /// Variables for function argumetns
     pub args: Vec<VarRepr>,
     /// First statement of the program
-    pub code: Option<StatNode>,
+    pub code: StatNode,
     /// Whether a [read ref operand source](OpSrc::ReadRef) is used in the function code
     pub read_ref: bool,
 }
@@ -153,7 +153,7 @@ pub(super) struct ThreeCode {
     /// Whether a [read ref operand source](OpSrc::ReadRef) is used in the main program code
     pub read_ref: bool,
     /// First statement of the program
-    pub code: Option<StatNode>,
+    pub code: StatNode,
     /// Function to call as an int overflow/underflow handler for checking for
     /// 32-bit overflows.
     pub int_handler: Option<String>,
@@ -161,27 +161,27 @@ pub(super) struct ThreeCode {
 
 impl StatType {
     /// Creates a new simple statement with an empty list of incoming nodes.
-    fn new_simple(stat_code: StatCode, next: StatNode) -> Self {
+    pub(super) fn new_simple(stat_code: StatCode, next: StatNode) -> Self {
         StatType::Simple(vec![], stat_code, next)
     }
 
     /// Creates a new branch statement with an empty list of incoming nodes.
-    fn new_branch(cond: VarRepr, if_true: StatNode, if_false: StatNode) -> Self {
+    pub(super) fn new_branch(cond: VarRepr, if_true: StatNode, if_false: StatNode) -> Self {
         StatType::Branch(vec![], cond, if_true, if_false)
     }
 
     /// Creates a new loop statement with an empty list of incoming nodes.
-    fn new_loop() -> Self {
+    pub(super) fn new_loop() -> Self {
         StatType::Loop(vec![])
     }
 
     /// Creates a new return statement with an empty list of incoming nodes.
-    fn new_return(ret: Option<VarRepr>) -> Self {
+    pub(super) fn new_return(ret: Option<VarRepr>) -> Self {
         StatType::Return(vec![], ret)
     }
 
     /// Adds an incoming node to the list of incoming nodes.
-    fn add_incoming(&mut self, node: StatNode) {
+    pub(super) fn add_incoming(&mut self, node: StatNode) {
         match self {
             Self::Simple(incoming, _, _)
             | Self::Branch(incoming, _, _, _)
@@ -192,7 +192,7 @@ impl StatType {
     }
 
     /// Sets the list of incoming nodes.
-    fn set_incoming(&mut self, incoming: Vec<StatNode>) {
+    pub(super) fn set_incoming(&mut self, incoming: Vec<StatNode>) {
         match self {
             Self::Simple(old_incoming, _, _)
             | Self::Branch(old_incoming, _, _, _)
@@ -202,20 +202,53 @@ impl StatType {
         }
     }
 
-    /// Retreives the list of incoming nodes.
-    fn incoming(&self) -> Vec<StatNode> {
+    /// Substitutes one child of a node for a new one
+    pub(super) fn substitute_child(&mut self, old_child: &StatNode, new_child: &StatNode) {
+        let mut tmp_node = Self::deleted();
+        mem::swap(self, &mut tmp_node);
+        let mut tmp_node = match tmp_node {
+            Self::Simple(incoming, stat_code, next_node) => Self::Simple(
+                incoming,
+                stat_code,
+                if &next_node == old_child {
+                    new_child.clone()
+                } else {
+                    next_node
+                },
+            ),
+            Self::Branch(incoming, var, true_node, false_node) => Self::Branch(
+                incoming,
+                var,
+                if &true_node == old_child {
+                    new_child.clone()
+                } else {
+                    true_node
+                },
+                if &false_node == old_child {
+                    new_child.clone()
+                } else {
+                    false_node
+                },
+            ),
+            tmp_node => tmp_node,
+        };
+        mem::swap(self, &mut tmp_node);
+    }
+
+    /// Constructs the list of successor nodes.
+    pub(super) fn successors(&self) -> Vec<StatNode> {
         match self {
-            Self::Simple(incoming, _, _)
-            | Self::Branch(incoming, _, _, _)
-            | Self::Loop(incoming)
-            | Self::Return(incoming, _)
-            | Self::Dummy(incoming) => incoming.clone(),
+            Self::Loop(_) | Self::Return(_, _) | Self::Dummy(_) => vec![],
+            Self::Simple(_, _, next_node) => vec![next_node.clone()],
+            Self::Branch(_, _, true_node, false_node) => {
+                vec![true_node.clone(), false_node.clone()]
+            }
         }
     }
 
     /// If a node is a simple node, sets
     /// the next node as the given node and returns the old next node for removal.
-    fn append(&mut self, next_node: StatNode) -> StatNode {
+    pub(super) fn append(&mut self, next_node: StatNode) -> StatNode {
         let mut tmp_node = Self::deleted();
         mem::swap(self, &mut tmp_node);
         let (incoming, stat_code, old_next_node) =
@@ -227,6 +260,28 @@ impl StatType {
         let mut tmp_node = Self::Simple(incoming, stat_code, next_node);
         mem::swap(self, &mut tmp_node);
         old_next_node
+    }
+}
+
+impl DataflowNode for StatType {
+    fn incoming(&self) -> Vec<&StatNode> {
+        match self {
+            Self::Simple(incoming, _, _)
+            | Self::Branch(incoming, _, _, _)
+            | Self::Loop(incoming)
+            | Self::Return(incoming, _)
+            | Self::Dummy(incoming) => incoming.iter().collect(),
+        }
+    }
+
+    fn outgoing(&self) -> Vec<&StatNode> {
+        match self {
+            Self::Loop(_) | Self::Return(_, _) | Self::Dummy(_) => vec![],
+            Self::Simple(_, _, next_node) => vec![next_node],
+            Self::Branch(_, _, true_node, false_node) => {
+                vec![true_node, false_node]
+            }
+        }
     }
 }
 
@@ -363,7 +418,7 @@ impl StatLine {
             },
             Self::Line {
                 start_node,
-                end_node,
+                end_node: _,
                 graph,
             } => Self::Line {
                 start_node,
@@ -506,13 +561,13 @@ fn translate_block(
             }
             (vec![], None)
         }
-        ir::BlockEnding::CondJumps(conds, last) => {
+        ir::BlockEnding::CondJumps(conds, _) => {
             let mut outputs = vec![];
             outputs.reserve_exact(conds.len());
             let dummy_node = stat_graph.borrow_mut().new_node(StatType::deleted());
             stat_line.add_node(dummy_node);
 
-            for (bool_expr, block_id) in conds {
+            for (bool_expr, _) in conds {
                 let mut bool_stat_line = StatLine::new(stat_graph.clone());
                 translate_bool_expr(
                     bool_expr,
@@ -556,7 +611,7 @@ fn translate_block(
             }
 
             let end_node = stat_line.end_node().unwrap();
-            let else_output = match &end_node.get_mut().incoming()[..] {
+            let else_output = match end_node.get_mut().incoming()[..] {
                 [] => {
                     stat_line = StatLine::new(stat_graph.clone());
                     let loop_node = stat_graph.borrow_mut().new_node(StatType::new_loop());
@@ -605,14 +660,6 @@ fn clean_up_block_graph_dfs(
 /// and directly precede it in terms of execution, as well as blocks with just
 /// unconditional branches and no statements, unless they point to themselves.
 fn clean_up_block_graph(block_graph: &mut ir::BlockGraph) {
-    for ir::Block(_, _, block_ending) in block_graph.iter_mut() {
-        if let ir::BlockEnding::CondJumps(conds, else_id) = block_ending {
-            while let Some((_, true_id)) = conds.last() && *true_id == *else_id {
-                conds.pop();
-            }
-        }
-    }
-
     let mut edge_mappings = HashMap::new();
     for block_id in 0..block_graph.len() {
         clean_up_block_graph_dfs(block_graph, block_id, &mut edge_mappings);
@@ -641,7 +688,7 @@ fn clean_up_block_graph(block_graph: &mut ir::BlockGraph) {
         })
         .collect();
 
-    for ir::Block(incoming, _, ending) in block_graph {
+    for ir::Block(incoming, _, ending) in &mut *block_graph {
         for incoming_id in incoming {
             *incoming_id = new_block_graph_mappings[&edge_mappings[incoming_id]];
         }
@@ -685,7 +732,7 @@ fn translate_block_graph(
     vars: &HashMap<VarRepr, ir::Type>,
     function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
-) -> Option<StatNode> {
+) -> StatNode {
     clean_up_block_graph(&mut block_graph);
 
     let (start_nodes, block_cond_nodes): (Vec<_>, Vec<_>) = block_graph
@@ -756,7 +803,10 @@ fn translate_block_graph(
         }
     }
 
-    start_nodes.into_iter().next()
+    start_nodes
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| stat_graph.borrow_mut().new_node(StatType::new_return(None)))
 }
 
 /// Translates a function. Returns the function in a three-code representation.
@@ -917,6 +967,7 @@ mod tests {
         graph::{Deleted, Graph},
         intermediate as ir,
     };
+    use std::mem;
     use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
     #[test]
@@ -945,7 +996,7 @@ mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: false,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
@@ -1059,7 +1110,7 @@ mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: false,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
@@ -1078,7 +1129,16 @@ mod tests {
             StatCode::Assign(1, OpSrc::Var(0)),
             return_node,
         ));
-        let branch2_node = graph.new_node(StatType::new_branch(1, return_assign_node, loop_node));
+        let branch3_node = graph.new_node(StatType::new_branch(1, loop_node.clone(), loop_node));
+        let branch3_cond_set_node = graph.new_node(StatType::new_simple(
+            StatCode::Assign(1, OpSrc::Const(1)),
+            branch3_node,
+        ));
+        let branch2_node = graph.new_node(StatType::new_branch(
+            1,
+            return_assign_node,
+            branch3_cond_set_node,
+        ));
         let branch2_cond_set_node = graph.new_node(StatType::new_simple(
             StatCode::Assign(1, OpSrc::Var(0)),
             branch2_node,
@@ -1102,7 +1162,7 @@ mod tests {
             branch2_cond_set_node,
         ));
 
-        match_graph(start_node.expect("No start node"), tmp_var_set_node);
+        match_graph(start_node, tmp_var_set_node);
     }
 
     #[test]
@@ -1133,7 +1193,7 @@ mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: false,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
@@ -1153,7 +1213,7 @@ mod tests {
             StatCode::Assign(2, OpSrc::Const(0)),
             return_node,
         ));
-        match_graph(code.expect("No code"), return_assign_node);
+        match_graph(code, return_assign_node);
     }
 
     #[test]
@@ -1180,7 +1240,7 @@ mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: false,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
@@ -1196,13 +1256,13 @@ mod tests {
             .expect("Multiple references to the graph")
             .into_inner();
         let return_node = graph.new_node(StatType::new_return(None));
-        match_graph(code.expect("No code"), return_node);
+        match_graph(code, return_node);
     }
 
     #[test]
     fn translate_program_test() {
         let ThreeCode {
-            functions,
+            functions: _,
             data_refs,
             graph: program_graph,
             read_ref,
@@ -1224,7 +1284,7 @@ mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: false,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
@@ -1248,6 +1308,7 @@ mod tests {
             StatCode::Assign(0, OpSrc::Const(0)),
             exit_node,
         ));
-        match_graph(code.expect("No code"), exit_assign_node);
+        match_graph(code, exit_assign_node);
+        mem::drop(program_graph);
     }
 }

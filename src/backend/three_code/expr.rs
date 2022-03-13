@@ -101,7 +101,7 @@ pub(super) fn translate_num_expr(
         ir::NumExpr::ArithOp(box num_expr1, arith_op, box num_expr2) => {
             let size1 =
                 translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
-            let size2 = translate_num_expr(
+            translate_num_expr(
                 num_expr2,
                 result + 1,
                 stat_line,
@@ -297,8 +297,7 @@ pub(super) fn translate_bool_expr(
         }
 
         ir::BoolExpr::Not(box bool_expr) => {
-            let bool_const =
-                translate_bool_expr(bool_expr, result, stat_line, vars, function_types, options);
+            translate_bool_expr(bool_expr, result, stat_line, vars, function_types, options);
             stat_line.add_stat(StatCode::AssignOp(
                 result,
                 OpSrc::Var(result),
@@ -490,7 +489,7 @@ mod tests {
                     sethi_ullman_weights: false,
                     dead_code_removal: false,
                     propagation: PropagationOpt::None,
-                    inlining: false,
+                    inlining: Some(1000),
                     tail_call: false,
                     hoisting: false,
                     strength_reduction: false,

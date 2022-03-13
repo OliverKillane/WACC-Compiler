@@ -3,6 +3,7 @@
 use crate::backend::{compile, Options, PropagationOpt};
 use crate::frontend::{analyse, gather_modules};
 use glob::glob;
+use indoc::indoc;
 use lazy_static::lazy_static;
 use nom::{
     branch::alt,
@@ -43,7 +44,7 @@ fn parse_line(input: &str) -> IResult<&str, Vec<Tokens>> {
     many1(alt((
         map(is_not("#\n"), |s: &str| Tokens::String(s.to_string())),
         value(Tokens::Address, tag("#addrs#")),
-        value(Tokens::Address, tag("#runtime_error#")),
+        value(Tokens::RuntimeError, tag("#runtime_error#")),
     )))(input)
 }
 
@@ -77,6 +78,8 @@ impl PartialEq<&str> for Behaviour {
         let mut iter = other.chars();
         for line in self.0.iter() {
             for token in line {
+                println!("{:?}", iter.clone().collect::<String>());
+                println!("{:?}", token);
                 match token {
                     Tokens::String(s) => {
                         if &iter.by_ref().take(s.len()).collect::<String>() != s {
@@ -84,10 +87,24 @@ impl PartialEq<&str> for Behaviour {
                         }
                     }
                     Tokens::Address => {
-                        if iter.by_ref().take(2).collect::<String>() != "0x" {
-                            return false;
+                        println!("{}", iter.clone().take(5).collect::<String>());
+                        if iter.clone().take(5).collect::<String>() == "(nil)" {
+                            let _ = iter.by_ref().take(5);
+                            println!("after:{:?}", iter.clone().collect::<String>());
+                            println!("Wow this worked");
+                        } else {
+                            if iter.by_ref().take(2).collect::<String>() != "0x" {
+                                return false;
+                            }
+                            let mut peek = iter.clone();
+                            while peek
+                                .next()
+                                .map(|c| c.is_numeric() || ('a'..='f').contains(&c))
+                                == Some(true)
+                            {
+                                let _ = iter.next();
+                            }
                         }
-                        let _ = iter.by_ref().skip_while(|c| c.is_numeric());
                     }
                     Tokens::Empty => return iter.next() == None,
                     Tokens::RuntimeError => {
@@ -102,6 +119,7 @@ impl PartialEq<&str> for Behaviour {
                 }
             }
             if iter.next() != Some('\n') {
+                println!("Failing here");
                 return false;
             }
         }
@@ -110,19 +128,117 @@ impl PartialEq<&str> for Behaviour {
     }
 }
 
+#[test]
+fn test_output_eq_behaviour() {
+    let input = include_str!("static/expressions/charComparisonExpr.wacc");
+
+    let expected_output = indoc! {
+        "false
+    true
+    true
+    true
+    false
+    false
+    "
+    };
+
+    assert_eq!(parse_behaviour(input).unwrap().1 .0, expected_output);
+
+    let input = include_str!("static/basic/skip/skip.wacc");
+
+    let expected_output = indoc! {
+        ""
+    };
+
+    assert_eq!(parse_behaviour(input).unwrap().1 .0, expected_output);
+
+    let input = include_str!("static/pairs/printPair.wacc");
+
+    let expected_output = indoc! {
+    "0x22150 = (10, a)
+    "
+    };
+
+    assert_eq!(parse_behaviour(input).unwrap().1 .0, expected_output);
+
+    let input = include_str!("static/array/printRef.wacc");
+
+    let expected_output = indoc! {
+    "Printing an array variable gives an address, such as 0x234234
+    "
+    };
+
+    assert_eq!(parse_behaviour(input).unwrap().1 .0, expected_output);
+
+    let input = include_str!("static/runtimeErr/integerOverflow/intmultOverflow.wacc");
+
+    let expected_output = indoc! {
+    "2147483
+    2147483000
+    OverflowError: the result is too small/large to store in a 4-byte signed-integer.
+    "
+    };
+
+    assert_eq!(parse_behaviour(input).unwrap().1 .0, expected_output);
+
+    let input = include_str!("static/runtimeErr/divideByZero/divZero.wacc");
+
+    let expected_output = indoc! {
+    "DivideByZeroError: divide or modulo by zero
+    "
+    };
+
+    assert_eq!(parse_behaviour(input).unwrap().1 .0, expected_output);
+}
+
+#[test]
+fn behaviour_comparison() {
+    // let source = "( [1, 2, 3] , [a, b, c] )\n[ 0x231f0 = (a, true), 0x23200 = (b, false) ]\n1, 2\narray, of, strings\ntrue, false, true\nxyz\n1, 2, 3\nthis is a string\ntrue\nx\n5\n";
+    let source = "0x23200\n";
+
+    let matching = Behaviour(vec![vec![Tokens::Address]]);
+
+    assert_eq!(matching, source);
+}
+
+#[test]
+fn all_types_test() {
+    let behaviour = Behaviour(vec![
+        vec![Tokens::String("( [1, 2, 3] , [a, b, c] )".to_string())],
+        vec![
+            Tokens::String("[ ".to_string()),
+            Tokens::Address,
+            Tokens::String(" = (a, true), ".to_string()),
+            Tokens::Address,
+            Tokens::String(" = (b, false) ]".to_string()),
+        ],
+        vec![Tokens::String("1, 2".to_string())],
+        vec![Tokens::String("array, of, strings".to_string())],
+        vec![Tokens::String("true, false, true".to_string())],
+        vec![Tokens::String("xyz".to_string())],
+        vec![Tokens::String("1, 2, 3".to_string())],
+        vec![Tokens::String("this is a string".to_string())],
+        vec![Tokens::String("true".to_string())],
+        vec![Tokens::String("x".to_string())],
+        vec![Tokens::String("5".to_string())],
+    ]);
+    let string = "( [1, 2, 3] , [a, b, c] )\n[ 0x231f0 = (a, true), 0x23200 = (b, false) ]\n1, 2\narray, of, strings\ntrue, false, true\nxyz\n1, 2, 3\nthis is a string\ntrue\nx\n5\n";
+    assert_eq!(behaviour, string);
+}
+
 #[rstest]
 #[case("static/basic")]
-// #[case("static/expressions")]
-// #[case("static/pairs")]
-// #[case("static/variables")]
-// #[case("static/if")]
-// #[case("static/array")]
-// #[case("static/function")]
-// #[case("static/runtimeErr")]
-// #[case("static/scope")]
+#[case("static/expressions")]
+#[case("static/pairs")]
+#[case("static/variables")]
+#[case("static/if")]
+#[case("static/array")]
+#[case("static/function")]
+#[case("static/runtimeErr")]
+#[case("static/scope")]
 #[case("static/sequence")]
 #[case("static/variables")]
-// #[case("static/while")]
+#[case("static/while")]
 fn examples_test(#[case] path: &str) {
     examples_dir_test(path).expect("Unable to test directory:");
 }
@@ -150,7 +266,7 @@ fn compiler_test(filename: &str, input: String, output: Behaviour, _exit_code: O
         sethi_ullman_weights: false,
         dead_code_removal: false,
         propagation: PropagationOpt::None,
-        inlining: false,
+        inlining: Some(1000),
         tail_call: false,
         hoisting: false,
         strength_reduction: false,

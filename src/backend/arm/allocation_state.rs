@@ -7,11 +7,11 @@
 //!
 //! Generates register mappings for temporaries on a per-instruction basis
 //!
-//! Uses live ranges to determine when to spill values from registers.
+//! Uses 'instructions till use' associated with live ranges to determine when
+//! to spill values from registers.
 
 use crate::graph::Graph;
 use std::{
-    cmp::max,
     collections::{HashMap, HashSet},
     fmt::Display,
 };
@@ -133,12 +133,12 @@ impl AllocationState {
         // now put all other arguments onto the stack. These will be just
         // before the stack pointer in reverse order (were pushed and popped)
         for (arg_ind, temp) in args.iter().enumerate().skip(4) {
-            alloc_map.insert(Alloc::Temp(*temp), (args.len() - arg_ind) as i32);
+            alloc_map.insert(Alloc::Temp(*temp), arg_ind as i32 - args.len() as i32 + 1);
         }
 
         // Now push all temporaries to the map to fill the frame. If it is
         // already in the map (it is a stack argument) we ignore.
-        let mut sp_displacement = 0;
+        let mut sp_displacement = 1;
         for temp in temps_set {
             let temp_alloc = Alloc::Temp(*temp);
             if alloc_map.try_insert(temp_alloc, sp_displacement).is_ok() {
@@ -385,14 +385,27 @@ impl AllocationState {
 
     /// Move a temporary value into a register, without affecting the
     /// leave_alone temporaries, and considering the order of next uses for each
-    /// live temporary. If load_stack is true, loads the temporaries value from
-    /// the stack.
+    /// live temporary.
+    ///
+    /// - If the temporary is already in a register, that register is returned
+    ///   (with no instructions required).
+    /// - If there are free registers, a free register is used.
+    /// - If there are preserved registers, we push the preserved to its stack
+    ///   location, and use its register (preserved will only be used just
+    ///   before the final return)
+    /// - If there are other temporaries (not to be left alone), we push the one
+    ///   with the furthest-away use to its stack frame location, and use its
+    ///   register
+    ///
+    /// If `stack_load` is true, then if using the temporary, we must load its
+    /// value from the stack frame, to the register returned. There instructions
+    /// are returned as a [chain](Chain).
     pub fn move_temp_into_reg(
         &mut self,
         temp: Temporary,
         load_stack: bool,
         leave_alone: &[Temporary],
-        used: &[Temporary],
+        live: &[Temporary],
         graph: &mut Graph<ControlFlow>,
     ) -> (Register, Option<Chain>) {
         let mut free_registers = Vec::new();
@@ -400,7 +413,7 @@ impl AllocationState {
         let mut temp_registers = HashMap::new();
 
         // iterate through all registers to get the free, preserved and the temporary registers
-        for (reg_ind, alloc) in self.registers.iter_mut().enumerate().rev() {
+        for (reg_ind, alloc) in self.registers.iter().enumerate().rev() {
             match alloc {
                 Alloc::Temp(t) => {
                     if *t == temp {
@@ -480,7 +493,7 @@ impl AllocationState {
             }
         } else {
             // Use current temporary (attempting to use one with the longest time till use)
-            for old_temp in used {
+            for old_temp in live {
                 if let Some(reg_ind) = temp_registers.get(old_temp) {
                     let dst_register = Register::from(*reg_ind);
 
@@ -552,7 +565,8 @@ impl AllocationState {
         None
     }
 
-    /// Mark a register as free, moving any contents to its place in the stack frame.
+    /// Mark a register as free, moving any contents to its place in the stack
+    /// frame.
     fn free_register(
         &mut self,
         register: Register,
@@ -653,8 +667,8 @@ impl AllocationState {
         }
     }
 
-    /// Creates the preamble to a branch link, by placing the contents of register
-    /// 14 in an appropriate stack location.
+    /// Creates the preamble to a branch link, by placing the contents of the link
+    /// register in an appropriate stack location.
     fn link(&mut self, graph: &mut Graph<ControlFlow>) -> Option<Chain> {
         let alloc = if let alloc @ Alloc::Temp(_) | alloc @ Alloc::Preserve(_) =
             &self.registers[Register::Lr as usize]
@@ -687,7 +701,7 @@ impl AllocationState {
                 chains.push(self.backup_alloc_to_frame(Alloc::Temp(*arg), graph))
             }
         }
-
+        let old_sp = self.sp_displacement;
         // place arguments in registers
         if args.len() < 4 {
             for (reg_ind, arg) in args.iter().enumerate() {
@@ -702,18 +716,28 @@ impl AllocationState {
                 chains.push(self.alloc_to_reg(Alloc::Temp(*arg), Register::from(reg_ind), graph))
             }
 
+            let mut usable_temps = Vec::from(live_after);
+            for arg in args[4..].iter() {
+                if !usable_temps.contains(arg) {
+                    usable_temps.push(*arg)
+                }
+            }
+
             for arg in args.iter().skip(4) {
                 // note that registers R0-3 are protected as the first 4 args reside there and are to be 'left alone'
                 let (reg, move_chain) =
-                    self.move_temp_into_reg(*arg, true, &args[0..4], &[], graph);
+                    self.move_temp_into_reg(*arg, true, &args[0..4], &usable_temps, graph);
+                self.registers[reg as usize] = Alloc::Free;
                 chains.push(move_chain);
                 chains.push(Some(simple_node(
                     Stat::Push(Cond::Al, Ident::Reg(reg)),
                     graph,
                 )));
+                // move the sp-displacement to account for the new stack pointer
+                // location.
+                self.push_sp();
             }
         }
-        // now the sp_displacement is not valid (is off by max(0, args.len() - 4)
 
         // free link register
         chains.push(self.link(graph));
@@ -739,12 +763,17 @@ impl AllocationState {
         self.registers[2] = Alloc::Free;
         self.registers[3] = Alloc::Free;
 
-        // decrement stack pointer by arguments placed on the stack
+        // if stack arguments were used, decrement stack pointer by arguments
+        // move the stack pointer back to its original location.
         if args.len() > 4 {
             chains.push(Some(
-                self.move_stack_pointer(max(args.len() as i32 - 4, 0), graph),
+                self.move_stack_pointer(self.sp_displacement - old_sp, graph),
             ));
         }
+
+        // reset the sp_displacement for use in generating offsets for stack
+        // frame slots.
+        self.sp_displacement = old_sp;
 
         link_optional_chains(chains).expect("Several statements are 'Some' so must have be a chain")
     }

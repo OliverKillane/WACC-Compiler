@@ -310,10 +310,17 @@ pub fn str_delimited<'a>(
     ws(map(
         delimited(
             tag(del),
-            // escaped(none_of("\\\'\""), '\\', one_of("'0nt\"b\\rf\'").cut()),
             many0(alt((
                 none_of("\\\'\""),
-                preceded(char('\\'), one_of("'0nt\"b\\rf\'")),
+                map(preceded(char('\\'), one_of("'0nt\"b\\rf\'")), |c| match c {
+                    'b' => '\u{0008}',
+                    'n' => '\n',
+                    't' => '\t',
+                    'r' => '\r',
+                    'f' => '\u{0012}',
+                    '0' => '\0',
+                    c => c,
+                }),
             )))
             .cut(),
             tag(del).cut(),

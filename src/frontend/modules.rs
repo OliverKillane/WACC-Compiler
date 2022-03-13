@@ -48,6 +48,8 @@ impl Hash for InputFile {
 pub enum GatherModulesError {
     /// Main file is not present at all
     MainFileNotPresent,
+    /// No actual code besides imports in the main file
+    MainFileNoCode,
     /// A module is not encoded with a utf-8 encoding.
     InvalidEncoding(PathBuf),
     /// A mod declaration in a specific file, line and column is wrongly formatted.
@@ -103,6 +105,9 @@ pub fn gather_modules(
         .map_err(|_| GatherModulesError::MainFileNotPresent)?
         .into_owned();
     let (main_input_file, main_imports) = process_component(main_file_path)?;
+    if main_input_file.to_parse_contents().is_empty() {
+        return Err(GatherModulesError::MainFileNoCode);
+    }
     let mut analyzed_modules = Vec::new();
     let mut analyzed_modules_paths = HashSet::new();
     let mut module_analyze_queue = chain_modules(&main_input_file.filepath, main_imports);

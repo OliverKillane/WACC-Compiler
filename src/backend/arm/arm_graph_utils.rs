@@ -1,4 +1,4 @@
-//! Utility functions to allow easy manipoulation of the arm graph for
+//! Utility functions to allow easy manipulation of the arm graph for
 //! translation and final register allocation.
 
 use lazy_static::__Deref;

@@ -3,6 +3,9 @@
 //!
 //! An allocation state is used to keep track of register usage, and
 //! create/maintain the stack frame.
+//!
+//! Register allocation makes use of live ranges to determine when temporaries
+//! 'die' and hence free up registers.
 
 use super::{
     allocation_state::AllocationState,
@@ -153,24 +156,9 @@ fn translate_from_node(
         // a helper closure for checking conditions
         let load_dst = |cond: &Cond| cond != &Cond::Al;
 
-        // println!("----------------------------");
-        // println!(
-        //     "LIVEIN: {}",
-        //     livein
-        //         .iter()
-        //         .map(|t| format!("T{}, ", t))
-        //         .collect::<String>()
-        // );
-        // println!("{}", alloc_state);
-        // println!("{:?}", current_node.get().deref());
-        // println!(
-        //     "LIVEOUT: {}",
-        //     liveout
-        //         .iter()
-        //         .map(|t| format!("T{}, ", t))
-        //         .collect::<String>()
-        // );
-
+        // Translate the node, translating all identifiers (temporary) to registers
+        // and linking up any necessary instructions before & after, returning the
+        // next node to check and the end of the statement to link up with any next nodes.
         let (mut next, mut new_end): (ArmNode, ArmNode) = match current_node
             .clone()
             .get_mut()
@@ -182,6 +170,8 @@ fn translate_from_node(
 
                 start.set_predecessor(prev.clone());
                 prev.replace_successor(current_node.clone(), start);
+
+                alloc_state.update_live(&liveout);
 
                 // as we entirely replace the 'call' node, we set the successors and
                 // predecessors to point to the ends of our chain of statements
@@ -651,7 +641,9 @@ fn translate_from_node(
 }
 
 impl Ident {
-    /// used to extract temporaries
+    /// used to extract temporaries for temporary idents. Used when a mutable
+    /// reference to the entire ident is required, so no immutable references to
+    /// the temporary value inside the ident can be made.
     pub fn get_temp(&self) -> Temporary {
         if let Ident::Temp(t) = self {
             *t
