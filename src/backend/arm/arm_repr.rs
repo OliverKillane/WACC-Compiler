@@ -351,6 +351,7 @@ pub struct Subroutine {
     pub start_node: ArmNode,
     pub temps: HashSet<Temporary>,
     pub reserved_stack: u8,
+    pub cfg: Graph<ControlFlow>,
 }
 
 /// The main program containing text ([instructions](Stat)) and [data](Data).
@@ -365,7 +366,7 @@ pub struct ArmCode {
     pub temps: HashSet<Temporary>,
     /// A map of all subroutines contained in the program.
     pub subroutines: HashMap<String, Subroutine>,
-    /// The control flow graph containing all nodes in the program.
+    /// The control flow graph containing all nodes in main function.
     pub cfg: Graph<ControlFlow>,
 }
 

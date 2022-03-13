@@ -495,6 +495,7 @@ impl Display for ArmCode {
                 start_node,
                 temps: _,
                 reserved_stack: _,
+                cfg: _,
             },
         ) in functions
         {
