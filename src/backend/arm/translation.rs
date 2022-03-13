@@ -349,6 +349,7 @@ fn translate_function(
     Function {
         args,
         code,
+        graph: _,
         read_ref,
     }: Function,
     int_handler: Option<&String>,
