@@ -91,15 +91,15 @@ pub(super) enum StatCode {
     /// Store to a pointer reference. The first variable reference is the pointer to the
     /// store destination and the second one is the variable to store the data from.
     /// The number of bytes stored is signified by the [size](Size) field.
-    Store(OpSrc, OpSrc, Size),
+    Store(VarRepr, OpSrc, Size),
     /// A call to a function. If the function name is not in the list of the
     /// [program](ThreeCode) functions then it is assumed to be external and linked
     /// to by the linker.
-    Call(VarRepr, String, Vec<OpSrc>),
+    Call(VarRepr, String, Vec<VarRepr>),
     /// A call to a function that ommits the return value. If the function name
     /// is not in the list of the [program](ThreeCode) functions then it is assumed
     /// to be external and linked to by the linker.
-    VoidCall(String, Vec<OpSrc>),
+    VoidCall(String, Vec<VarRepr>),
 }
 
 /// General type of the statement. Used in the dataflow graph.
@@ -568,7 +568,7 @@ fn translate_block(
                 );
                 let return_node = stat_graph
                     .borrow_mut()
-                    .new_node(StatType::new_return(Some(free_var)));
+                    .new_node(StatType::new_return(Some(OpSrc::Var(free_var))));
                 stat_line.add_node(return_node);
             } else {
                 let return_node = stat_graph.borrow_mut().new_node(StatType::new_return(None));
@@ -1035,7 +1035,7 @@ mod tests {
             .into_inner();
         let return_node = graph.new_node(StatType::new_return(None));
         let exit_node = graph.new_node(StatType::new_simple(
-            StatCode::VoidCall("exit".to_string(), vec![1]),
+            StatCode::VoidCall("exit".to_string(), vec![OpSrc::Var(1)]),
             return_node,
         ));
         let exit_set_node = graph.new_node(StatType::new_simple(
@@ -1043,7 +1043,7 @@ mod tests {
             exit_node,
         ));
         let flush_call_node = graph.new_node(StatType::new_simple(
-            StatCode::VoidCall("fflush".to_string(), vec![1]),
+            StatCode::VoidCall("fflush".to_string(), vec![OpSrc::Var(1)]),
             exit_set_node,
         ));
         let stdout_set_node = graph.new_node(StatType::new_simple(
@@ -1051,7 +1051,7 @@ mod tests {
             flush_call_node,
         ));
         let print_call_node = graph.new_node(StatType::new_simple(
-            StatCode::VoidCall("printf".to_string(), vec![2, 1]),
+            StatCode::VoidCall("printf".to_string(), vec![OpSrc::Var(2), OpSrc::Var(1)]),
             stdout_set_node,
         ));
         let print_fmt_set_node = graph.new_node(StatType::new_simple(
@@ -1063,11 +1063,11 @@ mod tests {
             print_fmt_set_node,
         ));
         let scan_load_node = graph.new_node(StatType::new_simple(
-            StatCode::Load(0, 1, Size::DWord),
+            StatCode::Load(0, OpSrc::Var(1), Size::DWord),
             print_val_set_node,
         ));
         let scan_call_node = graph.new_node(StatType::new_simple(
-            StatCode::VoidCall("scanf".to_string(), vec![2, 1]),
+            StatCode::VoidCall("scanf".to_string(), vec![OpSrc::Var(2), OpSrc::Var(1)]),
             scan_load_node,
         ));
         let scan_fmt_set_node = graph.new_node(StatType::new_simple(
@@ -1075,7 +1075,7 @@ mod tests {
             scan_call_node,
         ));
         let scan_store_node = graph.new_node(StatType::new_simple(
-            StatCode::Store(1, 0, Size::DWord),
+            StatCode::Store(OpSrc::Var(1), OpSrc::Var(0), Size::DWord),
             scan_fmt_set_node,
         ));
         let scan_set_ref = graph.new_node(StatType::new_simple(
@@ -1142,18 +1142,22 @@ mod tests {
             .expect("Multiple references to the graph")
             .into_inner();
         let loop_node = graph.new_node(StatType::new_loop());
-        let return_node = graph.new_node(StatType::new_return(Some(1)));
+        let return_node = graph.new_node(StatType::new_return(Some(OpSrc::Var(1))));
         let return_assign_node = graph.new_node(StatType::new_simple(
             StatCode::Assign(1, OpSrc::Var(0)),
             return_node,
         ));
-        let branch3_node = graph.new_node(StatType::new_branch(1, loop_node.clone(), loop_node));
+        let branch3_node = graph.new_node(StatType::new_branch(
+            OpSrc::Var(1),
+            loop_node.clone(),
+            loop_node,
+        ));
         let branch3_cond_set_node = graph.new_node(StatType::new_simple(
             StatCode::Assign(1, OpSrc::Const(1)),
             branch3_node,
         ));
         let branch2_node = graph.new_node(StatType::new_branch(
-            1,
+            OpSrc::Var(1),
             return_assign_node,
             branch3_cond_set_node,
         ));
@@ -1175,7 +1179,7 @@ mod tests {
             var_set_node,
         ));
         branch1_node.set(StatType::new_branch(
-            1,
+            OpSrc::Var(1),
             tmp_var_set_node.clone(),
             branch2_cond_set_node,
         ));
@@ -1311,7 +1315,7 @@ mod tests {
         let mut graph = Graph::new();
         let return_node = graph.new_node(StatType::new_return(None));
         let exit_node = graph.new_node(StatType::new_simple(
-            StatCode::VoidCall("exit".to_string(), vec![0]),
+            StatCode::VoidCall("exit".to_string(), vec![OpSrc::Var(0)]),
             return_node,
         ));
         let exit_assign_node = graph.new_node(StatType::new_simple(

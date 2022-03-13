@@ -29,22 +29,24 @@ fn get_use_op_src(op_src: &OpSrc) -> Option<VarRepr> {
 
 fn get_uses(node: &StatNode) -> Vec<VarRepr> {
     match &*node.get() {
-        StatType::Simple(_, StatCode::Assign(_, op_src), _) => get_use_op_src(op_src)
+        StatType::Simple(_, StatCode::Assign(_, op_src) | StatCode::Load(_, op_src, _), _)
+        | StatType::Branch(_, op_src, _, _) => get_use_op_src(op_src)
             .map(|var| vec![var])
             .unwrap_or_default(),
-        StatType::Simple(_, StatCode::AssignOp(_, op_src1, _, op_src2), _) => {
-            vec![get_use_op_src(op_src1), get_use_op_src(op_src2)]
-                .into_iter()
-                .filter_map(|var| var)
-                .collect()
-        }
-        StatType::Simple(_, StatCode::Load(_, var, _), _) => vec![*var],
-        StatType::Simple(_, StatCode::Store(var1, var2, _), _) => vec![*var1, *var2],
+        StatType::Simple(
+            _,
+            StatCode::AssignOp(_, op_src1, _, op_src2) | StatCode::Store(op_src1, op_src2, _),
+            _,
+        ) => vec![get_use_op_src(op_src1), get_use_op_src(op_src2)]
+            .into_iter()
+            .filter_map(|var| var)
+            .collect(),
         StatType::Simple(_, StatCode::Call(_, _, args) | StatCode::VoidCall(_, args), _) => {
-            args.clone()
+            args.iter().filter_map(get_use_op_src).collect()
         }
-        StatType::Branch(_, var, _, _) => vec![*var],
-        StatType::Return(_, var) => var.map(|var| vec![var]).unwrap_or_default(),
+        StatType::Return(_, op_src) => op_src
+            .and_then(|op_src| get_use_op_src(&op_src).map(|var| vec![var]))
+            .unwrap_or_default(),
         _ => vec![],
     }
 }
