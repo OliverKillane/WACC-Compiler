@@ -196,7 +196,7 @@ fn translate_node_inner(
             let Chain(start, end) = translate_statcode(stat, int_handler, graph, temp_map);
             (start, Some((end, succ.clone())))
         }
-        StatType::Branch(_, three_temp, true_branch, false_branch) => {
+        StatType::Branch(_, opsrc, true_branch, false_branch) => {
             // Recur to get the true_branch
             let mut true_branch = translate_from_node(
                 true_branch.clone(),
@@ -205,21 +205,31 @@ fn translate_node_inner(
                 translate_map,
                 graph,
             );
-            let Chain(start, end) = simple_node(
+
+            let (arm_temp, opsrc_chain) = opsrc_to_temp(opsrc, temp_map, graph);
+
+            let cmp_chain = simple_node(
                 Stat::Cmp(
                     CmpOp::Cmp,
                     Cond::Al,
-                    temp_map.use_temp(*three_temp),
+                    arm_temp,
                     FlexOperand::Imm(1),
                 ),
                 graph,
             );
+
             let branch = graph.new_node(ControlFlow::Branch(
                 None,
                 true_branch.clone(),
                 Cond::Eq,
                 None,
             ));
+
+            let Chain(start,end) = if let Some(chain) = opsrc_chain {
+                link_two_chains(chain, cmp_chain)
+            } else {
+                cmp_chain
+            };
 
             link_two_nodes(end, branch.clone());
             true_branch.set_predecessor(branch.clone());
@@ -237,11 +247,21 @@ fn translate_node_inner(
             label.set_successor(branch);
             (label, None)
         }
-        StatType::Return(_, three_var) => (
-            graph.new_node(ControlFlow::Return(
-                None,
-                three_var.map(|three_var| temp_map.use_id(three_var)),
-            )),
+        StatType::Return(_, opt_opsrc) => (
+            {
+                if let Some(opsrc) = opt_opsrc {
+                    let (arm_temp, opsrc_chain) = opsrc_to_temp(opsrc, temp_map, graph);
+                    let ret_node = graph.new_node(ControlFlow::Return(None, Some(arm_temp.get_temp())));
+                    if let Some(Chain(start, end)) = opsrc_chain {
+                        link_two_nodes(end, ret_node);
+                        start
+                    } else {
+                        ret_node
+                    }
+                } else {
+                    graph.new_node(ControlFlow::Return(None, None))
+                }
+            },
             None,
         ),
         StatType::Dummy(_) => panic!("No dummy nodes should be in the final threecode"),
@@ -479,6 +499,33 @@ fn dataref_to_reg(
     }
 }
 
+/// Move an opsrc into a temporary.
+fn opsrc_to_temp(opsrc: &OpSrc, temp_map: &mut TempMap, graph: &mut Graph<ControlFlow>) -> (Ident, Option<Chain>) {
+    match opsrc {
+        OpSrc::Const(i) => {
+            // Load the constant into a temporary
+            let new_temp = temp_map.get_new_temp();
+            (new_temp, Some(const_to_reg(new_temp, *i, graph)))
+        }
+        OpSrc::DataRef(dataref, offset) => {
+            let new_temp = temp_map.get_new_temp();
+
+            (new_temp, Some(dataref_to_reg(
+                new_temp,
+                convert_data_ref(*dataref),
+                *offset,
+                temp_map,
+                graph,
+            )))
+        }
+        OpSrc::Var(var) => (temp_map.use_temp(*var), None),
+        OpSrc::ReadRef => {
+            let new_temp = temp_map.get_new_temp();
+            (new_temp, Some(simple_node(Stat::AssignStackWord(new_temp), graph)))
+        }
+    }
+}
+
 /// Translates a three-code statement, returning the start and end nodes of the
 /// statement's graph.
 fn translate_statcode(
@@ -520,32 +567,12 @@ fn translate_statcode(
             let arm_dst_temp = temp_map.use_temp(*three_temp_dst);
             let mut nodes = Vec::new();
 
-            let mut opsrc_to_reg = |opsrc: &OpSrc| {
-                match opsrc {
-                    OpSrc::Const(i) => {
-                        // Load the constant into a temporary
-                        let new_temp = temp_map.get_new_temp();
-                        nodes.push(const_to_reg(new_temp, *i, graph));
-                        new_temp
-                    }
-                    OpSrc::DataRef(dataref, offset) => {
-                        let new_temp = temp_map.get_new_temp();
-                        nodes.push(dataref_to_reg(
-                            new_temp,
-                            convert_data_ref(*dataref),
-                            *offset,
-                            temp_map,
-                            graph,
-                        ));
-                        new_temp
-                    }
-                    OpSrc::Var(var) => temp_map.use_temp(*var),
-                    OpSrc::ReadRef => {
-                        let new_temp = temp_map.get_new_temp();
-                        nodes.push(simple_node(Stat::AssignStackWord(new_temp), graph));
-                        new_temp
-                    }
+            let mut opsrc_to_reg= |opsrc: &OpSrc| {
+                let (arm_temp, opsrc_chain) = opsrc_to_temp(opsrc, temp_map, graph);
+                if let Some(chain) = opsrc_chain {
+                    nodes.push(chain);
                 }
+                arm_temp
             };
 
             let left_reg = opsrc_to_reg(first_op);
@@ -748,27 +775,64 @@ fn translate_statcode(
             link_chains(nodes).expect("Had more than one statement")
         }
         // LDR(size is bytes) three_temp, [temp_ptr]
-        StatCode::Load(three_temp, temp_ptr, size) => simple_node(
-            Stat::MemOp(
-                MemOp::Ldr,
-                Cond::Al,
-                size == &Size::Byte,
-                temp_map.use_temp(*three_temp),
-                MemOperand::Zero(temp_map.use_temp(*temp_ptr)),
-            ),
-            graph,
-        ),
+        StatCode::Load(three_temp, opsrc, size) => {
+
+            // load the opsrc, potentially using more/other instructions
+            let (memoperand, opsrc_chain) = match opsrc {
+                OpSrc::Const(i) => (MemOperand::Expression(*i), None),
+                OpSrc::Var(temp_ptr) => (MemOperand::Zero(temp_map.use_temp(*temp_ptr)), None),
+                OpSrc::DataRef(dref, 0) => (MemOperand::Label(convert_data_ref(*dref)), None),
+                OpSrc::DataRef(dref, offset) => {
+                    let new_temp =  temp_map.get_new_temp();
+                    (MemOperand::Zero(new_temp), Some(dataref_to_reg(new_temp, convert_data_ref(*dref), *offset, temp_map, graph)))
+                },
+                OpSrc::ReadRef => {
+                    let new_temp = temp_map.get_new_temp();
+                    (MemOperand::Zero(new_temp), Some(simple_node(Stat::AssignStackWord(new_temp), graph)))   
+                },
+            };
+
+            let load = simple_node(
+                Stat::MemOp(
+                    MemOp::Ldr,
+                    Cond::Al,
+                    size == &Size::Byte,
+                    temp_map.use_temp(*three_temp),
+                    memoperand
+                ),
+                graph,
+            );
+
+            // if a preamble is required, link it
+            if let Some(chain) = opsrc_chain {
+                link_two_chains(chain, load)
+            } else {
+                load
+            }
+        },
         // STR(size is bytes) three_temp, [temp_ptr]
-        StatCode::Store(temp_ptr, three_temp, size) => simple_node(
-            Stat::MemOp(
-                MemOp::Str,
-                Cond::Al,
-                size == &Size::Byte,
-                temp_map.use_temp(*three_temp),
-                MemOperand::Zero(temp_map.use_temp(*temp_ptr)),
-            ),
-            graph,
-        ),
+        StatCode::Store(temp_ptr, opsrc, size) => {
+            
+            let (arm_temp, opsrc_chain) = opsrc_to_temp(opsrc, temp_map, graph);
+            
+            let store = simple_node(
+                Stat::MemOp(
+                    MemOp::Str,
+                    Cond::Al,
+                    size == &Size::Byte,
+                    arm_temp,
+                    MemOperand::Zero(temp_map.use_temp(*temp_ptr)),
+                ),
+                graph,
+            );
+
+            // if a preamble is required, link it
+            if let Some(chain) = opsrc_chain {
+                link_two_chains(chain, store)
+            } else {
+                store
+            }
+        },
         // Creates a dummy call node for use when allocating registers
         StatCode::Call(ret_temp, fun_name, args) => simple_node(
             Stat::Call(
