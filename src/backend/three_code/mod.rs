@@ -87,19 +87,19 @@ pub(super) enum StatCode {
     /// Load from a reference to a pointer. The first variable reference is
     /// the load destination and the second one is the pointer to the data. The
     /// number of bytes loaded is signified by the [size](Size) field.
-    Load(VarRepr, VarRepr, Size),
+    Load(VarRepr, OpSrc, Size),
     /// Store to a pointer reference. The first variable reference is the pointer to the
     /// store destination and the second one is the variable to store the data from.
     /// The number of bytes stored is signified by the [size](Size) field.
-    Store(VarRepr, VarRepr, Size),
+    Store(OpSrc, OpSrc, Size),
     /// A call to a function. If the function name is not in the list of the
     /// [program](ThreeCode) functions then it is assumed to be external and linked
     /// to by the linker.
-    Call(VarRepr, String, Vec<VarRepr>),
+    Call(VarRepr, String, Vec<OpSrc>),
     /// A call to a function that ommits the return value. If the function name
     /// is not in the list of the [program](ThreeCode) functions then it is assumed
     /// to be external and linked to by the linker.
-    VoidCall(String, Vec<VarRepr>),
+    VoidCall(String, Vec<OpSrc>),
 }
 
 /// General type of the statement. Used in the dataflow graph.
@@ -111,11 +111,11 @@ pub(super) enum StatType {
     Simple(Vec<StatNode>, StatCode, StatNode),
     /// A simple branch instruction that checks if the value in the variable is
     /// a boolean 1 or a 0.
-    Branch(Vec<StatNode>, VarRepr, StatNode, StatNode),
+    Branch(Vec<StatNode>, OpSrc, StatNode, StatNode),
     /// A self-looping infinite loop, which might occur as a user program.
     Loop(Vec<StatNode>),
     /// A return from a function. The variable contains the return value.
-    Return(Vec<StatNode>, Option<VarRepr>),
+    Return(Vec<StatNode>, Option<OpSrc>),
 }
 
 /// A statement graph node.
@@ -168,7 +168,7 @@ impl StatType {
     }
 
     /// Creates a new branch statement with an empty list of incoming nodes.
-    pub(super) fn new_branch(cond: VarRepr, if_true: StatNode, if_false: StatNode) -> Self {
+    pub(super) fn new_branch(cond: OpSrc, if_true: StatNode, if_false: StatNode) -> Self {
         StatType::Branch(vec![], cond, if_true, if_false)
     }
 
@@ -178,7 +178,7 @@ impl StatType {
     }
 
     /// Creates a new return statement with an empty list of incoming nodes.
-    pub(super) fn new_return(ret: Option<VarRepr>) -> Self {
+    pub(super) fn new_return(ret: Option<OpSrc>) -> Self {
         StatType::Return(vec![], ret)
     }
 
@@ -548,7 +548,10 @@ fn translate_block(
                 function_types,
                 options,
             );
-            stat_line.add_stat(StatCode::VoidCall("exit".to_string(), vec![free_var]));
+            stat_line.add_stat(StatCode::VoidCall(
+                "exit".to_string(),
+                vec![OpSrc::Var(free_var)],
+            ));
             let return_node = stat_graph.borrow_mut().new_node(StatType::new_return(None));
             stat_line.add_node(return_node);
             (vec![], None)
@@ -592,7 +595,7 @@ fn translate_block(
                 let true_dummy = stat_graph.borrow_mut().new_node(StatType::deleted());
                 let false_dummy = stat_graph.borrow_mut().new_node(StatType::deleted());
                 let cond_node = stat_graph.borrow_mut().new_node(StatType::new_branch(
-                    free_var,
+                    OpSrc::Var(free_var),
                     true_dummy.clone(),
                     false_dummy.clone(),
                 ));
