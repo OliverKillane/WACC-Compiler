@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::RwLock;
 
 use super::super::ast::{self, ASTWrapper, Expr, Type, UnOp};
 use super::helper_funcs::*;
@@ -8,11 +9,11 @@ use crate::intermediate::{self as ir, DataRef};
 /// Adds a string [data reference](DataRef) to the data reference map.
 /// Returns the data reference to the newly added string.
 pub(super) fn add_string(
-    data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
+    data_ref_map: &RwLock<HashMap<DataRef, Vec<ir::Expr>>>,
     string: String,
 ) -> DataRef {
-    let data_ref: u64 = data_ref_map.len() as u64;
-    data_ref_map.insert(
+    let data_ref: u64 = data_ref_map.read().unwrap().len() as u64;
+    data_ref_map.write().unwrap().insert(
         data_ref,
         vec![ir::Expr::Num(ir::NumExpr::Const(
             ir::NumSize::DWord,
@@ -44,8 +45,8 @@ pub(super) fn translate_expr(
     ast_expr: Expr<Option<Type>, usize>,
     ast_expr_type: &Type,
     var_symb: &VariableSymbolTable,
-    data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
-    helper_function_flags: &mut HelperFunctionFlags,
+    data_ref_map: &RwLock<HashMap<DataRef, Vec<ir::Expr>>>,
+    helper_function_flags: &RwLock<HelperFunctionFlags>,
 ) -> ir::Expr {
     match ast_expr {
         Expr::Null => ir::Expr::Ptr(ir::PtrExpr::Null),
@@ -70,7 +71,7 @@ pub(super) fn translate_expr(
         },
 
         Expr::ArrayElem(var, mut indices) => {
-            helper_function_flags.array_indexing = true;
+            helper_function_flags.write().unwrap().array_indexing = true;
             let ASTWrapper(last_index_type, last_index) = indices.remove(indices.len() - 1);
             let last_index = translate_expr(
                 last_index,
@@ -178,7 +179,7 @@ pub(super) fn translate_expr(
                     ir::Expr::Num(ir::NumExpr::Deref(ir::NumSize::DWord, ptr))
                 }
                 (UnOp::Fst, expr @ ir::Expr::Ptr(_)) => {
-                    helper_function_flags.check_null = true;
+                    helper_function_flags.write().unwrap().check_null = true;
                     let ptr = ir::PtrExpr::Call(CHECK_NULL_FNAME.to_string(), vec![expr]);
                     match ast_expr_type {
                         ast::Type::Int => {
@@ -197,7 +198,7 @@ pub(super) fn translate_expr(
                     }
                 }
                 (UnOp::Snd, expr @ ir::Expr::Ptr(_)) => {
-                    helper_function_flags.check_null = true;
+                    helper_function_flags.write().unwrap().check_null = true;
                     let offset_ptr = ir::PtrExpr::Offset(
                         box ir::PtrExpr::Call(CHECK_NULL_FNAME.to_string(), vec![expr]),
                         box ir::NumExpr::SizeOfWideAlloc,
@@ -268,7 +269,7 @@ pub(super) fn translate_expr(
                     ))
                 }
                 (ir::Expr::Num(num_expr1), ast::BinOp::Div, ir::Expr::Num(num_expr2)) => {
-                    helper_function_flags.divide_modulo_check = true;
+                    helper_function_flags.write().unwrap().divide_modulo_check = true;
                     ir::Expr::Num(ir::NumExpr::ArithOp(
                         box num_expr1,
                         ir::ArithOp::Div,
@@ -279,7 +280,7 @@ pub(super) fn translate_expr(
                     ))
                 }
                 (ir::Expr::Num(num_expr1), ast::BinOp::Mod, ir::Expr::Num(num_expr2)) => {
-                    helper_function_flags.divide_modulo_check = true;
+                    helper_function_flags.write().unwrap().divide_modulo_check = true;
                     ir::Expr::Num(ir::NumExpr::ArithOp(
                         box num_expr1,
                         ir::ArithOp::Mod,
@@ -367,8 +368,8 @@ mod tests {
 
     #[test]
     fn check_simple_boolean_unop_expression() {
-        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
-        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let mut helper_function_flags = RwLock::new(HelperFunctionFlags::default());
+        let mut data_ref_map: RwLock<HashMap<DataRef, Vec<ir::Expr>>> = RwLock::new(HashMap::new());
         let var_symb = VariableSymbolTable::new();
 
         let translated: intermediate::Expr =
@@ -383,16 +384,16 @@ mod tests {
                 ),
                 &Type::Bool,
                 &var_symb,
-                &mut data_ref_map,
-                &mut helper_function_flags
+                &data_ref_map,
+                &helper_function_flags
             )
         );
     }
 
     #[test]
     fn check_complex_boolean_binop_expression() {
-        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
-        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let mut helper_function_flags: RwLock<HelperFunctionFlags> = RwLock::new(HelperFunctionFlags::default());
+        let mut data_ref_map: RwLock<HashMap<DataRef, Vec<ir::Expr>>> = RwLock::new(HashMap::new());
         let var_symb = VariableSymbolTable::new();
 
         let translated: intermediate::Expr = ir::Expr::Bool(ir::BoolExpr::BoolOp(
@@ -447,16 +448,16 @@ mod tests {
                 ),
                 &Type::Bool,
                 &var_symb,
-                &mut data_ref_map,
-                &mut helper_function_flags
+                &data_ref_map,
+                &helper_function_flags
             )
         );
     }
 
     #[test]
     fn check_simple_integer_binop_expression() {
-        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
-        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let mut helper_function_flags: RwLock<HelperFunctionFlags> = RwLock::new(HelperFunctionFlags::default());
+        let mut data_ref_map: RwLock<HashMap<DataRef, Vec<ir::Expr>>> = RwLock::new(HashMap::new());
         let var_symb = VariableSymbolTable::new();
 
         let translated: intermediate::Expr = intermediate::Expr::Num(ir::NumExpr::ArithOp(
@@ -475,16 +476,16 @@ mod tests {
                 ),
                 &Type::Int,
                 &var_symb,
-                &mut data_ref_map,
-                &mut helper_function_flags
+                &data_ref_map,
+                &helper_function_flags
             )
         );
     }
 
     #[test]
     fn check_complex_integer_binop_expression() {
-        let mut helper_function_flags: HelperFunctionFlags = HelperFunctionFlags::default();
-        let mut data_ref_map: HashMap<DataRef, Vec<ir::Expr>> = HashMap::new();
+        let mut helper_function_flags: RwLock<HelperFunctionFlags> = RwLock::new(HelperFunctionFlags::default());
+        let mut data_ref_map: RwLock<HashMap<DataRef, Vec<ir::Expr>>> = RwLock::new(HashMap::new());
         let mut var_symb = VariableSymbolTable::new();
 
         var_symb.0.insert(0, ast::Type::Int);
@@ -528,8 +529,8 @@ mod tests {
                 ),
                 &Type::Int,
                 &var_symb,
-                &mut data_ref_map,
-                &mut helper_function_flags
+                &data_ref_map,
+                &helper_function_flags
             )
         );
     }
