@@ -149,8 +149,7 @@ fn translate_from_node(
 ) {
     loop {
         // get the live in and live out
-        let livein = live_ranges.get_livein(&current_node.clone());
-        let liveout = live_ranges.get_liveout(&current_node.clone());
+        let (livein, liveout) = &live_ranges[&current_node];
 
         // update the registers for current live_in
         alloc_state.update_live(&livein);
