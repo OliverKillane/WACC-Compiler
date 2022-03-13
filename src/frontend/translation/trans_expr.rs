@@ -12,8 +12,9 @@ pub(super) fn add_string(
     data_ref_map: &RwLock<HashMap<DataRef, Vec<ir::Expr>>>,
     string: String,
 ) -> DataRef {
-    let data_ref: u64 = data_ref_map.read().unwrap().len() as u64;
-    data_ref_map.write().unwrap().insert(
+    let mut data_ref_map = data_ref_map.write().unwrap();
+    let data_ref: u64 = data_ref_map.len() as u64;
+    data_ref_map.insert(
         data_ref,
         vec![ir::Expr::Num(ir::NumExpr::Const(
             ir::NumSize::DWord,
