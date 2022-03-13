@@ -429,6 +429,7 @@ fn parse_pair_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
 /// an array.
 fn parse_pair_elem_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     alt((
+        parse_pair_type,
         value(
             Type::Pair(box Type::Any, box Type::Any),
             Lexer::Pair.parser(),

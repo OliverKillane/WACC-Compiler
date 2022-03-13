@@ -214,6 +214,8 @@ use std::path::Path;
 #[case("valid/modules/main_files/ticTacToe.wacc")]
 #[case("valid/modules/main_files/hashTable.wacc")]
 #[case("valid/modules/main_files/binarySortTree.wacc")]
+#[case("valid/pairsExtended/basicNested.wacc")]
+#[case("valid/pairsExtended/deeplyNested.wacc")]
 fn semantic_anal_pass(#[case] file_name: &str) {
     let mut absolute_prefix = Path::new(file!()).to_owned();
     absolute_prefix.pop();
@@ -289,6 +291,9 @@ fn semantic_anal_pass(#[case] file_name: &str) {
 #[case("invalid/syntaxErr/basic/noBody.wacc")]
 #[case("invalid/syntaxErr/basic/skpErr.wacc")]
 #[case("invalid/syntaxErr/modules/no_semicolon.wacc")]
+#[case("invalid/syntaxErr/pairsExtended/invalidInnerPair.wacc")]
+#[case("invalid/syntaxErr/pairsExtended/invalidPairArray.wacc")]
+#[case("invalid/syntaxErr/pairsExtended/invalidPairNested.wacc")]
 #[case("invalid/semanticErr/multiple/funcMess.wacc")]
 #[case("invalid/semanticErr/multiple/ifAndWhileErrs.wacc")]
 #[case("invalid/semanticErr/multiple/multiTypeErrs.wacc")]
@@ -342,6 +347,8 @@ fn semantic_anal_pass(#[case] file_name: &str) {
 #[case("invalid/semanticErr/pairs/sndNull.wacc")]
 #[case("invalid/semanticErr/pairs/fstNull.wacc")]
 #[case("invalid/semanticErr/pairs/freeNonPair.wacc")]
+#[case("invalid/semanticErr/pairsExtended/invalidNewPairAssignment.wacc")]
+#[case("invalid/semanticErr/pairsExtended/invalidPairAssignment.wacc")]
 fn semantic_anal_fail(#[case] file_name: &str) {
     let mut absolute_prefix = Path::new(file!()).to_owned();
     absolute_prefix.pop();
