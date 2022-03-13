@@ -105,13 +105,23 @@ type DefsAnalysis = HashMap<VarRepr, Rc<HashSet<StatNode>>>;
 
 fn construct_defs_out(
     node: &StatNode,
-    mut defs_in: DefsAnalysis,
+    defs_in: &DefsAnalysis,
     live_out: &LiveAnalysis,
 ) -> DefsAnalysis {
+    let mut defs_in = defs_in
+        .iter()
+        .filter_map(|(var, defs)| {
+            if live_out.contains(var) {
+                Some((*var, defs.clone()))
+            } else {
+                None
+            }
+        })
+        .collect();
     let def_var = if let Some(def_var) = get_defined_var(node) && live_out.contains(&def_var) {
         def_var
     } else {
-        return defs_in.clone();
+        return defs_in;
     };
     let def_in = defs_in
         .get(&def_var)
@@ -132,7 +142,8 @@ fn construct_defs_out(
 
 fn defs_init(node: &StatNode, live_out: &LiveAnalysis) -> (DefsAnalysis, DefsAnalysis) {
     let defs_in: DefsAnalysis = HashMap::new();
-    (defs_in.clone(), construct_defs_out(node, defs_in, live_out))
+    let defs_out = construct_defs_out(node, &defs_in, live_out);
+    (defs_in, defs_out)
 }
 
 fn defs_update(
@@ -147,7 +158,7 @@ fn defs_update(
             return (defs_in, defs_out, false);
         } else {
             let new_defs_in = pred_defs_out[0].clone();
-            let new_defs_out = construct_defs_out(node, new_defs_in.clone(), live_out);
+            let new_defs_out = construct_defs_out(node, &new_defs_in, live_out);
             (new_defs_in, new_defs_out)
         }
     } else {
@@ -162,7 +173,7 @@ fn defs_update(
                 defs_in
             },
         );
-        let new_defs_out = construct_defs_out(node, new_defs_in.clone(), live_out);
+        let new_defs_out = construct_defs_out(node, &new_defs_in, live_out);
         (new_defs_in, new_defs_out)
     };
     let updated = defs_in != new_defs_in || defs_out != new_defs_out;
