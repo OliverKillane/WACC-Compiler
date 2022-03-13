@@ -129,7 +129,7 @@ fn construct_defs_out(
         .unwrap_or_else(|| Rc::new(HashSet::new()));
     defs_in.insert(
         def_var,
-        if def_in.contains(node) {
+        if !def_in.contains(node) {
             let mut def_in = (&*def_in).clone();
             def_in.insert(node.clone());
             Rc::new(def_in)
@@ -190,6 +190,17 @@ fn prop_const_graph(code: &StatNode, _: &[VarRepr], _: &mut Graph<StatType>) -> 
         },
         true,
     );
+    let mut defs_uses: HashMap<_, HashSet<_>> = HashMap::new();
+    for (node, def_map) in &live_defs {
+        let uses = get_uses(node).into_iter().collect::<HashSet<_>>();
+        for (var, defs) in &def_map.0 {
+            if uses.contains(&var) {
+                for def in &**defs {
+                    defs_uses.entry(def).or_default().insert(node);
+                }
+            }
+        }
+    }
     todo!()
 }
 
