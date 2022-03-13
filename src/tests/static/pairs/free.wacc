@@ -1,0 +1,12 @@
+# Create and free a simple pair
+
+# Output:
+# #empty#
+
+# Program:
+
+begin
+  pair(int, char) a = newpair(10, 'a') ;
+  free a
+end
+

@@ -48,8 +48,10 @@ pub(super) struct FmtDataRefFlags {
     bool_false: Option<DataRef>,
     /// "%.*s" null-terminated string
     string: Option<DataRef>,
+    /// " %c" null-terminated string
+    char_in: Option<DataRef>,
     /// "%c" null-terminated string
-    char: Option<DataRef>,
+    char_out: Option<DataRef>,
     /// "\n" null-terminated string
     eol: Option<DataRef>,
 }
@@ -133,7 +135,7 @@ pub(super) fn translate_statement(
                 function_types,
                 options,
             ));
-            let ptr_const = translate_ptr_expr(
+            translate_ptr_expr(
                 ptr_expr,
                 free_var + 1,
                 stat_line,
@@ -194,7 +196,8 @@ pub(super) fn translate_statement(
         }
         ir::Stat::ReadCharVar(var) => {
             *read_ref = true;
-            let char_format = ensure_format(free_data_ref, data_refs, "%c", &mut fmt_flags.char);
+            let char_format =
+                ensure_format(free_data_ref, data_refs, " %c", &mut fmt_flags.char_in);
             stat_line.add_stat(StatCode::Assign(free_var, OpSrc::ReadRef));
             stat_line.add_stat(StatCode::Store(free_var, var, Size::Byte));
             stat_line.add_stat(StatCode::Assign(
@@ -209,7 +212,8 @@ pub(super) fn translate_statement(
         }
         ir::Stat::ReadCharPtr(ptr_expr) => {
             translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
-            let char_format = ensure_format(free_data_ref, data_refs, "%c", &mut fmt_flags.char);
+            let char_format =
+                ensure_format(free_data_ref, data_refs, " %c", &mut fmt_flags.char_in);
             stat_line.add_stat(StatCode::Assign(
                 free_var + 1,
                 OpSrc::DataRef(char_format, 0),
@@ -302,7 +306,8 @@ pub(super) fn translate_statement(
         }
         ir::Stat::PrintChar(num_expr) => {
             translate_num_expr(num_expr, free_var, stat_line, vars, function_types, options);
-            let integer_format = ensure_format(free_data_ref, data_refs, "%c", &mut fmt_flags.char);
+            let integer_format =
+                ensure_format(free_data_ref, data_refs, "%c", &mut fmt_flags.char_out);
             stat_line.add_stat(StatCode::Assign(
                 free_var + 1,
                 OpSrc::DataRef(integer_format, 0),
@@ -449,7 +454,7 @@ pub(super) mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: false,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,
@@ -558,7 +563,7 @@ pub(super) mod tests {
             HashMap::from([(0, ir::Type::Num(ir::NumSize::Byte))]),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%c\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String(" %c\0".as_bytes().to_vec()))]),
             true,
         )
     }
@@ -594,7 +599,7 @@ pub(super) mod tests {
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
-            HashMap::from([(0, DataRefType::String("%c\0".as_bytes().to_vec()))]),
+            HashMap::from([(0, DataRefType::String(" %c\0".as_bytes().to_vec()))]),
             false,
         )
     }
@@ -655,7 +660,7 @@ pub(super) mod tests {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
-                inlining: false,
+                inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
                 strength_reduction: false,

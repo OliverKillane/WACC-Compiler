@@ -1,0 +1,29 @@
+# iteratively calculate the given fibonacci number
+
+# Output:
+# This program calculates the nth fibonacci number iteratively.
+# Please enter n (should not be too large): #input#
+# The input n is #output#
+# The nth fibonacci number is #output#
+
+# Program:
+
+begin
+  println "This program calculates the nth fibonacci number iteratively." ;
+  print "Please enter n (should not be too large): " ;
+  int n = 0;
+  read n ;
+  print "The input n is " ;
+  println n ;
+  print "The nth fibonacci number is " ;
+  int f0 = 0 ;
+  int f1 = 1 ;
+  int save = 0;
+  while n > 0 do
+    save = f0 ;
+    f0 = f1 ;
+    f1 = save + f1 ;
+    n = n - 1
+  done ;
+  println f0
+end

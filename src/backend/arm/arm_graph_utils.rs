@@ -1,11 +1,14 @@
-//! Utility functions to allow easy manipoulation of the arm graph for
+//! Utility functions to allow easy manipulation of the arm graph for
 //! translation and final register allocation.
+
+use lazy_static::__Deref;
 
 use super::arm_repr::{ArmNode, ControlFlow, Stat};
 use crate::graph::Graph;
 use std::ops::DerefMut;
 
 /// A chain from one start armnode to and end armnode.
+#[derive(Debug)]
 pub struct Chain(pub ArmNode, pub ArmNode);
 
 /// Link two pairs of node chain starts and ends together.
@@ -117,6 +120,8 @@ impl ArmNode {
             ControlFlow::Simple(_, _, succ) | ControlFlow::Multi(_, succ) => {
                 if &Some(successor) == succ {
                     let _ = succ.insert(new_successor);
+                } else {
+                    panic!("incorrect simple successor!")
                 }
             }
             ControlFlow::Branch(_, succ1, _, succ2) => {
@@ -124,6 +129,8 @@ impl ArmNode {
                     *succ1 = new_successor
                 } else if &Some(successor) == succ2 {
                     let _ = succ2.insert(new_successor);
+                } else {
+                    panic!("incorrect branch successor!")
                 }
             }
             ControlFlow::Ltorg(_) => panic!("There are no nodes after a return"),
@@ -141,7 +148,7 @@ impl ArmNode {
                 if &Some(predecessor) == pre {
                     let _ = pre.insert(new_predecessor);
                 } else {
-                    panic!("Attempted replace a predecessor that was not there")
+                    panic!("Attempted replace a predecessor that was not there - return")
                 }
             }
             ControlFlow::Multi(pres, _) => {
@@ -151,7 +158,7 @@ impl ArmNode {
                         return;
                     }
                 }
-                // panic!("Attempted replace a predecessor that was not there")
+                panic!("Attempted replace a predecessor that was not there - multi")
             }
             ControlFlow::Removed => panic!("Cannot replace a predecessor to a removed node."),
         }
@@ -165,6 +172,44 @@ impl ArmNode {
             ControlFlow::Ltorg(_) => panic!("literal pool has no successor"),
             ControlFlow::Return(_, _) => panic!("return statement has no successor"),
             ControlFlow::Removed => panic!("cannot replace successor for a removed node"),
+        }
+    }
+
+    pub fn has_successor(&self, other: &Self) -> bool {
+        match self.get().deref() {
+            ControlFlow::Simple(_, _, succ) | ControlFlow::Multi(_, succ) => {
+                if let Some(node) = succ {
+                    node == other
+                } else {
+                    false
+                }
+            }
+            ControlFlow::Branch(_, true_branch, _, succ) => {
+                if let Some(node) = succ {
+                    node == other || other == true_branch
+                } else {
+                    other == true_branch
+                }
+            }
+            ControlFlow::Ltorg(_) | ControlFlow::Return(_, _) => false,
+            ControlFlow::Removed => panic!("Cannot check successor of a removed node"),
+        }
+    }
+
+    pub fn has_predecessor(&self, other: &Self) -> bool {
+        match self.get().deref() {
+            ControlFlow::Simple(pre, _, _)
+            | ControlFlow::Return(pre, _)
+            | ControlFlow::Branch(pre, _, _, _)
+            | ControlFlow::Ltorg(pre) => {
+                if let Some(node) = pre {
+                    node == other
+                } else {
+                    false
+                }
+            }
+            ControlFlow::Multi(pres, _) => pres.contains(other),
+            ControlFlow::Removed => panic!("Cannot check predecessor of a removed node"),
         }
     }
 }

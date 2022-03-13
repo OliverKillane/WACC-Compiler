@@ -1,11 +1,15 @@
 //! Translates the three code representation of a graph into an arm
 //! representation, with temporaries instead of registers.
-use lazy_static::__Deref;
+//!
+//! Several special nodes are created, for calls, returns and assignment of the
+//! reserved stack space for functions. These are translated into arm instructions
+//! during register allocation.
 
 use crate::{
     graph::Graph,
     intermediate::{DataRef, VarRepr},
 };
+use lazy_static::__Deref;
 
 use super::{
     super::three_code::{
@@ -311,7 +315,7 @@ fn translate_from_node(
 
 /// Start building up a routine (subroutine or main code body) from a start node.
 fn translate_routine(
-    start: Option<StatNode>,
+    start: StatNode,
     int_handler: Option<&String>,
     temp_map: &mut TempMap,
     graph: &mut Graph<ControlFlow>,
@@ -319,36 +323,25 @@ fn translate_routine(
     // Normal nodes require labels for 1 or more predecessors, the first node
     // of a function requires a label if it has any predecessors.
     let mut translate_map = HashMap::new();
+    let label = require_label(start.clone(), &mut translate_map, graph, true);
+    let (mut start, next) =
+        translate_node_inner(start, int_handler, temp_map, &mut translate_map, graph);
 
-    match start {
-        Some(node) => {
-            let label = require_label(node.clone(), &mut translate_map, graph, true);
-            let (mut start, next) =
-                translate_node_inner(node, int_handler, temp_map, &mut translate_map, graph);
+    let first = if let Some(mut label_node) = label {
+        start.set_predecessor(label_node.clone());
+        label_node.set_successor(start);
+        label_node
+    } else {
+        start
+    };
 
-            let first = if let Some(mut label_node) = label {
-                start.set_predecessor(label_node.clone());
-                label_node.set_successor(start);
-                label_node
-            } else {
-                start
-            };
-
-            if let Some((mut next_node, next_three)) = next {
-                let mut node_to_rest = translate_from_node(
-                    next_three,
-                    int_handler,
-                    temp_map,
-                    &mut translate_map,
-                    graph,
-                );
-                node_to_rest.set_predecessor(next_node.clone());
-                next_node.set_successor(node_to_rest);
-            }
-            first
-        }
-        None => graph.new_node(ControlFlow::Return(None, None)),
+    if let Some((mut next_node, next_three)) = next {
+        let mut node_to_rest =
+            translate_from_node(next_three, int_handler, temp_map, &mut translate_map, graph);
+        node_to_rest.set_predecessor(next_node.clone());
+        next_node.set_successor(node_to_rest);
     }
+    first
 }
 
 /// Translate a three-code function.
@@ -735,7 +728,7 @@ fn translate_statcode(
                 {
                     simple_node(
                         Stat::Call(
-                            String::from("__aeabi_idivmod"),
+                            String::from("__modsi3"),
                             Some(arm_dst_temp.get_temp()),
                             vec![left_reg.get_temp(), right_reg.get_temp()],
                         ),

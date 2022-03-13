@@ -3,6 +3,7 @@
 //!
 //! Builder-like pattern use to construct error messages for printing.
 
+#[cfg(debug_assertions)]
 use super::span_utils::get_relative_range;
 use std::collections::LinkedList;
 

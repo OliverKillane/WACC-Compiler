@@ -1,0 +1,31 @@
+# moderate complexity array manipulations
+
+# Output:
+# #addrs# = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+
+# Program:
+
+begin
+  int[] a = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] ;
+  int i = 0 ;
+  while i < 10 
+  do
+    a[i] = i ;
+    i = i + 1
+  done ;
+  print a ;
+  print " = {" ;
+  i = 0 ;
+  while i < 10 
+  do 
+    print a[i] ;
+    if i < 9
+    then
+      print ", "
+    else
+      skip
+    fi ;
+    i = i + 1
+  done ;
+  println "}"
+end

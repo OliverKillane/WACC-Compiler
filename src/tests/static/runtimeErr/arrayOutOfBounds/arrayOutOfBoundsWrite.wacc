@@ -1,0 +1,17 @@
+# attempt write out of array bounds (gods, this really should not work!)
+
+# Output:
+# #runtime_error#
+
+# Exit:
+# 255
+
+# Program:
+
+begin
+
+  int[] b = [1, 2, 3] ;
+	int[] a = [43, 2, 18, 1] ;
+	a[5] = 100 ;
+  println a[5]
+end

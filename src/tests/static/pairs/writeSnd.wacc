@@ -1,0 +1,16 @@
+# create a pair and write to its second element
+
+# Output:
+# a
+# Z
+
+# Program:
+
+begin
+  pair(int, char) p = newpair(10, 'a') ;
+  char s = snd p ;
+  println s ;
+  snd p = 'Z' ;
+  s = snd p ;
+  println s
+end

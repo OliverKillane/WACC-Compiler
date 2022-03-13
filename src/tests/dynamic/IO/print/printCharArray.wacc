@@ -1,0 +1,14 @@
+# printing the contents of a char[] is possible via an intermediate variable
+
+# Output:
+# hi!
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  char[] s = ['h','i','!'];
+  println s
+end

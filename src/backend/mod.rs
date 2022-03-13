@@ -1,10 +1,14 @@
 mod arm;
+mod data_flow;
+mod inlining;
+mod same_branch;
 mod three_code;
 
 use crate::intermediate::Program;
 use arm::ArmResult;
-use std::ops::Deref;
-use three_code::{StatType, ThreeCode};
+use inlining::inline;
+use same_branch::same_branch_optimization;
+use three_code::ThreeCode;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PropagationOpt {
@@ -18,7 +22,7 @@ pub struct Options {
     pub sethi_ullman_weights: bool,
     pub dead_code_removal: bool,
     pub propagation: PropagationOpt,
-    pub inlining: bool,
+    pub inlining: Option<usize>,
     pub tail_call: bool,
     pub hoisting: bool,
     pub strength_reduction: bool,
@@ -34,7 +38,10 @@ pub struct BackendOutput {
 
 /// Compiles the given program into an arm32 assembly
 pub fn compile(program: Program, options: Options) -> BackendOutput {
-    let three_code = ThreeCode::from((program, &options));
+    let mut three_code = same_branch_optimization(ThreeCode::from((program, &options)));
+    if let Some(instructions_limit) = options.inlining {
+        three_code = inline(three_code, instructions_limit);
+    }
     #[cfg(debug_assertions)]
     three_code
         .check_dummy()

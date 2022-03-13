@@ -1,0 +1,13 @@
+# simple boolean calculation
+
+# Output:
+# false
+
+# Program:
+
+begin
+  bool b1 = true ;
+  bool b2 = false ;
+  bool b3 = b1 && b2 ;
+  println b3
+end

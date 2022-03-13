@@ -3,6 +3,9 @@
 //!
 //! An allocation state is used to keep track of register usage, and
 //! create/maintain the stack frame.
+//!
+//! Register allocation makes use of live ranges to determine when temporaries
+//! 'die' and hence free up registers.
 
 use super::{
     allocation_state::AllocationState,
@@ -153,25 +156,14 @@ fn translate_from_node(
         // a helper closure for checking conditions
         let load_dst = |cond: &Cond| cond != &Cond::Al;
 
-        // println!("----------------------------");
-        // println!(
-        //     "LIVEIN: {}",
-        //     livein
-        //         .iter()
-        //         .map(|t| format!("T{}, ", t))
-        //         .collect::<String>()
-        // );
-        // println!("{}", alloc_state);
-        // println!("{:?}", current_node.get().deref());
-        // println!(
-        //     "LIVEOUT: {}",
-        //     liveout
-        //         .iter()
-        //         .map(|t| format!("T{}, ", t))
-        //         .collect::<String>()
-        // );
-
-        let mut next: ArmNode = match current_node.clone().get_mut().deref_mut() {
+        // Translate the node, translating all identifiers (temporary) to registers
+        // and linking up any necessary instructions before & after, returning the
+        // next node to check and the end of the statement to link up with any next nodes.
+        let (mut next, mut new_end): (ArmNode, ArmNode) = match current_node
+            .clone()
+            .get_mut()
+            .deref_mut()
+        {
             ControlFlow::Simple(Some(prev), Stat::Call(fun_name, ret, args), next) => {
                 let Chain(mut start, mut end) =
                     alloc_state.call(fun_name.clone(), ret, args, &liveout, graph);
@@ -179,12 +171,38 @@ fn translate_from_node(
                 start.set_predecessor(prev.clone());
                 prev.replace_successor(current_node.clone(), start);
 
+                alloc_state.update_live(&liveout);
+
                 // as we entirely replace the 'call' node, we set the successors and
                 // predecessors to point to the ends of our chain of statements
                 if let Some(next_node) = next {
                     end.set_successor(next_node.clone());
-                    next_node.replace_predecessor(current_node.clone(), end);
-                    next_node.clone()
+                    next_node.replace_predecessor(current_node.clone(), end.clone());
+                    (next_node.clone(), end)
+                } else {
+                    return;
+                }
+            }
+            ControlFlow::Simple(Some(prev), Stat::AssignStackWord(dst_ident), next_entry) => {
+                // single destination, this node is removed from the graph and replaced with assignment
+
+                let dst_t = dst_ident.get_temp();
+                alloc_state.update_live(&liveout);
+                let (reg, get_reg_chain) =
+                    alloc_state.move_temp_into_reg(dst_t, false, &[], &liveout, graph);
+                let set_address_chain = alloc_state.assign_stack_reserved(reg, graph);
+
+                let Chain(mut start, mut end) =
+                    link_optional_chains(vec![get_reg_chain, Some(set_address_chain)])
+                        .expect("Must assign stack reserve");
+
+                prev.replace_successor(current_node.clone(), start.clone());
+                start.set_predecessor(prev.clone());
+
+                if let Some(next_node) = next_entry {
+                    next_node.replace_predecessor(current_node.clone(), end.clone());
+                    end.set_successor(next_node.clone());
+                    (next_node.clone(), end)
                 } else {
                     return;
                 }
@@ -349,14 +367,14 @@ fn translate_from_node(
                             dst1_t,
                             load_dst(cond),
                             &[arg1_t, arg2_t],
-                            &livein,
+                            &liveout,
                             graph,
                         );
                         let (dst2_reg, dst2_chain) = alloc_state.move_temp_into_reg(
                             dst2_t,
                             load_dst(cond),
                             &[arg1_t, arg2_t, dst1_t],
-                            &livein,
+                            &liveout,
                             graph,
                         );
 
@@ -382,8 +400,13 @@ fn translate_from_node(
                         // kill unused variables before determining destination
                         alloc_state.update_live(&liveout);
 
-                        let (reg, chain) =
-                            alloc_state.move_temp_into_reg(dst_t, load_dst(cond), &[], &[], graph);
+                        let (reg, chain) = alloc_state.move_temp_into_reg(
+                            dst_t,
+                            load_dst(cond),
+                            &[],
+                            &liveout,
+                            graph,
+                        );
                         *dst_ident = Ident::Reg(reg);
                         chain
                     }
@@ -395,7 +418,7 @@ fn translate_from_node(
                         alloc_state.update_live(&liveout);
 
                         let (reg, chain) =
-                            alloc_state.move_temp_into_reg(dst_t, false, &[], &[], graph);
+                            alloc_state.move_temp_into_reg(dst_t, false, &[], &liveout, graph);
                         *dst_ident = Ident::Reg(reg);
                         chain
                     }
@@ -417,6 +440,8 @@ fn translate_from_node(
                             alloc_state.move_temp_into_reg(arg1_t, true, &[arg2_t], &livein, graph);
                         let (arg2_reg, arg2_chain) =
                             alloc_state.move_temp_into_reg(arg2_t, true, &[arg1_t], &livein, graph);
+
+                        alloc_state.update_live(&liveout);
 
                         *arg1_ident = Ident::Reg(arg1_reg);
                         *arg2_ident = Ident::Reg(arg2_reg);
@@ -462,6 +487,8 @@ fn translate_from_node(
                         *arg2_ident = Ident::Reg(arg2_reg);
                         *arg3_ident = Ident::Reg(arg3_reg);
 
+                        alloc_state.update_live(&liveout);
+
                         link_optional_chains(vec![arg1_chain, arg2_chain, arg3_chain])
                     }
                     Stat::MemOp(
@@ -478,6 +505,8 @@ fn translate_from_node(
                         let (arg1_reg, arg_chain) =
                             alloc_state.move_temp_into_reg(arg_t, true, &[], &livein, graph);
 
+                        alloc_state.update_live(&liveout);
+
                         *arg_ident = Ident::Reg(arg1_reg);
 
                         arg_chain
@@ -492,6 +521,8 @@ fn translate_from_node(
 
                         *arg_ident = Ident::Reg(arg1_reg);
 
+                        alloc_state.update_live(&liveout);
+
                         alloc_state.push_sp();
 
                         arg_chain
@@ -499,11 +530,12 @@ fn translate_from_node(
                     Stat::Pop(cond, dst_ident) => {
                         // pop from the stack into some temporary
                         let dst_t = dst_ident.get_temp();
+                        alloc_state.update_live(&liveout);
                         let (dst_reg, dst_chain) = alloc_state.move_temp_into_reg(
                             dst_t,
                             load_dst(cond),
                             &[],
-                            &livein,
+                            &liveout,
                             graph,
                         );
 
@@ -514,18 +546,6 @@ fn translate_from_node(
                         dst_chain
                     }
                     Stat::Link(_, _) => None,
-                    Stat::AssignStackWord(dst_ident) => {
-                        // single destination
-                        let dst_t = dst_ident.get_temp();
-
-                        let (reg, get_reg_chain) =
-                            alloc_state.move_temp_into_reg(dst_t, false, &[], &[], graph);
-                        let set_address_chain = alloc_state.assign_stack_reserved(reg, graph);
-
-                        *dst_ident = Ident::Reg(reg);
-
-                        link_optional_chains(vec![get_reg_chain, Some(set_address_chain)])
-                    }
                     _ => None, // No temporaries, so no chain
                 };
 
@@ -542,7 +562,7 @@ fn translate_from_node(
                 }
 
                 if let Some(next_node) = next_entry {
-                    next_node.clone()
+                    (next_node.clone(), current_node)
                 } else {
                     return;
                 }
@@ -568,7 +588,7 @@ fn translate_from_node(
                 }
 
                 if let Some(next_node) = next {
-                    next_node.clone()
+                    (next_node.clone(), current_node)
                 } else {
                     // cap unconditional jumps with a literal pool
                     *next = Some(graph.new_node(ControlFlow::Ltorg(Some(current_node))));
@@ -579,8 +599,8 @@ fn translate_from_node(
             ControlFlow::Return(Some(prev), ret) => {
                 let mut start = alloc_state.subroutine_return(ret, graph);
 
-                prev.replace_successor(current_node.clone(), start.clone());
                 start.set_predecessor(prev.clone());
+                prev.replace_successor(current_node, start);
 
                 return;
             }
@@ -589,9 +609,9 @@ fn translate_from_node(
                 // track that we have translated this (other nodes go here)
                 state_map.insert(current_node.clone(), (alloc_state.clone(), true));
 
-                // no other instructions are needed, so we simpy move to the next node.
+                // no other instructions are needed, so we simply move to the next node.
                 if let Some(next_node) = next {
-                    next_node.clone()
+                    (next_node.clone(), current_node)
                 } else {
                     return;
                 }
@@ -607,9 +627,9 @@ fn translate_from_node(
             if let Some(Chain(mut chain_start, mut chain_end)) =
                 alloc_state.match_state(conform_alloc_state, graph)
             {
-                next.replace_predecessor(current_node.clone(), chain_end.clone());
-                chain_start.set_predecessor(current_node.clone());
-                current_node.replace_successor(next.clone(), chain_start);
+                next.replace_predecessor(new_end.clone(), chain_end.clone());
+                chain_start.set_predecessor(new_end.clone());
+                new_end.replace_successor(next.clone(), chain_start);
                 chain_end.set_successor(next.clone());
             }
 
@@ -621,7 +641,9 @@ fn translate_from_node(
 }
 
 impl Ident {
-    /// used to extract temporaries
+    /// used to extract temporaries for temporary idents. Used when a mutable
+    /// reference to the entire ident is required, so no immutable references to
+    /// the temporary value inside the ident can be made.
     pub fn get_temp(&self) -> Temporary {
         if let Ident::Temp(t) = self {
             *t

@@ -1,0 +1,16 @@
+# simple if statement
+
+# Output:
+# #empty#
+
+# Program:
+
+begin
+  if true 
+  then
+    skip
+  else
+    skip
+  fi
+end
+

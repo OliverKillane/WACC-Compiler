@@ -1,0 +1,15 @@
+# evaluating boolean operator precedence
+
+# Output:
+# true
+# false
+
+# Program:
+
+begin
+  bool a = false ;
+  bool b = false ;
+  bool c = true ;
+  println a && b || c ;
+  println a && (b || c)
+end

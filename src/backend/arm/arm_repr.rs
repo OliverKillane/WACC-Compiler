@@ -6,9 +6,12 @@
 //! - A subset of arm [Statements](Stat) are contained in simple (1/0 in, 1/0
 //!   out) nodes. While many instruction options are not used by the current
 //!   implementation, it allows for extension.
-//! - Labels are used for nodes jumped to by more than one other node.
-//!
-//!
+//! - Multis are used for nodes jumped to by more than one node, they become
+//!   labels in the assembly (as do some other nodes)
+//! - Some special nodes are considered (e.g return) which are converted into
+//! many arm instructions during register allocation.
+
+use super::super::data_flow::DataflowNode;
 use super::int_constraints::ConstrainedInt;
 use crate::graph::{Deleted, Graph, NodeRef};
 use std::collections::{HashMap, HashSet};
@@ -369,5 +372,27 @@ pub struct ArmCode {
 impl Deleted for ControlFlow {
     fn deleted() -> Self {
         Self::Removed
+    }
+}
+
+impl DataflowNode for ControlFlow {
+    fn incoming(&self) -> Vec<&ArmNode> {
+        match self {
+            Self::Simple(Some(incoming_node), _, _)
+            | Self::Branch(Some(incoming_node), _, _, _)
+            | Self::Ltorg(Some(incoming_node))
+            | Self::Return(Some(incoming_node), _) => vec![incoming_node],
+            Self::Multi(incoming, _) => incoming.iter().collect(),
+            _ => vec![],
+        }
+    }
+    fn outgoing(&self) -> Vec<&ArmNode> {
+        match self {
+            Self::Simple(_, _, Some(outgoing_node))
+            | Self::Branch(_, outgoing_node, _, None)
+            | Self::Multi(_, Some(outgoing_node)) => vec![outgoing_node],
+            Self::Branch(_, true_node, _, Some(false_node)) => vec![true_node, false_node],
+            _ => vec![],
+        }
     }
 }

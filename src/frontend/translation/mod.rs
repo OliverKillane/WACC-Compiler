@@ -322,9 +322,11 @@ fn translate_stat(
             });
         }
         Stat::Free(ASTWrapper(expr_type, expr)) => {
+            helper_function_flags.check_null = true;
+            let expr_type = expr_type.expect("Expected a type for an expression");
             let ptr_expr = if let ir::Expr::Ptr(ptr_expr) = translate_expr(
                 expr,
-                &expr_type.expect("Expected a type for an expression"),
+                &expr_type,
                 var_symb,
                 data_ref_map,
                 helper_function_flags,
@@ -333,7 +335,14 @@ fn translate_stat(
             } else {
                 panic!("Expected a pointer expression")
             };
-            block_stats.push(ir::Stat::Free(ptr_expr));
+            block_stats.push(if let Type::Pair(_, _) = expr_type {
+                ir::Stat::Free(ir::PtrExpr::Call(
+                    CHECK_NULL_FNAME.to_string(),
+                    vec![ir::Expr::Ptr(ptr_expr)],
+                ))
+            } else {
+                ir::Stat::Free(ptr_expr)
+            });
         }
         Stat::Return(ASTWrapper(expr_type, expr)) => {
             let mut tmp_block_stats = vec![];
