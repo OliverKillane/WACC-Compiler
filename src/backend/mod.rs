@@ -8,9 +8,10 @@ mod three_code;
 
 use crate::intermediate::Program;
 use arm::ArmResult;
+use const_prop::prop_consts;
 use inlining::inline;
 use same_branch::same_branch_optimization;
-use three_code::ThreeCode;
+use three_code::{hashed, ThreeCode};
 
 use self::tail_call_optimisation::tail_call_optimise;
 
@@ -55,6 +56,15 @@ pub fn compile(program: Program, options: Options) -> BackendOutput {
     three_code
         .check_dummy()
         .expect("There are left-over dummy nodes in the ThreeCode");
+    println!(
+        "{}",
+        three_code
+            .graph
+            .iter()
+            .map(|node| format!("{} {:?}\n", hashed(&node), &*node.get()))
+            .collect::<String>()
+    );
+    let three_code = prop_consts(three_code);
 
     // the arm result can return a printable intermediate representation.
     let ArmResult(armcode, temp_rep) = ArmResult::from((three_code, &options));
