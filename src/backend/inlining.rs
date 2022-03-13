@@ -7,7 +7,6 @@ use crate::{
 use std::{
     collections::{HashMap, HashSet, LinkedList},
     iter::zip,
-    mem::drop,
     rc::Rc,
 };
 
@@ -622,7 +621,6 @@ pub(super) fn inline(
             },
         )
         .collect();
-    drop(graph);
 
     let mut called_functions = HashSet::new();
     if let Some(int_handler) = &int_handler {

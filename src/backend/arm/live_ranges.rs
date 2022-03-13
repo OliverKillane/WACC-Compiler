@@ -347,6 +347,7 @@ pub fn get_live_ranges(
         start_node,
         temps: _,
         reserved_stack: _,
+        cfg: _,
     } in functions.values()
     {
         traverse_live_ranges(start_node.clone(), &mut live_ranges);
