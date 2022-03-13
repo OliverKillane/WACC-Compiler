@@ -23,10 +23,9 @@ impl From<&Type> for ir::Type {
             ast::Type::String | ast::Type::Pair(_, _) => ir::Type::Ptr,
             ast::Type::Array(box Type::Array(_, _), _) => panic!("Nested Array Type"),
             ast::Type::Array(_, _) => ir::Type::Ptr,
-            ast::Type::Generic(_) | ast::Type::Any => {
+            ast::Type::Generic(_) | ast::Type::Any | ast::Type::Void => {
                 panic!("Expected a concrete type")
             }
-            ast::Type::Void => todo!()
         }
     }
 }
@@ -81,7 +80,7 @@ fn translate_rhs(
                     ir::Expr::Ptr(ir::PtrExpr::Call(prefixed_name, args))
                 }
                 Type::Generic(_) | Type::Any => panic!("Expected a concrete type"),
-                Type::Void => todo!()
+                Type::Void => panic!("Cannot assign a void type"),
             }
         }
         AssignRhs::Array(ASTWrapper(_, fields)) => ir::Expr::Ptr(ir::PtrExpr::Malloc(
@@ -346,7 +345,18 @@ fn translate_stat(
                 ir::Stat::Free(ptr_expr)
             });
         }
-        Stat::Return(ASTWrapper(expr_type, expr)) => {
+        Stat::Return(None) => {
+            let mut tmp_block_stats = vec![];
+            mem::swap(block_stats, &mut tmp_block_stats);
+            let mut tmp_prev_blocks = vec![];
+            mem::swap(prev_blocks, &mut tmp_prev_blocks);
+            block_graph.push(ir::Block(
+                tmp_prev_blocks,
+                tmp_block_stats,
+                BlockEnding::Return(None),
+            ));
+        }
+        Stat::Return(Some(ASTWrapper(expr_type, expr))) => {
             let mut tmp_block_stats = vec![];
             mem::swap(block_stats, &mut tmp_block_stats);
             let mut tmp_prev_blocks = vec![];
@@ -578,8 +588,22 @@ fn translate_stat(
             data_ref_map,
             helper_function_flags,
         ),
-        Stat::VoidCall(_, _) => todo!(),
-        
+        Stat::VoidCall(ASTWrapper(_, name), args) => {
+            let prefixed_name = prefix_function_name(&name);
+            let args = args
+                .into_iter()
+                .map(|ASTWrapper(arg_type, arg_expr)| {
+                    translate_expr(
+                        arg_expr,
+                        &arg_type.expect("Expected a type for an expression"),
+                        var_symb,
+                        data_ref_map,
+                        helper_function_flags,
+                    )
+                })
+                .collect();
+            block_stats.push(ir::Stat::Call(prefixed_name, args));
+        }
     }
 }
 
@@ -711,7 +735,10 @@ fn translate_function(
         helper_function_flags
     ));
     ir::Function(
-        Some(ret_type.into()),
+        match ret_type {
+            ast::Type::Void => None,
+            _ => Some(ret_type.into()),
+        },
         args.iter()
             .map(|ASTWrapper(_, Param(arg_type, arg))| (arg_type.into(), *arg))
             .collect(),

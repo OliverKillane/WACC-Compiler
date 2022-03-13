@@ -155,7 +155,7 @@ pub enum Lexer {
     /// "mod"
     Module,
     /// "void"
-    Void
+    Void,
 }
 
 impl Lexer {

@@ -218,7 +218,22 @@ fn analyse_statement<'a, 'b>(
                 None => add_error(ASTWrapper(span, stat_errors)),
             }
         }
-        Stat::Return(expr @ ASTWrapper(expr_span, _)) => {
+        Stat::Return(None) => match ret_type {
+            Some(Type::Void) => Some(ASTWrapper(None, Stat::Return(None))),
+            Some(t) => add_error(ASTWrapper(
+                span,
+                vec![SemanticError::InvalidFunctionReturn(
+                    span,
+                    Type::Void,
+                    t.clone(),
+                )],
+            )),
+            None => add_error(ASTWrapper(
+                span,
+                vec![SemanticError::ReturnStatementMisplaced(span)],
+            )),
+        },
+        Stat::Return(Some(expr @ ASTWrapper(expr_span, _))) => {
             let mut stat_errors = vec![];
             match analyse_expression(expr, local_symb, var_symb, &mut stat_errors) {
                 Some(ASTWrapper(Some(expr_type), expr_ast)) => match &ret_type {
@@ -226,7 +241,7 @@ fn analyse_statement<'a, 'b>(
                         if can_coerce(return_type, &expr_type) {
                             Some(ASTWrapper(
                                 None,
-                                Stat::Return(ASTWrapper(Some(expr_type), expr_ast)),
+                                Stat::Return(Some(ASTWrapper(Some(expr_type), expr_ast))),
                             ))
                         } else {
                             add_error(ASTWrapper(
@@ -400,11 +415,20 @@ fn analyse_statement<'a, 'b>(
         .map(|block_ast| ASTWrapper(None, Stat::Block(block_ast))),
         Stat::VoidCall(ASTWrapper(fun_name, fun_name_string), args) => {
             let mut stat_errors = vec![];
-            match analyse_call(fun_name, fun_name_string, args, &Type::Any, fun_symb, local_symb, var_symb, &mut stat_errors) {
+            match analyse_call(
+                fun_name,
+                fun_name_string,
+                args,
+                &Type::Any,
+                fun_symb,
+                local_symb,
+                var_symb,
+                &mut stat_errors,
+            ) {
                 Some((t, exprs)) => Some(ASTWrapper(None, Stat::VoidCall(t, exprs))),
-                None =>  add_error(ASTWrapper(span, stat_errors))
+                None => add_error(ASTWrapper(span, stat_errors)),
             }
-        },
+        }
     }
 }
 
@@ -526,17 +550,35 @@ fn analyse_rhs<'a, 'b>(
                 None
             }
         }
-        AssignRhs::Call(ASTWrapper(fun_name, fun_name_string), args) => {
-            analyse_call(fun_name, fun_name_string, args, expected, fun_symb, local_symb, var_symb, errors).map(|(t, exprs)| AssignRhs::Call(t, exprs))
-        }
+        AssignRhs::Call(ASTWrapper(fun_name, fun_name_string), args) => analyse_call(
+            fun_name,
+            fun_name_string,
+            args,
+            expected,
+            fun_symb,
+            local_symb,
+            var_symb,
+            errors,
+        )
+        .map(|(t, exprs)| AssignRhs::Call(t, exprs)),
     }
 }
 
-fn analyse_call<'a, 'b>(fun_name: &'a str, fun_name_string: String, args: Vec<ExprWrap<&'a str, &'a str>>, expected: &Type,
+#[allow(clippy::type_complexity)]
+#[allow(clippy::too_many_arguments)]
+fn analyse_call<'a, 'b>(
+    fun_name: &'a str,
+    fun_name_string: String,
+    args: Vec<ExprWrap<&'a str, &'a str>>,
+    expected: &Type,
     fun_symb: &FunctionSymbolTable<'a>,
     local_symb: &LocalSymbolTable<'a, 'b>,
     var_symb: &VariableSymbolTable,
-    errors: &mut Vec<SemanticError<'a>>,) -> Option<(ASTWrapper<Option<Type>, String>, Vec<ExprWrap<Option<Type>, usize>>)> {
+    errors: &mut Vec<SemanticError<'a>>,
+) -> Option<(
+    ASTWrapper<Option<Type>, String>,
+    Vec<ExprWrap<Option<Type>, usize>>,
+)> {
     match fun_symb.get_fun(fun_name) {
         Some((ret_type, param_types)) => {
             let mut correct = vec![];
@@ -575,10 +617,7 @@ fn analyse_call<'a, 'b>(fun_name: &'a str, fun_name_string: String, args: Vec<Ex
             }
 
             if errors.is_empty() {
-                Some((
-                    ASTWrapper(Some(expected.clone()), fun_name_string),
-                    correct)
-                )
+                Some((ASTWrapper(Some(expected.clone()), fun_name_string), correct))
             } else {
                 None
             }

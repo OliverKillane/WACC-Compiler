@@ -62,7 +62,7 @@ pub fn analyse_function<'a>(
         &mut LocalSymbolTable::new_child(&local_symb),
         &mut var_symb,
         &Some(ret_type.clone()),
-        ret_type != Type::Void,
+        true,
         &mut errors,
     ) {
         Some(block_ast) => {

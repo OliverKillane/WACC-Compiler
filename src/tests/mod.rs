@@ -239,6 +239,7 @@ fn all_types_test() {
 #[case("static/sequence")]
 #[case("static/variables")]
 #[case("static/while")]
+#[case("static/voidCalls")]
 fn examples_test(#[case] path: &str) {
     examples_dir_test(path).expect("Unable to test directory:");
 }

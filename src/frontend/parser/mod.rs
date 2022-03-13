@@ -341,14 +341,13 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str, &str>, ErrorTree<&str>> {
             ),
             preceded(Lexer::Read.parser(), map(parse_lhs.cut(), Stat::Read)),
             preceded(Lexer::Free.parser(), map(parse_expr.cut(), Stat::Free)),
-            preceded(Lexer::Return.parser(), map(parse_expr.cut(), Stat::Return)),
+            preceded(Lexer::Return.parser(), map(opt(parse_expr), Stat::Return)),
             preceded(Lexer::Exit.parser(), map(parse_expr.cut(), Stat::Exit)),
             preceded(
                 Lexer::Println.parser(),
                 map(parse_expr.cut(), Stat::PrintLn),
             ),
             preceded(Lexer::Print.parser(), map(parse_expr.cut(), Stat::Print)),
-            preceded(Lexer::Return.parser(), map(parse_expr.cut(), Stat::Return)),
             map(parse_if, |((e, st), sf)| Stat::If(e, st, sf)),
             map(parse_while, |(e, s)| Stat::While(e, s)),
             preceded(

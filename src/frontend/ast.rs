@@ -469,7 +469,7 @@ pub enum Stat<W, IdRepr> {
     ///     return 2 * b
     /// end
     /// ```
-    Return(ExprWrap<W, IdRepr>),
+    Return(Option<ExprWrap<W, IdRepr>>),
 
     /// End the program and return the exit code.
     /// ```text
@@ -531,7 +531,7 @@ pub enum Stat<W, IdRepr> {
     ///     call print_hello_world()
     /// end ;
     /// ```
-    VoidCall(ASTWrapper<W, String>, Vec<ExprWrap<W, IdRepr>>)
+    VoidCall(ASTWrapper<W, String>, Vec<ExprWrap<W, IdRepr>>),
 }
 
 /// Alias for WarpSpans around statements
