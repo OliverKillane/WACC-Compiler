@@ -27,10 +27,7 @@ use super::{
     int_constraints::ConstrainedInt,
 };
 
-use std::{
-    collections::{HashMap, HashSet},
-    panic,
-};
+use std::collections::{HashMap, HashSet};
 
 /// A struct for tracking names of arm representation temporaries. Is used to
 /// allocate new temporary identifiers, and maintain the mappings of three-code
@@ -84,26 +81,28 @@ pub(super) fn translate_threecode(
     ThreeCode {
         functions,
         data_refs,
-        graph: _,
+        graph,
         read_ref,
         code,
         int_handler,
     }: ThreeCode,
 ) -> ArmCode {
-    let mut graph = Graph::new();
+    let mut cfg = Graph::new();
     let int_handler = int_handler.as_ref();
     let mut temp_map = TempMap::new();
-    ArmCode {
+    let arm_code = ArmCode {
         data: translate_data(data_refs),
         reserved_stack: if read_ref { 1 } else { 0 },
-        main: translate_routine(code, int_handler, &mut temp_map, &mut graph),
+        main: translate_routine(code, int_handler, &mut temp_map, &mut cfg),
         temps: temp_map.get_hashset(),
         subroutines: functions
             .into_iter()
-            .map(|(name, fun)| (name, translate_function(fun, int_handler, &mut graph)))
+            .map(|(name, fun)| (name, translate_function(fun, int_handler)))
             .collect::<HashMap<_, _>>(),
-        cfg: graph,
-    }
+        cfg,
+    };
+    drop(graph);
+    arm_code
 }
 
 /// Translate the data section from the threecode to the arm representation.
@@ -349,21 +348,22 @@ fn translate_function(
     Function {
         args,
         code,
+        graph,
         read_ref,
     }: Function,
     int_handler: Option<&String>,
-    graph: &mut Graph<ControlFlow>,
 ) -> Subroutine {
     let mut temp_map = TempMap::new();
-
+    let mut cfg = Graph::new();
     Subroutine {
         args: args
             .into_iter()
             .map(|t| temp_map.use_id(t))
             .collect::<Vec<_>>(),
-        start_node: translate_routine(code, int_handler, &mut temp_map, graph),
+        start_node: translate_routine(code, int_handler, &mut temp_map, &mut cfg),
         temps: temp_map.get_hashset(),
         reserved_stack: if read_ref { 1 } else { 0 },
+        cfg: cfg,
     }
 }
 

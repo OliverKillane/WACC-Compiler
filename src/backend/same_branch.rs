@@ -1,44 +1,10 @@
 use super::three_code::*;
-use crate::graph::Deleted;
-use std::collections::{HashMap, HashSet, LinkedList};
+use crate::graph::{Deleted, Graph};
+use std::collections::LinkedList;
 
-/// Assuming the mapping is a relation, computes a finite closure on it.
-/// There should be no cycles in the mappings.
-fn map_closure(mapping: &mut HashMap<StatNode, StatNode>) {
-    let mut visited = HashSet::new();
-    let mapped_nodes = mapping.keys().cloned().collect::<LinkedList<_>>();
-    for mut node in mapped_nodes {
-        if visited.contains(&node) {
-            continue;
-        }
-        let mut mapping_chain = vec![node.clone()];
-        while let Some(next_node) = mapping.get(&node) {
-            assert!(!visited.contains(next_node));
-            mapping_chain.push(next_node.clone());
-            node = next_node.clone();
-        }
-        for mapped_node in mapping_chain {
-            visited.insert(mapped_node.clone());
-            mapping.insert(mapped_node, node.clone());
-        }
-    }
-}
-
-/// Applies an optimization so that nodes pointing with both branches to the same
-/// successor node get removed.
-pub(super) fn same_branch_optimization(
-    ThreeCode {
-        functions,
-        data_refs,
-        mut graph,
-        read_ref,
-        code,
-        int_handler,
-    }: ThreeCode,
-) -> ThreeCode {
-    let mut removed_node_mapping = HashMap::new();
+fn same_branch_opt_graph(graph: &mut Graph<StatType>, code: &mut StatNode) {
     let mut needless_branches = LinkedList::new();
-    for node in &graph {
+    for node in &*graph {
         if let StatType::Branch(_, _, true_node, false_node) = &*node.get() && true_node == false_node {
             needless_branches.push_back(node.clone());
         }
@@ -52,7 +18,9 @@ pub(super) fn same_branch_optimization(
         } else {
             panic!("Expected a branch node")
         };
-        removed_node_mapping.insert(node.clone(), next_node.clone());
+        if &*code == &node {
+            *code = next_node.clone()
+        }
         for incoming_node in &incoming {
             incoming_node.get_mut().substitute_child(&node, &next_node);
             next_node.get_mut().add_incoming(incoming_node.clone());
@@ -63,35 +31,46 @@ pub(super) fn same_branch_optimization(
         graph.remove_node(node);
     }
     assert!(needless_branches.is_empty());
-    map_closure(&mut removed_node_mapping);
+}
+
+/// Applies an optimization so that nodes pointing with both branches to the same
+/// successor node get removed.
+pub(super) fn same_branch_optimization(
+    ThreeCode {
+        functions,
+        data_refs,
+        mut graph,
+        read_ref,
+        mut code,
+        int_handler,
+    }: ThreeCode,
+) -> ThreeCode {
     let functions = functions
         .into_iter()
         .map(
             |(
                 fname,
                 Function {
+                    mut graph,
                     args,
-                    code,
+                    mut code,
                     read_ref,
                 },
             )| {
+                same_branch_opt_graph(&mut graph, &mut code);
                 (
                     fname,
                     Function {
+                        graph,
                         args,
-                        code: removed_node_mapping.get(&code).unwrap_or(&code).clone(),
+                        code,
                         read_ref,
                     },
                 )
             },
         )
         .collect();
-    #[cfg(debug_assertions)]
-    for node in &graph {
-        if let StatType::Branch(_, _, true_node, false_node) = &*node.get() {
-            assert_ne!(true_node, false_node);
-        }
-    }
+    same_branch_opt_graph(&mut graph, &mut code);
     ThreeCode {
         functions,
         data_refs,
