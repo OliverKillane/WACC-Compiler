@@ -828,7 +828,7 @@ fn translate_statcode(
             }
         }
         // STR(size is bytes) three_temp, [temp_ptr]
-        StatCode::Store(temp_ptr, opsrc, size) => {
+        StatCode::Store(opsrc, temp_ptr, size) => {
             let (arm_temp, opsrc_chain) = opsrc_to_temp(opsrc, temp_map, graph);
 
             let store = simple_node(
