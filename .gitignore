@@ -14,3 +14,11 @@ Cargo.lock
 # Compilation artifacts
 compile
 *.s
+
+# report/latex artifacts
+*.synctex.gz
+*.log
+*.out
+*.fls
+*.fdb_latexmk
+*.aux
