@@ -91,7 +91,7 @@ pub(super) enum StatCode {
     /// Store to a pointer reference. The first variable reference is the pointer to the
     /// store destination and the second one is the variable to store the data from.
     /// The number of bytes stored is signified by the [size](Size) field.
-    Store(VarRepr, OpSrc, Size),
+    Store(OpSrc, VarRepr, Size),
     /// A call to a function. If the function name is not in the list of the
     /// [program](ThreeCode) functions then it is assumed to be external and linked
     /// to by the linker.
@@ -548,10 +548,7 @@ fn translate_block(
                 function_types,
                 options,
             );
-            stat_line.add_stat(StatCode::VoidCall(
-                "exit".to_string(),
-                vec![OpSrc::Var(free_var)],
-            ));
+            stat_line.add_stat(StatCode::VoidCall("exit".to_string(), vec![free_var]));
             let return_node = stat_graph.borrow_mut().new_node(StatType::new_return(None));
             stat_line.add_node(return_node);
             (vec![], None)

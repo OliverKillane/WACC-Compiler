@@ -209,12 +209,7 @@ fn translate_node_inner(
             let (arm_temp, opsrc_chain) = opsrc_to_temp(opsrc, temp_map, graph);
 
             let cmp_chain = simple_node(
-                Stat::Cmp(
-                    CmpOp::Cmp,
-                    Cond::Al,
-                    arm_temp,
-                    FlexOperand::Imm(1),
-                ),
+                Stat::Cmp(CmpOp::Cmp, Cond::Al, arm_temp, FlexOperand::Imm(1)),
                 graph,
             );
 
@@ -225,7 +220,7 @@ fn translate_node_inner(
                 None,
             ));
 
-            let Chain(start,end) = if let Some(chain) = opsrc_chain {
+            let Chain(start, end) = if let Some(chain) = opsrc_chain {
                 link_two_chains(chain, cmp_chain)
             } else {
                 cmp_chain
@@ -251,7 +246,8 @@ fn translate_node_inner(
             {
                 if let Some(opsrc) = opt_opsrc {
                     let (arm_temp, opsrc_chain) = opsrc_to_temp(opsrc, temp_map, graph);
-                    let ret_node = graph.new_node(ControlFlow::Return(None, Some(arm_temp.get_temp())));
+                    let ret_node =
+                        graph.new_node(ControlFlow::Return(None, Some(arm_temp.get_temp())));
                     if let Some(Chain(start, end)) = opsrc_chain {
                         link_two_nodes(end, ret_node);
                         start
@@ -500,7 +496,11 @@ fn dataref_to_reg(
 }
 
 /// Move an opsrc into a temporary.
-fn opsrc_to_temp(opsrc: &OpSrc, temp_map: &mut TempMap, graph: &mut Graph<ControlFlow>) -> (Ident, Option<Chain>) {
+fn opsrc_to_temp(
+    opsrc: &OpSrc,
+    temp_map: &mut TempMap,
+    graph: &mut Graph<ControlFlow>,
+) -> (Ident, Option<Chain>) {
     match opsrc {
         OpSrc::Const(i) => {
             // Load the constant into a temporary
@@ -510,18 +510,24 @@ fn opsrc_to_temp(opsrc: &OpSrc, temp_map: &mut TempMap, graph: &mut Graph<Contro
         OpSrc::DataRef(dataref, offset) => {
             let new_temp = temp_map.get_new_temp();
 
-            (new_temp, Some(dataref_to_reg(
+            (
                 new_temp,
-                convert_data_ref(*dataref),
-                *offset,
-                temp_map,
-                graph,
-            )))
+                Some(dataref_to_reg(
+                    new_temp,
+                    convert_data_ref(*dataref),
+                    *offset,
+                    temp_map,
+                    graph,
+                )),
+            )
         }
         OpSrc::Var(var) => (temp_map.use_temp(*var), None),
         OpSrc::ReadRef => {
             let new_temp = temp_map.get_new_temp();
-            (new_temp, Some(simple_node(Stat::AssignStackWord(new_temp), graph)))
+            (
+                new_temp,
+                Some(simple_node(Stat::AssignStackWord(new_temp), graph)),
+            )
         }
     }
 }
@@ -567,7 +573,7 @@ fn translate_statcode(
             let arm_dst_temp = temp_map.use_temp(*three_temp_dst);
             let mut nodes = Vec::new();
 
-            let mut opsrc_to_reg= |opsrc: &OpSrc| {
+            let mut opsrc_to_reg = |opsrc: &OpSrc| {
                 let (arm_temp, opsrc_chain) = opsrc_to_temp(opsrc, temp_map, graph);
                 if let Some(chain) = opsrc_chain {
                     nodes.push(chain);
@@ -776,20 +782,31 @@ fn translate_statcode(
         }
         // LDR(size is bytes) three_temp, [temp_ptr]
         StatCode::Load(three_temp, opsrc, size) => {
-
             // load the opsrc, potentially using more/other instructions
             let (memoperand, opsrc_chain) = match opsrc {
                 OpSrc::Const(i) => (MemOperand::Expression(*i), None),
                 OpSrc::Var(temp_ptr) => (MemOperand::Zero(temp_map.use_temp(*temp_ptr)), None),
                 OpSrc::DataRef(dref, 0) => (MemOperand::Label(convert_data_ref(*dref)), None),
                 OpSrc::DataRef(dref, offset) => {
-                    let new_temp =  temp_map.get_new_temp();
-                    (MemOperand::Zero(new_temp), Some(dataref_to_reg(new_temp, convert_data_ref(*dref), *offset, temp_map, graph)))
-                },
+                    let new_temp = temp_map.get_new_temp();
+                    (
+                        MemOperand::Zero(new_temp),
+                        Some(dataref_to_reg(
+                            new_temp,
+                            convert_data_ref(*dref),
+                            *offset,
+                            temp_map,
+                            graph,
+                        )),
+                    )
+                }
                 OpSrc::ReadRef => {
                     let new_temp = temp_map.get_new_temp();
-                    (MemOperand::Zero(new_temp), Some(simple_node(Stat::AssignStackWord(new_temp), graph)))   
-                },
+                    (
+                        MemOperand::Zero(new_temp),
+                        Some(simple_node(Stat::AssignStackWord(new_temp), graph)),
+                    )
+                }
             };
 
             let load = simple_node(
@@ -798,7 +815,7 @@ fn translate_statcode(
                     Cond::Al,
                     size == &Size::Byte,
                     temp_map.use_temp(*three_temp),
-                    memoperand
+                    memoperand,
                 ),
                 graph,
             );
@@ -809,12 +826,11 @@ fn translate_statcode(
             } else {
                 load
             }
-        },
+        }
         // STR(size is bytes) three_temp, [temp_ptr]
         StatCode::Store(temp_ptr, opsrc, size) => {
-            
             let (arm_temp, opsrc_chain) = opsrc_to_temp(opsrc, temp_map, graph);
-            
+
             let store = simple_node(
                 Stat::MemOp(
                     MemOp::Str,
@@ -832,7 +848,7 @@ fn translate_statcode(
             } else {
                 store
             }
-        },
+        }
         // Creates a dummy call node for use when allocating registers
         StatCode::Call(ret_temp, fun_name, args) => simple_node(
             Stat::Call(

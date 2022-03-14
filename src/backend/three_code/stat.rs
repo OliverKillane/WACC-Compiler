@@ -1,6 +1,8 @@
 use super::{
     super::Options,
-    expr::{translate_bool_expr, translate_expr, translate_num_expr, translate_ptr_expr},
+    expr::{
+        assign_op_src, translate_bool_expr, translate_expr, translate_num_expr, translate_ptr_expr,
+    },
     DataRefType, OpSrc, Size, StatCode, StatLine, StatType,
 };
 use crate::{
@@ -84,10 +86,8 @@ fn ensure_format(
 
 /// Adds a call to a flush function
 fn add_flush(free_var: VarRepr, stat_line: &mut StatLine) {
-    stat_line.add_stat(StatCode::VoidCall(
-        "fflush".to_string(),
-        vec![OpSrc::Const(0)],
-    ));
+    stat_line.add_stat(StatCode::Assign(free_var, OpSrc::Const(0)));
+    stat_line.add_stat(StatCode::VoidCall("fflush".to_string(), vec![free_var]));
 }
 
 /// Translates a single [statement](ir::Stat) into a
@@ -125,30 +125,34 @@ pub(super) fn translate_statement(
 ) {
     match stat {
         ir::Stat::AssignVar(var, expr) => {
-            translate_expr(expr, free_var, stat_line, vars, function_types, options);
-            stat_line.add_stat(StatCode::Assign(var, OpSrc::Var(free_var)));
+            let (_, op_src) =
+                translate_expr(expr, free_var, stat_line, vars, function_types, options);
+            stat_line.add_stat(StatCode::Assign(var, op_src));
         }
         ir::Stat::AssignPtr(ptr_expr, expr) => {
-            let store_width = get_type_width(translate_expr(
-                expr,
-                free_var,
-                stat_line,
-                vars,
-                function_types,
-                options,
-            ));
-            translate_ptr_expr(
-                ptr_expr,
+            let (expr_type, op_src) =
+                translate_expr(expr, free_var, stat_line, vars, function_types, options);
+            let store_width = get_type_width(expr_type);
+            assign_op_src(
                 free_var + 1,
+                translate_ptr_expr(
+                    ptr_expr,
+                    free_var + 1,
+                    stat_line,
+                    vars,
+                    function_types,
+                    options,
+                ),
                 stat_line,
-                vars,
-                function_types,
-                options,
             );
-            stat_line.add_stat(StatCode::Store(free_var + 1, free_var, store_width));
+            stat_line.add_stat(StatCode::Store(free_var + 1, op_src, store_width));
         }
         ir::Stat::Free(ptr_expr) => {
-            translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
+            assign_op_src(
+                free_var,
+                translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options),
+                stat_line,
+            );
             stat_line.add_stat(StatCode::VoidCall("free".to_string(), vec![free_var]));
         }
         ir::Stat::Call(name, args) => {
@@ -159,7 +163,9 @@ pub(super) fn translate_statement(
                     successors(Some(free_var), |arg_result| Some(*arg_result + 1)),
                 )
                 .map(|(expr, arg_result)| {
-                    translate_expr(expr, arg_result, stat_line, vars, function_types, options);
+                    let (_, op_src) =
+                        translate_expr(expr, arg_result, stat_line, vars, function_types, options);
+                    assign_op_src(arg_result, op_src, stat_line);
                     arg_result
                 })
                 .collect(),
