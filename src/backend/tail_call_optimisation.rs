@@ -210,10 +210,15 @@ fn generate_call_jump(
 ) -> StatNode {
     for (param, arg) in param_args {
         if param != arg {
-            to_node = graph.new_node(StatType::new_simple(
+            let next_node = graph.new_node(StatType::new_simple(
                 StatCode::Assign(*param, OpSrc::Var(*arg)),
-                to_node,
-            ))
+                to_node.clone(),
+            ));
+            to_node
+                .get_mut()
+                .deref_mut()
+                .add_incoming(next_node.clone());
+            to_node = next_node;
         }
     }
     to_node
@@ -239,5 +244,6 @@ fn substitute_call(
         node.get_mut()
             .deref_mut()
             .substitute_child(&replace_node, &loop_node);
+        loop_node.get_mut().deref_mut().add_incoming(node.clone());
     }
 }
