@@ -94,11 +94,106 @@
     \maketitle
 
     \section*{Compiler Design}
-    \centerimage{0.9}{Compiler Map}
+        \centerimage{0.9}{Compiler Map}
+        Our design attempts to maximize extensibility through modularity for every stage 
+        of the compiler. Each representation has has an interface and defined semantics, 
+        and hence we can easily swap out translations, optimisations, entire frontends or 
+        translation to architecture specific backends.
+        \\
+        \\ The compiler translates source code through 4 main representations; our \keyword{AST}, \keyword{IR}, \keyword{Three-Code} and \keyword{Arm-Code}.
+
+        \subsection*{AST}
+            A tree based structure using an extended structure of the \keyword{WACC grammar} 
+            (allowing for more unary (fst, snd), binary operators (newpair) and types (full 
+            pair types)).
+            \\
+            \\ Each node in the three is wrapped by a generic. This allows the \keyword{AST} to 
+            be wrapped with different types of information, without having to change the structure.
+            \\
+            \\ Parsing of the input file (and included modules) produces an \keyword{AST} wrapped by 
+            spans (pointer to the section of relevant source code). Following a successful semantic 
+            analysis, the \keyword{AST} produced is wrapped by types (if one exists for a given node) 
+            to allow for easier translation to our \keyword{IR}.
+        
+        \subsection*{IR}
+            The intermediate representation comprises of a basic data section (for static, immutable data),
+            and functions comprising of block graphs of basic statements.
+            \\
+            \\ Expressions can be nested, and come in three main types; \keyword{Pointer}, \keyword{Number} 
+            and \keyword{Boolean}.
+            \\
+            \\ The semantics of the language are also encoded here. All expressions can be reordered and 
+            short-circuited (hence language semantics for short-circuiting must be encoded in its translation to IR)
+            \\
+            \\ This \keyword{IR} was designed to be highly general, to allow for potentially any different 
+            language frontends, and as such supports full pointer arithmetic, function calls in expressions, 
+            void calls, and all possible control flows (as a block graph). It can also optionally define an 
+            integer overflow handler.
+        
+        \subsection*{ThreeCode}
+            A control flow graph based \keyword{pesudo-assembly} upon which we perform all of our high-level 
+            optimisations.
+            \unfinished
+        
+        \subsection*{ArmCode}
+            A control flow graph based arm representation,
+
+    \section*{Implementation}
+        % rust provides:
+        % strong types, good type inference -> difficult to make mistakes
+        % very strong memory safety -> important for graph & complex traversals
+        % parallelization -> combined with memory safety provides compiler time guarentees
+        % high performance -> allow us to do more optimisation in less time
+        % support -> cargo, documentation, testing
+        % 
+        % Use of nightly rust for let chains, box pattern matching, etc
+        %
+        % Design style -> where possible functional, avoid expensive redundant copying of data, modularize.
+        %
+        % 
+
 
     \section*{Compiler Extensions}
+        % full pair types
+        % modules/includes
+        % parallel compilation
+        % function inlining
+        % tail recursion optimisation
+        % efficient register allocation
+        % constant propagation
+        % standard library
+
     
     \section*{Project Management}
+        % organised meetings (weekly)
+        % discord server
+        % tasks divided between members, each has a branch
+        % CI compliance and mandatory merge request reviews (either text, or must call)
+        % 
+        % If we were to do again, reduce scope of project to make work more manageable.
+        % Develop basic backend working from our IR, then once that works attempt to produce a graph based compiler.
+        %
+        % Use of CI integration and unit tests.
+        % CI pushed documentation - for easy reading & catchup for current state of master.
+        % 
+        % More in-person -> easy help, can more easiy assist others & better idea of how tasks are progressing
+
+    \section*{Future Improvements}
+        % Compiler allows for great extensibility
+        % 
+        % 1. x86 Backend (can simply create translation from the three-code, all three-code optimisations will still be applied)
+        % 2. Dead code removal (can be performed on the three-code, can make easy use of dataflow analysis traits & existing infrastructure)
+        % 3. Split arm stack and register allocation (to allow for smaller stack frames by doing stack slot allocation in a separate pass)
+        % 4. SSA (can translate from threecode -> SSA --(optimisations)--> SSA -> threecode)
+        %
+        % 5. General language improvements:
+        %  - for loops
+        %  - do while
+        %  - pointer arithmetic
+        %  - case statements
+        %  - etc...
+        % As the IR already supports all features required for these, the entire backend already supports these features, simply a case of
+        % altering the AST, parser, semantic analyser and the translation to IR
 
 
 \end{document}
