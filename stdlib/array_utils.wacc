@@ -120,7 +120,90 @@ begin
         return true
     end
 
-    ##### ARRAY FIND AND COUNT FUNCTIONS #####
+    ##### ARRAY COUNT FUNCTIONS #####
+
+    # Returns a pair with the 1st element being the number of appearances of given element in given integer array
+    # and the 2nd element being the index of the last appearance of given element (or -1 if count is 0) 
+    pair(int, int) count_last_int_array(int elem, int[] arr) is
+        int count = 0 ;
+        int i = 0 ;
+        int arr_len = len arr ;
+        int last = (- 1) ;
+        while (i < arr_len) do
+            if (arr[i] == elem) then
+                count = count + 1 ;
+                last = i
+            else
+                skip
+            fi ;
+            i = i + 1
+        done ;
+        pair(int, int) count_last = newpair (count, last) ;
+        return count_last
+    end
+
+    # Returns a pair with the 1st element being the number of appearances of given element in given boolean array
+    # and the 2nd element being the index of the last appearance of given element (or -1 if count is 0) 
+    pair(int, int) count_last_bool_array(bool elem, bool[] arr) is
+        int count = 0 ;
+        int i = 0 ;
+        int arr_len = len arr ;
+        int last = (- 1) ;
+        while (i < arr_len) do
+            if (arr[i] == elem) then
+                count = count + 1 ;
+                last = i
+            else
+                skip
+            fi ;
+            i = i + 1
+        done ;
+        pair(int, int) count_last = newpair (count, last) ;
+        return count_last
+    end
+
+    # Returns a pair with the 1st element being the number of appearances of given element in given character array
+    # and the 2nd element being the index of the last appearance of given element (or -1 if count is 0) 
+    pair(int, int) count_last_char_array(char elem, char[] arr) is
+        int count = 0 ;
+        int i = 0 ;
+        int arr_len = len arr ;
+        int last = (- 1) ;
+        while (i < arr_len) do
+            if (arr[i] == elem) then
+                count = count + 1 ;
+                last = i
+            else
+                skip
+            fi ;
+            i = i + 1
+        done ;
+        pair(int, int) count_last = newpair (count, last) ;
+        return count_last
+    end
+
+    # Returns the number of appearances of given element in given integer array
+    int count_int_array(int elem, int[] arr) is
+        pair(int, int) count_last = call count_last_int_array(elem, arr) ;
+        int count = fst count_last ;
+        return count
+    end
+
+    # Returns the number of appearances of given element in given boolean array
+    int count_bool_array(bool elem, bool[] arr) is
+    pair(int, int) count_last = call count_last_bool_array(elem, arr) ;
+    int count = fst count_last ;
+    return count
+    end
+
+    # Returns the index of the appearance of given element in given character array
+    int count_char_array(char elem, char[] arr) is
+    pair(int, int) count_last = call count_last_char_array(elem, arr) ;
+    int count = fst count_last ;
+    return count
+    end
+
+    ##### ARRAY SEARCH FUNCTIONS #####
 
     # Returns the index of the nth appearance of given element in given integer array
     # Returns -1 if given element is not present in given array n times
@@ -209,114 +292,88 @@ begin
         return i
     end
 
-    # Returns a pair with the 1st element being the number of appearances of given element in given integer array
-    # and the 2nd element being the index of the last appearance of given element (or -1 if count is 0) 
-    pair(int, int) count_last_int_array(int elem, int[] arr) is
-        int count = 0 ;
-        int i = 0 ;
-        int arr_len = len arr ;
-        int last = (- 1) ;
-        while (i < arr_len) do
-            if (arr[i] == elem) then
-                count = count + 1 ;
-                last = i
-            else
-                skip
-            fi ;
-            i = i + 1
-        done ;
-        pair(int, int) count_last = newpair (count, last) ;
-        return count_last
-    end
-
-    # Returns a pair with the 1st element being the number of appearances of given element in given boolean array
-    # and the 2nd element being the index of the last appearance of given element (or -1 if count is 0) 
-    pair(int, int) count_last_bool_array(bool elem, bool[] arr) is
-        int count = 0 ;
-        int i = 0 ;
-        int arr_len = len arr ;
-        int last = (- 1) ;
-        while (i < arr_len) do
-            if (arr[i] == elem) then
-                count = count + 1 ;
-                last = i
-            else
-                skip
-            fi ;
-            i = i + 1
-        done ;
-        pair(int, int) count_last = newpair (count, last) ;
-        return count_last
-    end
-
-    # Returns a pair with the 1st element being the number of appearances of given element in given character array
-    # and the 2nd element being the index of the last appearance of given element (or -1 if count is 0) 
-    pair(int, int) count_last_char_array(char elem, char[] arr) is
-        int count = 0 ;
-        int i = 0 ;
-        int arr_len = len arr ;
-        int last = (- 1) ;
-        while (i < arr_len) do
-            if (arr[i] == elem) then
-                count = count + 1 ;
-                last = i
-            else
-                skip
-            fi ;
-            i = i + 1
-        done ;
-        pair(int, int) count_last = newpair (count, last) ;
-        return count_last
-    end
-
-    # Returns the number of appearances of given element in given integer array
-    int count_int_array(int elem, int[] arr) is
-        pair(int, int) count_last = call count_last_int_array(elem, arr) ;
-        int count = fst count_last ;
-        return count
-    end
-
-    # Returns the number of appearances of given element in given boolean array
-    int count_bool_array(bool elem, bool[] arr) is
-    pair(int, int) count_last = call count_last_bool_array(elem, arr) ;
-    int count = fst count_last ;
-    return count
-    end
-
-    # Returns the index of the appearance of given element in given character array
-    int count_char_array(char elem, char[] arr) is
-    pair(int, int) count_last = call count_last_char_array(elem, arr) ;
-    int count = fst count_last ;
-    return count
-    end
-
-    # Returns the index of the appearance of given element in given integer array
+    # Returns the index of the last appearance of given element in given integer array
+    # Returns -1 if given element is not present in given array
     int find_last_int_array(int elem, int[] arr) is
         pair(int, int) count_last = call count_last_int_array(elem, arr) ;
         int last = snd count_last ;
         return last
     end
 
-    # Returns the index of the appearance of given element in given boolean array
+    # Returns the index of the last appearance of given element in given boolean array
+    # Returns -1 if given element is not present in given array
     int find_last_bool_array(bool elem, bool[] arr) is
         pair(int, int) count_last = call count_last_bool_array(elem, arr) ;
         int last = snd count_last ;
         return last
     end
 
-    # Returns the number of appearances of given element in given character array
+     # Returns the index of the last appearance of given element in given character array
+     # Returns -1 if given element is not present in given array
     int find_last_char_array(char elem, char[] arr) is
         pair(int, int) count_last = call count_last_char_array(elem, arr) ;
         int last = snd count_last ;
         return last
     end
 
+    # Returns the index of the first encountered appearance of the given target in an integer array
+    # after following the binary search algorithm
+    # Returns -1 if given target is not present in given array
+    # The given array MUST be sorted
+    int binary_search_int_array(int target, int[] arr) is
+        int arr_len = len arr ;
+        int left = 0 ;
+        int right = arr_len - 1 ;
+        int mid = (- 1) ;
+
+        while (left <= right) do
+            mid = (left + right) / 2 ;
+            if (arr[mid] < target) then
+                left = mid + 1
+            else 
+                if (arr[mid] > target) then
+                    right = mid - 1 
+                else
+                    return mid
+                fi
+            fi
+        done ;
+
+        return (- 1)
+    end
+
+    # Returns the index of the first encountered appearance of the given target in an character array
+    # after following the binary search algorithm
+    # Returns -1 if given target is not present in given array
+    # The given array MUST be sorted
+    int binary_search_char_array(char target, char[] arr) is
+        int arr_len = len arr ;
+        int left = 0 ;
+        int right = arr_len - 1 ;
+        int mid = (- 1) ;
+
+        while (left <= right) do
+            mid = (left + right) / 2 ;
+            if (arr[mid] < target) then
+                left = mid + 1
+            else 
+                if (arr[mid] > target) then
+                    right = mid - 1 
+                else
+                    return mid
+                fi
+            fi
+        done ;
+
+        return (- 1)
+    end
+
     ##### ARRAY CONTAINS FUNCTIONS #####
 
     # Returns true if given element exists in given integer array
     bool contains_int_array(int elem, int[] arr) is
-        int count = call count_int_array(elem, arr) ;
-        if (count > 0) then
+        int found = call find_int_arr(elem, arr) ;
+        if (found != -1) then
             return true
         else
             return false
@@ -325,8 +382,8 @@ begin
 
     # Returns true if given element exists in given boolean array
     bool contains_bool_array(bool elem, bool[] arr) is
-        int count = call count_bool_array(elem, arr) ;
-        if (count > 0) then
+       int found = call find_bool_arr(elem, arr) ;
+        if (found != -1) then
             return true
         else
             return false
@@ -335,8 +392,8 @@ begin
 
     # Returns true if given element exists in given character array
     bool contains_char_array(char elem, char[] arr) is
-        int count = call count_char_array(elem, arr) ;
-        if (count > 0) then
+        int found = call find_char_arr(elem, arr) ;
+        if (found != -1) then
             return true
         else
             return false
