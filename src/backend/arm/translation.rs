@@ -784,7 +784,10 @@ fn translate_statcode(
         StatCode::Load(three_temp, opsrc, size) => {
             // load the opsrc, potentially using more/other instructions
             let (memoperand, opsrc_chain) = match opsrc {
-                OpSrc::Const(i) => (MemOperand::Expression(*i), None),
+                OpSrc::Const(i) => {
+                    let new_temp = temp_map.get_new_temp();
+                    (MemOperand::Zero(new_temp), Some(simple_node(Stat::MemOp(MemOp::Ldr,Cond::Al, false, new_temp, MemOperand::Expression(*i)), graph)))
+                },
                 OpSrc::Var(temp_ptr) => (MemOperand::Zero(temp_map.use_temp(*temp_ptr)), None),
                 OpSrc::DataRef(dref, 0) => (MemOperand::Label(convert_data_ref(*dref)), None),
                 OpSrc::DataRef(dref, offset) => {
@@ -828,16 +831,43 @@ fn translate_statcode(
             }
         }
         // STR(size is bytes) three_temp, [temp_ptr]
-        StatCode::Store(opsrc, temp_ptr, size) => {
-            let (arm_temp, opsrc_chain) = opsrc_to_temp(opsrc, temp_map, graph);
+        StatCode::Store(opsrc_ptr, temp, size) => {
+            let (memoperand, opsrc_chain) = match opsrc_ptr {
+                OpSrc::Const(i) => {
+                    let new_temp = temp_map.get_new_temp();
+                    (MemOperand::Zero(new_temp), Some(simple_node(Stat::MemOp(MemOp::Ldr,Cond::Al, false, new_temp, MemOperand::Expression(*i)), graph)))
+                },
+                OpSrc::Var(temp_ptr) => (MemOperand::Zero(temp_map.use_temp(*temp_ptr)), None),
+                OpSrc::DataRef(dref, 0) => (MemOperand::Label(convert_data_ref(*dref)), None),
+                OpSrc::DataRef(dref, offset) => {
+                    let new_temp = temp_map.get_new_temp();
+                    (
+                        MemOperand::Zero(new_temp),
+                        Some(dataref_to_reg(
+                            new_temp,
+                            convert_data_ref(*dref),
+                            *offset,
+                            temp_map,
+                            graph,
+                        )),
+                    )
+                }
+                OpSrc::ReadRef => {
+                    let new_temp = temp_map.get_new_temp();
+                    (
+                        MemOperand::Zero(new_temp),
+                        Some(simple_node(Stat::AssignStackWord(new_temp), graph)),
+                    )
+                }
+            };
 
             let store = simple_node(
                 Stat::MemOp(
                     MemOp::Str,
                     Cond::Al,
                     size == &Size::Byte,
-                    arm_temp,
-                    MemOperand::Zero(temp_map.use_temp(*temp_ptr)),
+                    temp_map.use_temp(*temp),
+                    memoperand
                 ),
                 graph,
             );
