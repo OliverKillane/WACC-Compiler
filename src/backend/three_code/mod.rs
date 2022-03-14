@@ -798,24 +798,25 @@ fn translate_block_graph(
         for (cond_id, cond_node) in cond_maps {
             if let StatType::Branch(_, _, true_node, _) = &mut *cond_node.get_mut() {
                 stat_graph.borrow_mut().remove_node(true_node.clone());
-                start_nodes[*cond_id]
-                    .get_mut()
-                    .add_incoming(cond_node.clone());
                 *true_node = start_nodes[*cond_id].clone();
             } else {
                 panic!("Expected a condition node")
-            }
+            };
+            start_nodes[*cond_id]
+                .get_mut()
+                .add_incoming(cond_node.clone());
         }
-        match &mut *else_node.get_mut() {
-            StatType::Simple(_, _, next_node) | StatType::Branch(_, _, _, next_node) => {
-                stat_graph.borrow_mut().remove_node(next_node.clone());
-                start_nodes[*else_id]
-                    .get_mut()
-                    .add_incoming(else_node.clone());
-                *next_node = start_nodes[*else_id].clone();
-            }
-            _ => panic!("Expected a simple node or a branch node"),
+        if let StatType::Simple(_, _, next_node) | StatType::Branch(_, _, _, next_node) =
+            &mut *else_node.get_mut()
+        {
+            stat_graph.borrow_mut().remove_node(next_node.clone());
+            *next_node = start_nodes[*else_id].clone();
+        } else {
+            panic!("Expected a simple node or a branch node")
         }
+        start_nodes[*else_id]
+            .get_mut()
+            .add_incoming(else_node.clone());
     }
 
     start_nodes
