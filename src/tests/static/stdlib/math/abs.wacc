@@ -1,0 +1,17 @@
+# corectness of abs()
+
+# Output:
+# 5
+# 5
+# 0
+
+mod ../../../../../stdlib/math.wacc;
+
+begin
+    int test = call abs(-5) ;
+    println test ;
+    test = call abs (5) ;
+    println test ;
+    test = call abs (0) ;
+    println test
+end
