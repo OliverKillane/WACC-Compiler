@@ -133,6 +133,7 @@ pub(super) fn translate_num_expr(
                         BinOp::And,
                         OpSrc::from(0xFF),
                     ));
+                    (size, OpSrc::Var(result))
                 }
                 (ir::NumSize::Word, ir::NumSize::DWord) => {
                     stat_line.add_stat(StatCode::AssignOp(
@@ -141,10 +142,10 @@ pub(super) fn translate_num_expr(
                         BinOp::And,
                         OpSrc::from(0xFFFF),
                     ));
+                    (size, OpSrc::Var(result))
                 }
-                _ => {}
+                _ => (size, op_src),
             }
-            (size, OpSrc::Var(result))
         }
         ir::NumExpr::Call(name, args) => {
             let size = if let Some(ir::Type::Num(size)) =
