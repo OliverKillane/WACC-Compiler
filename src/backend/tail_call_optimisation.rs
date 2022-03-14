@@ -19,10 +19,25 @@
 //!
 //! This can also be done for void functions.
 
-use super::three_code::{Function, OpSrc, StatCode, StatNode, StatType};
+use super::three_code::{Function, OpSrc, StatCode, StatNode, StatType, ThreeCode};
 use crate::{graph::Graph, intermediate::VarRepr};
 use lazy_static::__Deref;
-use std::{collections::HashSet, ops::DerefMut};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::DerefMut,
+};
+
+pub(super) fn tail_call_optimise(mut threecode: ThreeCode) -> ThreeCode {
+    threecode.functions = threecode
+        .functions
+        .into_iter()
+        .map(|(name, function)| {
+            let opt_function = tail_call_opt(&name, function, &mut threecode.graph);
+            (name, opt_function)
+        })
+        .collect::<HashMap<_, _>>();
+    threecode
+}
 
 /// Perform tail call optimisation on a given function.
 fn tail_call_opt(
@@ -35,22 +50,23 @@ fn tail_call_opt(
     graph: &mut Graph<StatType>,
 ) -> Function {
     for node in get_return_nodes(code.clone()) {
-        match node.get().deref() {
-            StatType::Return(prevs, return_temp) => {
-                for start_node in prevs {
-                    backtraverse(
-                        HashSet::new(),
-                        &node,
-                        start_node.clone(),
-                        return_temp,
-                        fun_name,
-                        &code,
-                        &args,
-                        graph,
-                    )
-                }
-            }
+
+        let (prevs, return_temp) = match node.get().deref() {
+            StatType::Return(prevs, return_temp) => (prevs.clone(), *return_temp),
             _ => panic!("Was not a return node"),
+        };
+
+        for start_node in prevs {
+            backtraverse(
+                HashSet::from([node.clone()]),
+                &node,
+                start_node.clone(),
+                return_temp,
+                fun_name,
+                &code,
+                &args,
+                graph,
+            )
         }
     }
 
@@ -110,17 +126,19 @@ fn backtraverse(
     mut visited: HashSet<StatNode>, // nodes previously visited
     prev_cut: &StatNode,            // the node to cut from the prev-node, if jumping
     start_node: StatNode,           // the node to traverse back from
-    return_temp: &Option<VarRepr>,
+    mut return_temp: Option<VarRepr>,
     fun_name: &str, // name of the function - to check for recursion
     fun_start: &StatNode,
     fun_params: &[VarRepr],
     graph: &mut Graph<StatType>,
 ) {
+    // println!("hello here: {:?} {:?}", prev_cut.get().deref(), start_node.get().deref());
     // set the current node
     let mut current_node = start_node.clone();
 
     // determine if in visited
     while visited.insert(current_node.clone()) {
+        // println!("hey over here here, current: {:?}", current_node.get().deref());
         let next_node = match current_node.get().deref() {
             StatType::Dummy(_) => {
                 panic!("Dummy has no previous node, hence cannot traverse back to one")
@@ -136,18 +154,25 @@ fn backtraverse(
                 // can now check if the statement is sideeffectful, or a call
                 match stat {
                     StatCode::Store(_, _, _) => return, // stores are side effectual (memory) so cannot safely continue
+                    StatCode::Assign(dst, OpSrc::Var(other_dst)) => {
+                        // if the destination is the return we are tracking, then we can switch to another variable.
+                        if let Some(ret_t) = return_temp && dst == &ret_t {
+                            return_temp = Some(*other_dst);
+                        }
+                    },
                     StatCode::Assign(dst, _)
                     | StatCode::AssignOp(dst, _, _, _)
                     | StatCode::Load(dst, _, _) => {
                         // if we have a return, then we must check it is not changed.
-                        if let Some(ret_t) = return_temp && dst == ret_t {
+                        if let Some(ret_t) = &return_temp && dst == ret_t {
                             return
                         }
                     }
                     StatCode::Call(ret, name, args) => {
-                        if let Some(ret_t) = return_temp && ret == ret_t && name == fun_name {
+                        if let Some(ret_t) = &return_temp && ret == ret_t && name == fun_name {
                             // if a recursive call, assigning to the variable, then we can replace it.
                             substitute_call(args, fun_params, fun_start.clone(), current_node.clone(), prevs, graph);
+                            println!("hey over here{:?}{:?}", prev_cut, current_node);
                             prev_cut.get_mut().deref_mut().remove_incoming(&start_node)
                         }
                         return;
@@ -163,6 +188,7 @@ fn backtraverse(
                                 prevs,
                                 graph,
                             );
+                            println!("hey here");
                             prev_cut.get_mut().deref_mut().remove_incoming(&start_node)
                         }
                         return;

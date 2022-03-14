@@ -268,7 +268,7 @@ fn compiler_test(filename: &str, input: String, output: Behaviour, _exit_code: O
         dead_code_removal: false,
         propagation: PropagationOpt::None,
         inlining: Some(1000),
-        tail_call: false,
+        tail_call: true,
         hoisting: false,
         strength_reduction: false,
         loop_unrolling: false,
