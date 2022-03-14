@@ -348,7 +348,7 @@ fn translate_function(
     Function {
         args,
         code,
-        graph,
+        graph: _,
         read_ref,
     }: Function,
     int_handler: Option<&String>,
@@ -363,7 +363,7 @@ fn translate_function(
         start_node: translate_routine(code, int_handler, &mut temp_map, &mut cfg),
         temps: temp_map.get_hashset(),
         reserved_stack: if read_ref { 1 } else { 0 },
-        cfg: cfg,
+        cfg,
     }
 }
 

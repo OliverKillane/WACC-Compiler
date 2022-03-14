@@ -18,7 +18,7 @@ fn same_branch_opt_graph(graph: &mut Graph<StatType>, code: &mut StatNode) {
         } else {
             panic!("Expected a branch node")
         };
-        if &*code == &node {
+        if *code == node {
             *code = next_node.clone()
         }
         for incoming_node in &incoming {
