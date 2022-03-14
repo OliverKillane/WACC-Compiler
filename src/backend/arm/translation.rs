@@ -16,8 +16,7 @@ use super::{
         BinOp, DataRefType, Function, OpSrc, Size, StatCode, StatNode, StatType, ThreeCode,
     },
     arm_graph_utils::{
-        is_shifted_8_bit, link_chains, link_stats, link_two_chains, link_two_nodes, simple_node,
-        Chain,
+        is_8_bit, link_chains, link_stats, link_two_chains, link_two_nodes, simple_node, Chain,
     },
     arm_repr::{
         ArmCode, ArmNode, CmpOp, Cond, ControlFlow, Data, DataIdent, DataType, FlexOffset,
@@ -375,7 +374,7 @@ fn convert_data_ref(i: DataRef) -> DataIdent {
 
 /// place a constant in a temporary
 fn const_to_reg(dst_ident: Ident, i: i32, graph: &mut Graph<ControlFlow>) -> Chain {
-    if is_shifted_8_bit(i) {
+    if is_8_bit(i) {
         // Mov dst_ident, #i
         simple_node(
             Stat::Move(

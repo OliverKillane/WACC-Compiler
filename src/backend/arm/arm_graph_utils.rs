@@ -76,13 +76,9 @@ pub fn link_two_nodes(mut start: ArmNode, mut end: ArmNode) {
     end.set_predecessor(start);
 }
 
-/// Determines if an integer is a left logical shifted 8 bit pattern.
-pub fn is_shifted_8_bit(i: i32) -> bool {
-    if i != 0 {
-        ((32 - i.leading_zeros()) - i.trailing_zeros()) <= 8
-    } else {
-        true
-    }
+/// Determines if an integer is an  8 bit pattern (can be used in immediate operand).
+pub fn is_8_bit(i: i32) -> bool {
+    (0..256).contains(&i)
 }
 
 impl ArmNode {
@@ -307,8 +303,8 @@ mod tests {
 
     #[test]
     fn detects_left_shifted_8_bits() {
-        assert!(is_shifted_8_bit(0b10000001 as i32));
-        assert!(is_shifted_8_bit(0b10111 as i32));
-        assert!(!is_shifted_8_bit(0b1000000111 as i32));
+        assert!(is_8_bit(0b10000001 as i32));
+        assert!(is_8_bit(0b10111 as i32));
+        assert!(!is_8_bit(0b1000000111 as i32));
     }
 }
