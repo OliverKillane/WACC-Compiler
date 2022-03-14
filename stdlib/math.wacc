@@ -80,6 +80,7 @@ begin
             println " ) whose floored log2 were to be calculated is not positive!" ;
             exit 255
         else
+            int precision = 1 ;
             int hi = 0 ;
             int temp_hi = call pow(2, hi) ;
 
@@ -92,43 +93,46 @@ begin
                 return hi
             else
                 int lo = hi - 1 ;
-                int l_bound = call pow(2, lo) ;
-                int r_bound = call pow(2, hi) ;
-                int temp_diff = call abs(l_bound - num) ;
 
-                int prev_mid_val = call floor_sqrt(l_bound * r_bound) ;
-                bool first = true ;
+                # The below would be useful for floating point numbers
 
-                while (temp_diff >= 1) do
-                    int mid = (lo + hi) / 2 ;
-                    int mid_val = call floor_sqrt(l_bound * r_bound) ;
-                    if (mid_val > num) then
-                        hi = mid ;
-                        if (first == true) then
-                            r_bound = mid_val
-                        else
-                            if (prev_mid_val == mid_val) then
-                                r_bound = mid_val - 1
-                            else 
-                                r_bound = mid_val
-                            fi
-                        fi
-                    else
-                        lo = mid ;
-                        if (first == true) then
-                            l_bound = mid_val
-                        else
-                            if (prev_mid_val == mid_val) then
-                                l_bound = mid_val + 1
-                            else 
-                                l_bound = mid_val
-                            fi
-                        fi
-                    fi ;
-                    temp_diff = call abs(l_bound - num) ;
-                    prev_mid_val = mid_val ;
-                    first = false 
-                done ;
+                # int l_bound = call pow(2, lo) ;
+                # int r_bound = call pow(2, hi) ;
+                # int temp_diff = call abs(l_bound - num) ;
+
+                # int prev_mid_val = call floor_sqrt(l_bound * r_bound) ;
+                # bool first = true ;
+
+                # while (temp_diff >= precision) do
+                #     int mid = (lo + hi) / 2 ;
+                #     int mid_val = call floor_sqrt(l_bound * r_bound) ;
+                #     if (mid_val > num) then
+                #         hi = mid ;
+                #         if (first == true) then
+                #             r_bound = mid_val
+                #         else
+                #             if (prev_mid_val == mid_val) then
+                #                 r_bound = mid_val - 1
+                #             else 
+                #                 r_bound = mid_val
+                #             fi
+                #         fi
+                #     else
+                #         lo = mid ;
+                #         if (first == true) then
+                #             l_bound = mid_val
+                #         else
+                #             if (prev_mid_val == mid_val) then
+                #                 l_bound = mid_val + 1
+                #             else 
+                #                 l_bound = mid_val
+                #             fi
+                #         fi
+                #     fi ;
+                #     temp_diff = call abs(l_bound - num) ;
+                #     prev_mid_val = mid_val ;
+                #     first = false 
+                # done ;
 
                 return lo
             fi
