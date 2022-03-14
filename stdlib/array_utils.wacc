@@ -347,8 +347,26 @@ begin
 
     # Swaps the values of the two given indices
     # Change return type to void
-    bool swap(int i1, int i2, int[] arr) is
+    bool swap_int(int i1, int i2, int[] arr) is
         int temp = arr[i1] ;
+        arr[i1] = arr[i2] ;
+        arr[i2] = temp ;
+        return true
+    end
+
+    # Swaps the values of the two given indices
+    # Change return type to void
+    bool swap_bool(int i1, int i2, bool[] arr) is
+        bool temp = arr[i1] ;
+        arr[i1] = arr[i2] ;
+        arr[i2] = temp ;
+        return true
+    end
+
+    # Swaps the values of the two given indices
+    # Change return type to void
+    bool swap_char(int i1, int i2, char[] arr) is
+        char temp = arr[i1] ;
         arr[i1] = arr[i2] ;
         arr[i2] = temp ;
         return true
@@ -557,7 +575,7 @@ begin
 
     # Performs BubbleSort on given integer array
     # If the 'desc' flag is set, then the algorithm follows descending order
-    bool bubble_sort(int[] arr, bool desc) is
+    bool bubble_sort_int(int[] arr, bool desc) is
         int i = 0 ;
         int j = 0 ;
         int arr_len = len arr ;
@@ -567,13 +585,13 @@ begin
             while (j < arr_len - i - 1) do
                 if (!desc) then
                     if (arr[j] > arr[j + 1]) then
-                        swapped = call swap(j, j + 1, arr)
+                        swapped = call swap_int(j, j + 1, arr)
                     else
                         skip
                     fi
                 else
                     if (arr[j] < arr[j + 1]) then
-                        swapped = call swap(j, j + 1, arr)
+                        swapped = call swap_int(j, j + 1, arr)
                     else
                         skip
                     fi
@@ -591,7 +609,7 @@ begin
 
     # Creates maxHeap if desc is not set
     # Creates minHeap if desc is set
-    bool heapify(int[] arr, int size, int root, bool desc) is
+    bool heapify_int(int[] arr, int size, int root, bool desc) is
         int comp = root ;
         int left = 2 * root + 1 ;
         int right = 2 * root + 2 ;
@@ -636,8 +654,8 @@ begin
         bool heapified = false ;
 
         if (comp != root) then
-            swapped = call swap(root, comp, arr) ;
-            heapified = call heapify(arr, size, comp, desc)
+            swapped = call swap_int(root, comp, arr) ;
+            heapified = call heapify_int(arr, size, comp, desc)
         else
             skip
         fi ;
@@ -646,13 +664,13 @@ begin
     end
 
     # Main HeapSort function
-    bool heap_sort(int[] arr, bool desc) is
+    bool heap_sort_int(int[] arr, bool desc) is
         int arr_len = len arr ;
         int i = (arr_len / 2) - 1 ;
         bool heapified = false ;
                 
         while (i >= 0) do
-            heapified = call heapify(arr, arr_len, i, desc) ;
+            heapified = call heapify_int(arr, arr_len, i, desc) ;
             i = i - 1
         done ;
 
@@ -660,8 +678,8 @@ begin
         bool swapped = false ;
 
         while (i > 0) do
-            swapped = call swap(0, i, arr) ;
-            heapified = call heapify(arr, i, 0, desc) ;
+            swapped = call swap_int(0, i, arr) ;
+            heapified = call heapify_int(arr, i, 0, desc) ;
             i = i - 1
         done ;
 
@@ -676,7 +694,7 @@ begin
     # all the elements to the left are less than the pivot     | VICE-VERSA IF
     # all the elements to the right are greater than the pivot | 'desc' is 'true'
     # returns the so-called partitioning index
-    int partition(int lo, int hi, int[] arr, bool desc) is
+    int partition_int(int lo, int hi, int[] arr, bool desc) is
         int pivot = arr[hi] ;
         int i = (lo - 1) ;
         
@@ -686,14 +704,14 @@ begin
             if (!desc) then
                 if (arr[j] < pivot) then
                     i = i + 1 ;
-                    swapped = call swap(i, j, arr)
+                    swapped = call swap_int(i, j, arr)
                 else
                     skip
                 fi
             else
                 if (arr[j] > pivot) then
                     i = i + 1 ;
-                    swapped = call swap(i, j, arr)
+                    swapped = call swap_int(i, j, arr)
                 else
                     skip
                 fi
@@ -701,19 +719,19 @@ begin
             j = j + 1
         done ;
 
-        swapped = call swap(i + 1, hi, arr) ;
+        swapped = call swap_int(i + 1, hi, arr) ;
 
         return i + 1
     end
 
     # QuickSort helper function
     # Change return type to void
-    bool quick_sort_helper(int lo, int hi, int[] arr, bool desc) is
+    bool quick_sort_int_helper(int lo, int hi, int[] arr, bool desc) is
         bool sort = false ;
         if (lo < hi) then
-            int par_index = call partition(lo, hi, arr, desc) ;
-            sort = call quick_sort_helper(lo, par_index - 1, arr, desc) ;
-            sort = call quick_sort_helper(par_index + 1, hi, arr, desc)
+            int par_index = call partition_int(lo, hi, arr, desc) ;
+            sort = call quick_sort_int_helper(lo, par_index - 1, arr, desc) ;
+            sort = call quick_sort_int_helper(par_index + 1, hi, arr, desc)
         else
             skip
         fi ;
@@ -723,10 +741,186 @@ begin
     # Main QuickSort function - performs Quick Sort on given integer array
     # If the 'desc' flag is set, then the algorithm follows descending order
     # Change return type to void
-    bool quick_sort(int[] arr, bool desc) is
+    bool quick_sort_int(int[] arr, bool desc) is
         int lo = 0 ;
         int hi = (len arr) - 1;
-        bool sort = call quick_sort_helper(lo, hi, arr, desc) ;
+        bool sort = call quick_sort_int_helper(lo, hi, arr, desc) ;
+        return sort
+    end
+
+    # Performs BubbleSort on given character array
+    # If the 'desc' flag is set, then the algorithm follows descending order
+    bool bubble_sort_char(char[] arr, bool desc) is
+        int i = 0 ;
+        int j = 0 ;
+        int arr_len = len arr ;
+        bool swapped = false ;
+
+        while (i < arr_len - 1) do
+            while (j < arr_len - i - 1) do
+                if (!desc) then
+                    if (arr[j] > arr[j + 1]) then
+                        swapped = call swap_char(j, j + 1, arr)
+                    else
+                        skip
+                    fi
+                else
+                    if (arr[j] < arr[j + 1]) then
+                        swapped = call swap_char(j, j + 1, arr)
+                    else
+                        skip
+                    fi
+                fi ;
+                j = j + 1
+            done ;
+            j = 0 ;
+            i = i + 1
+        done ;
+
+        return true
+    end
+
+    ### HEAP SORT ###
+
+    # Creates maxHeap if desc is not set
+    # Creates minHeap if desc is set
+    bool heapify_char(char[] arr, int size, int root, bool desc) is
+        int comp = root ;
+        int left = 2 * root + 1 ;
+        int right = 2 * root + 2 ;
+
+        if (left < size) then
+            if (!desc) then
+                if (arr[left] > arr[comp]) then
+                    comp = left
+                else 
+                    skip
+                fi
+            else
+                if (arr[left] < arr[comp]) then
+                    comp = left
+                else 
+                    skip
+                fi
+            fi 
+        else
+            skip
+        fi ;
+
+        if (right < size) then
+            if (!desc) then
+                if (arr[right] > arr[comp]) then
+                    comp = right
+                else 
+                    skip
+                fi
+            else
+                if (arr[right] < arr[comp]) then
+                    comp = right
+                else 
+                    skip
+                fi
+            fi 
+        else
+            skip
+        fi ;
+
+        bool swapped = false ;
+        bool heapified = false ;
+
+        if (comp != root) then
+            swapped = call swap_char(root, comp, arr) ;
+            heapified = call heapify_char(arr, size, comp, desc)
+        else
+            skip
+        fi ;
+
+        return true
+    end
+
+    # Main HeapSort function
+    # If the 'desc' flag is set, then the algorithm follows descending order
+    bool heap_sort_char(char[] arr, bool desc) is
+        int arr_len = len arr ;
+        int i = (arr_len / 2) - 1 ;
+        bool heapified = false ;
+                
+        while (i >= 0) do
+            heapified = call heapify_char(arr, arr_len, i, desc) ;
+            i = i - 1
+        done ;
+
+        i = arr_len - 1 ;
+        bool swapped = false ;
+
+        while (i > 0) do
+            swapped = call swap_char(0, i, arr) ;
+            heapified = call heapify_char(arr, i, 0, desc) ;
+            i = i - 1
+        done ;
+
+        return true
+    end
+
+    ### QUICK SORT ###
+
+    # Uses the element at index 'hi' as the pivot
+    # the pivot will be placed at its final position in the sorted array
+    # the rest of the elements will be swapped such that
+    # all the elements to the left are less than the pivot     | VICE-VERSA IF
+    # all the elements to the right are greater than the pivot | 'desc' is 'true'
+    # returns the so-called partitioning index
+    int partition_char(int lo, int hi, char[] arr, bool desc) is
+        char pivot = arr[hi] ;
+        int i = (lo - 1) ;
+        
+        int j = lo ;
+        bool swapped = false ;
+        while (j < hi) do
+            if (!desc) then
+                if (arr[j] < pivot) then
+                    i = i + 1 ;
+                    swapped = call swap_char(i, j, arr)
+                else
+                    skip
+                fi
+            else
+                if (arr[j] > pivot) then
+                    i = i + 1 ;
+                    swapped = call swap_char(i, j, arr)
+                else
+                    skip
+                fi
+            fi ;
+            j = j + 1
+        done ;
+
+        swapped = call swap_char(i + 1, hi, arr) ;
+
+        return i + 1
+    end
+
+    # QuickSort helper function
+    # Change return type to void
+    bool quick_sort_char_helper(int lo, int hi, char[] arr, bool desc) is
+        bool sort = false ;
+        if (lo < hi) then
+            int par_index = call partition_char(lo, hi, arr, desc) ;
+            sort = call quick_sort_char_helper(lo, par_index - 1, arr, desc) ;
+            sort = call quick_sort_char_helper(par_index + 1, hi, arr, desc)
+        else
+            skip
+        fi ;
+        return true
+    end
+
+    # Main QuickSort function - performs Quick Sort on given character array
+    # If the 'desc' flag is set, then the algorithm follows descending order
+    # Change return type to void
+    bool quick_sort_char(char[] arr, bool desc) is
+        int lo = 0 ;
+        int hi = (len arr) - 1;
+        bool sort = call quick_sort_char_helper(lo, hi, arr, desc) ;
         return sort
     end
 
