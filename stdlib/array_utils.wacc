@@ -273,21 +273,21 @@ begin
 
     # Returns the index of the 1st appearance of given element in given integer array
     # Returns -1 if given element is not present in given array
-    int find_int_arr(int elem, int[] arr) is
+    int find_first_int_arr(int elem, int[] arr) is
         int i = call find_nth_int_array(elem, 1, arr) ;
         return i
     end
 
     # Returns the index of the 1st appearance of given element in given boolean array
     # Returns -1 if given element is not present in given array
-    int find_bool_arr(bool elem, bool[] arr) is
+    int find_first_bool_arr(bool elem, bool[] arr) is
         int i = call find_nth_bool_array(elem, 1, arr) ;
         return i
     end
 
     # Returns the index of the 1st appearance of given element in given character array
     # Returns -1 if given element is not present in given array
-    int find_char_arr(char elem, char[] arr) is
+    int find_first_char_arr(char elem, char[] arr) is
         int i = call find_nth_char_array(elem, 1, arr) ;
         return i
     end
@@ -372,7 +372,7 @@ begin
 
     # Returns true if given element exists in given integer array
     bool contains_int_array(int elem, int[] arr) is
-        int found = call find_int_arr(elem, arr) ;
+        int found = call find_first_int_arr(elem, arr) ;
         if (found != -1) then
             return true
         else
@@ -382,7 +382,7 @@ begin
 
     # Returns true if given element exists in given boolean array
     bool contains_bool_array(bool elem, bool[] arr) is
-       int found = call find_bool_arr(elem, arr) ;
+       int found = call find_first_bool_arr(elem, arr) ;
         if (found != -1) then
             return true
         else
@@ -392,7 +392,7 @@ begin
 
     # Returns true if given element exists in given character array
     bool contains_char_array(char elem, char[] arr) is
-        int found = call find_char_arr(elem, arr) ;
+        int found = call find_first_char_arr(elem, arr) ;
         if (found != -1) then
             return true
         else
