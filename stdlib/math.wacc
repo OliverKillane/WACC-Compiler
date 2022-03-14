@@ -263,7 +263,5 @@ begin
         int sd = call floor_sqrt(var) ;
         return sd
     end
-        
-    skip
 
 end

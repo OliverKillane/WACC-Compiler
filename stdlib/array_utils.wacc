@@ -1004,6 +1004,4 @@ begin
     #     return arr
     # end
 
-    skip
-
 end
