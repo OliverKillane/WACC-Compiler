@@ -33,16 +33,21 @@ fn get_uses(node: &StatNode) -> Vec<VarRepr> {
         | StatType::Branch(_, op_src, _, _) => get_use_op_src(op_src)
             .map(|var| vec![var])
             .unwrap_or_default(),
-        StatType::Simple(
-            _,
-            StatCode::AssignOp(_, op_src1, _, op_src2) | StatCode::Store(op_src1, op_src2, _),
-            _,
-        ) => vec![get_use_op_src(op_src1), get_use_op_src(op_src2)]
-            .into_iter()
-            .filter_map(|var| var)
-            .collect(),
+        StatType::Simple(_, StatCode::Store(op_src, var1, _), _) => {
+            if let Some(var2) = get_use_op_src(op_src) {
+                vec![*var1, var2]
+            } else {
+                vec![*var1]
+            }
+        }
+        StatType::Simple(_, StatCode::AssignOp(_, op_src1, _, op_src2), _) => {
+            vec![get_use_op_src(op_src1), get_use_op_src(op_src2)]
+                .into_iter()
+                .filter_map(|var| var)
+                .collect()
+        }
         StatType::Simple(_, StatCode::Call(_, _, args) | StatCode::VoidCall(_, args), _) => {
-            args.iter().filter_map(get_use_op_src).collect()
+            args.clone()
         }
         StatType::Return(_, op_src) => op_src
             .and_then(|op_src| get_use_op_src(&op_src).map(|var| vec![var]))
@@ -220,6 +225,7 @@ pub(super) fn prop_consts(
     for Function {
         args,
         code,
+        graph: _,
         read_ref: _,
     } in functions.values_mut()
     {

@@ -2,6 +2,8 @@ mod eval;
 mod expr;
 mod stat;
 
+use self::expr::assign_op_src;
+
 use super::data_flow::DataflowNode;
 use super::Options;
 use crate::graph::{Deleted, Graph, NodeRef};
@@ -540,7 +542,7 @@ fn translate_block(
     }
     let (cond_outputs, else_output) = match block_ending {
         ir::BlockEnding::Exit(num_expr) => {
-            translate_num_expr(
+            let (_, op_src) = translate_num_expr(
                 num_expr,
                 free_var,
                 &mut stat_line,
@@ -548,6 +550,7 @@ fn translate_block(
                 function_types,
                 options,
             );
+            assign_op_src(free_var, op_src, &mut stat_line);
             stat_line.add_stat(StatCode::VoidCall("exit".to_string(), vec![free_var]));
             let return_node = stat_graph.borrow_mut().new_node(StatType::new_return(None));
             stat_line.add_node(return_node);
@@ -555,7 +558,7 @@ fn translate_block(
         }
         ir::BlockEnding::Return(expr) => {
             if let Some(expr) = expr {
-                translate_expr(
+                let (_, op_src) = translate_expr(
                     expr,
                     free_var,
                     &mut stat_line,
@@ -565,7 +568,7 @@ fn translate_block(
                 );
                 let return_node = stat_graph
                     .borrow_mut()
-                    .new_node(StatType::new_return(Some(OpSrc::Var(free_var))));
+                    .new_node(StatType::new_return(Some(op_src)));
                 stat_line.add_node(return_node);
             } else {
                 let return_node = stat_graph.borrow_mut().new_node(StatType::new_return(None));
@@ -581,7 +584,7 @@ fn translate_block(
 
             for (bool_expr, _) in conds {
                 let mut bool_stat_line = StatLine::new(stat_graph.clone());
-                translate_bool_expr(
+                let op_src = translate_bool_expr(
                     bool_expr,
                     free_var,
                     &mut bool_stat_line,
@@ -592,7 +595,7 @@ fn translate_block(
                 let true_dummy = stat_graph.borrow_mut().new_node(StatType::deleted());
                 let false_dummy = stat_graph.borrow_mut().new_node(StatType::deleted());
                 let cond_node = stat_graph.borrow_mut().new_node(StatType::new_branch(
-                    OpSrc::Var(free_var),
+                    op_src,
                     true_dummy.clone(),
                     false_dummy.clone(),
                 ));
@@ -1032,7 +1035,7 @@ mod tests {
             .into_inner();
         let return_node = graph.new_node(StatType::new_return(None));
         let exit_node = graph.new_node(StatType::new_simple(
-            StatCode::VoidCall("exit".to_string(), vec![OpSrc::Var(1)]),
+            StatCode::VoidCall("exit".to_string(), vec![1]),
             return_node,
         ));
         let exit_set_node = graph.new_node(StatType::new_simple(
@@ -1040,7 +1043,7 @@ mod tests {
             exit_node,
         ));
         let flush_call_node = graph.new_node(StatType::new_simple(
-            StatCode::VoidCall("fflush".to_string(), vec![OpSrc::Var(1)]),
+            StatCode::VoidCall("fflush".to_string(), vec![1]),
             exit_set_node,
         ));
         let stdout_set_node = graph.new_node(StatType::new_simple(
@@ -1048,7 +1051,7 @@ mod tests {
             flush_call_node,
         ));
         let print_call_node = graph.new_node(StatType::new_simple(
-            StatCode::VoidCall("printf".to_string(), vec![OpSrc::Var(2), OpSrc::Var(1)]),
+            StatCode::VoidCall("printf".to_string(), vec![2, 1]),
             stdout_set_node,
         ));
         let print_fmt_set_node = graph.new_node(StatType::new_simple(
@@ -1060,27 +1063,27 @@ mod tests {
             print_fmt_set_node,
         ));
         let scan_load_node = graph.new_node(StatType::new_simple(
-            StatCode::Load(0, OpSrc::Var(1), Size::DWord),
+            StatCode::Load(0, OpSrc::ReadRef, Size::DWord),
             print_val_set_node,
         ));
         let scan_call_node = graph.new_node(StatType::new_simple(
-            StatCode::VoidCall("scanf".to_string(), vec![OpSrc::Var(2), OpSrc::Var(1)]),
+            StatCode::VoidCall("scanf".to_string(), vec![2, 1]),
             scan_load_node,
         ));
         let scan_fmt_set_node = graph.new_node(StatType::new_simple(
             StatCode::Assign(2, OpSrc::DataRef(0, 0)),
             scan_call_node,
         ));
-        let scan_store_node = graph.new_node(StatType::new_simple(
-            StatCode::Store(OpSrc::Var(1), OpSrc::Var(0), Size::DWord),
-            scan_fmt_set_node,
-        ));
         let scan_set_ref = graph.new_node(StatType::new_simple(
             StatCode::Assign(1, OpSrc::ReadRef),
-            scan_store_node,
+            scan_fmt_set_node,
+        ));
+        let scan_store_node = graph.new_node(StatType::new_simple(
+            StatCode::Store(OpSrc::ReadRef, 0, Size::DWord),
+            scan_set_ref,
         ));
 
-        match_graph(start_node, scan_set_ref);
+        match_graph(start_node, scan_store_node);
     }
 
     #[test]
@@ -1145,43 +1148,31 @@ mod tests {
             return_node,
         ));
         let branch3_node = graph.new_node(StatType::new_branch(
-            OpSrc::Var(1),
+            OpSrc::Const(1),
             loop_node.clone(),
             loop_node,
-        ));
-        let branch3_cond_set_node = graph.new_node(StatType::new_simple(
-            StatCode::Assign(1, OpSrc::Const(1)),
-            branch3_node,
         ));
         let branch2_node = graph.new_node(StatType::new_branch(
             OpSrc::Var(1),
             return_assign_node,
-            branch3_cond_set_node,
+            branch3_node,
         ));
         let branch2_cond_set_node = graph.new_node(StatType::new_simple(
             StatCode::Assign(1, OpSrc::Var(0)),
             branch2_node,
         ));
         let branch1_node = graph.new_node(StatType::deleted());
-        let branch1_cond_set_node = graph.new_node(StatType::new_simple(
-            StatCode::Assign(1, OpSrc::Const(1)),
+        let var_set_node = graph.new_node(StatType::new_simple(
+            StatCode::Assign(0, OpSrc::Const(1)),
             branch1_node.clone(),
         ));
-        let var_set_node = graph.new_node(StatType::new_simple(
-            StatCode::Assign(0, OpSrc::Var(1)),
-            branch1_cond_set_node,
-        ));
-        let tmp_var_set_node = graph.new_node(StatType::new_simple(
-            StatCode::Assign(1, OpSrc::Const(1)),
-            var_set_node,
-        ));
         branch1_node.set(StatType::new_branch(
-            OpSrc::Var(1),
-            tmp_var_set_node.clone(),
+            OpSrc::Const(1),
+            var_set_node.clone(),
             branch2_cond_set_node,
         ));
 
-        match_graph(start_node, tmp_var_set_node);
+        match_graph(start_node, var_set_node);
     }
 
     #[test]
@@ -1223,12 +1214,8 @@ mod tests {
         assert_eq!(args, vec![0]);
         assert!(!read_ref);
 
-        let return_node = graph.new_node(StatType::new_return(Some(2)));
-        let return_assign_node = graph.new_node(StatType::new_simple(
-            StatCode::Assign(2, OpSrc::Const(0)),
-            return_node,
-        ));
-        match_graph(code, return_assign_node);
+        let return_node = graph.new_node(StatType::new_return(Some(OpSrc::Const(0))));
+        match_graph(code, return_node);
     }
 
     #[test]
@@ -1312,7 +1299,7 @@ mod tests {
         let mut graph = Graph::new();
         let return_node = graph.new_node(StatType::new_return(None));
         let exit_node = graph.new_node(StatType::new_simple(
-            StatCode::VoidCall("exit".to_string(), vec![OpSrc::Var(0)]),
+            StatCode::VoidCall("exit".to_string(), vec![0]),
             return_node,
         ));
         let exit_assign_node = graph.new_node(StatType::new_simple(

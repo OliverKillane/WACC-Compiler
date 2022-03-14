@@ -182,20 +182,20 @@ fn substitute_vars(
         ),
         StatCode::Store(op_src1, op_src2, size) => StatCode::Store(
             substitute_op_src(*op_src1, new_variable, variable_mappings),
-            substitute_op_src(*op_src2, new_variable, variable_mappings),
+            get_mapping(*op_src2, new_variable, variable_mappings),
             *size,
         ),
         StatCode::Call(var, fname, args) => StatCode::Call(
             get_mapping(*var, new_variable, variable_mappings),
             fname.clone(),
             args.iter()
-                .map(|op_src| substitute_op_src(*op_src, new_variable, variable_mappings))
+                .map(|op_src| get_mapping(*op_src, new_variable, variable_mappings))
                 .collect(),
         ),
         StatCode::VoidCall(fname, args) => StatCode::VoidCall(
             fname.clone(),
             args.iter()
-                .map(|op_src| substitute_op_src(*op_src, new_variable, variable_mappings))
+                .map(|op_src| get_mapping(*op_src, new_variable, variable_mappings))
                 .collect(),
         ),
     }
@@ -502,7 +502,7 @@ fn inline_graph(
                     continue;
                 };
             let arg_assign_node = new_graph.new_node(StatType::new_simple(
-                StatCode::Assign(new_function_arg, call_arg),
+                StatCode::Assign(new_function_arg, OpSrc::Var(call_arg)),
                 new_call_node.clone(),
             ));
             new_call_node
