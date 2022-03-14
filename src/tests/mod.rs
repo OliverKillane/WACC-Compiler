@@ -264,15 +264,15 @@ fn compiler_test(filename: &str, input: String, output: Behaviour, _exit_code: O
     let (main_file, module_files) = gather_modules(Path::new(filename)).unwrap();
 
     let options = Options {
-        sethi_ullman_weights: false,
-        dead_code_removal: false,
+        sethi_ullman_weights: true,
+        dead_code_removal: true,
         propagation: PropagationOpt::None,
-        inlining: Some(1000),
-        tail_call: false,
-        hoisting: false,
-        strength_reduction: false,
-        loop_unrolling: false,
-        common_expressions: false,
+        inlining: Some(10000),
+        tail_call: true,
+        hoisting: true,
+        strength_reduction: true,
+        loop_unrolling: true,
+        common_expressions: true,
         show_arm_temp_rep: false,
     };
     let assembly = compile(
