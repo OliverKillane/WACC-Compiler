@@ -214,7 +214,7 @@ begin
     end
 
     # Returns the floored mean of all elements in integer array
-    int floor_avg_int_arr(int[] arr) is
+    int floor_mean_int_arr(int[] arr) is
         int sum = call sum_int_arr(arr);
         int arr_len = len arr ;
         return (sum / arr_len)
@@ -222,13 +222,13 @@ begin
 
     # Returns the floored population variance of all elements in integer array
     int floor_pop_var_int_arr(int[] arr) is
-        int avg = call floor_avg_int_arr(arr) ;
+        int mean = call floor_mean_int_arr(arr) ;
         int i = 0 ; 
         int arr_len = len arr ;
         int diff_sum = 0 ;
         int curr_diff_sum_sq = 0 ;
         while (i < arr_len) do
-            curr_diff_sum_sq = call pow((arr[i] - avg), 2) ;
+            curr_diff_sum_sq = call pow((arr[i] - mean), 2) ;
             diff_sum = diff_sum + curr_diff_sum_sq ;
             i = i + 1
         done ;
@@ -244,13 +244,13 @@ begin
 
     # Returns the floored sample variance of all elements in integer array
     int floor_sam_var_int_arr(int[] arr) is
-        int avg = call floor_avg_int_arr(arr) ;
+        int mean = call floor_mean_int_arr(arr) ;
         int i = 0 ; 
         int arr_len = len arr ;
         int diff_sum = 0 ;
         int curr_diff_sum_sq = 0 ;
         while (i < arr_len) do
-            curr_diff_sum_sq = call pow((arr[i] - avg), 2) ;
+            curr_diff_sum_sq = call pow((arr[i] - mean), 2) ;
             diff_sum = diff_sum + curr_diff_sum_sq ;
             i = i + 1
         done ;
