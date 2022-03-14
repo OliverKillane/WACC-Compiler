@@ -1,0 +1,51 @@
+# corectness of floor_sqrt()
+
+# Output:
+# 0
+# 1
+# 1
+# 2
+# 3
+# 10
+# 12
+# 69
+# 69
+# 420
+# 420
+
+# Exit:
+# 255
+
+mod ../../../../../stdlib/math.wacc;
+
+begin
+    # +ve numbers
+    int test = call floor_sqrt(0) ;
+    println test ;
+    test = call floor_sqrt(1) ;
+    println test ;
+    test = call floor_sqrt(2) ;
+    println test ;
+    test = call floor_sqrt(4) ;
+    println test ;
+    test = call floor_sqrt(9) ;
+    println test ;
+    test = call floor_sqrt(100) ;
+    println test ;
+    test = call floor_sqrt(144) ;
+    println test ;
+    test = call floor_sqrt(4761) ;
+    println test ;
+    test = call floor_sqrt(4762) ;
+    println test ;
+    test = call floor_sqrt(176400) ;
+    println test ;
+    test = call floor_sqrt(176401) ;
+    println test ;
+    
+    # -ve exponent
+    test = call floor_sqrt(- 10) ;
+    # Should exit before reaching this
+    println test 
+
+end
