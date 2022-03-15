@@ -369,8 +369,8 @@ mod tests {
 
     #[test]
     fn check_simple_boolean_unop_expression() {
-        let mut helper_function_flags = RwLock::new(HelperFunctionFlags::default());
-        let mut data_ref_map: RwLock<HashMap<DataRef, Vec<ir::Expr>>> = RwLock::new(HashMap::new());
+        let helper_function_flags = RwLock::new(HelperFunctionFlags::default());
+        let data_ref_map: RwLock<HashMap<DataRef, Vec<ir::Expr>>> = RwLock::new(HashMap::new());
         let var_symb = VariableSymbolTable::new();
 
         let translated: intermediate::Expr =
@@ -393,9 +393,9 @@ mod tests {
 
     #[test]
     fn check_complex_boolean_binop_expression() {
-        let mut helper_function_flags: RwLock<HelperFunctionFlags> =
+        let helper_function_flags: RwLock<HelperFunctionFlags> =
             RwLock::new(HelperFunctionFlags::default());
-        let mut data_ref_map: RwLock<HashMap<DataRef, Vec<ir::Expr>>> = RwLock::new(HashMap::new());
+        let data_ref_map: RwLock<HashMap<DataRef, Vec<ir::Expr>>> = RwLock::new(HashMap::new());
         let var_symb = VariableSymbolTable::new();
 
         let translated: intermediate::Expr = ir::Expr::Bool(ir::BoolExpr::BoolOp(
@@ -458,9 +458,9 @@ mod tests {
 
     #[test]
     fn check_simple_integer_binop_expression() {
-        let mut helper_function_flags: RwLock<HelperFunctionFlags> =
+        let helper_function_flags: RwLock<HelperFunctionFlags> =
             RwLock::new(HelperFunctionFlags::default());
-        let mut data_ref_map: RwLock<HashMap<DataRef, Vec<ir::Expr>>> = RwLock::new(HashMap::new());
+        let data_ref_map: RwLock<HashMap<DataRef, Vec<ir::Expr>>> = RwLock::new(HashMap::new());
         let var_symb = VariableSymbolTable::new();
 
         let translated: intermediate::Expr = intermediate::Expr::Num(ir::NumExpr::ArithOp(
@@ -487,9 +487,9 @@ mod tests {
 
     #[test]
     fn check_complex_integer_binop_expression() {
-        let mut helper_function_flags: RwLock<HelperFunctionFlags> =
+        let helper_function_flags: RwLock<HelperFunctionFlags> =
             RwLock::new(HelperFunctionFlags::default());
-        let mut data_ref_map: RwLock<HashMap<DataRef, Vec<ir::Expr>>> = RwLock::new(HashMap::new());
+        let data_ref_map: RwLock<HashMap<DataRef, Vec<ir::Expr>>> = RwLock::new(HashMap::new());
         let mut var_symb = VariableSymbolTable::new();
 
         var_symb.0.insert(0, ast::Type::Int);

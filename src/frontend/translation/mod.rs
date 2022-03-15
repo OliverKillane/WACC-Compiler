@@ -824,7 +824,7 @@ mod tests {
     ) {
         let mut block_stats = vec![];
         let mut block_graph = vec![];
-        let mut data_ref_map = RwLock::new(HashMap::new());
+        let data_ref_map = RwLock::new(HashMap::new());
         translate_stat(
             ASTWrapper(None, stat),
             &mut block_stats,
