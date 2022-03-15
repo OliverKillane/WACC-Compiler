@@ -369,10 +369,10 @@ fn display_routine(
                 None => (),
             }
 
-            // print out
+            since_lit += 1;
+            
             next = match current.get().deref() {
                 ControlFlow::Simple(_, stat, next) => {
-                    since_lit += 1;
                     writeln!(f, "{}", stat)?;
                     next.clone()
                 }
