@@ -1,0 +1,70 @@
+# A demonstration of a fully tail-call optimised function, that includes 
+# non-side effecting instructions, and reassignment of the recursive call's 
+# return value.
+#
+# The optimisation traces back from all paths going to a return, ignores dead 
+# code (potentially removing it if possible), and can follow reassignments of the 
+# returned variable. 
+# 
+# Expected behaviour is to print 'Reached final depth!'
+#
+# f_some_recursion:
+# b_f_some_recursion_0:
+#         MOV     T1,     T0
+#         MOV     T2,     #100
+#         MOV     T3,     #0
+#         CMP     T1,     T2
+#         MOVLT   T3,     #1
+#         MOV     T1,     T3
+#         CMP     T1,     #1
+#         BEQ     b_f_some_recursion_1
+#         LDR     T1,     =d_ref_0
+#         MOV     T4,     T1
+#         MOV     T1,     T4
+#         MOV     T2,     #4
+#         ADDS    T1,     T1,     T2
+#         BLVS    overflow_handler
+#         MOV     T2,     T4
+#         LDR     T2,     [T2]
+#         LDR     T5,     =d_ref_2
+#         INTERNAL OPERATION: CALL        printf  No Return, ARGS(T5,T2,T1)
+#         MOV     T1,     #0
+#         INTERNAL OPERATION: CALL        fflush  No Return, ARGS(T1)
+#         LDR     T1,     =d_ref_3
+#         INTERNAL OPERATION: CALL        printf  No Return, ARGS(T1)
+#         MOV     T1,     #0
+#         INTERNAL OPERATION: CALL        fflush  No Return, ARGS(T1)
+#         MOV     T1,     #100
+#         INTERNAL OPERATION: RETURN      T1
+# b_f_some_recursion_1:
+#         MOV     T1,     T0
+#         MOV     T2,     #1
+#         ADDS    T1,     T1,     T2
+#         BLVS    overflow_handler
+#         MOV     T0,     T1
+#         B       b_f_some_recursion_0
+
+begin
+    int some_recursion(int depth) is
+        if depth < 100 then
+            # this is label 'b_f_some_recursion_1'
+            int recur = call some_recursion(depth + 1); # tail call optimised
+
+            # non-side effecting instructions can be ignored by optimisation 
+            # and are in fact removed.
+            int a = 2;
+            a = 3 + (2 * a);
+
+            # direct assignments can be used in trace (now looks for a recursive 
+            # call setting variable recur)
+            a = recur;
+
+            return a
+        else 
+            println "Reached final depth!";
+            return 100
+        fi
+    end
+
+    int _ = call some_recursion(1)
+end

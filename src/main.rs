@@ -90,6 +90,9 @@ struct Args {
     #[clap(short, long, help = "print the intermediate representation generated")]
     ir_print: bool,
 
+    #[clap(long, help = "run tail call optimisation")]
+    tail_call: bool,
+
     #[clap(
         long,
         arg_enum,
@@ -141,6 +144,7 @@ fn main() -> io::Result<()> {
         outputpath,
         backend_temps: temp_arm,
         ir_print,
+        tail_call,
         inlining,
     } = Args::parse();
 
@@ -205,7 +209,7 @@ fn main() -> io::Result<()> {
                 dead_code_removal: false,
                 propagation: PropagationOpt::None,
                 inlining: inlining.into(),
-                tail_call: false,
+                tail_call,
                 hoisting: false,
                 strength_reduction: false,
                 loop_unrolling: false,
