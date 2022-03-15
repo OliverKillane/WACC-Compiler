@@ -241,9 +241,7 @@ fn all_types_test() {
 #[case("static/pairsExtended")]
 #[case("static/while")]
 fn examples_test(#[case] path: &str) {
-    for _ in 0..500 {
     examples_dir_test(path).expect("Unable to test directory:");
-    }
 }
 
 fn examples_dir_test(dir: &str) -> Result<(), i32> {
@@ -282,52 +280,51 @@ fn compiler_test(filename: &str, input: String, output: Behaviour, _exit_code: O
         options,
     )
     .assembly;
-    dbg!(assembly);
 
-    // let file_id = FILE_SYSTEM_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let file_id = FILE_SYSTEM_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
-    // create_dir_all("./tmp/").unwrap();
-    // write(format!("./tmp/tmp{}.s", file_id), assembly.as_bytes()).expect("Unable to write file");
+    create_dir_all("./tmp/").unwrap();
+    write(format!("./tmp/tmp{}.s", file_id), assembly.as_bytes()).expect("Unable to write file");
 
-    // let stdout = std::process::Command::new("arm-linux-gnueabi-gcc")
-    //     .args(&[
-    //         "-o",
-    //         &format!("./tmp/tmp{}", file_id),
-    //         "-mcpu=arm1176jzf-s",
-    //         "-mtune=arm1176jzf-s",
-    //         &format!("./tmp/tmp{}.s", file_id),
-    //     ])
-    //     .output()
-    //     .expect("Unable to run program");
+    let stdout = std::process::Command::new("arm-linux-gnueabi-gcc")
+        .args(&[
+            "-o",
+            &format!("./tmp/tmp{}", file_id),
+            "-mcpu=arm1176jzf-s",
+            "-mtune=arm1176jzf-s",
+            &format!("./tmp/tmp{}.s", file_id),
+        ])
+        .output()
+        .expect("Unable to run program");
 
-    // assert!(stdout.status.success());
+    assert!(stdout.status.success());
 
-    // let mut child = std::process::Command::new("qemu-arm")
-    //     .args(&[
-    //         "-L",
-    //         "/usr/arm-linux-gnueabi/",
-    //         &format!("tmp/tmp{}", file_id),
-    //     ])
-    //     .stdin(Stdio::piped())
-    //     .stdout(Stdio::piped())
-    //     .stderr(Stdio::null())
-    //     .spawn()
-    //     .expect("Unable to run program");
+    let mut child = std::process::Command::new("qemu-arm")
+        .args(&[
+            "-L",
+            "/usr/arm-linux-gnueabi/",
+            &format!("tmp/tmp{}", file_id),
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("Unable to run program");
 
-    // let mut stdin = child.stdin.take().expect("Failed to open stdin");
-    // let _ = std::thread::spawn(move || {
-    //     stdin
-    //         .write_all(input.as_bytes())
-    //         .expect("Failed to write to stdin");
-    // })
-    // .join();
+    let mut stdin = child.stdin.take().expect("Failed to open stdin");
+    let _ = std::thread::spawn(move || {
+        stdin
+            .write_all(input.as_bytes())
+            .expect("Failed to write to stdin");
+    })
+    .join();
 
-    // let stdout = dbg!(child.wait_with_output().expect("Failed to read stdout"));
+    let stdout = dbg!(child.wait_with_output().expect("Failed to read stdout"));
 
-    // // match dbg!(exit_code) {
-    // //     Some(e) => assert_eq!(stdout.status.code().unwrap(), e),
-    // //     None => assert!(stdout.status.success()),
-    // // }
+    // match dbg!(exit_code) {
+    //     Some(e) => assert_eq!(stdout.status.code().unwrap(), e),
+    //     None => assert!(stdout.status.success()),
+    // }
 
-    // assert_eq!(output, &String::from_utf8_lossy(&stdout.stdout).as_ref());
+    assert_eq!(output, &String::from_utf8_lossy(&stdout.stdout).as_ref());
 }
