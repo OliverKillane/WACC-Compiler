@@ -32,7 +32,7 @@ pub(super) fn tail_call_optimise(mut threecode: ThreeCode) -> ThreeCode {
         .functions
         .into_iter()
         .map(|(name, function)| {
-            let opt_function = tail_call_opt(&name, function, &mut threecode.graph);
+            let opt_function = tail_call_opt(&name, function);
             (name, opt_function)
         })
         .collect::<HashMap<_, _>>();
@@ -46,11 +46,11 @@ fn tail_call_opt(
         args,
         code,
         read_ref,
+        mut graph,
     }: Function,
-    graph: &mut Graph<StatType>,
 ) -> Function {
-    for node in get_return_nodes(code.clone()) {
 
+    for node in get_return_nodes(code.clone()) {
         let (prevs, return_temp) = match node.get().deref() {
             StatType::Return(prevs, return_temp) => (prevs.clone(), *return_temp),
             _ => panic!("Was not a return node"),
@@ -65,7 +65,7 @@ fn tail_call_opt(
                 fun_name,
                 &code,
                 &args,
-                graph,
+                &mut graph,
             )
         }
     }
@@ -74,6 +74,7 @@ fn tail_call_opt(
         args,
         code,
         read_ref,
+        graph,
     }
 }
 
@@ -132,14 +133,12 @@ fn backtraverse(
     fun_params: &[VarRepr],
     graph: &mut Graph<StatType>,
 ) {
-    // println!("hello here: {:?} {:?}", prev_cut.get().deref(), start_node.get().deref());
     // set the current node
     let mut current_node = start_node.clone();
 
     // determine if in visited
     while visited.insert(current_node.clone()) {
-        // println!("hey over here here, current: {:?}", current_node.get().deref());
-        let next_node = match current_node.get().deref() {
+        let prevs = match current_node.get().deref() {
             StatType::Dummy(_) => {
                 panic!("Dummy has no previous node, hence cannot traverse back to one")
             }
@@ -159,7 +158,7 @@ fn backtraverse(
                         if let Some(ret_t) = return_temp && dst == &ret_t {
                             return_temp = Some(*other_dst);
                         }
-                    },
+                    }
                     StatCode::Assign(dst, _)
                     | StatCode::AssignOp(dst, _, _, _)
                     | StatCode::Load(dst, _, _) => {
@@ -172,7 +171,6 @@ fn backtraverse(
                         if let Some(ret_t) = &return_temp && ret == ret_t && name == fun_name {
                             // if a recursive call, assigning to the variable, then we can replace it.
                             substitute_call(args, fun_params, fun_start.clone(), current_node.clone(), prevs, graph);
-                            println!("hey over here{:?}{:?}", prev_cut, current_node);
                             prev_cut.get_mut().deref_mut().remove_incoming(&start_node)
                         }
                         return;
@@ -188,38 +186,37 @@ fn backtraverse(
                                 prevs,
                                 graph,
                             );
-                            println!("hey here");
                             prev_cut.get_mut().deref_mut().remove_incoming(&start_node)
                         }
                         return;
                     }
                 }
-
-                // if there is a single predecessor, we can continue our loop,
-                // if there is more than one, we have reached a new point to
-                // cut from. Otherwise we cannot check any further.
-                if prevs.is_empty() {
-                    return;
-                } else if prevs.len() == 1 {
-                    prevs[0].clone()
-                } else {
-                    for prev_node in prevs {
-                        backtraverse(
-                            visited.clone(),
-                            &current_node,
-                            prev_node.clone(),
-                            return_temp,
-                            fun_name,
-                            fun_start,
-                            fun_params,
-                            graph,
-                        )
-                    }
-                    return;
-                }
+                prevs.clone()
             }
         };
-        current_node = next_node;
+
+        // if there is a single predecessor, we can continue our loop,
+        // if there is more than one, we have reached a new point to
+        // cut from. Otherwise we cannot check any further.
+        current_node = if prevs.is_empty() {
+            return;
+        } else if prevs.len() == 1 {
+            prevs[0].clone()
+        } else {
+            for prev_node in prevs {
+                backtraverse(
+                    visited.clone(),
+                    &current_node,
+                    prev_node.clone(),
+                    return_temp,
+                    fun_name,
+                    fun_start,
+                    fun_params,
+                    graph,
+                )
+            }
+            return;
+        }
     }
 }
 
