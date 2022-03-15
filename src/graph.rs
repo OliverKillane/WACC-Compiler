@@ -1,11 +1,5 @@
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
-use std::{
-    collections::HashSet,
-    fmt::Debug,
-    hash::Hash,
-    mem,
-    sync::Arc,
-};
+use std::{collections::HashSet, fmt::Debug, hash::Hash, mem, sync::Arc};
 
 /// Node graph. Houses all the [nodes](NodeRef). [Deletes](Deleted) nodes only when they
 /// get deleted explicitly or when the graph goes out of scope (gets dropped).
