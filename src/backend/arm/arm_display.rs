@@ -370,7 +370,7 @@ fn display_routine(
             }
 
             since_lit += 1;
-            
+
             next = match current.get().deref() {
                 ControlFlow::Simple(_, stat, next) => {
                     writeln!(f, "{}", stat)?;

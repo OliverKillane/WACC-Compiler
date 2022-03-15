@@ -49,7 +49,6 @@ fn tail_call_opt(
         mut graph,
     }: Function,
 ) -> Function {
-
     for node in get_return_nodes(code.clone()) {
         let (prevs, return_temp) = match node.get().deref() {
             StatType::Return(prevs, return_temp) => (prevs.clone(), *return_temp),
