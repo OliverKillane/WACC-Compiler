@@ -102,9 +102,9 @@ pub fn analyse_semantics<'a>(
         }
     }).unzip();
 
-    let errors: Vec<_> = e.into_par_iter().filter_map(|x| x).collect();
-    let fun_symbol_tables: HashMap<_, _> = fst.into_par_iter().filter_map(|x| x).collect();
-    let functions: Vec<_> = fs.into_par_iter().filter_map(|x| x).collect();
+    let errors: Vec<_> = e.into_iter().filter_map(|x| x).collect();
+    let fun_symbol_tables: HashMap<_, _> = fst.into_iter().filter_map(|x| x).collect();
+    let functions: Vec<_> = fs.into_iter().filter_map(|x| x).collect();
 
     // analyse main code block
     let mut main_var_symb = VariableSymbolTable::new();

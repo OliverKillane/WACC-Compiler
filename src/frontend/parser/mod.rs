@@ -67,7 +67,6 @@ pub fn parse<'a>(
     let main_semantic_info = final_parser(parse_program)(main_input);
     let module_semantic_infos = module_inputs
         .par_iter()
-        .cloned()
         .map(|source| final_parser(parse_module)(source))
         .collect::<LinkedList<_>>();
     let mut error_trees = Vec::new();
@@ -92,10 +91,10 @@ pub fn parse<'a>(
     if error_trees.is_empty() {
         let Program(functions, main_code) = ast.unwrap();
         let functions = vec![functions]
-            .into_par_iter()
+            .into_iter()
             .chain(
                 module_functions
-                    .into_par_iter()
+                    .into_iter()
                     .map(|module_semantic_info| module_semantic_info.unwrap()),
             )
             .flatten()
