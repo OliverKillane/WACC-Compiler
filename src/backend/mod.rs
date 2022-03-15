@@ -2,6 +2,7 @@ mod arm;
 mod data_flow;
 mod inlining;
 mod same_branch;
+mod tail_call_optimisation;
 mod three_code;
 
 use crate::intermediate::Program;
@@ -9,6 +10,8 @@ use arm::ArmResult;
 use inlining::inline;
 use same_branch::same_branch_optimization;
 use three_code::ThreeCode;
+
+use self::tail_call_optimisation::tail_call_optimise;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PropagationOpt {
@@ -42,6 +45,11 @@ pub fn compile(program: Program, options: Options) -> BackendOutput {
     if let Some(instructions_limit) = options.inlining {
         three_code = inline(three_code, instructions_limit);
     }
+
+    if options.tail_call {
+        three_code = tail_call_optimise(three_code)
+    }
+
     #[cfg(debug_assertions)]
     three_code
         .check_dummy()

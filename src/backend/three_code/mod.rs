@@ -204,6 +204,16 @@ impl StatType {
         }
     }
 
+    pub(super) fn remove_incoming(&mut self, node: &StatNode) {
+        match self {
+            Self::Simple(old_incoming, _, _)
+            | Self::Branch(old_incoming, _, _, _)
+            | Self::Loop(old_incoming)
+            | Self::Return(old_incoming, _)
+            | Self::Dummy(old_incoming) => old_incoming.retain(|other_node| other_node != node),
+        }
+    }
+
     /// Substitutes one child of a node for a new one
     pub(super) fn substitute_child(&mut self, old_child: &StatNode, new_child: &StatNode) {
         let mut tmp_node = Self::deleted();

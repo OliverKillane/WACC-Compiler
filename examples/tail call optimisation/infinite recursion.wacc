@@ -1,0 +1,45 @@
+# A demonstration of tail call optimisation altering the correctness of a 
+# function.
+#
+# The normal behaviour of the reference compiler (and ours without --tail-call)
+# is to eventually segfault due to a stack overflow from infinite recursion. 
+# (printing the depth it gets to)
+#
+# However, with tail call optimisation on, as there is no recursive call here.
+# Thus this function will continue to run (to higher and higher depth) until the 
+# depth counter overflows.
+#
+# We can see the removal of return and the tail call optimisation in the first 
+# stage of armcode (temporaries, just after threecode - where the tail call 
+# optimisation is done).
+#
+# f_infinite_recursion:
+# b_f_infinite_recursion_0:
+#         MOV     T1,     T0
+#         LDR     T2,     =d_ref_2
+#         INTERNAL OPERATION: CALL        printf  No Return, ARGS(T2,T1)
+#         MOV     T1,     #0
+#         INTERNAL OPERATION: CALL        fflush  No Return, ARGS(T1)
+#         LDR     T1,     =d_ref_3
+#         INTERNAL OPERATION: CALL        printf  No Return, ARGS(T1)
+#         MOV     T1,     #0
+#         INTERNAL OPERATION: CALL        fflush  No Return, ARGS(T1)
+#         MOV     T1,     T0
+#         MOV     T2,     #1
+#         ADDS    T1,     T1,     T2
+#         BLVS    overflow_handler
+#         MOV     T0,     T1
+#         B       b_f_infinite_recursion_0
+#
+# The recursive call, and its associated return have been removed.
+
+
+begin
+    int infinite_recursion(int depth) is
+        println depth;
+        int result = call infinite_recursion(depth + 1); # tail call optimised
+        return result # unreachable
+    end
+
+    int _ = call infinite_recursion(1)
+end
