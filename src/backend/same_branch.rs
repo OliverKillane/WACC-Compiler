@@ -1,5 +1,8 @@
 use super::three_code::*;
-use crate::graph::{Deleted, Graph};
+use crate::{
+    backend::data_flow::DataflowNode,
+    graph::{Deleted, Graph},
+};
 use std::collections::LinkedList;
 
 fn same_branch_opt_graph(graph: &mut Graph<StatType>, code: &mut StatNode) {
@@ -29,6 +32,21 @@ fn same_branch_opt_graph(graph: &mut Graph<StatType>, code: &mut StatNode) {
             }
         }
         graph.remove_node(node);
+    }
+    for node in &*graph {
+        let incoming = (&*node.get())
+            .incoming()
+            .into_iter()
+            .filter(|&incoming_node| {
+                if let StatType::Dummy(_) = &*incoming_node.get() {
+                    false
+                } else {
+                    true
+                }
+            })
+            .cloned()
+            .collect();
+        (&mut *node.get_mut()).set_incoming(incoming);
     }
     assert!(needless_branches.is_empty());
 }

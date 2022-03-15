@@ -387,17 +387,17 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr], int_handler: &Option<Stri
             )
         })
         .collect::<HashMap<_, _>>();
-    println!(
-        "{}",
-        non_const_defs
-            .iter()
-            .map(|(node, non_const_uses_counts)| format!(
-                "{} {:?}\n",
-                hashed(node),
-                non_const_uses_counts
-            ))
-            .collect::<String>()
-    );
+    // println!(
+    //     "{}",
+    //     non_const_defs
+    //         .iter()
+    //         .map(|(node, non_const_uses_counts)| format!(
+    //             "{} {:?}\n",
+    //             hashed(node),
+    //             non_const_uses_counts
+    //         ))
+    //         .collect::<String>()
+    // );
     for (node, _) in &live_defs {
         let assigned_var = if let Some(assigned_var) = prop_const_node(&node, int_handler) {
             assigned_var
@@ -472,7 +472,7 @@ pub(super) fn prop_consts(
         int_handler,
     }: ThreeCode,
 ) -> ThreeCode {
-    println!("{}", hashed(&code));
+    // println!("{}", hashed(&code));
     prop_const_graph(&code, &[], &int_handler);
     for Function {
         args,
@@ -481,7 +481,7 @@ pub(super) fn prop_consts(
         read_ref: _,
     } in functions.values_mut()
     {
-        println!("{}", hashed(&code));
+        // println!("{}", hashed(&code));
         prop_const_graph(code, args, &int_handler);
     }
     ThreeCode {
