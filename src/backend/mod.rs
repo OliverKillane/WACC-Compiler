@@ -8,10 +8,9 @@ mod three_code;
 
 use crate::intermediate::Program;
 use arm::ArmResult;
-use const_prop::prop_consts;
 use inlining::inline;
 use same_branch::same_branch_optimization;
-use three_code::{hashed, ThreeCode};
+use three_code::ThreeCode;
 
 use self::tail_call_optimisation::tail_call_optimise;
 

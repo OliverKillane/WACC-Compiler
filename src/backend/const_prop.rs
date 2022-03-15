@@ -43,7 +43,7 @@ fn get_uses(node: &StatNode) -> Vec<VarRepr> {
         StatType::Simple(_, StatCode::AssignOp(_, op_src1, _, op_src2), _) => {
             vec![get_use_op_src(op_src1), get_use_op_src(op_src2)]
                 .into_iter()
-                .filter_map(|var| var)
+                .flatten()
                 .collect()
         }
         StatType::Simple(_, StatCode::Call(_, _, args) | StatCode::VoidCall(_, args), _) => {
@@ -87,7 +87,7 @@ fn live_update(
 ) -> (LiveAnalysis, LiveAnalysis, bool) {
     let (new_live_in, new_live_out) = if succ_live_in.len() == 1 {
         if succ_live_in[0] == &live_out {
-            return (live_in.clone(), live_out.clone(), false);
+            return (live_in, live_out, false);
         } else {
             let new_live_out = succ_live_in[0].clone();
             (construct_live_in(node, new_live_out.clone()), new_live_out)
@@ -132,7 +132,7 @@ fn construct_defs_out(
     };
     let def_in = defs_in
         .get(&def_var)
-        .map(|def_in| def_in.clone())
+        .cloned()
         .unwrap_or_else(|| Rc::new(HashSet::new()));
     defs_in.insert(
         def_var,
@@ -201,7 +201,7 @@ fn prop_const_graph(code: &StatNode, _: &[VarRepr], _: &mut Graph<StatType>) -> 
     for (node, def_map) in &live_defs {
         let uses = get_uses(node).into_iter().collect::<HashSet<_>>();
         for (var, defs) in &def_map.0 {
-            if uses.contains(&var) {
+            if uses.contains(var) {
                 for def in &**defs {
                     defs_uses.entry(def).or_default().insert(node);
                 }
@@ -221,7 +221,7 @@ pub(super) fn prop_consts(
         int_handler,
     }: ThreeCode,
 ) -> ThreeCode {
-    let code = prop_const_graph(&code, &vec![], &mut graph);
+    let code = prop_const_graph(&code, &[], &mut graph);
     for Function {
         args,
         code,

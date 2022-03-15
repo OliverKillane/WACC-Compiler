@@ -786,8 +786,20 @@ fn translate_statcode(
             let (memoperand, opsrc_chain) = match opsrc {
                 OpSrc::Const(i) => {
                     let new_temp = temp_map.get_new_temp();
-                    (MemOperand::Zero(new_temp), Some(simple_node(Stat::MemOp(MemOp::Ldr,Cond::Al, false, new_temp, MemOperand::Expression(*i)), graph)))
-                },
+                    (
+                        MemOperand::Zero(new_temp),
+                        Some(simple_node(
+                            Stat::MemOp(
+                                MemOp::Ldr,
+                                Cond::Al,
+                                false,
+                                new_temp,
+                                MemOperand::Expression(*i),
+                            ),
+                            graph,
+                        )),
+                    )
+                }
                 OpSrc::Var(temp_ptr) => (MemOperand::Zero(temp_map.use_temp(*temp_ptr)), None),
                 OpSrc::DataRef(dref, 0) => (MemOperand::Label(convert_data_ref(*dref)), None),
                 OpSrc::DataRef(dref, offset) => {
@@ -835,8 +847,20 @@ fn translate_statcode(
             let (memoperand, opsrc_chain) = match opsrc_ptr {
                 OpSrc::Const(i) => {
                     let new_temp = temp_map.get_new_temp();
-                    (MemOperand::Zero(new_temp), Some(simple_node(Stat::MemOp(MemOp::Ldr,Cond::Al, false, new_temp, MemOperand::Expression(*i)), graph)))
-                },
+                    (
+                        MemOperand::Zero(new_temp),
+                        Some(simple_node(
+                            Stat::MemOp(
+                                MemOp::Ldr,
+                                Cond::Al,
+                                false,
+                                new_temp,
+                                MemOperand::Expression(*i),
+                            ),
+                            graph,
+                        )),
+                    )
+                }
                 OpSrc::Var(temp_ptr) => (MemOperand::Zero(temp_map.use_temp(*temp_ptr)), None),
                 OpSrc::DataRef(dref, 0) => (MemOperand::Label(convert_data_ref(*dref)), None),
                 OpSrc::DataRef(dref, offset) => {
@@ -867,7 +891,7 @@ fn translate_statcode(
                     Cond::Al,
                     size == &Size::Byte,
                     temp_map.use_temp(*temp),
-                    memoperand
+                    memoperand,
                 ),
                 graph,
             );
