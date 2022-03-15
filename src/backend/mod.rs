@@ -56,12 +56,12 @@ pub fn compile(program: Program, options: Options) -> BackendOutput {
         .check_dummy()
         .expect("There are left-over dummy nodes in the ThreeCode");
     // println!(
-    // "{}",
-    // three_code
-    // .graph
-    // .iter()
-    // .map(|node| format!("{} {:?}\n", hashed(&node), &*node.get()))
-    // .collect::<String>()
+    //     "{}",
+    //     three_code
+    //         .graph
+    //         .iter()
+    //         .map(|node| format!("{} {:?}\n", hashed(&node), &*node.get()))
+    //         .collect::<String>()
     // );
     let three_code = prop_consts(three_code);
 

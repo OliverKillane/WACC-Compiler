@@ -14,7 +14,8 @@ fn get_defined_var(node: &StatNode) -> Option<VarRepr> {
             _,
             StatCode::Assign(var, _)
             | StatCode::AssignOp(var, _, _, _, _)
-            | StatCode::Load(var, _, _),
+            | StatCode::Load(var, _, _)
+            | StatCode::Call(var, _, _),
             _,
         ) => Some(*var),
         _ => None,
@@ -336,6 +337,20 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr], int_handler: &Option<Stri
         },
         true,
     );
+    // println!(
+    //     "{}",
+    //     live_defs
+    //         .iter()
+    //         .map(|(node, (def_map, _))| format!(
+    //             "{} {:?}\n",
+    //             hashed(node),
+    //             def_map
+    //                 .iter()
+    //                 .map(|(var, defs)| (var, defs.iter().map(|def| hashed(def)).collect()))
+    //                 .collect::<HashMap<_, HashSet<_>>>()
+    //         ))
+    //         .collect::<String>()
+    // );
     let mut defs_uses: HashMap<_, HashSet<_>> = HashMap::new();
     for (node, (def_map, _)) in &live_defs {
         let uses = get_const_prop_uses(node)
