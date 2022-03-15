@@ -78,14 +78,14 @@ fn live_init(node: &StatNode) -> (LiveAnalysis, LiveAnalysis) {
 
 fn live_update(
     _: Vec<&LiveAnalysis>,
-    live_in: LiveAnalysis,
+    live_in: &LiveAnalysis,
     node: &StatNode,
-    live_out: LiveAnalysis,
+    live_out: &LiveAnalysis,
     succ_live_in: Vec<&LiveAnalysis>,
 ) -> (LiveAnalysis, LiveAnalysis, bool) {
     let (new_live_in, new_live_out) = if succ_live_in.len() == 1 {
-        if succ_live_in[0] == &live_out {
-            return (live_in, live_out, false);
+        if succ_live_in[0] == live_out {
+            return (live_in.clone(), live_out.clone(), false);
         } else {
             let new_live_out = succ_live_in[0].clone();
             (construct_live_in(node, new_live_out.clone()), new_live_out)
@@ -102,7 +102,7 @@ fn live_update(
         ));
         (construct_live_in(node, new_live_out.clone()), new_live_out)
     };
-    let updated = live_in != new_live_in || live_out != new_live_out;
+    let updated = live_in != &new_live_in || live_out != &new_live_out;
     (new_live_in, new_live_out, updated)
 }
 
@@ -160,15 +160,15 @@ fn defs_init(
 
 fn defs_update(
     pred_defs_out: Vec<&DefsAnalysis>,
-    defs_in: DefsAnalysis,
+    defs_in: &DefsAnalysis,
     node: &StatNode,
-    defs_out: DefsAnalysis,
+    defs_out: &DefsAnalysis,
     live_out: &LiveAnalysis,
     additional_defs: &[(VarRepr, StatNode)],
 ) -> (DefsAnalysis, DefsAnalysis, bool) {
     let (new_defs_in, new_defs_out) = if pred_defs_out.len() == 1 {
-        if pred_defs_out[0] == &defs_in {
-            return (defs_in, defs_out, false);
+        if pred_defs_out[0] == defs_in {
+            return (defs_in.clone(), defs_out.clone(), false);
         } else {
             let new_defs_in = pred_defs_out[0].clone();
             let new_defs_out = construct_defs_out(node, &new_defs_in, live_out);
@@ -192,7 +192,7 @@ fn defs_update(
         let new_defs_out = construct_defs_out(node, &new_defs_in, live_out);
         (new_defs_in, new_defs_out)
     };
-    let updated = defs_in != new_defs_in || defs_out != new_defs_out;
+    let updated = defs_in != &new_defs_in || defs_out != &new_defs_out;
     (new_defs_in, new_defs_out, updated)
 }
 

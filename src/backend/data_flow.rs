@@ -43,7 +43,7 @@ pub(super) fn dataflow_analysis<SIn: Eq, SOut: Eq, Node: Deleted + DataflowNode,
 ) -> HashMap<NodeRef<Node>, (SIn, SOut)>
 where
     Init: FnMut(&NodeRef<Node>) -> (SIn, SOut),
-    Update: FnMut(Vec<&SOut>, SIn, &NodeRef<Node>, SOut, Vec<&SIn>) -> (SIn, SOut, bool),
+    Update: FnMut(Vec<&SOut>, &SIn, &NodeRef<Node>, &SOut, Vec<&SIn>) -> (SIn, SOut, bool),
 {
     let mut topo_sorted = Vec::new();
     topo_sort(
@@ -56,10 +56,18 @@ where
         .iter()
         .map(|node| (node.clone(), initialize(node)))
         .collect::<HashMap<_, _>>();
+    #[cfg(debug_assertions)]
+    for node in &topo_sorted {
+        for incoming_node in (&*node.get()).incoming() {
+            if !analysis_map.contains_key(incoming_node) {
+                panic!("Root node is not a root or the incoming nodes are ill-defined")
+            }
+        }
+    }
     loop {
         let mut updated = false;
         for node in &topo_sorted {
-            let (set_in, set_out) = analysis_map.remove(node).unwrap();
+            let (set_in, set_out) = &analysis_map[node];
             let incoming_outs = (&*node.get())
                 .incoming()
                 .iter()
