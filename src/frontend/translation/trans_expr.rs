@@ -393,7 +393,8 @@ mod tests {
 
     #[test]
     fn check_complex_boolean_binop_expression() {
-        let mut helper_function_flags: RwLock<HelperFunctionFlags> = RwLock::new(HelperFunctionFlags::default());
+        let mut helper_function_flags: RwLock<HelperFunctionFlags> =
+            RwLock::new(HelperFunctionFlags::default());
         let mut data_ref_map: RwLock<HashMap<DataRef, Vec<ir::Expr>>> = RwLock::new(HashMap::new());
         let var_symb = VariableSymbolTable::new();
 
@@ -457,7 +458,8 @@ mod tests {
 
     #[test]
     fn check_simple_integer_binop_expression() {
-        let mut helper_function_flags: RwLock<HelperFunctionFlags> = RwLock::new(HelperFunctionFlags::default());
+        let mut helper_function_flags: RwLock<HelperFunctionFlags> =
+            RwLock::new(HelperFunctionFlags::default());
         let mut data_ref_map: RwLock<HashMap<DataRef, Vec<ir::Expr>>> = RwLock::new(HashMap::new());
         let var_symb = VariableSymbolTable::new();
 
@@ -485,7 +487,8 @@ mod tests {
 
     #[test]
     fn check_complex_integer_binop_expression() {
-        let mut helper_function_flags: RwLock<HelperFunctionFlags> = RwLock::new(HelperFunctionFlags::default());
+        let mut helper_function_flags: RwLock<HelperFunctionFlags> =
+            RwLock::new(HelperFunctionFlags::default());
         let mut data_ref_map: RwLock<HashMap<DataRef, Vec<ir::Expr>>> = RwLock::new(HashMap::new());
         let mut var_symb = VariableSymbolTable::new();
 

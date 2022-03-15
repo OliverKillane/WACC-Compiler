@@ -21,8 +21,8 @@ use super::arm_repr::{
     Temporary,
 };
 use lazy_static::__Deref;
-use std::{cmp::min, collections::HashMap, sync::Arc};
 use rayon::prelude::*;
+use std::{cmp::min, collections::HashMap, sync::Arc};
 
 type LiveAnalysis = Arc<HashMap<Temporary, usize>>;
 fn construct_live_in(node: &ArmNode, live_out: LiveAnalysis) -> LiveAnalysis {

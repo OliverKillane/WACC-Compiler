@@ -51,8 +51,8 @@ mod statement_analysis;
 pub mod symbol_table;
 mod type_constraints;
 
-use std::collections::HashMap;
 use rayon::prelude::*;
+use std::collections::HashMap;
 
 use self::{
     error_conversion::convert_errors,
@@ -92,19 +92,22 @@ pub fn analyse_semantics<'a>(
     let (fun_symb, filtered_fn_defs, fun_def_errs) = get_fn_symbols(fn_defs);
 
     // traverse and analyse functions
-    let (e, (fst, fs)): (Vec<_>, (Vec<_>, Vec<_>)) = filtered_fn_defs.into_par_iter().map(|ASTWrapper(fun_name, fun)| {
-        match analyse_function(ASTWrapper(fun_name, fun), &fun_symb) {
-            Ok((function, var_symb)) => {
-                let ASTWrapper(_, Function(_, ASTWrapper(_, fun_name), _, _)) = &function;
-                (None, (Some((fun_name.clone(), var_symb)), Some(function)))
+    let (e, (fst, fs)): (Vec<_>, (Vec<_>, Vec<_>)) = filtered_fn_defs
+        .into_par_iter()
+        .map(|ASTWrapper(fun_name, fun)| {
+            match analyse_function(ASTWrapper(fun_name, fun), &fun_symb) {
+                Ok((function, var_symb)) => {
+                    let ASTWrapper(_, Function(_, ASTWrapper(_, fun_name), _, _)) = &function;
+                    (None, (Some((fun_name.clone(), var_symb)), Some(function)))
+                }
+                Err(fun_err) => (Some(fun_err), (None, None)),
             }
-            Err(fun_err) => (Some(fun_err), (None, None)),
-        }
-    }).unzip();
+        })
+        .unzip();
 
-    let errors: Vec<_> = e.into_iter().filter_map(|x| x).collect();
-    let fun_symbol_tables: HashMap<_, _> = fst.into_iter().filter_map(|x| x).collect();
-    let functions: Vec<_> = fs.into_iter().filter_map(|x| x).collect();
+    let errors: Vec<_> = e.into_iter().flatten().collect();
+    let fun_symbol_tables: HashMap<_, _> = fst.into_iter().flatten().collect();
+    let functions: Vec<_> = fs.into_iter().flatten().collect();
 
     // analyse main code block
     let mut main_var_symb = VariableSymbolTable::new();

@@ -27,12 +27,12 @@ use nom_supreme::{
     multi::collect_separated_terminated,
     ParserExt,
 };
+use rayon::prelude::*;
 use std::{
     collections::{HashMap, LinkedList},
     iter::zip,
     path::{Path, PathBuf},
 };
-use rayon::prelude::*;
 
 use lexer::{parse_int, str_delimited};
 
@@ -77,6 +77,7 @@ pub fn parse<'a>(
             None
         }
     };
+    #[allow(clippy::needless_collect)]
     let module_functions = zip(&module_inputs, module_semantic_infos)
         .map(
             |(module_input, module_semantic_info)| match module_semantic_info {

@@ -10,11 +10,11 @@ use crate::{
     intermediate::BlockEnding,
 };
 use helper_funcs::*;
+use rayon::prelude::*;
 use std::collections::{HashMap, LinkedList};
 use std::mem;
 use std::sync::RwLock;
 use trans_expr::translate_expr;
-use rayon::prelude::*;
 
 impl From<&Type> for ir::Type {
     fn from(ast_type: &Type) -> Self {
@@ -735,9 +735,9 @@ pub(super) fn translate_ast(
             },
         )
         .unzip();
-    let mut data_ref_map = RwLock::new(HashMap::new());
-    let mut helper_function_flags = RwLock::new(HelperFunctionFlags::default());
-    
+    let data_ref_map = RwLock::new(HashMap::new());
+    let helper_function_flags = RwLock::new(HelperFunctionFlags::default());
+
     let mut functions_map: HashMap<_, _> = functions
         .into_par_iter()
         .map(|(fname, args, block)| {
@@ -790,7 +790,10 @@ pub(super) fn translate_ast(
             ir::BlockEnding::Exit(ir::NumExpr::Const(ir::NumSize::DWord, 0)),
         ));
     }
-    helper_function_flags.into_inner().unwrap().generate_functions(&mut functions_map, &data_ref_map);
+    helper_function_flags
+        .into_inner()
+        .unwrap()
+        .generate_functions(&mut functions_map, &data_ref_map);
     ir::Program(
         functions_map,
         ir_vars,

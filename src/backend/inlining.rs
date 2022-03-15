@@ -4,12 +4,12 @@ use crate::{
     graph::{Deleted, Graph},
     intermediate::VarRepr,
 };
+use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet, LinkedList},
     iter::zip,
-    rc::Rc, sync::Arc,
+    sync::Arc,
 };
-use rayon::prelude::*;
 
 /// Heuristic for how many instructions more or less a [stat type](StatType) is
 /// converted to in the assembly conversion.
@@ -588,7 +588,7 @@ pub(super) fn inline(
         &sccs,
     );
 
-    // let sscs_ref = 
+    // let sscs_ref =
     let new_functions = functions
         .par_iter()
         .map(
@@ -606,7 +606,7 @@ pub(super) fn inline(
                     code,
                     &mut new_function_graph,
                     instructions_limit,
-                    &args,
+                    args,
                     &functions,
                     &function_instruction_counts,
                     sccs[fname.as_str()].clone(),

@@ -1,13 +1,11 @@
+use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 use std::{
-    cell::{Ref, RefCell},
     collections::HashSet,
     fmt::Debug,
     hash::Hash,
     mem,
-    rc::Rc, sync::Arc,
+    sync::Arc,
 };
-use atomic_refcell::{AtomicRefCell, AtomicRef, AtomicRefMut};
-
 
 /// Node graph. Houses all the [nodes](NodeRef). [Deletes](Deleted) nodes only when they
 /// get deleted explicitly or when the graph goes out of scope (gets dropped).
@@ -122,7 +120,10 @@ impl<T: Deleted> Eq for NodeRef<T> {}
 mod test {
     use super::*;
 
-    struct Callback<'l>(Arc<AtomicRefCell<dyn FnMut()>>, Option<NodeRef<Callback<'l>>>);
+    struct Callback<'l>(
+        Arc<AtomicRefCell<dyn FnMut()>>,
+        Option<NodeRef<Callback<'l>>>,
+    );
     impl<'l> Deleted for Callback<'l> {
         fn deleted() -> Self {
             Callback(Arc::new(AtomicRefCell::new(|| {})), None)
@@ -130,7 +131,8 @@ mod test {
     }
     impl<'l> Drop for Callback<'l> {
         fn drop(&mut self) {
-            let mut tmp_fn: Arc<AtomicRefCell<dyn FnMut() + '_>> = Arc::new(AtomicRefCell::new(|| {}));
+            let mut tmp_fn: Arc<AtomicRefCell<dyn FnMut() + '_>> =
+                Arc::new(AtomicRefCell::new(|| {}));
             mem::swap(&mut self.0, &mut tmp_fn);
             tmp_fn.borrow_mut()();
         }
