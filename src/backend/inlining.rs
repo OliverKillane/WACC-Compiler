@@ -169,11 +169,12 @@ fn substitute_vars(
             get_mapping(*var, new_variable, variable_mappings),
             substitute_op_src(*op_src, new_variable, variable_mappings),
         ),
-        StatCode::AssignOp(var, op_src1, bin_op, op_src2) => StatCode::AssignOp(
+        StatCode::AssignOp(var, op_src1, bin_op, op_src2, check) => StatCode::AssignOp(
             get_mapping(*var, new_variable, variable_mappings),
             substitute_op_src(*op_src1, new_variable, variable_mappings),
             *bin_op,
             substitute_op_src(*op_src2, new_variable, variable_mappings),
+            *check,
         ),
         StatCode::Load(var, op_src, size) => StatCode::Load(
             get_mapping(*var, new_variable, variable_mappings),

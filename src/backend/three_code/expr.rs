@@ -119,6 +119,7 @@ pub(super) fn translate_num_expr(
                 op_src1,
                 arith_op.into(),
                 op_src2,
+                true,
             ));
             (size, OpSrc::Var(result))
         }
@@ -132,6 +133,7 @@ pub(super) fn translate_num_expr(
                         op_src,
                         BinOp::And,
                         OpSrc::from(0xFF),
+                        false,
                     ));
                     (size, OpSrc::Var(result))
                 }
@@ -141,6 +143,7 @@ pub(super) fn translate_num_expr(
                         op_src,
                         BinOp::And,
                         OpSrc::from(0xFFFF),
+                        false,
                     ));
                     (size, OpSrc::Var(result))
                 }
@@ -198,6 +201,7 @@ pub(super) fn translate_bool_expr(
                 OpSrc::Var(result),
                 BinOp::And,
                 OpSrc::from(0x01),
+                false,
             ));
             OpSrc::Var(result)
         }
@@ -212,7 +216,13 @@ pub(super) fn translate_bool_expr(
                 function_types,
                 options,
             );
-            stat_line.add_stat(StatCode::AssignOp(result, op_src1, BinOp::Eq, op_src2));
+            stat_line.add_stat(StatCode::AssignOp(
+                result,
+                op_src1,
+                BinOp::Eq,
+                op_src2,
+                false,
+            ));
             OpSrc::Var(result)
         }
         ir::BoolExpr::NumLt(num_expr1, num_expr2) => {
@@ -226,7 +236,13 @@ pub(super) fn translate_bool_expr(
                 function_types,
                 options,
             );
-            stat_line.add_stat(StatCode::AssignOp(result, op_src1, BinOp::Lt, op_src2));
+            stat_line.add_stat(StatCode::AssignOp(
+                result,
+                op_src1,
+                BinOp::Lt,
+                op_src2,
+                false,
+            ));
             OpSrc::Var(result)
         }
         ir::BoolExpr::PtrEq(ptr_expr1, ptr_expr2) => {
@@ -240,7 +256,13 @@ pub(super) fn translate_bool_expr(
                 function_types,
                 options,
             );
-            stat_line.add_stat(StatCode::AssignOp(result, op_src1, BinOp::Eq, op_src2));
+            stat_line.add_stat(StatCode::AssignOp(
+                result,
+                op_src1,
+                BinOp::Eq,
+                op_src2,
+                false,
+            ));
             OpSrc::Var(result)
         }
         ir::BoolExpr::BoolOp(box bool_expr1, bool_op, box bool_expr2) => {
@@ -254,7 +276,13 @@ pub(super) fn translate_bool_expr(
                 function_types,
                 options,
             );
-            stat_line.add_stat(StatCode::AssignOp(result, op_src1, bool_op.into(), op_src2));
+            stat_line.add_stat(StatCode::AssignOp(
+                result,
+                op_src1,
+                bool_op.into(),
+                op_src2,
+                false,
+            ));
             OpSrc::Var(result)
         }
         ir::BoolExpr::Not(box ir::BoolExpr::NumEq(num_expr1, num_expr2)) => {
@@ -268,7 +296,13 @@ pub(super) fn translate_bool_expr(
                 function_types,
                 options,
             );
-            stat_line.add_stat(StatCode::AssignOp(result, op_src1, BinOp::Ne, op_src2));
+            stat_line.add_stat(StatCode::AssignOp(
+                result,
+                op_src1,
+                BinOp::Ne,
+                op_src2,
+                false,
+            ));
             OpSrc::Var(result)
         }
         ir::BoolExpr::Not(box ir::BoolExpr::NumLt(num_expr1, num_expr2)) => {
@@ -282,7 +316,13 @@ pub(super) fn translate_bool_expr(
                 function_types,
                 options,
             );
-            stat_line.add_stat(StatCode::AssignOp(result, op_src1, BinOp::Gte, op_src2));
+            stat_line.add_stat(StatCode::AssignOp(
+                result,
+                op_src1,
+                BinOp::Gte,
+                op_src2,
+                false,
+            ));
             OpSrc::Var(result)
         }
 
@@ -294,6 +334,7 @@ pub(super) fn translate_bool_expr(
                 op_src,
                 BinOp::Xor,
                 OpSrc::from(0x01),
+                false,
             ));
             OpSrc::Var(result)
         }
@@ -340,7 +381,13 @@ pub(super) fn translate_ptr_expr(
                 function_types,
                 options,
             );
-            stat_line.add_stat(StatCode::AssignOp(result, op_src1, BinOp::Add, op_src2));
+            stat_line.add_stat(StatCode::AssignOp(
+                result,
+                op_src1,
+                BinOp::Add,
+                op_src2,
+                false,
+            ));
             OpSrc::Var(result)
         }
         malloc @ ir::PtrExpr::Malloc(_) | malloc @ ir::PtrExpr::WideMalloc(_) => {
@@ -402,6 +449,7 @@ pub(super) fn translate_ptr_expr(
                         OpSrc::Var(result),
                         BinOp::Add,
                         OpSrc::from(offset),
+                        false,
                     ));
                     stat_line.add_stat(StatCode::Store(
                         OpSrc::Var(result + 2),
@@ -606,6 +654,7 @@ mod tests {
                 OpSrc::Const(1),
                 BinOp::Add,
                 OpSrc::Const(2),
+                true,
             )],
             HashMap::new(),
             HashMap::new(),
@@ -624,7 +673,7 @@ mod tests {
             0,
             vec![
                 StatCode::Assign(0, OpSrc::Var(1)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::And, OpSrc::Const(0xff)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::And, OpSrc::Const(0xff), false),
             ],
             HashMap::from([(1, ir::Type::Num(ir::NumSize::DWord))]),
             HashMap::new(),
@@ -689,7 +738,7 @@ mod tests {
             0,
             vec![
                 StatCode::Load(0, OpSrc::DataRef(0, 0), Size::Byte),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::And, OpSrc::Const(0x01)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::And, OpSrc::Const(0x01), false),
             ],
             HashMap::new(),
             HashMap::new(),
@@ -711,6 +760,7 @@ mod tests {
                 OpSrc::Const(420),
                 BinOp::Eq,
                 OpSrc::Const(69),
+                false,
             )],
             HashMap::new(),
             HashMap::new(),
@@ -732,6 +782,7 @@ mod tests {
                 OpSrc::Const(420),
                 BinOp::Lt,
                 OpSrc::Const(69),
+                false,
             )],
             HashMap::new(),
             HashMap::new(),
@@ -753,6 +804,7 @@ mod tests {
                 OpSrc::Const(420),
                 BinOp::Ne,
                 OpSrc::Const(69),
+                false,
             )],
             HashMap::new(),
             HashMap::new(),
@@ -774,6 +826,7 @@ mod tests {
                 OpSrc::Const(420),
                 BinOp::Gte,
                 OpSrc::Const(69),
+                false,
             )],
             HashMap::new(),
             HashMap::new(),
@@ -792,6 +845,7 @@ mod tests {
                 OpSrc::Const(0),
                 BinOp::Eq,
                 OpSrc::Const(0),
+                false,
             )],
             HashMap::new(),
             HashMap::new(),
@@ -814,6 +868,7 @@ mod tests {
                 OpSrc::Const(1),
                 BinOp::And,
                 OpSrc::Const(0),
+                false,
             )],
             HashMap::new(),
             HashMap::new(),
@@ -910,6 +965,7 @@ mod tests {
                 OpSrc::Const(0),
                 BinOp::Add,
                 OpSrc::Const(2),
+                false,
             )],
             HashMap::new(),
             HashMap::new(),
@@ -930,10 +986,10 @@ mod tests {
                 StatCode::Assign(0, OpSrc::Const(5)),
                 StatCode::Call(0, "malloc".to_string(), vec![0]),
                 StatCode::Assign(1, OpSrc::Const(1)),
-                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(0)),
+                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(0), false),
                 StatCode::Store(OpSrc::Var(2), 1, Size::Byte),
                 StatCode::Assign(1, OpSrc::Const(0)),
-                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(1)),
+                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(1), false),
                 StatCode::Store(OpSrc::Var(2), 1, Size::DWord),
             ],
             HashMap::new(),
@@ -951,10 +1007,10 @@ mod tests {
                 StatCode::Assign(0, OpSrc::Const(8)),
                 StatCode::Call(0, "malloc".to_string(), vec![0]),
                 StatCode::Assign(1, OpSrc::Const(1)),
-                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(0)),
+                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(0), false),
                 StatCode::Store(OpSrc::Var(2), 1, Size::Byte),
                 StatCode::Assign(1, OpSrc::Const(0)),
-                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(4)),
+                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(4), false),
                 StatCode::Store(OpSrc::Var(2), 1, Size::DWord),
             ],
             HashMap::new(),

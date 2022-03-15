@@ -85,7 +85,7 @@ pub(super) enum StatCode {
     /// Assignment of one variable to another
     Assign(VarRepr, OpSrc),
     /// Assignment of a binary operation to a variable.
-    AssignOp(VarRepr, OpSrc, BinOp, OpSrc),
+    AssignOp(VarRepr, OpSrc, BinOp, OpSrc, bool),
     /// Load from a reference to a pointer. The first variable reference is
     /// the load destination and the second one is the pointer to the data. The
     /// number of bytes loaded is signified by the [size](Size) field.

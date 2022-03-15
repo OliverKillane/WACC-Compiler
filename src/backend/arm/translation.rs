@@ -569,7 +569,7 @@ fn translate_statcode(
                 OpSrc::ReadRef => simple_node(Stat::AssignStackWord(arm_temp), graph),
             }
         }
-        StatCode::AssignOp(three_temp_dst, first_op, binop, second_op) => {
+        StatCode::AssignOp(three_temp_dst, first_op, binop, second_op, checked) => {
             let arm_dst_temp = temp_map.use_temp(*three_temp_dst);
             let mut nodes = Vec::new();
 
@@ -630,117 +630,107 @@ fn translate_statcode(
                 BinOp::Add => {
                     // Perform the addition operation, if there is an overflow
                     // handler, then if overflow occurs, branch to it
-
-                    match int_handler {
-                        Some(overflow_handler) => {
-                            // ADDS arm_dst_reg, left_reg, right_reg
-                            // BLVS overflow_handler
-                            let addition = simple_node(
-                                Stat::ApplyOp(
-                                    RegOp::Add,
-                                    Cond::Al,
-                                    true,
-                                    arm_dst_temp,
-                                    left_reg,
-                                    FlexOperand::ShiftReg(right_reg, None),
-                                ),
-                                graph,
-                            );
-                            let check =
-                                simple_node(Stat::Link(Cond::Vs, overflow_handler.clone()), graph);
-                            link_two_chains(addition, check)
-                        }
-                        None => {
-                            // ADD arm_dst_temp, left_reg, right_reg
-                            simple_node(
-                                Stat::ApplyOp(
-                                    RegOp::Add,
-                                    Cond::Al,
-                                    false,
-                                    arm_dst_temp,
-                                    left_reg,
-                                    FlexOperand::ShiftReg(right_reg, None),
-                                ),
-                                graph,
-                            )
-                        }
+                    if let Some(overflow_handler) = int_handler && *checked {
+                        // ADDS arm_dst_reg, left_reg, right_reg
+                        // BLVS overflow_handler
+                        let addition = simple_node(
+                            Stat::ApplyOp(
+                                RegOp::Add,
+                                Cond::Al,
+                                true,
+                                arm_dst_temp,
+                                left_reg,
+                                FlexOperand::ShiftReg(right_reg, None),
+                            ),
+                            graph,
+                        );
+                        let check =
+                            simple_node(Stat::Link(Cond::Vs, overflow_handler.clone()), graph);
+                        link_two_chains(addition, check)
+                    } else {
+                        // ADD arm_dst_temp, left_reg, right_reg
+                        simple_node(
+                            Stat::ApplyOp(
+                                RegOp::Add,
+                                Cond::Al,
+                                false,
+                                arm_dst_temp,
+                                left_reg,
+                                FlexOperand::ShiftReg(right_reg, None),
+                            ),
+                            graph,
+                        )
                     }
                 }
                 BinOp::Sub => {
-                    match int_handler {
-                        Some(overflow_handler) => {
-                            // SUBS arm_dst_temp, left_reg, right_reg
-                            // BLVS overflow_handler
-                            let subtraction = simple_node(
-                                Stat::ApplyOp(
-                                    RegOp::Sub,
-                                    Cond::Al,
-                                    true,
-                                    arm_dst_temp,
-                                    left_reg,
-                                    FlexOperand::ShiftReg(right_reg, None),
-                                ),
-                                graph,
-                            );
-                            let check =
-                                simple_node(Stat::Link(Cond::Vs, overflow_handler.clone()), graph);
-                            link_two_chains(subtraction, check)
-                        }
-                        None => {
-                            // SUB arm_dst_temp, left_reg, right_reg
-                            simple_node(
-                                Stat::ApplyOp(
-                                    RegOp::Sub,
-                                    Cond::Al,
-                                    false,
-                                    arm_dst_temp,
-                                    left_reg,
-                                    FlexOperand::ShiftReg(right_reg, None),
-                                ),
-                                graph,
-                            )
-                        }
+                    if let Some(overflow_handler) = int_handler && *checked {
+                        // SUBS arm_dst_temp, left_reg, right_reg
+                        // BLVS overflow_handler
+                        let subtraction = simple_node(
+                            Stat::ApplyOp(
+                                RegOp::Sub,
+                                Cond::Al,
+                                true,
+                                arm_dst_temp,
+                                left_reg,
+                                FlexOperand::ShiftReg(right_reg, None),
+                            ),
+                            graph,
+                        );
+                        let check =
+                            simple_node(Stat::Link(Cond::Vs, overflow_handler.clone()), graph);
+                        link_two_chains(subtraction, check)
+                    } else {
+                        // SUB arm_dst_temp, left_reg, right_reg
+                        simple_node(
+                            Stat::ApplyOp(
+                                RegOp::Sub,
+                                Cond::Al,
+                                false,
+                                arm_dst_temp,
+                                left_reg,
+                                FlexOperand::ShiftReg(right_reg, None),
+                            ),
+                            graph,
+                        )
                     }
                 }
                 BinOp::Mul => {
-                    match int_handler {
-                        Some(overflow_fun) => {
-                            // SMULL holder_temp, arm_dst_temp, left_reg, right_reg
-                            // CMP arm_dst_temp, holder_temp, ASR #31
-                            // BLNE overflow_fun
-                            let holder_temp = temp_map.get_new_temp();
-                            link_stats(
-                                vec![
-                                    Stat::MulOp(
-                                        MulOp::SMulL,
-                                        Cond::Al,
-                                        true,
+                    if let Some(overflow_handler) = int_handler && *checked {
+                        // SMULL holder_temp, arm_dst_temp, left_reg, right_reg
+                        // CMP arm_dst_temp, holder_temp, ASR #31
+                        // BLNE overflow_fun
+                        let holder_temp = temp_map.get_new_temp();
+                        link_stats(
+                            vec![
+                                Stat::MulOp(
+                                    MulOp::SMulL,
+                                    Cond::Al,
+                                    true,
+                                    arm_dst_temp,
+                                    holder_temp,
+                                    left_reg,
+                                    right_reg,
+                                ),
+                                Stat::Cmp(
+                                    CmpOp::Cmp,
+                                    Cond::Al,
+                                    holder_temp,
+                                    FlexOperand::ShiftReg(
                                         arm_dst_temp,
-                                        holder_temp,
-                                        left_reg,
-                                        right_reg,
+                                        Some(Shift::Asr(31.into())),
                                     ),
-                                    Stat::Cmp(
-                                        CmpOp::Cmp,
-                                        Cond::Al,
-                                        holder_temp,
-                                        FlexOperand::ShiftReg(
-                                            arm_dst_temp,
-                                            Some(Shift::Asr(31.into())),
-                                        ),
-                                    ),
-                                    Stat::Link(Cond::Ne, overflow_fun.clone()),
-                                ],
-                                graph,
-                            )
-                        }
-                        None => {
-                            // MUL arm_dst_temp, left_reg, right_reg
-                            simple_node(
-                                Stat::Mul(Cond::Al, false, arm_dst_temp, left_reg, right_reg),
-                                graph,
-                            )
-                        }
+                                ),
+                                Stat::Link(Cond::Ne, overflow_handler.clone()),
+                            ],
+                            graph,
+                        )
+                    } else {
+                        // MUL arm_dst_temp, left_reg, right_reg
+                        simple_node(
+                            Stat::Mul(Cond::Al, false, arm_dst_temp, left_reg, right_reg),
+                            graph,
+                        )
                     }
                 }
                 BinOp::Div =>

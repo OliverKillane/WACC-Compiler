@@ -1,6 +1,6 @@
 use super::data_flow::dataflow_analysis;
 use super::three_code::*;
-use crate::graph::Graph;
+use crate::graph::{Deleted, Graph};
 use crate::intermediate::VarRepr;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, LinkedList};
@@ -12,7 +12,9 @@ fn get_defined_var(node: &StatNode) -> Option<VarRepr> {
     match &*node.get() {
         StatType::Simple(
             _,
-            StatCode::Assign(var, _) | StatCode::AssignOp(var, _, _, _) | StatCode::Load(var, _, _),
+            StatCode::Assign(var, _)
+            | StatCode::AssignOp(var, _, _, _, _)
+            | StatCode::Load(var, _, _),
             _,
         ) => Some(*var),
         _ => None,
@@ -39,7 +41,7 @@ fn get_const_prop_uses(node: &StatNode) -> HashSet<VarRepr> {
         | StatType::Branch(_, op_src, _, _) => get_use_op_src(op_src)
             .map(|var| HashSet::from([var]))
             .unwrap_or_default(),
-        StatType::Simple(_, StatCode::AssignOp(_, op_src1, _, op_src2), _) => {
+        StatType::Simple(_, StatCode::AssignOp(_, op_src1, _, op_src2, _), _) => {
             vec![get_use_op_src(op_src1), get_use_op_src(op_src2)]
                 .into_iter()
                 .flatten()
@@ -143,8 +145,15 @@ fn construct_defs_out(
     defs_in
 }
 
-fn defs_init(node: &StatNode, live_out: &LiveAnalysis) -> (DefsAnalysis, DefsAnalysis) {
-    let defs_in: DefsAnalysis = HashMap::new();
+fn defs_init(
+    node: &StatNode,
+    live_out: &LiveAnalysis,
+    additional_defs: &[(VarRepr, StatNode)],
+) -> (DefsAnalysis, DefsAnalysis) {
+    let defs_in: DefsAnalysis = additional_defs
+        .iter()
+        .map(|(var, def)| (*var, Rc::new(HashSet::from([def.clone()]))))
+        .collect();
     let defs_out = construct_defs_out(node, &defs_in, live_out);
     (defs_in, defs_out)
 }
@@ -155,6 +164,7 @@ fn defs_update(
     node: &StatNode,
     defs_out: DefsAnalysis,
     live_out: &LiveAnalysis,
+    additional_defs: &[(VarRepr, StatNode)],
 ) -> (DefsAnalysis, DefsAnalysis, bool) {
     let (new_defs_in, new_defs_out) = if pred_defs_out.len() == 1 {
         if pred_defs_out[0] == &defs_in {
@@ -166,7 +176,10 @@ fn defs_update(
         }
     } else {
         let new_defs_in = pred_defs_out.into_iter().fold(
-            HashMap::new(),
+            additional_defs
+                .iter()
+                .map(|(var, def)| (*var, Rc::new(HashSet::from([def.clone()]))))
+                .collect(),
             |mut defs_in: DefsAnalysis, defs_out| {
                 for (&var, defs) in defs_out {
                     let def_in = defs_in.entry(var).or_default();
@@ -194,7 +207,7 @@ fn substitute_const_use(node: &StatNode, var: VarRepr, const_op: OpSrc) {
                 *op_src = const_op;
             }
         }
-        StatType::Simple(_, StatCode::AssignOp(_, op_src1, _, op_src2), _) => {
+        StatType::Simple(_, StatCode::AssignOp(_, op_src1, _, op_src2, _), _) => {
             if let OpSrc::Var(op_src_var) = *op_src1 && op_src_var == var {
                 *op_src1 = const_op;
             }
@@ -211,17 +224,115 @@ fn substitute_const_use(node: &StatNode, var: VarRepr, const_op: OpSrc) {
     }
 }
 
-fn propagate_op(op_src1: OpSrc, bin_op: BinOp, op_src2: OpSrc) -> Option<OpSrc> {
-    todo!()
+enum PropagateOpResult {
+    Failed,
+    Oob,
+    Const(OpSrc),
 }
 
-fn prop_const_graph(code: &StatNode, args: &[VarRepr]) -> StatNode {
+fn propagate_op(op_src1: OpSrc, bin_op: BinOp, op_src2: OpSrc, checked: bool) -> PropagateOpResult {
+    use PropagateOpResult::*;
+    match (op_src1, bin_op, op_src2) {
+        (OpSrc::Const(c1), BinOp::Add | BinOp::Sub | BinOp::Mul, OpSrc::Const(c2)) => {
+            if checked {
+                match bin_op {
+                    BinOp::Add => c1.checked_add(c2),
+                    BinOp::Sub => c1.checked_sub(c2),
+                    BinOp::Mul => c1.checked_mul(c2),
+                    _ => panic!("Unexpected binary operation"),
+                }
+                .map(|val| Const(OpSrc::Const(val)))
+                .unwrap_or(Oob)
+            } else {
+                Const(OpSrc::Const(match bin_op {
+                    BinOp::Add => c1.wrapping_add(c2),
+                    BinOp::Sub => c1.wrapping_sub(c2),
+                    BinOp::Mul => c1.wrapping_mul(c2),
+                    _ => panic!("Unexpected binary operation"),
+                }))
+            }
+        }
+        (OpSrc::Const(_), BinOp::Div | BinOp::Mod, OpSrc::Const(0)) => Failed,
+        (OpSrc::Const(c1), BinOp::Div | BinOp::Mod, OpSrc::Const(c2)) => {
+            Const(OpSrc::Const(match bin_op {
+                BinOp::Div => c1 / c2,
+                BinOp::Mod => c1 % c2,
+                _ => panic!("Unexpected binary operation"),
+            }))
+        }
+        (OpSrc::DataRef(data_ref, o), BinOp::Add | BinOp::Sub, OpSrc::Const(c))
+        | (OpSrc::Const(c), BinOp::Add | BinOp::Sub, OpSrc::DataRef(data_ref, o)) => {
+            Const(OpSrc::DataRef(
+                data_ref,
+                match bin_op {
+                    BinOp::Add => o.wrapping_add(c),
+                    BinOp::Sub => o.wrapping_sub(c),
+                    _ => panic!("Unexpected binary operation"),
+                },
+            ))
+        }
+        _ => Failed,
+    }
+}
+
+fn prop_const_node(node: &StatNode, int_handler: &Option<String>) -> Option<VarRepr> {
+    let (assigned_var, op_src1, bin_op, op_src2, checked) = if let StatType::Simple(
+        _,
+        StatCode::AssignOp(assigned_var, op_src1, bin_op, op_src2, checked),
+        _,
+    ) = *node.get()
+    {
+        (assigned_var, op_src1, bin_op, op_src2, checked)
+    } else {
+        return None;
+    };
+    let propagate_op_result =
+        propagate_op(op_src1, bin_op, op_src2, checked || int_handler.is_some());
+    let new_stat_code = match propagate_op_result {
+        PropagateOpResult::Const(op_src) => StatCode::Assign(assigned_var, op_src),
+        PropagateOpResult::Oob => StatCode::VoidCall(
+            int_handler.as_ref().expect("No int handler").clone(),
+            vec![],
+        ),
+        _ => return None,
+    };
+    if let StatType::Simple(_, stat_code, _) = &mut *node.get_mut() {
+        *stat_code = new_stat_code;
+    } else {
+        panic!("Expected a simple node")
+    };
+    if let StatType::Simple(_, StatCode::Assign(assigned_var, _), _) = &*node.get() {
+        Some(*assigned_var)
+    } else {
+        None
+    }
+}
+
+fn prop_const_graph(code: &StatNode, args: &[VarRepr], int_handler: &Option<String>) {
+    let mut fake_defs_graph = Graph::new();
+    let args_nodes = args
+        .iter()
+        .map(|var| (*var, fake_defs_graph.new_node(StatType::deleted())))
+        .collect::<Vec<_>>();
     let live_vars = dataflow_analysis(code, live_init, live_update, false);
     let live_defs = dataflow_analysis(
         code,
-        |node| defs_init(node, &live_vars[node].1),
+        |node| {
+            defs_init(
+                node,
+                &live_vars[node].1,
+                if code == node { &args_nodes } else { &[] },
+            )
+        },
         |pred_live_out, def_in, node, def_out, _| {
-            defs_update(pred_live_out, def_in, node, def_out, &live_vars[node].1)
+            defs_update(
+                pred_live_out,
+                def_in,
+                node,
+                def_out,
+                &live_vars[node].1,
+                if code == node { &args_nodes } else { &[] },
+            )
         },
         true,
     );
@@ -233,7 +344,7 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr]) -> StatNode {
         for (var, defs) in def_map {
             if uses.contains(var) {
                 for def in &**defs {
-                    defs_uses.entry(def).or_default().insert(node);
+                    defs_uses.entry(def).or_default().insert(node.clone());
                 }
             }
         }
@@ -244,16 +355,6 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr]) -> StatNode {
             let uses = get_const_prop_uses(node)
                 .into_iter()
                 .collect::<HashSet<_>>();
-            let non_const_uses_counts = def_map
-                .iter()
-                .filter_map(|(var, defs)| {
-                    if uses.contains(var) {
-                        Some((*var, defs.len()))
-                    } else {
-                        None
-                    }
-                })
-                .collect::<HashMap<_, _>>();
             (
                 node.clone(),
                 def_map
@@ -268,12 +369,12 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr]) -> StatNode {
                                             &*def.get()
                                         {
                                             if let OpSrc::Var(_) = op_src {
-                                                false
-                                            } else {
                                                 true
+                                            } else {
+                                                false
                                             }
                                         } else {
-                                            false
+                                            true
                                         }
                                     })
                                     .count(),
@@ -286,17 +387,42 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr]) -> StatNode {
             )
         })
         .collect::<HashMap<_, _>>();
-    let const_prop = LinkedList::new();
-    for (node, uses_counts) in &non_const_defs {
-        for (&used_var, &uses_count) in uses_counts {
-            if uses_count == 0 {
-                const_prop.push_back((node, used_var));
+    println!(
+        "{}",
+        non_const_defs
+            .iter()
+            .map(|(node, non_const_uses_counts)| format!(
+                "{} {:?}\n",
+                hashed(node),
+                non_const_uses_counts
+            ))
+            .collect::<String>()
+    );
+    for (node, _) in &live_defs {
+        let assigned_var = if let Some(assigned_var) = prop_const_node(&node, int_handler) {
+            assigned_var
+        } else {
+            continue;
+        };
+        for use_node in defs_uses.get(&node).unwrap_or(&HashSet::new()) {
+            *non_const_defs
+                .get_mut(use_node)
+                .unwrap()
+                .get_mut(&assigned_var)
+                .unwrap() -= 1;
+        }
+    }
+    let mut const_prop = LinkedList::new();
+    for (node, non_const_uses_counts) in &non_const_defs {
+        for (&used_var, &non_const_uses_count) in non_const_uses_counts {
+            if non_const_uses_count == 0 {
+                const_prop.push_back((node.clone(), used_var));
             }
         }
     }
     while let Some((node, var)) = const_prop.pop_front() {
         let mut substitute_op_src = None;
-        for def in &*(&live_defs[node].0)[&var] {
+        for def in &*(&live_defs[&node].0)[&var] {
             if let StatType::Simple(_, StatCode::Assign(_, op_src), _) = &*def.get() {
                 if substitute_op_src == None || substitute_op_src == Some(*op_src) {
                     substitute_op_src = Some(*op_src)
@@ -313,52 +439,41 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr]) -> StatNode {
         } else {
             continue;
         };
-        substitute_const_use(node, var, substitute_op_src);
-        non_const_defs[node].remove(&var);
-        if !non_const_defs[node].is_empty() {
+        substitute_const_use(&node, var, substitute_op_src);
+        non_const_defs.get_mut(&node).unwrap().remove(&var);
+        if !non_const_defs[&node].is_empty() {
             continue;
         }
-        let (assigned_var, op_src1, bin_op, op_src2) = if let StatType::Simple(
-            _,
-            StatCode::AssignOp(assigned_var, op_src1, bin_op, op_src2),
-            _,
-        ) = *node.get()
-        {
-            (assigned_var, op_src1, bin_op, op_src2)
+        let assigned_var = if let Some(assigned_var) = prop_const_node(&node, int_handler) {
+            assigned_var
         } else {
             continue;
         };
-        let op_src = if let Some(op_src) = propagate_op(op_src1, bin_op, op_src2) {
-            op_src
-        } else {
-            continue;
-        };
-        if let StatType::Simple(_, stat_code, _) = &mut *node.get_mut() {
-            *stat_code = StatCode::Assign(assigned_var, op_src);
-        } else {
-            panic!("Expected a simple node")
-        };
-        for use_node in defs_uses[node] {
-            non_const_defs[use_node][&assigned_var] -= 1;
+        for use_node in defs_uses.get(&node).unwrap_or(&HashSet::new()) {
+            *non_const_defs
+                .get_mut(use_node)
+                .unwrap()
+                .get_mut(&assigned_var)
+                .unwrap() -= 1;
             if non_const_defs[use_node][&assigned_var] == 0 {
-                const_prop.push_back((use_node, assigned_var));
+                const_prop.push_back((use_node.clone(), assigned_var));
             }
         }
     }
-    todo!()
 }
 
 pub(super) fn prop_consts(
     ThreeCode {
         mut functions,
         data_refs,
-        mut graph,
+        graph,
         read_ref,
         code,
         int_handler,
     }: ThreeCode,
 ) -> ThreeCode {
-    let code = prop_const_graph(&code, &[], &mut graph);
+    println!("{}", hashed(&code));
+    prop_const_graph(&code, &[], &int_handler);
     for Function {
         args,
         code,
@@ -366,8 +481,8 @@ pub(super) fn prop_consts(
         read_ref: _,
     } in functions.values_mut()
     {
-        let new_code = prop_const_graph(code, args, &mut graph);
-        *code = new_code;
+        println!("{}", hashed(&code));
+        prop_const_graph(code, args, &int_handler);
     }
     ThreeCode {
         functions,

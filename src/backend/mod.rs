@@ -6,13 +6,13 @@ mod same_branch;
 mod tail_call_optimisation;
 mod three_code;
 
-use crate::intermediate::Program;
+use self::const_prop::prop_consts;
+use self::tail_call_optimisation::tail_call_optimise;
+use crate::{backend::three_code::hashed, intermediate::Program};
 use arm::ArmResult;
 use inlining::inline;
 use same_branch::same_branch_optimization;
 use three_code::ThreeCode;
-
-use self::tail_call_optimisation::tail_call_optimise;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PropagationOpt {
@@ -55,15 +55,15 @@ pub fn compile(program: Program, options: Options) -> BackendOutput {
     three_code
         .check_dummy()
         .expect("There are left-over dummy nodes in the ThreeCode");
-    // println!(
-    //     "{}",
-    //     three_code
-    //         .graph
-    //         .iter()
-    //         .map(|node| format!("{} {:?}\n", hashed(&node), &*node.get()))
-    //         .collect::<String>()
-    // );
-    // let three_code = prop_consts(three_code);
+    println!(
+        "{}",
+        three_code
+            .graph
+            .iter()
+            .map(|node| format!("{} {:?}\n", hashed(&node), &*node.get()))
+            .collect::<String>()
+    );
+    let three_code = prop_consts(three_code);
 
     // the arm result can return a printable intermediate representation.
     let ArmResult(armcode, temp_rep) = ArmResult::from((three_code, &options));
