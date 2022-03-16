@@ -43,7 +43,7 @@ begin
     test = call floor_sqrt(176401) ;
     println test ;
     
-    # -ve exponent
+    # -ve number
     test = call floor_sqrt(- 10) ;
     # Should exit before reaching this
     println test 
