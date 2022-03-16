@@ -1,0 +1,32 @@
+# corectness of prod_int_arr()
+
+# Output:
+# 73029600
+# 0
+# 0
+# 240
+# -240
+# 1
+
+mod ../../../../../stdlib/math.wacc;
+
+begin
+    int[] arr = [1, 2, 3, 10, 42, 69, 420] ;
+    int prod = call prod_int_arr(arr) ;
+    println prod ;
+    arr = [0, 0, 0] ;
+    prod = call prod_int_arr(arr) ;
+    println prod ;
+    arr = [0, 0, 1, -1] ;
+    prod = call prod_int_arr(arr) ;
+    println prod ;
+    arr = [-12, 2, -10] ;
+    prod = call prod_int_arr(arr) ;
+    println prod ;
+    arr = [12, -2, 10] ;
+    prod = call prod_int_arr(arr) ;
+    println prod ;
+    arr = [] ;
+    prod = call prod_int_arr(arr) ;
+    println prod
+end

@@ -1,0 +1,52 @@
+# corectness of trunc_log2()
+
+# Output:
+# 0
+# 1
+# 2
+# 3
+# 3
+# 4
+# 4
+# 6
+# 7
+# 12
+# 17
+# The given number ( -10 ) whose truncated log2 were to be calculated is not positive!
+
+# Exit:
+# 255
+
+mod ../../../../../stdlib/math.wacc;
+
+begin
+    # +ve numbers
+    int test = call trunc_log2(1) ;
+    println test ;
+    test = call trunc_log2(2) ;
+    println test ;
+    test = call trunc_log2(4) ;
+    println test ;
+    test = call trunc_log2(9) ;
+    println test ;
+    test = call trunc_log2(15) ;
+    println test ;
+    test = call trunc_log2(16) ;
+    println test ;
+    test = call trunc_log2(17) ;
+    println test ;
+    test = call trunc_log2(100) ;
+    println test ;
+    test = call trunc_log2(144) ;
+    println test ;
+    test = call trunc_log2(4761) ;
+    println test ;
+    test = call trunc_log2(176401) ;
+    println test ;
+    
+    # -ve exponent
+    test = call trunc_log2(- 10) ;
+    # Should exit before reaching this
+    println test 
+
+end
