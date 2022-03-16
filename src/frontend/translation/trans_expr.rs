@@ -12,7 +12,7 @@ pub(super) fn add_string(
     data_ref_map: &RwLock<HashMap<DataRef, Vec<ir::Expr>>>,
     string: String,
 ) -> DataRef {
-    let mut data_ref_map = data_ref_map.write().unwrap();
+    let mut data_ref_map = data_ref_map.write().expect("Cannot obtain lock");
     let data_ref: u64 = data_ref_map.len() as u64;
     data_ref_map.insert(
         data_ref,
@@ -72,7 +72,7 @@ pub(super) fn translate_expr(
         },
 
         Expr::ArrayElem(var, mut indices) => {
-            helper_function_flags.write().unwrap().array_indexing = true;
+            helper_function_flags.write().expect("Cannot obtain lock").array_indexing = true;
             let ASTWrapper(last_index_type, last_index) = indices.remove(indices.len() - 1);
             let last_index = translate_expr(
                 last_index,
@@ -180,7 +180,7 @@ pub(super) fn translate_expr(
                     ir::Expr::Num(ir::NumExpr::Deref(ir::NumSize::DWord, ptr))
                 }
                 (UnOp::Fst, expr @ ir::Expr::Ptr(_)) => {
-                    helper_function_flags.write().unwrap().check_null = true;
+                    helper_function_flags.write().expect("Cannot obtain lock").check_null = true;
                     let ptr = ir::PtrExpr::Call(CHECK_NULL_FNAME.to_string(), vec![expr]);
                     match ast_expr_type {
                         ast::Type::Int => {
@@ -199,7 +199,7 @@ pub(super) fn translate_expr(
                     }
                 }
                 (UnOp::Snd, expr @ ir::Expr::Ptr(_)) => {
-                    helper_function_flags.write().unwrap().check_null = true;
+                    helper_function_flags.write().expect("Cannot obtain lock").check_null = true;
                     let offset_ptr = ir::PtrExpr::Offset(
                         box ir::PtrExpr::Call(CHECK_NULL_FNAME.to_string(), vec![expr]),
                         box ir::NumExpr::SizeOfWideAlloc,
@@ -270,7 +270,7 @@ pub(super) fn translate_expr(
                     ))
                 }
                 (ir::Expr::Num(num_expr1), ast::BinOp::Div, ir::Expr::Num(num_expr2)) => {
-                    helper_function_flags.write().unwrap().divide_modulo_check = true;
+                    helper_function_flags.write().expect("Cannot obtain lock").divide_modulo_check = true;
                     ir::Expr::Num(ir::NumExpr::ArithOp(
                         box num_expr1,
                         ir::ArithOp::Div,
@@ -281,7 +281,7 @@ pub(super) fn translate_expr(
                     ))
                 }
                 (ir::Expr::Num(num_expr1), ast::BinOp::Mod, ir::Expr::Num(num_expr2)) => {
-                    helper_function_flags.write().unwrap().divide_modulo_check = true;
+                    helper_function_flags.write().expect("Cannot obtain lock").divide_modulo_check = true;
                     ir::Expr::Num(ir::NumExpr::ArithOp(
                         box num_expr1,
                         ir::ArithOp::Mod,

@@ -124,7 +124,7 @@ fn translate_lhs<'l>(
 ) -> (ir::PtrExpr, ir::Type) {
     match assign_lhs {
         AssignLhs::ArrayElem(var, mut indices) => {
-            helper_function_flags.write().unwrap().array_indexing = true;
+            helper_function_flags.write().expect("Cannot obtain lock").array_indexing = true;
             let (fields_type, &num_indices) =
                 if let ast::Type::Array(box fields_type, num_indices) =
                     var_symb.get_type_from_id(var).expect("Variable not found")
@@ -183,7 +183,7 @@ fn translate_lhs<'l>(
             )
         }
         AssignLhs::PairFst(ASTWrapper(expr_type, expr)) => {
-            helper_function_flags.write().unwrap().check_null = true;
+            helper_function_flags.write().expect("Cannot obtain lock").check_null = true;
             let expr_type = expr_type.expect("Expected a type for an expression");
             let fst_type = if let Type::Pair(box ref fst_type, _) = expr_type {
                 fst_type
@@ -205,7 +205,7 @@ fn translate_lhs<'l>(
             )
         }
         AssignLhs::PairSnd(ASTWrapper(expr_type, expr)) => {
-            helper_function_flags.write().unwrap().check_null = true;
+            helper_function_flags.write().expect("Cannot obtain lock").check_null = true;
             let expr_type = expr_type.expect("Expected a type for an expression");
             let snd_type = if let Type::Pair(_, box ref snd_type) = expr_type {
                 snd_type
@@ -324,7 +324,7 @@ fn translate_stat(
             });
         }
         Stat::Free(ASTWrapper(expr_type, expr)) => {
-            helper_function_flags.write().unwrap().check_null = true;
+            helper_function_flags.write().expect("Cannot obtain lock").check_null = true;
             let expr_type = expr_type.expect("Expected a type for an expression");
             let ptr_expr = if let ir::Expr::Ptr(ptr_expr) = translate_expr(
                 expr,
