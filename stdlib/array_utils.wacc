@@ -5,15 +5,12 @@ begin
     ##### ARRAY PRINTING FUNCTIONS #####
 
     # Print the given integer array
-    # Change return type to void
-    bool print_int_array(string ident, int[] arr) is
+    void print_int_array(string ident, int[] arr) is
 
         int arr_len = len arr ;
         if (arr_len == 0) then 
-            print "Given array (with identifier: \'" ;
-            print ident;
-            println "\') is empty!" ;
-            return false
+            print ident ;
+            println " = [] "
         else
             int i = 0 ;
             print ident ;
@@ -25,21 +22,17 @@ begin
             done ;
             print arr[i] ;
             println "]" ;
-            return true
         fi 
 
     end
 
     # Print the given boolean array
-    # Change return type to void
-    bool print_bool_array(string ident, bool[] arr) is
+    void print_bool_array(string ident, bool[] arr) is
         
         int arr_len = len arr ;
         if (arr_len == 0) then 
-            print "Given array (with identifier: \'" ;
-            print ident;
-            println "\') is empty!" ;
-            return false
+            print ident ;
+            println " = [] "
         else
             int i = 0 ;
             print ident ;
@@ -51,21 +44,17 @@ begin
             done ;
             print arr[i] ;
             println "]" ;
-            return true
         fi 
 
     end
 
     # Print the given characater array
-    # Change return type to void
-    bool print_char_array(string ident, char[] arr) is
+    void print_char_array(string ident, char[] arr) is
         
         int arr_len = len arr ;
         if (arr_len == 0) then 
-            print "Given array (with identifier: \'" ;
-            print ident;
-            println "\') is empty!" ;
-            return false
+            print ident ;
+            println " = [] "
         else
             int i = 0 ;
             print ident ;
@@ -77,7 +66,6 @@ begin
             done ;
             print arr[i] ;
             println "]" ;
-            return true
         fi 
 
     end
@@ -85,39 +73,33 @@ begin
     ##### ARRAY FILL FUNCTIONS #####
 
     # Fill given integer array with given integer
-    # Change return type to void
-    bool fill_int_array(int elem, int[] arr) is
+    void fill_int_array(int elem, int[] arr) is
         int i = 0 ;
         int arr_len = len arr ;
         while (i < arr_len) do
             arr[i] = elem ;
             i = i + 1
         done ;
-        return true
     end
 
     # Fill given boolean array with given boolean
-    # Change return type to void
-    bool fill_bool_array(bool elem, bool[] arr) is
+    void fill_bool_array(bool elem, bool[] arr) is
         int i = 0 ;
         int arr_len = len arr ;
         while (i < arr_len) do
             arr[i] = elem ;
             i = i + 1
         done ;
-        return true
     end
 
     # Fill given character array with given character
-    # Change return type to void
-    bool fill_char_array(char elem, char[] arr) is
+    void fill_char_array(char elem, char[] arr) is
         int i = 0 ;
         int arr_len = len arr ;
         while (i < arr_len) do
             arr[i] = elem ;
             i = i + 1
         done ;
-        return true
     end
 
     ##### ARRAY COUNT FUNCTIONS #####
@@ -373,60 +355,63 @@ begin
     # Returns true if given element exists in given integer array
     bool contains_int_array(int elem, int[] arr) is
         int found = call find_first_int_arr(elem, arr) ;
-        if (found != -1) then
-            return true
-        else
-            return false
-        fi
+        return (found != -1)
     end
 
     # Returns true if given element exists in given boolean array
     bool contains_bool_array(bool elem, bool[] arr) is
-       int found = call find_first_bool_arr(elem, arr) ;
-        if (found != -1) then
-            return true
-        else
-            return false
-        fi
+        int found = call find_first_bool_arr(elem, arr) ;
+        return (found != -1)
     end
 
     # Returns true if given element exists in given character array
     bool contains_char_array(char elem, char[] arr) is
         int found = call find_first_char_arr(elem, arr) ;
-        if (found != -1) then
-            return true
-        else
-            return false
-        fi
+        return (found != -1)
     end
 
     ##### ARRAY MEMORY MANIPULATION #####
 
-    # Swaps the values of the two given indices
-    # Change return type to void
+    # Swaps the values of the two given indices in an integer array
     bool swap_int(int i1, int i2, int[] arr) is
-        int temp = arr[i1] ;
-        arr[i1] = arr[i2] ;
-        arr[i2] = temp ;
-        return true
+        int arr_len = len arr ;
+        if ((i1 >= arr_len || i1 < 0) || (i2 >= arr_len || i2 < 0)) then
+            println "One, or both, of the given indices is out of bounds!" ;
+            return false
+        else
+            int temp = arr[i1] ;
+            arr[i1] = arr[i2] ;
+            arr[i2] = temp ;
+            return true
+        fi
     end
 
-    # Swaps the values of the two given indices
-    # Change return type to void
+    # Swaps the values of the two given indices in a boolean array
     bool swap_bool(int i1, int i2, bool[] arr) is
-        bool temp = arr[i1] ;
-        arr[i1] = arr[i2] ;
-        arr[i2] = temp ;
-        return true
+        int arr_len = len arr ;
+        if ((i1 >= arr_len || i1 < 0) || (i2 >= arr_len || i2 < 0)) then
+            println "One, or both, of the given indices is out of bounds!" ;
+            return false
+        else
+            int temp = arr[i1] ;
+            arr[i1] = arr[i2] ;
+            arr[i2] = temp ;
+            return true
+        fi
     end
 
-    # Swaps the values of the two given indices
-    # Change return type to void
+    # Swaps the values of the two given indices in a character array
     bool swap_char(int i1, int i2, char[] arr) is
-        char temp = arr[i1] ;
-        arr[i1] = arr[i2] ;
-        arr[i2] = temp ;
-        return true
+        int arr_len = len arr ;
+        if ((i1 >= arr_len || i1 < 0) || (i2 >= arr_len || i2 < 0)) then
+            println "One, or both, of the given indices is out of bounds!" ;
+            return false
+        else
+            int temp = arr[i1] ;
+            arr[i1] = arr[i2] ;
+            arr[i2] = temp ;
+            return true
+        fi
     end
 
     # Copies the elements of given integer array 'arr' into the given buffer array 'buff'
@@ -500,7 +485,6 @@ begin
 
     # Copies the given integer array 'arr' into the given buffer array 'buff' and frees 'arr'
     # If the 'rev' flag is set, then the order is reversed
-    # Change return type to void ?
     bool move_int_array(int[] arr, int[] buff, bool reverse) is
         bool copied = call copy_int_array(arr, buff, reverse) ;
         free arr ;
@@ -509,7 +493,6 @@ begin
 
     # Copies the given boolean array 'arr' into the given buffer array 'buff' and frees 'arr'
     # If the 'rev' flag is set, then the order is reversed
-    # Change return type to void ?
     bool move_bool_array(bool[] arr, bool[] buff, bool reverse) is
         bool copied = call copy_bool_array(arr, buff, reverse) ;
         free arr ;
@@ -518,7 +501,6 @@ begin
 
     # Copies the given character array 'arr' into the given buffer array 'buff' and frees 'arr'
     # If the 'rev' flag is set, then the order is reversed
-    # Change return type to void ?
     bool move_char_array(char[] arr, char[] buff, bool reverse) is
         bool copied = call copy_char_array(arr, buff, reverse) ;
         free arr ;
@@ -782,27 +764,22 @@ begin
     end
 
     # QuickSort helper function
-    # Change return type to void
-    bool quick_sort_int_helper(int lo, int hi, int[] arr, bool desc) is
-        bool sort = false ;
+    void quick_sort_int_helper(int lo, int hi, int[] arr, bool desc) is
         if (lo < hi) then
             int par_index = call partition_int(lo, hi, arr, desc) ;
-            sort = call quick_sort_int_helper(lo, par_index - 1, arr, desc) ;
-            sort = call quick_sort_int_helper(par_index + 1, hi, arr, desc)
+            call quick_sort_int_helper(lo, par_index - 1, arr, desc) ;
+            call quick_sort_int_helper(par_index + 1, hi, arr, desc)
         else
             skip
         fi ;
-        return true
     end
 
     # Main QuickSort function - performs Quick Sort on given integer array
     # If the 'desc' flag is set, then the algorithm follows descending order
-    # Change return type to void
-    bool quick_sort_int(int[] arr, bool desc) is
+    void quick_sort_int(int[] arr, bool desc) is
         int lo = 0 ;
         int hi = (len arr) - 1;
-        bool sort = call quick_sort_int_helper(lo, hi, arr, desc) ;
-        return sort
+        call quick_sort_int_helper(lo, hi, arr, desc) ;
     end
 
     # Performs BubbleSort on given character array
@@ -958,27 +935,22 @@ begin
     end
 
     # QuickSort helper function
-    # Change return type to void
-    bool quick_sort_char_helper(int lo, int hi, char[] arr, bool desc) is
-        bool sort = false ;
+    void quick_sort_char_helper(int lo, int hi, char[] arr, bool desc) is
         if (lo < hi) then
             int par_index = call partition_char(lo, hi, arr, desc) ;
-            sort = call quick_sort_char_helper(lo, par_index - 1, arr, desc) ;
-            sort = call quick_sort_char_helper(par_index + 1, hi, arr, desc)
+            call quick_sort_char_helper(lo, par_index - 1, arr, desc) ;
+            call quick_sort_char_helper(par_index + 1, hi, arr, desc)
         else
             skip
         fi ;
-        return true
     end
 
     # Main QuickSort function - performs Quick Sort on given character array
     # If the 'desc' flag is set, then the algorithm follows descending order
-    # Change return type to void
-    bool quick_sort_char(char[] arr, bool desc) is
+    void quick_sort_char(char[] arr, bool desc) is
         int lo = 0 ;
         int hi = (len arr) - 1;
-        bool sort = call quick_sort_char_helper(lo, hi, arr, desc) ;
-        return sort
+        call quick_sort_char_helper(lo, hi, arr, desc) ;
     end
 
     ##### WILL NEED TO ADD NEW 'new' OPERATOR #####
@@ -1003,5 +975,5 @@ begin
     #     arr = call fill_char_array(elem, arr) ;
     #     return arr
     # end
-
+    
 end
