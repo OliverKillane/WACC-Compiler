@@ -314,7 +314,7 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str, &str>, ErrorTree<&str>> {
     );
 
     let call = context(
-        "Argument List",
+        "Function call",
         delimited(
             Lexer::Call.parser(),
             separated_pair(
