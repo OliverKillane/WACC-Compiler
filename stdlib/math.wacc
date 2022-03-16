@@ -2,6 +2,8 @@
 
 begin
 
+    ##### STANDARD MATH FUNCTIONS #####
+
     # Returns the minimum between num1 and num2
     int min(int num1, int num2) is
         if (num1 <= num2) then
@@ -139,6 +141,8 @@ begin
         fi
     end
 
+    ##### TRIGONOMETRIC FUNCTIONS #####
+
     # Returns the sign of the sine trigonometric function for the given angle (in degrees)
     int sin_sign(int angle) is
         if (angle >= 0) then
@@ -189,6 +193,8 @@ begin
         fi
     end
 
+    ##### MATH OPERATIONS ON ARRAYS #####
+
     # Returns the sum of all elements in integer array
     int sum_int_arr(int[] arr) is
         int sum = 0 ;
@@ -212,6 +218,8 @@ begin
         done ;
         return prod
     end
+
+    ##### STATISTICS #####
 
     # Returns the floored mean of all elements in integer array
     int floor_mean_int_arr(int[] arr) is
