@@ -4,10 +4,11 @@ use crate::{
     graph::{Deleted, Graph},
     intermediate::VarRepr,
 };
+use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet, LinkedList},
     iter::zip,
-    rc::Rc,
+    sync::Arc,
 };
 
 /// Heuristic for how many instructions more or less a [stat type](StatType) is
@@ -107,7 +108,7 @@ fn get_function_sccs_scc<'l>(
 fn get_function_sccs<'l>(
     call_graph: &HashMap<&'l str, Vec<&'l str>>,
     transpose_call_graph: &HashMap<&'l str, Vec<&'l str>>,
-) -> HashMap<&'l str, Rc<HashSet<&'l str>>> {
+) -> HashMap<&'l str, Arc<HashSet<&'l str>>> {
     let mut visited = HashSet::new();
     let mut post_order = Vec::new();
     for &fname in call_graph.keys() {
@@ -118,7 +119,7 @@ fn get_function_sccs<'l>(
     for fname in post_order.into_iter().rev() {
         let mut group = HashSet::new();
         get_function_sccs_scc(&mut group, fname, &mut visited, transpose_call_graph);
-        let group = Rc::new(group);
+        let group = Arc::new(group);
         for &group_fname in group.iter() {
             sccs.insert(group_fname, group.clone());
         }
@@ -225,7 +226,7 @@ fn inline_code_dfs(
     new_variable: &mut VarRepr,
     variable_mappings: &mut HashMap<VarRepr, VarRepr>,
     functions: &HashMap<String, Function>,
-    sccs_group: Rc<HashSet<&str>>,
+    sccs_group: Arc<HashSet<&str>>,
 ) -> StatNode {
     if mappings.contains_key(node) {
         return mappings[node].clone();
@@ -332,7 +333,7 @@ fn copy_code_dfs(
     new_variable: &mut VarRepr,
     variable_mappings: &mut HashMap<VarRepr, VarRepr>,
     functions: &HashMap<String, Function>,
-    sccs_group: Rc<HashSet<&str>>,
+    sccs_group: Arc<HashSet<&str>>,
 ) -> (StatNode, f64) {
     if mappings.contains_key(node) {
         return (mappings[node].clone(), 0.0);
@@ -428,8 +429,8 @@ fn inline_graph(
     args: &[VarRepr],
     functions: &HashMap<String, Function>,
     function_instruction_counts: &HashMap<&str, usize>,
-    sccs_group: Rc<HashSet<&str>>,
-    sccs_groups: &HashMap<&str, Rc<HashSet<&str>>>,
+    sccs_group: Arc<HashSet<&str>>,
+    sccs_groups: &HashMap<&str, Arc<HashSet<&str>>>,
 ) -> (StatNode, Vec<VarRepr>) {
     let mut call_nodes = LinkedList::new();
     let mut main_variable_mappings = HashMap::new();
@@ -584,11 +585,13 @@ pub(super) fn inline(
         &[],
         &functions,
         &function_instruction_counts,
-        Rc::new(HashSet::new()),
+        Arc::new(HashSet::new()),
         &sccs,
     );
+
+    // let sscs_ref =
     let new_functions = functions
-        .iter()
+        .par_iter()
         .map(
             |(
                 fname,

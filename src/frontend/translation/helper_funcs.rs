@@ -1,6 +1,6 @@
 use super::trans_expr::add_string;
 use crate::intermediate::{self as ir, DataRef};
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::RwLock};
 
 pub(super) const ARRAY_INDEX_FNAME: &str = "arr_index";
 const ARRAY_INDEX_OOB_NEGATIVE: &str = "ArrayIndexOutOfBoundsError: negative index";
@@ -33,7 +33,7 @@ impl HelperFunctionFlags {
     pub(super) fn generate_functions(
         self,
         functions_map: &mut HashMap<String, ir::Function>,
-        data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
+        data_ref_map: &RwLock<HashMap<DataRef, Vec<ir::Expr>>>,
     ) {
         if self.array_indexing {
             functions_map
@@ -71,7 +71,7 @@ impl HelperFunctionFlags {
 /// Generates a print statement based on a string to be printed.
 fn print_static_string(
     string: &str,
-    data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>,
+    data_ref_map: &RwLock<HashMap<DataRef, Vec<ir::Expr>>>,
 ) -> ir::Stat {
     ir::Stat::PrintStr(
         ir::PtrExpr::Offset(
@@ -88,7 +88,7 @@ fn err_exit() -> ir::BlockEnding {
 }
 
 /// Generates an array indexing helper function.
-fn array_indexing_function(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir::Function {
+fn array_indexing_function(data_ref_map: &RwLock<HashMap<DataRef, Vec<ir::Expr>>>) -> ir::Function {
     ir::Function(
         Some(ir::Type::Ptr),
         vec![
@@ -152,7 +152,7 @@ fn array_indexing_function(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -
 }
 
 /// Generates a null pointer checking helper function.
-fn null_check_function(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir::Function {
+fn null_check_function(data_ref_map: &RwLock<HashMap<DataRef, Vec<ir::Expr>>>) -> ir::Function {
     ir::Function(
         Some(ir::Type::Ptr),
         vec![(ir::Type::Ptr, 0)],
@@ -184,7 +184,7 @@ fn null_check_function(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir
 }
 
 /// Generates a division by zero checking helper function.
-fn divide_modulo_check(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir::Function {
+fn divide_modulo_check(data_ref_map: &RwLock<HashMap<DataRef, Vec<ir::Expr>>>) -> ir::Function {
     ir::Function(
         Some(ir::Type::Num(ir::NumSize::DWord)),
         vec![(ir::Type::Num(ir::NumSize::DWord), 0)],
@@ -219,7 +219,7 @@ fn divide_modulo_check(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir
 }
 
 /// Generates an integer overflow handler.
-fn overflow_handler(data_ref_map: &mut HashMap<DataRef, Vec<ir::Expr>>) -> ir::Function {
+fn overflow_handler(data_ref_map: &RwLock<HashMap<DataRef, Vec<ir::Expr>>>) -> ir::Function {
     ir::Function(
         Some(ir::Type::Num(ir::NumSize::DWord)),
         vec![],
