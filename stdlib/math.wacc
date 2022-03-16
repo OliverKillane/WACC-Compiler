@@ -126,11 +126,7 @@ begin
 
     # Returns the sign of the sine trigonometric function for the given angle (in degrees)
     int sin_sign(int angle) is
-        if (angle >= 0) then
-            angle = angle % 360
-        else
-            angle = 360 + (angle % 360)
-        fi ;
+        angle = ((angle % 360) + 360) % 360 ;
         if (angle == 0 || angle == 180) then
             return 0
         else
@@ -144,11 +140,7 @@ begin
 
     # Returns the sign of the cosine trigonometric function for the given angle (in degrees)
     int cos_sign(int angle) is
-        if (angle >= 0) then
-            angle = angle % 360
-        else
-            angle = 360 + (angle % 360)
-        fi ;
+        angle = ((angle % 360) + 360) % 360 ;
         if (angle == 90 || angle == 270) then
             return 0
         else
@@ -169,7 +161,7 @@ begin
             print angle ;
             println " degrees!" ;
             exit 255
-        else 
+        else
             return sin_sign / cos_sign
         fi
     end
