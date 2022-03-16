@@ -60,7 +60,13 @@ fn tail_call_opt(
                 HashSet::from([node.clone()]),
                 &node,
                 start_node.clone(),
-                return_temp,
+                return_temp.and_then(|op_src| {
+                    if let OpSrc::Var(var) = op_src {
+                        Some(var)
+                    } else {
+                        None
+                    }
+                }),
                 fun_name,
                 &code,
                 &args,
@@ -159,7 +165,7 @@ fn backtraverse(
                         }
                     }
                     StatCode::Assign(dst, _)
-                    | StatCode::AssignOp(dst, _, _, _)
+                    | StatCode::AssignOp(dst, _, _, _, _)
                     | StatCode::Load(dst, _, _) => {
                         // if we have a return, then we must check it is not changed.
                         if let Some(ret_t) = &return_temp && dst == ret_t {
