@@ -16,21 +16,15 @@ use super::{
         BinOp, DataRefType, Function, OpSrc, Size, StatCode, StatNode, StatType, ThreeCode,
     },
     arm_graph_utils::{
-        is_shifted_8_bit, link_chains, link_stats, link_two_chains, link_two_nodes, simple_node,
-        Chain,
+        is_8_bit, link_chains, link_stats, link_two_chains, link_two_nodes, simple_node, Chain,
     },
     arm_repr::{
-        ArmCode, ArmNode, CmpOp, Cond, ControlFlow, Data, DataIdent, DataType, FlexOffset,
-        FlexOperand, Ident, MemOp, MemOperand, MovOp, MulOp, RegOp, Shift, Stat, Subroutine,
-        Temporary,
+        ArmCode, ArmNode, CmpOp, Cond, ControlFlow, Data, DataIdent, DataType, FlexOperand, Ident,
+        MemOp, MemOperand, MovOp, MulOp, RegOp, Shift, Stat, Subroutine, Temporary,
     },
-    int_constraints::ConstrainedInt,
 };
 
-use std::{
-    collections::{HashMap, HashSet},
-    panic,
-};
+use std::collections::{HashMap, HashSet};
 
 /// A struct for tracking names of arm representation temporaries. Is used to
 /// allocate new temporary identifiers, and maintain the mappings of three-code
@@ -84,26 +78,28 @@ pub(super) fn translate_threecode(
     ThreeCode {
         functions,
         data_refs,
-        graph: _,
+        graph,
         read_ref,
         code,
         int_handler,
     }: ThreeCode,
 ) -> ArmCode {
-    let mut graph = Graph::new();
+    let mut cfg = Graph::new();
     let int_handler = int_handler.as_ref();
     let mut temp_map = TempMap::new();
-    ArmCode {
+    let arm_code = ArmCode {
         data: translate_data(data_refs),
         reserved_stack: if read_ref { 1 } else { 0 },
-        main: translate_routine(code, int_handler, &mut temp_map, &mut graph),
+        main: translate_routine(code, int_handler, &mut temp_map, &mut cfg),
         temps: temp_map.get_hashset(),
         subroutines: functions
             .into_iter()
-            .map(|(name, fun)| (name, translate_function(fun, int_handler, &mut graph)))
+            .map(|(name, fun)| (name, translate_function(fun, int_handler)))
             .collect::<HashMap<_, _>>(),
-        cfg: graph,
-    }
+        cfg,
+    };
+    drop(graph);
+    arm_code
 }
 
 /// Translate the data section from the threecode to the arm representation.
@@ -198,7 +194,7 @@ fn translate_node_inner(
             let Chain(start, end) = translate_statcode(stat, int_handler, graph, temp_map);
             (start, Some((end, succ.clone())))
         }
-        StatType::Branch(_, three_temp, true_branch, false_branch) => {
+        StatType::Branch(_, opsrc, true_branch, false_branch) => {
             // Recur to get the true_branch
             let mut true_branch = translate_from_node(
                 true_branch.clone(),
@@ -207,21 +203,26 @@ fn translate_node_inner(
                 translate_map,
                 graph,
             );
-            let Chain(start, end) = simple_node(
-                Stat::Cmp(
-                    CmpOp::Cmp,
-                    Cond::Al,
-                    temp_map.use_temp(*three_temp),
-                    FlexOperand::Imm(1),
-                ),
+
+            let (arm_temp, opsrc_chain) = opsrc_to_temp(opsrc, temp_map, graph);
+
+            let cmp_chain = simple_node(
+                Stat::Cmp(CmpOp::Cmp, Cond::Al, arm_temp, FlexOperand::Imm(1)),
                 graph,
             );
+
             let branch = graph.new_node(ControlFlow::Branch(
                 None,
                 true_branch.clone(),
                 Cond::Eq,
                 None,
             ));
+
+            let Chain(start, end) = if let Some(chain) = opsrc_chain {
+                link_two_chains(chain, cmp_chain)
+            } else {
+                cmp_chain
+            };
 
             link_two_nodes(end, branch.clone());
             true_branch.set_predecessor(branch.clone());
@@ -239,11 +240,22 @@ fn translate_node_inner(
             label.set_successor(branch);
             (label, None)
         }
-        StatType::Return(_, three_var) => (
-            graph.new_node(ControlFlow::Return(
-                None,
-                three_var.map(|three_var| temp_map.use_id(three_var)),
-            )),
+        StatType::Return(_, opt_opsrc) => (
+            {
+                if let Some(opsrc) = opt_opsrc {
+                    let (arm_temp, opsrc_chain) = opsrc_to_temp(opsrc, temp_map, graph);
+                    let ret_node =
+                        graph.new_node(ControlFlow::Return(None, Some(arm_temp.get_temp())));
+                    if let Some(Chain(start, end)) = opsrc_chain {
+                        link_two_nodes(end, ret_node);
+                        start
+                    } else {
+                        ret_node
+                    }
+                } else {
+                    graph.new_node(ControlFlow::Return(None, None))
+                }
+            },
             None,
         ),
         StatType::Dummy(_) => panic!("No dummy nodes should be in the final threecode"),
@@ -349,21 +361,22 @@ fn translate_function(
     Function {
         args,
         code,
+        graph: _,
         read_ref,
     }: Function,
     int_handler: Option<&String>,
-    graph: &mut Graph<ControlFlow>,
 ) -> Subroutine {
     let mut temp_map = TempMap::new();
-
+    let mut cfg = Graph::new();
     Subroutine {
         args: args
             .into_iter()
             .map(|t| temp_map.use_id(t))
             .collect::<Vec<_>>(),
-        start_node: translate_routine(code, int_handler, &mut temp_map, graph),
+        start_node: translate_routine(code, int_handler, &mut temp_map, &mut cfg),
         temps: temp_map.get_hashset(),
         reserved_stack: if read_ref { 1 } else { 0 },
+        cfg,
     }
 }
 
@@ -375,7 +388,7 @@ fn convert_data_ref(i: DataRef) -> DataIdent {
 
 /// place a constant in a temporary
 fn const_to_reg(dst_ident: Ident, i: i32, graph: &mut Graph<ControlFlow>) -> Chain {
-    if is_shifted_8_bit(i) {
+    if is_8_bit(i) {
         // Mov dst_ident, #i
         simple_node(
             Stat::Move(
@@ -407,76 +420,53 @@ fn dataref_to_reg(
     dst_ident: Ident,
     data_ident: DataIdent,
     offset: i32,
-    temp_map: &mut TempMap,
     graph: &mut Graph<ControlFlow>,
 ) -> Chain {
-    if offset == 0 {
-        // LDR dst_ident, =data_ident
-        simple_node(
-            Stat::MemOp(
-                MemOp::Ldr,
-                Cond::Al,
-                false,
-                dst_ident,
-                MemOperand::Label(data_ident),
-            ),
-            graph,
-        )
-    } else if offset >= -4095 && offset <= 4095 {
-        // LDR arm_temp, =dataref
-        // LDR arm_temp, [arm_temp, #offset]
-        link_stats(
-            vec![
-                Stat::MemOp(
-                    MemOp::Ldr,
-                    Cond::Al,
-                    false,
-                    dst_ident,
-                    MemOperand::Label(data_ident),
-                ),
-                Stat::MemOp(
-                    MemOp::Ldr,
-                    Cond::Al,
-                    false,
-                    dst_ident,
-                    MemOperand::PreIndex(dst_ident, FlexOffset::Expr(ConstrainedInt::from(offset))),
-                ),
-            ],
-            graph,
-        )
-    } else {
-        // LDR arm_temp, =dataref
-        // LDR other_temp, =offset
-        // ADD arm_temp, arm_temp, other_temp
-        // note: no overflow checking for offset
-        let other_temp = temp_map.get_new_temp();
-        link_stats(
-            vec![
-                Stat::MemOp(
-                    MemOp::Ldr,
-                    Cond::Al,
-                    false,
-                    dst_ident,
-                    MemOperand::Label(data_ident),
-                ),
-                Stat::MemOp(
-                    MemOp::Ldr,
-                    Cond::Al,
-                    false,
-                    other_temp,
-                    MemOperand::Expression(offset),
-                ),
-                Stat::ApplyOp(
-                    RegOp::Add,
-                    Cond::Al,
-                    false,
-                    dst_ident,
-                    dst_ident,
-                    FlexOperand::ShiftReg(other_temp, None),
-                ),
-            ],
-            graph,
-        )
+    // LDR dst_ident, =data_ident + offset
+    simple_node(
+        Stat::MemOp(
+            MemOp::Ldr,
+            Cond::Al,
+            false,
+            dst_ident,
+            MemOperand::Label(data_ident, offset),
+        ),
+        graph,
+    )
+}
+/// Move an opsrc into a temporary.
+fn opsrc_to_temp(
+    opsrc: &OpSrc,
+    temp_map: &mut TempMap,
+    graph: &mut Graph<ControlFlow>,
+) -> (Ident, Option<Chain>) {
+    match opsrc {
+        OpSrc::Const(i) => {
+            // Load the constant into a temporary
+            let new_temp = temp_map.get_new_temp();
+            (new_temp, Some(const_to_reg(new_temp, *i, graph)))
+        }
+        OpSrc::DataRef(dataref, offset) => {
+            let new_temp = temp_map.get_new_temp();
+
+            (
+                new_temp,
+                Some(dataref_to_reg(
+                    new_temp,
+                    convert_data_ref(*dataref),
+                    *offset,
+                    graph,
+                )),
+            )
+        }
+        OpSrc::Var(var) => (temp_map.use_temp(*var), None),
+        OpSrc::ReadRef => {
+            let new_temp = temp_map.get_new_temp();
+            (
+                new_temp,
+                Some(simple_node(Stat::AssignStackWord(new_temp), graph)),
+            )
+        }
     }
 }
 
@@ -493,13 +483,9 @@ fn translate_statcode(
             let arm_temp = temp_map.use_temp(*three_temp);
             match opsrc {
                 OpSrc::Const(i) => const_to_reg(arm_temp, *i, graph),
-                OpSrc::DataRef(dataref, offset) => dataref_to_reg(
-                    arm_temp,
-                    convert_data_ref(*dataref),
-                    *offset,
-                    temp_map,
-                    graph,
-                ),
+                OpSrc::DataRef(dataref, offset) => {
+                    dataref_to_reg(arm_temp, convert_data_ref(*dataref), *offset, graph)
+                }
                 OpSrc::Var(other_three_temp) => {
                     // Mov arm_tep other_arm_temp
                     let other_arm_temp = temp_map.use_temp(*other_three_temp);
@@ -517,36 +503,16 @@ fn translate_statcode(
                 OpSrc::ReadRef => simple_node(Stat::AssignStackWord(arm_temp), graph),
             }
         }
-        StatCode::AssignOp(three_temp_dst, first_op, binop, second_op) => {
+        StatCode::AssignOp(three_temp_dst, first_op, binop, second_op, checked) => {
             let arm_dst_temp = temp_map.use_temp(*three_temp_dst);
             let mut nodes = Vec::new();
 
             let mut opsrc_to_reg = |opsrc: &OpSrc| {
-                match opsrc {
-                    OpSrc::Const(i) => {
-                        // Load the constant into a temporary
-                        let new_temp = temp_map.get_new_temp();
-                        nodes.push(const_to_reg(new_temp, *i, graph));
-                        new_temp
-                    }
-                    OpSrc::DataRef(dataref, offset) => {
-                        let new_temp = temp_map.get_new_temp();
-                        nodes.push(dataref_to_reg(
-                            new_temp,
-                            convert_data_ref(*dataref),
-                            *offset,
-                            temp_map,
-                            graph,
-                        ));
-                        new_temp
-                    }
-                    OpSrc::Var(var) => temp_map.use_temp(*var),
-                    OpSrc::ReadRef => {
-                        let new_temp = temp_map.get_new_temp();
-                        nodes.push(simple_node(Stat::AssignStackWord(new_temp), graph));
-                        new_temp
-                    }
+                let (arm_temp, opsrc_chain) = opsrc_to_temp(opsrc, temp_map, graph);
+                if let Some(chain) = opsrc_chain {
+                    nodes.push(chain);
                 }
+                arm_temp
             };
 
             let left_reg = opsrc_to_reg(first_op);
@@ -598,117 +564,107 @@ fn translate_statcode(
                 BinOp::Add => {
                     // Perform the addition operation, if there is an overflow
                     // handler, then if overflow occurs, branch to it
-
-                    match int_handler {
-                        Some(overflow_handler) => {
-                            // ADDS arm_dst_reg, left_reg, right_reg
-                            // BLVS overflow_handler
-                            let addition = simple_node(
-                                Stat::ApplyOp(
-                                    RegOp::Add,
-                                    Cond::Al,
-                                    true,
-                                    arm_dst_temp,
-                                    left_reg,
-                                    FlexOperand::ShiftReg(right_reg, None),
-                                ),
-                                graph,
-                            );
-                            let check =
-                                simple_node(Stat::Link(Cond::Vs, overflow_handler.clone()), graph);
-                            link_two_chains(addition, check)
-                        }
-                        None => {
-                            // ADD arm_dst_temp, left_reg, right_reg
-                            simple_node(
-                                Stat::ApplyOp(
-                                    RegOp::Add,
-                                    Cond::Al,
-                                    false,
-                                    arm_dst_temp,
-                                    left_reg,
-                                    FlexOperand::ShiftReg(right_reg, None),
-                                ),
-                                graph,
-                            )
-                        }
+                    if let Some(overflow_handler) = int_handler && *checked {
+                        // ADDS arm_dst_reg, left_reg, right_reg
+                        // BLVS overflow_handler
+                        let addition = simple_node(
+                            Stat::ApplyOp(
+                                RegOp::Add,
+                                Cond::Al,
+                                true,
+                                arm_dst_temp,
+                                left_reg,
+                                FlexOperand::ShiftReg(right_reg, None),
+                            ),
+                            graph,
+                        );
+                        let check =
+                            simple_node(Stat::Link(Cond::Vs, overflow_handler.clone()), graph);
+                        link_two_chains(addition, check)
+                    } else {
+                        // ADD arm_dst_temp, left_reg, right_reg
+                        simple_node(
+                            Stat::ApplyOp(
+                                RegOp::Add,
+                                Cond::Al,
+                                false,
+                                arm_dst_temp,
+                                left_reg,
+                                FlexOperand::ShiftReg(right_reg, None),
+                            ),
+                            graph,
+                        )
                     }
                 }
                 BinOp::Sub => {
-                    match int_handler {
-                        Some(overflow_handler) => {
-                            // SUBS arm_dst_temp, left_reg, right_reg
-                            // BLVS overflow_handler
-                            let subtraction = simple_node(
-                                Stat::ApplyOp(
-                                    RegOp::Sub,
-                                    Cond::Al,
-                                    true,
-                                    arm_dst_temp,
-                                    left_reg,
-                                    FlexOperand::ShiftReg(right_reg, None),
-                                ),
-                                graph,
-                            );
-                            let check =
-                                simple_node(Stat::Link(Cond::Vs, overflow_handler.clone()), graph);
-                            link_two_chains(subtraction, check)
-                        }
-                        None => {
-                            // SUB arm_dst_temp, left_reg, right_reg
-                            simple_node(
-                                Stat::ApplyOp(
-                                    RegOp::Sub,
-                                    Cond::Al,
-                                    false,
-                                    arm_dst_temp,
-                                    left_reg,
-                                    FlexOperand::ShiftReg(right_reg, None),
-                                ),
-                                graph,
-                            )
-                        }
+                    if let Some(overflow_handler) = int_handler && *checked {
+                        // SUBS arm_dst_temp, left_reg, right_reg
+                        // BLVS overflow_handler
+                        let subtraction = simple_node(
+                            Stat::ApplyOp(
+                                RegOp::Sub,
+                                Cond::Al,
+                                true,
+                                arm_dst_temp,
+                                left_reg,
+                                FlexOperand::ShiftReg(right_reg, None),
+                            ),
+                            graph,
+                        );
+                        let check =
+                            simple_node(Stat::Link(Cond::Vs, overflow_handler.clone()), graph);
+                        link_two_chains(subtraction, check)
+                    } else {
+                        // SUB arm_dst_temp, left_reg, right_reg
+                        simple_node(
+                            Stat::ApplyOp(
+                                RegOp::Sub,
+                                Cond::Al,
+                                false,
+                                arm_dst_temp,
+                                left_reg,
+                                FlexOperand::ShiftReg(right_reg, None),
+                            ),
+                            graph,
+                        )
                     }
                 }
                 BinOp::Mul => {
-                    match int_handler {
-                        Some(overflow_fun) => {
-                            // SMULL holder_temp, arm_dst_temp, left_reg, right_reg
-                            // CMP arm_dst_temp, holder_temp, ASR #31
-                            // BLNE overflow_fun
-                            let holder_temp = temp_map.get_new_temp();
-                            link_stats(
-                                vec![
-                                    Stat::MulOp(
-                                        MulOp::SMulL,
-                                        Cond::Al,
-                                        true,
+                    if let Some(overflow_handler) = int_handler && *checked {
+                        // SMULL holder_temp, arm_dst_temp, left_reg, right_reg
+                        // CMP arm_dst_temp, holder_temp, ASR #31
+                        // BLNE overflow_fun
+                        let holder_temp = temp_map.get_new_temp();
+                        link_stats(
+                            vec![
+                                Stat::MulOp(
+                                    MulOp::SMulL,
+                                    Cond::Al,
+                                    true,
+                                    arm_dst_temp,
+                                    holder_temp,
+                                    left_reg,
+                                    right_reg,
+                                ),
+                                Stat::Cmp(
+                                    CmpOp::Cmp,
+                                    Cond::Al,
+                                    holder_temp,
+                                    FlexOperand::ShiftReg(
                                         arm_dst_temp,
-                                        holder_temp,
-                                        left_reg,
-                                        right_reg,
+                                        Some(Shift::Asr(31.into())),
                                     ),
-                                    Stat::Cmp(
-                                        CmpOp::Cmp,
-                                        Cond::Al,
-                                        holder_temp,
-                                        FlexOperand::ShiftReg(
-                                            arm_dst_temp,
-                                            Some(Shift::Asr(31.into())),
-                                        ),
-                                    ),
-                                    Stat::Link(Cond::Ne, overflow_fun.clone()),
-                                ],
-                                graph,
-                            )
-                        }
-                        None => {
-                            // MUL arm_dst_temp, left_reg, right_reg
-                            simple_node(
-                                Stat::Mul(Cond::Al, false, arm_dst_temp, left_reg, right_reg),
-                                graph,
-                            )
-                        }
+                                ),
+                                Stat::Link(Cond::Ne, overflow_handler.clone()),
+                            ],
+                            graph,
+                        )
+                    } else {
+                        // MUL arm_dst_temp, left_reg, right_reg
+                        simple_node(
+                            Stat::Mul(Cond::Al, false, arm_dst_temp, left_reg, right_reg),
+                            graph,
+                        )
                     }
                 }
                 BinOp::Div =>
@@ -749,27 +705,106 @@ fn translate_statcode(
             link_chains(nodes).expect("Had more than one statement")
         }
         // LDR(size is bytes) three_temp, [temp_ptr]
-        StatCode::Load(three_temp, temp_ptr, size) => simple_node(
-            Stat::MemOp(
-                MemOp::Ldr,
-                Cond::Al,
-                size == &Size::Byte,
-                temp_map.use_temp(*three_temp),
-                MemOperand::Zero(temp_map.use_temp(*temp_ptr)),
-            ),
-            graph,
-        ),
+        StatCode::Load(three_temp, opsrc, size) => {
+            // load the opsrc, potentially using more/other instructions
+            let (memoperand, opsrc_chain) = match opsrc {
+                OpSrc::Const(i) => {
+                    let new_temp = temp_map.get_new_temp();
+                    (
+                        MemOperand::Zero(new_temp),
+                        Some(simple_node(
+                            Stat::MemOp(
+                                MemOp::Ldr,
+                                Cond::Al,
+                                false,
+                                new_temp,
+                                MemOperand::Expression(*i),
+                            ),
+                            graph,
+                        )),
+                    )
+                }
+                OpSrc::Var(temp_ptr) => (MemOperand::Zero(temp_map.use_temp(*temp_ptr)), None),
+                OpSrc::DataRef(dref, offset) => {
+                    (MemOperand::Label(convert_data_ref(*dref), *offset), None)
+                }
+                OpSrc::ReadRef => {
+                    let new_temp = temp_map.get_new_temp();
+                    (
+                        MemOperand::Zero(new_temp),
+                        Some(simple_node(Stat::AssignStackWord(new_temp), graph)),
+                    )
+                }
+            };
+
+            let load = simple_node(
+                Stat::MemOp(
+                    MemOp::Ldr,
+                    Cond::Al,
+                    size == &Size::Byte,
+                    temp_map.use_temp(*three_temp),
+                    memoperand,
+                ),
+                graph,
+            );
+
+            // if a preamble is required, link it
+            if let Some(chain) = opsrc_chain {
+                link_two_chains(chain, load)
+            } else {
+                load
+            }
+        }
         // STR(size is bytes) three_temp, [temp_ptr]
-        StatCode::Store(temp_ptr, three_temp, size) => simple_node(
-            Stat::MemOp(
-                MemOp::Str,
-                Cond::Al,
-                size == &Size::Byte,
-                temp_map.use_temp(*three_temp),
-                MemOperand::Zero(temp_map.use_temp(*temp_ptr)),
-            ),
-            graph,
-        ),
+        StatCode::Store(opsrc_ptr, temp, size) => {
+            let (memoperand, opsrc_chain) = match opsrc_ptr {
+                OpSrc::Const(i) => {
+                    let new_temp = temp_map.get_new_temp();
+                    (
+                        MemOperand::Zero(new_temp),
+                        Some(simple_node(
+                            Stat::MemOp(
+                                MemOp::Ldr,
+                                Cond::Al,
+                                false,
+                                new_temp,
+                                MemOperand::Expression(*i),
+                            ),
+                            graph,
+                        )),
+                    )
+                }
+                OpSrc::Var(temp_ptr) => (MemOperand::Zero(temp_map.use_temp(*temp_ptr)), None),
+                OpSrc::DataRef(dref, offset) => {
+                    (MemOperand::Label(convert_data_ref(*dref), *offset), None)
+                }
+                OpSrc::ReadRef => {
+                    let new_temp = temp_map.get_new_temp();
+                    (
+                        MemOperand::Zero(new_temp),
+                        Some(simple_node(Stat::AssignStackWord(new_temp), graph)),
+                    )
+                }
+            };
+
+            let store = simple_node(
+                Stat::MemOp(
+                    MemOp::Str,
+                    Cond::Al,
+                    size == &Size::Byte,
+                    temp_map.use_temp(*temp),
+                    memoperand,
+                ),
+                graph,
+            );
+
+            // if a preamble is required, link it
+            if let Some(chain) = opsrc_chain {
+                link_two_chains(chain, store)
+            } else {
+                store
+            }
+        }
         // Creates a dummy call node for use when allocating registers
         StatCode::Call(ret_temp, fun_name, args) => simple_node(
             Stat::Call(

@@ -209,8 +209,8 @@ pub enum MemOperand {
     /// If [bool] is true then we update the value in the register with offset
     /// before accessing the memory location.
     PreIndex(Ident, FlexOffset),
-    /// Direct from the label in the data section indicated by [String].
-    Label(DataIdent),
+    /// Direct from the label in the data section indicated by [String], offset by a set amount.
+    Label(DataIdent, i32),
     /// Immediate 32-bit integer value.
     Expression(i32),
 }
@@ -351,6 +351,7 @@ pub struct Subroutine {
     pub start_node: ArmNode,
     pub temps: HashSet<Temporary>,
     pub reserved_stack: u8,
+    pub cfg: Graph<ControlFlow>,
 }
 
 /// The main program containing text ([instructions](Stat)) and [data](Data).
@@ -365,7 +366,7 @@ pub struct ArmCode {
     pub temps: HashSet<Temporary>,
     /// A map of all subroutines contained in the program.
     pub subroutines: HashMap<String, Subroutine>,
-    /// The control flow graph containing all nodes in the program.
+    /// The control flow graph containing all nodes in main function.
     pub cfg: Graph<ControlFlow>,
 }
 

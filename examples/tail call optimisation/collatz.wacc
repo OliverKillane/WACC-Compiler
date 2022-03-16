@@ -1,0 +1,87 @@
+# Demonstration of recursive calls from within selection statements being 
+# tail-call optimised.
+# 
+# Both parts of the if statement get tail call optimised, as both eventually 
+# propagate their recursive call to a return.
+#
+# Expected behaviour is to ask for a number, then print its sequence to 1. As 
+# for all integers, (32 bit positive) the collatz conjecture has been verified, 
+# it should always return (except for case of an integer overflow).
+#
+# f_collatz:
+# b_f_collatz_0:
+#         MOV     T1,     T0
+#         LDR     T2,     =d_ref_5
+#         INTERNAL OPERATION: CALL        printf  No Return, ARGS(T2,T1)
+#         MOV     T1,     #0
+#         INTERNAL OPERATION: CALL        fflush  No Return, ARGS(T1)
+#         LDR     T1,     =d_ref_6
+#         INTERNAL OPERATION: CALL        printf  No Return, ARGS(T1)
+#         MOV     T1,     #0
+#         INTERNAL OPERATION: CALL        fflush  No Return, ARGS(T1)
+#         MOV     T1,     T0
+#         MOV     T2,     #1
+#         MOV     T3,     #0
+#         CMP     T1,     T2
+#         MOVEQ   T3,     #1
+#         MOV     T1,     T3
+#         CMP     T1,     #1
+#         BEQ     b_f_collatz_1
+#         MOV     T1,     #0
+#         MOV     T4,     T1
+#         MOV     T1,     T0
+#         MOV     T2,     #2
+#         INTERNAL OPERATION: CALL        chk_zero        T2, ARGS(T2)
+#         INTERNAL OPERATION: CALL        __modsi3        T1, ARGS(T1,T2)
+#         MOV     T2,     #0
+#         MOV     T5,     #0
+#         CMP     T1,     T2
+#         MOVEQ   T5,     #1
+#         MOV     T1,     T5
+#         CMP     T1,     #1
+#         BEQ     b_f_collatz_2
+#         MOV     T1,     #3
+#         MOV     T2,     T0
+#         SMULLS  T1,     T6,     T1,     T2
+#         CMP     T6,     T1,     ASR #31
+#         BLNE    overflow_handler
+#         MOV     T2,     #1
+#         ADDS    T1,     T1,     T2
+#         BLVS    overflow_handler
+#         MOV     T0,     T1
+#         B       b_f_collatz_0
+# b_f_collatz_1:
+#         MOV     T1,     #1
+#         INTERNAL OPERATION: RETURN      T1
+# b_f_collatz_2:
+#         MOV     T1,     T0
+#         MOV     T2,     #2
+#         INTERNAL OPERATION: CALL        chk_zero        T2, ARGS(T2)
+#         INTERNAL OPERATION: CALL        __aeabi_idiv    T1, ARGS(T1,T2)
+#         MOV     T0,     T1
+#         B       b_f_collatz_0
+
+begin
+    bool collatz(int n) is
+        println n;
+        if n == 1 then
+            return true
+        else 
+            bool x = false;
+            if (n % 2) == 0 then
+                x = call collatz(n / 2) # tail call optimised
+            else
+                x = call collatz(3 * n + 1) # tail call optimised
+            fi;
+            return x
+        fi
+    end
+
+    int num = 0;
+    print "Enter the value you want to check: ";
+    read num;
+    println "Checking...\n";
+    bool _ = call collatz(num);
+    print num;
+    println " does eventually go to 1!"
+end
