@@ -369,11 +369,7 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr], int_handler: &Option<Stri
                                         if let StatType::Simple(_, StatCode::Assign(_, op_src), _) =
                                             &*def.get()
                                         {
-                                            if let OpSrc::Var(_) = op_src {
-                                                true
-                                            } else {
-                                                false
-                                            }
+                                            matches!(op_src, OpSrc::Var(_))
                                         } else {
                                             true
                                         }
@@ -388,8 +384,8 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr], int_handler: &Option<Stri
             )
         })
         .collect::<HashMap<_, _>>();
-    for (node, _) in &live_defs {
-        let assigned_var = if let Some(assigned_var) = prop_const_node(&node, int_handler) {
+    for node in live_defs.keys() {
+        let assigned_var = if let Some(assigned_var) = prop_const_node(node, int_handler) {
             assigned_var
         } else {
             continue;

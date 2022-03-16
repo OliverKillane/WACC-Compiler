@@ -37,13 +37,7 @@ fn same_branch_opt_graph(graph: &mut Graph<StatType>, code: &mut StatNode) {
         let incoming = (&*node.get())
             .incoming()
             .into_iter()
-            .filter(|&incoming_node| {
-                if let StatType::Dummy(_) = &*incoming_node.get() {
-                    false
-                } else {
-                    true
-                }
-            })
+            .filter(|&incoming_node| !matches!(&*incoming_node.get(), StatType::Dummy(_)))
             .cloned()
             .collect();
         (&mut *node.get_mut()).set_incoming(incoming);

@@ -40,13 +40,15 @@ pub fn compile(program: Program, options: Options) -> BackendOutput {
         three_code = inline(three_code, instructions_limit);
     }
     if options.tail_call {
-        three_code = tail_call_optimise(three_code)
+        three_code = tail_call_optimise(three_code);
+    }
+    if options.const_propagation {
+        three_code = prop_consts(three_code);
     }
     #[cfg(debug_assertions)]
     three_code
         .check_dummy()
         .expect("There are left-over dummy nodes in the ThreeCode");
-    let three_code = prop_consts(three_code);
 
     // the arm result can return a printable intermediate representation.
     let ArmResult(armcode, temp_rep) = ArmResult::from((three_code, &options));
