@@ -209,8 +209,8 @@ pub enum MemOperand {
     /// If [bool] is true then we update the value in the register with offset
     /// before accessing the memory location.
     PreIndex(Ident, FlexOffset),
-    /// Direct from the label in the data section indicated by [String].
-    Label(DataIdent),
+    /// Direct from the label in the data section indicated by [String], offset by a set amount.
+    Label(DataIdent, i32),
     /// Immediate 32-bit integer value.
     Expression(i32),
 }

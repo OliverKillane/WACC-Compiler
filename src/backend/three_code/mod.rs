@@ -2,6 +2,8 @@ mod eval;
 mod expr;
 mod stat;
 
+use self::expr::assign_op_src;
+
 use super::data_flow::DataflowNode;
 use super::Options;
 use crate::graph::{Deleted, Graph, NodeRef};
@@ -83,15 +85,15 @@ pub(super) enum StatCode {
     /// Assignment of one variable to another
     Assign(VarRepr, OpSrc),
     /// Assignment of a binary operation to a variable.
-    AssignOp(VarRepr, OpSrc, BinOp, OpSrc),
+    AssignOp(VarRepr, OpSrc, BinOp, OpSrc, bool),
     /// Load from a reference to a pointer. The first variable reference is
     /// the load destination and the second one is the pointer to the data. The
     /// number of bytes loaded is signified by the [size](Size) field.
-    Load(VarRepr, VarRepr, Size),
+    Load(VarRepr, OpSrc, Size),
     /// Store to a pointer reference. The first variable reference is the pointer to the
     /// store destination and the second one is the variable to store the data from.
     /// The number of bytes stored is signified by the [size](Size) field.
-    Store(VarRepr, VarRepr, Size),
+    Store(OpSrc, VarRepr, Size),
     /// A call to a function. If the function name is not in the list of the
     /// [program](ThreeCode) functions then it is assumed to be external and linked
     /// to by the linker.
@@ -111,11 +113,11 @@ pub(super) enum StatType {
     Simple(Vec<StatNode>, StatCode, StatNode),
     /// A simple branch instruction that checks if the value in the variable is
     /// a boolean 1 or a 0.
-    Branch(Vec<StatNode>, VarRepr, StatNode, StatNode),
+    Branch(Vec<StatNode>, OpSrc, StatNode, StatNode),
     /// A self-looping infinite loop, which might occur as a user program.
     Loop(Vec<StatNode>),
     /// A return from a function. The variable contains the return value.
-    Return(Vec<StatNode>, Option<VarRepr>),
+    Return(Vec<StatNode>, Option<OpSrc>),
 }
 
 /// A statement graph node.
@@ -168,7 +170,7 @@ impl StatType {
     }
 
     /// Creates a new branch statement with an empty list of incoming nodes.
-    pub(super) fn new_branch(cond: VarRepr, if_true: StatNode, if_false: StatNode) -> Self {
+    pub(super) fn new_branch(cond: OpSrc, if_true: StatNode, if_false: StatNode) -> Self {
         StatType::Branch(vec![], cond, if_true, if_false)
     }
 
@@ -178,7 +180,7 @@ impl StatType {
     }
 
     /// Creates a new return statement with an empty list of incoming nodes.
-    pub(super) fn new_return(ret: Option<VarRepr>) -> Self {
+    pub(super) fn new_return(ret: Option<OpSrc>) -> Self {
         StatType::Return(vec![], ret)
     }
 
@@ -540,7 +542,7 @@ fn translate_block(
     }
     let (cond_outputs, else_output) = match block_ending {
         ir::BlockEnding::Exit(num_expr) => {
-            translate_num_expr(
+            let (_, op_src) = translate_num_expr(
                 num_expr,
                 free_var,
                 &mut stat_line,
@@ -548,6 +550,7 @@ fn translate_block(
                 function_types,
                 options,
             );
+            assign_op_src(free_var, op_src, &mut stat_line);
             stat_line.add_stat(StatCode::VoidCall("exit".to_string(), vec![free_var]));
             let return_node = stat_graph.borrow_mut().new_node(StatType::new_return(None));
             stat_line.add_node(return_node);
@@ -555,7 +558,7 @@ fn translate_block(
         }
         ir::BlockEnding::Return(expr) => {
             if let Some(expr) = expr {
-                translate_expr(
+                let (_, op_src) = translate_expr(
                     expr,
                     free_var,
                     &mut stat_line,
@@ -565,7 +568,7 @@ fn translate_block(
                 );
                 let return_node = stat_graph
                     .borrow_mut()
-                    .new_node(StatType::new_return(Some(free_var)));
+                    .new_node(StatType::new_return(Some(op_src)));
                 stat_line.add_node(return_node);
             } else {
                 let return_node = stat_graph.borrow_mut().new_node(StatType::new_return(None));
@@ -581,7 +584,7 @@ fn translate_block(
 
             for (bool_expr, _) in conds {
                 let mut bool_stat_line = StatLine::new(stat_graph.clone());
-                translate_bool_expr(
+                let op_src = translate_bool_expr(
                     bool_expr,
                     free_var,
                     &mut bool_stat_line,
@@ -592,7 +595,7 @@ fn translate_block(
                 let true_dummy = stat_graph.borrow_mut().new_node(StatType::deleted());
                 let false_dummy = stat_graph.borrow_mut().new_node(StatType::deleted());
                 let cond_node = stat_graph.borrow_mut().new_node(StatType::new_branch(
-                    free_var,
+                    op_src,
                     true_dummy.clone(),
                     false_dummy.clone(),
                 ));
@@ -795,24 +798,25 @@ fn translate_block_graph(
         for (cond_id, cond_node) in cond_maps {
             if let StatType::Branch(_, _, true_node, _) = &mut *cond_node.get_mut() {
                 stat_graph.borrow_mut().remove_node(true_node.clone());
-                start_nodes[*cond_id]
-                    .get_mut()
-                    .add_incoming(cond_node.clone());
                 *true_node = start_nodes[*cond_id].clone();
             } else {
                 panic!("Expected a condition node")
-            }
+            };
+            start_nodes[*cond_id]
+                .get_mut()
+                .add_incoming(cond_node.clone());
         }
-        match &mut *else_node.get_mut() {
-            StatType::Simple(_, _, next_node) | StatType::Branch(_, _, _, next_node) => {
-                stat_graph.borrow_mut().remove_node(next_node.clone());
-                start_nodes[*else_id]
-                    .get_mut()
-                    .add_incoming(else_node.clone());
-                *next_node = start_nodes[*else_id].clone();
-            }
-            _ => panic!("Expected a simple node or a branch node"),
+        if let StatType::Simple(_, _, next_node) | StatType::Branch(_, _, _, next_node) =
+            &mut *else_node.get_mut()
+        {
+            stat_graph.borrow_mut().remove_node(next_node.clone());
+            *next_node = start_nodes[*else_id].clone();
+        } else {
+            panic!("Expected a simple node or a branch node")
         }
+        start_nodes[*else_id]
+            .get_mut()
+            .add_incoming(else_node.clone());
     }
 
     start_nodes
@@ -973,9 +977,8 @@ impl From<(ir::Program, &Options)> for ThreeCode {
 mod tests {
     use super::stat::tests::match_graph;
     use super::{
-        super::{Options, PropagationOpt},
-        translate_block, translate_block_graph, translate_function, DataRefType, Function, OpSrc,
-        Size, StatCode, StatType, ThreeCode,
+        super::Options, translate_block, translate_block_graph, translate_function, DataRefType,
+        Function, OpSrc, Size, StatCode, StatType, ThreeCode,
     };
     use crate::{
         backend::three_code::stat::FmtDataRefFlags,
@@ -1010,7 +1013,7 @@ mod tests {
             &Options {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
-                propagation: PropagationOpt::None,
+                const_propagation: false,
                 inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
@@ -1060,7 +1063,7 @@ mod tests {
             print_fmt_set_node,
         ));
         let scan_load_node = graph.new_node(StatType::new_simple(
-            StatCode::Load(0, 1, Size::DWord),
+            StatCode::Load(0, OpSrc::ReadRef, Size::DWord),
             print_val_set_node,
         ));
         let scan_call_node = graph.new_node(StatType::new_simple(
@@ -1071,16 +1074,16 @@ mod tests {
             StatCode::Assign(2, OpSrc::DataRef(0, 0)),
             scan_call_node,
         ));
-        let scan_store_node = graph.new_node(StatType::new_simple(
-            StatCode::Store(1, 0, Size::DWord),
-            scan_fmt_set_node,
-        ));
         let scan_set_ref = graph.new_node(StatType::new_simple(
             StatCode::Assign(1, OpSrc::ReadRef),
-            scan_store_node,
+            scan_fmt_set_node,
+        ));
+        let scan_store_node = graph.new_node(StatType::new_simple(
+            StatCode::Store(OpSrc::ReadRef, 0, Size::DWord),
+            scan_set_ref,
         ));
 
-        match_graph(start_node, scan_set_ref);
+        match_graph(start_node, scan_store_node);
     }
 
     #[test]
@@ -1124,7 +1127,7 @@ mod tests {
             &Options {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
-                propagation: PropagationOpt::None,
+                const_propagation: false,
                 inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
@@ -1139,45 +1142,37 @@ mod tests {
             .expect("Multiple references to the graph")
             .into_inner();
         let loop_node = graph.new_node(StatType::new_loop());
-        let return_node = graph.new_node(StatType::new_return(Some(1)));
+        let return_node = graph.new_node(StatType::new_return(Some(OpSrc::Var(1))));
         let return_assign_node = graph.new_node(StatType::new_simple(
             StatCode::Assign(1, OpSrc::Var(0)),
             return_node,
         ));
-        let branch3_node = graph.new_node(StatType::new_branch(1, loop_node.clone(), loop_node));
-        let branch3_cond_set_node = graph.new_node(StatType::new_simple(
-            StatCode::Assign(1, OpSrc::Const(1)),
-            branch3_node,
+        let branch3_node = graph.new_node(StatType::new_branch(
+            OpSrc::Const(1),
+            loop_node.clone(),
+            loop_node,
         ));
         let branch2_node = graph.new_node(StatType::new_branch(
-            1,
+            OpSrc::Var(1),
             return_assign_node,
-            branch3_cond_set_node,
+            branch3_node,
         ));
         let branch2_cond_set_node = graph.new_node(StatType::new_simple(
             StatCode::Assign(1, OpSrc::Var(0)),
             branch2_node,
         ));
         let branch1_node = graph.new_node(StatType::deleted());
-        let branch1_cond_set_node = graph.new_node(StatType::new_simple(
-            StatCode::Assign(1, OpSrc::Const(1)),
+        let var_set_node = graph.new_node(StatType::new_simple(
+            StatCode::Assign(0, OpSrc::Const(1)),
             branch1_node.clone(),
         ));
-        let var_set_node = graph.new_node(StatType::new_simple(
-            StatCode::Assign(0, OpSrc::Var(1)),
-            branch1_cond_set_node,
-        ));
-        let tmp_var_set_node = graph.new_node(StatType::new_simple(
-            StatCode::Assign(1, OpSrc::Const(1)),
-            var_set_node,
-        ));
         branch1_node.set(StatType::new_branch(
-            1,
-            tmp_var_set_node.clone(),
+            OpSrc::Const(1),
+            var_set_node.clone(),
             branch2_cond_set_node,
         ));
 
-        match_graph(start_node, tmp_var_set_node);
+        match_graph(start_node, var_set_node);
     }
 
     #[test]
@@ -1206,7 +1201,7 @@ mod tests {
             &Options {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
-                propagation: PropagationOpt::None,
+                const_propagation: false,
                 inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
@@ -1219,12 +1214,8 @@ mod tests {
         assert_eq!(args, vec![0]);
         assert!(!read_ref);
 
-        let return_node = graph.new_node(StatType::new_return(Some(2)));
-        let return_assign_node = graph.new_node(StatType::new_simple(
-            StatCode::Assign(2, OpSrc::Const(0)),
-            return_node,
-        ));
-        match_graph(code, return_assign_node);
+        let return_node = graph.new_node(StatType::new_return(Some(OpSrc::Const(0))));
+        match_graph(code, return_node);
     }
 
     #[test]
@@ -1249,7 +1240,7 @@ mod tests {
             &Options {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
-                propagation: PropagationOpt::None,
+                const_propagation: false,
                 inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
@@ -1290,7 +1281,7 @@ mod tests {
             &Options {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
-                propagation: PropagationOpt::None,
+                const_propagation: false,
                 inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,

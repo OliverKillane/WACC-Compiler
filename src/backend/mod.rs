@@ -1,30 +1,24 @@
 mod arm;
+mod const_prop;
 mod data_flow;
 mod inlining;
 mod same_branch;
 mod tail_call_optimisation;
 mod three_code;
 
+use self::const_prop::prop_consts;
+use self::tail_call_optimisation::tail_call_optimise;
 use crate::intermediate::Program;
 use arm::ArmResult;
 use inlining::inline;
 use same_branch::same_branch_optimization;
 use three_code::ThreeCode;
 
-use self::tail_call_optimisation::tail_call_optimise;
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum PropagationOpt {
-    Symbolic,
-    Constant,
-    None,
-}
-
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Options {
     pub sethi_ullman_weights: bool,
     pub dead_code_removal: bool,
-    pub propagation: PropagationOpt,
+    pub const_propagation: bool,
     pub inlining: Option<usize>,
     pub tail_call: bool,
     pub hoisting: bool,
@@ -45,11 +39,12 @@ pub fn compile(program: Program, options: Options) -> BackendOutput {
     if let Some(instructions_limit) = options.inlining {
         three_code = inline(three_code, instructions_limit);
     }
-
     if options.tail_call {
-        three_code = tail_call_optimise(three_code)
+        three_code = tail_call_optimise(three_code);
     }
-
+    if options.const_propagation {
+        three_code = prop_consts(three_code);
+    }
     #[cfg(debug_assertions)]
     three_code
         .check_dummy()

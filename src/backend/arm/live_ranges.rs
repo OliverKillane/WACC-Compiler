@@ -49,14 +49,14 @@ fn live_init(node: &ArmNode) -> (LiveAnalysis, LiveAnalysis) {
 
 fn live_update(
     _: Vec<&LiveAnalysis>,
-    live_in: LiveAnalysis,
+    live_in: &LiveAnalysis,
     node: &ArmNode,
-    live_out: LiveAnalysis,
+    live_out: &LiveAnalysis,
     succ_live_in: Vec<&LiveAnalysis>,
 ) -> (LiveAnalysis, LiveAnalysis, bool) {
     let (new_live_in, new_live_out) = if succ_live_in.len() == 1 {
-        if succ_live_in[0] == &live_out {
-            return (live_in, live_out, false);
+        if succ_live_in[0] == live_out {
+            return (live_in.clone(), live_out.clone(), false);
         } else {
             let new_live_out = succ_live_in[0].clone();
             (construct_live_in(node, new_live_out.clone()), new_live_out)
@@ -76,7 +76,7 @@ fn live_update(
         ));
         (construct_live_in(node, new_live_out.clone()), new_live_out)
     };
-    let updated = live_in != new_live_in || live_out != new_live_out;
+    let updated = live_in != &new_live_in || live_out != &new_live_out;
     (new_live_in, new_live_out, updated)
 }
 

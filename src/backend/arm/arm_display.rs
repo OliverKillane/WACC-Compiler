@@ -197,7 +197,15 @@ impl Display for MemOperand {
             match self {
                 MemOperand::Zero(reg) => format!("[{}]", reg),
                 MemOperand::PreIndex(reg, flex) => format!("[{}, {}]", reg, flex),
-                MemOperand::Label(label) => format!("={}", display_data_ref(*label)),
+                MemOperand::Label(label, offset) => format!(
+                    "={}{}",
+                    display_data_ref(*label),
+                    if *offset == 0 {
+                        String::new()
+                    } else {
+                        format!(" + {}", offset)
+                    }
+                ),
                 MemOperand::Expression(expr) => format!("={}", expr),
             }
         )
