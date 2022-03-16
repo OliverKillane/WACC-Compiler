@@ -15,18 +15,18 @@ mod ../../../../../stdlib/math.wacc;
 begin
     int test = call min(3, 5) ;
     println test ;
-    test = call min (-1, 12) ;
+    test = call min(-1, 12) ;
     println test ;
-    test = call min (21, 21) ;
+    test = call min(21, 21) ;
     println test ;
-    test = call min (-21, -21) ;
+    test = call min(-21, -21) ;
     println test ;
-    test = call min (-12, -5) ;
+    test = call min(-12, -5) ;
     println test ;
-    test = call min (-4, 0) ;
+    test = call min(-4, 0) ;
     println test ;
-    test = call min (10, 0) ;
+    test = call min(10, 0) ;
     println test ;
-    test = call min (0, 0) ;
+    test = call min(0, 0) ;
     println test
 end

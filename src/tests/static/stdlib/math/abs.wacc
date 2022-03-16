@@ -10,8 +10,8 @@ mod ../../../../../stdlib/math.wacc;
 begin
     int test = call abs(-5) ;
     println test ;
-    test = call abs (5) ;
+    test = call abs(5) ;
     println test ;
-    test = call abs (0) ;
+    test = call abs(0) ;
     println test
 end

@@ -15,18 +15,18 @@ mod ../../../../../stdlib/math.wacc;
 begin
     int test = call max(3, 5) ;
     println test ;
-    test = call max (-1, 12) ;
+    test = call max(-1, 12) ;
     println test ;
-    test = call max (21, 21) ;
+    test = call max(21, 21) ;
     println test ;
-    test = call max (-21, -21) ;
+    test = call max(-21, -21) ;
     println test ;
-    test = call max (-12, -5) ;
+    test = call max(-12, -5) ;
     println test ;
-    test = call max (-4, 0) ;
+    test = call max(-4, 0) ;
     println test ;
-    test = call max (10, 0) ;
+    test = call max(10, 0) ;
     println test ;
-    test = call max (0, 0) ;
+    test = call max(0, 0) ;
     println test
 end
