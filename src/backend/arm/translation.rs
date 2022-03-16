@@ -15,9 +15,7 @@ use super::{
     super::three_code::{
         BinOp, DataRefType, Function, OpSrc, Size, StatCode, StatNode, StatType, ThreeCode,
     },
-    arm_graph_utils::{
-        is_8_bit, link_chains, link_stats, link_two_chains, link_two_nodes, simple_node, Chain,
-    },
+    arm_graph_utils::{is_8_bit, link_chains, link_two_chains, link_two_nodes, simple_node, Chain},
     arm_repr::{
         ArmCode, ArmNode, CmpOp, Cond, ControlFlow, Data, DataIdent, DataType, FlexOperand, Ident,
         MemOp, MemOperand, MovOp, MulOp, RegOp, Shift, Stat, Subroutine, Temporary,
@@ -470,6 +468,151 @@ fn opsrc_to_temp(
     }
 }
 
+/// Load compare two [op sources](OpSrc), applying a different comparison if the
+/// operands are swapped in order.
+#[allow(clippy::too_many_arguments)]
+fn cmp_two_opsrc(
+    arm_dst_temp: Ident,
+    first_op: &OpSrc,
+    second_op: &OpSrc,
+    swapped: Cond,
+    not_swapped: Cond,
+    nodes: &mut Vec<Chain>,
+    graph: &mut Graph<ControlFlow>,
+    temp_map: &mut TempMap,
+) {
+    let othertemp = temp_map.get_new_temp();
+    nodes.push(simple_node(
+        Stat::Move(MovOp::Mov, Cond::Al, false, othertemp, FlexOperand::Imm(0)),
+        graph,
+    ));
+
+    let src_swapped = match (first_op, second_op) {
+        (OpSrc::Const(i @ 0..=255), opsrc) => {
+            let arg_temp = opsrc_to_reg(opsrc, nodes, temp_map, graph);
+
+            nodes.push(simple_node(
+                Stat::Cmp(CmpOp::Cmp, Cond::Al, arg_temp, FlexOperand::Imm(*i as u32)),
+                graph,
+            ));
+            true
+        }
+        (opsrc, OpSrc::Const(i @ 0..=255)) => {
+            let arg_temp = opsrc_to_reg(opsrc, nodes, temp_map, graph);
+
+            nodes.push(simple_node(
+                Stat::Cmp(CmpOp::Cmp, Cond::Al, arg_temp, FlexOperand::Imm(*i as u32)),
+                graph,
+            ));
+            false
+        }
+        (arg1_opsrc, arg2_opsrc) => {
+            let arg1_temp = opsrc_to_reg(arg1_opsrc, nodes, temp_map, graph);
+            let arg2_temp = opsrc_to_reg(arg2_opsrc, nodes, temp_map, graph);
+
+            nodes.push(simple_node(
+                Stat::Cmp(
+                    CmpOp::Cmp,
+                    Cond::Al,
+                    arg1_temp,
+                    FlexOperand::ShiftReg(arg2_temp, None),
+                ),
+                graph,
+            ));
+            false
+        }
+    };
+
+    nodes.push(simple_node(
+        Stat::Move(
+            MovOp::Mov,
+            if src_swapped { swapped } else { not_swapped },
+            false,
+            othertemp,
+            FlexOperand::Imm(1),
+        ),
+        graph,
+    ));
+    nodes.push(simple_node(
+        Stat::Move(
+            MovOp::Mov,
+            Cond::Al,
+            false,
+            arm_dst_temp,
+            FlexOperand::ShiftReg(othertemp, None),
+        ),
+        graph,
+    ));
+}
+
+/// Apply an associative operation on two [op sources](OpSrc) (can swap the
+/// operands order), adding an overflow check if checkable.
+#[allow(clippy::too_many_arguments)]
+fn apply_associative(
+    arm_dst_temp: Ident,
+    first_op: &OpSrc,
+    second_op: &OpSrc,
+    op: RegOp,
+    int_handler: Option<&String>,
+    nodes: &mut Vec<Chain>,
+    graph: &mut Graph<ControlFlow>,
+    temp_map: &mut TempMap,
+) {
+    match (first_op, second_op) {
+        (OpSrc::Const(i @ 0..=255), src) | (src, OpSrc::Const(i @ 0..=255)) => {
+            let arg_temp = opsrc_to_reg(src, nodes, temp_map, graph);
+            nodes.push(simple_node(
+                Stat::ApplyOp(
+                    op,
+                    Cond::Al,
+                    int_handler.is_some(),
+                    arm_dst_temp,
+                    arg_temp,
+                    FlexOperand::Imm(*i as u32),
+                ),
+                graph,
+            ))
+        }
+        (opsrc1, opsrc2) => {
+            let arg1_temp = opsrc_to_reg(opsrc1, nodes, temp_map, graph);
+            let arg2_temp = opsrc_to_reg(opsrc2, nodes, temp_map, graph);
+            nodes.push(simple_node(
+                Stat::ApplyOp(
+                    op,
+                    Cond::Al,
+                    int_handler.is_some(),
+                    arm_dst_temp,
+                    arg1_temp,
+                    FlexOperand::ShiftReg(arg2_temp, None),
+                ),
+                graph,
+            ))
+        }
+    }
+
+    if let Some(overflow_handler) = int_handler {
+        nodes.push(simple_node(
+            Stat::Link(Cond::Vs, overflow_handler.clone()),
+            graph,
+        ))
+    }
+}
+
+/// Place an [op source](OpSrc) into a temporary, returning it, and adding to a
+/// list of existing nodes if necessary
+fn opsrc_to_reg(
+    opsrc: &OpSrc,
+    nodes: &mut Vec<Chain>,
+    temp_map: &mut TempMap,
+    graph: &mut Graph<ControlFlow>,
+) -> Ident {
+    let (arm_temp, opsrc_chain) = opsrc_to_temp(opsrc, temp_map, graph);
+    if let Some(chain) = opsrc_chain {
+        nodes.push(chain);
+    }
+    arm_temp
+}
+
 /// Translates a three-code statement, returning the start and end nodes of the
 /// statement's graph.
 fn translate_statcode(
@@ -507,200 +650,164 @@ fn translate_statcode(
             let arm_dst_temp = temp_map.use_temp(*three_temp_dst);
             let mut nodes = Vec::new();
 
-            let mut opsrc_to_reg = |opsrc: &OpSrc| {
-                let (arm_temp, opsrc_chain) = opsrc_to_temp(opsrc, temp_map, graph);
-                if let Some(chain) = opsrc_chain {
-                    nodes.push(chain);
-                }
-                arm_temp
-            };
-
-            let left_reg = opsrc_to_reg(first_op);
-            let right_reg = opsrc_to_reg(second_op);
-
-            let mut compare_op = |cond: Cond, graph| {
-                let othertemp = temp_map.get_new_temp();
-                // Move 0 into the register, then compare, if equal set to 1
-                // MOV arm_dst_temp, #0
-                // CMP left_reg, right_reg
-                // MOV(cond) arm_dst_temp, #1
-                link_stats(
-                    vec![
-                        Stat::Move(MovOp::Mov, Cond::Al, false, othertemp, FlexOperand::Imm(0)),
-                        Stat::Cmp(
-                            CmpOp::Cmp,
-                            Cond::Al,
-                            left_reg,
-                            FlexOperand::ShiftReg(right_reg, None),
-                        ),
-                        Stat::Move(MovOp::Mov, cond, false, othertemp, FlexOperand::Imm(1)),
-                        Stat::Move(
-                            MovOp::Mov,
-                            Cond::Al,
-                            false,
-                            arm_dst_temp,
-                            FlexOperand::ShiftReg(othertemp, None),
-                        ),
-                    ],
+            let mut cmp_op = |swapped: Cond, not_swapped: Cond| {
+                cmp_two_opsrc(
+                    arm_dst_temp,
+                    first_op,
+                    second_op,
+                    swapped,
+                    not_swapped,
+                    &mut nodes,
                     graph,
+                    temp_map,
                 )
             };
 
-            let basic_apply_op = |op: RegOp, graph| {
-                simple_node(
-                    Stat::ApplyOp(
-                        op,
-                        Cond::Al,
-                        false,
-                        arm_dst_temp,
-                        left_reg,
-                        FlexOperand::ShiftReg(right_reg, None),
-                    ),
+            let assoc_op = |op: RegOp,
+                            handler: Option<&String>,
+                            nodes: &mut Vec<Chain>,
+                            graph: &mut Graph<ControlFlow>,
+                            temp_map: &mut TempMap| {
+                apply_associative(
+                    arm_dst_temp,
+                    first_op,
+                    second_op,
+                    op,
+                    handler,
+                    nodes,
                     graph,
+                    temp_map,
                 )
             };
 
-            nodes.push(match binop {
-                BinOp::Add => {
-                    // Perform the addition operation, if there is an overflow
-                    // handler, then if overflow occurs, branch to it
-                    if let Some(overflow_handler) = int_handler && *checked {
-                        // ADDS arm_dst_reg, left_reg, right_reg
-                        // BLVS overflow_handler
-                        let addition = simple_node(
-                            Stat::ApplyOp(
-                                RegOp::Add,
-                                Cond::Al,
-                                true,
-                                arm_dst_temp,
-                                left_reg,
-                                FlexOperand::ShiftReg(right_reg, None),
-                            ),
-                            graph,
-                        );
-                        let check =
-                            simple_node(Stat::Link(Cond::Vs, overflow_handler.clone()), graph);
-                        link_two_chains(addition, check)
-                    } else {
-                        // ADD arm_dst_temp, left_reg, right_reg
-                        simple_node(
-                            Stat::ApplyOp(
-                                RegOp::Add,
-                                Cond::Al,
-                                false,
-                                arm_dst_temp,
-                                left_reg,
-                                FlexOperand::ShiftReg(right_reg, None),
-                            ),
-                            graph,
-                        )
-                    }
-                }
+            match binop {
+                BinOp::Add => assoc_op(
+                    RegOp::Add,
+                    if *checked { int_handler } else { None },
+                    &mut nodes,
+                    graph,
+                    temp_map,
+                ),
                 BinOp::Sub => {
+                    match (first_op, second_op) {
+                        (src, OpSrc::Const(i @ 0..=255)) => {
+                            let arg_ident = opsrc_to_reg(src, &mut nodes, temp_map, graph);
+                            nodes.push(simple_node(
+                                Stat::ApplyOp(
+                                    RegOp::Sub,
+                                    Cond::Al,
+                                    *checked,
+                                    arm_dst_temp,
+                                    arg_ident,
+                                    FlexOperand::Imm(*i as u32),
+                                ),
+                                graph,
+                            ))
+                        }
+                        (OpSrc::Const(i @ 0..=255), src) => {
+                            let arg_ident = opsrc_to_reg(src, &mut nodes, temp_map, graph);
+                            nodes.push(simple_node(
+                                Stat::ApplyOp(
+                                    RegOp::Rsb,
+                                    Cond::Al,
+                                    *checked,
+                                    arm_dst_temp,
+                                    arg_ident,
+                                    FlexOperand::Imm(*i as u32),
+                                ),
+                                graph,
+                            ))
+                        }
+                        (opsrc1, opsrc2) => {
+                            let arg1_temp = opsrc_to_reg(opsrc1, &mut nodes, temp_map, graph);
+                            let arg2_temp = opsrc_to_reg(opsrc2, &mut nodes, temp_map, graph);
+                            nodes.push(simple_node(
+                                Stat::ApplyOp(
+                                    RegOp::Sub,
+                                    Cond::Al,
+                                    *checked,
+                                    arm_dst_temp,
+                                    arg1_temp,
+                                    FlexOperand::ShiftReg(arg2_temp, None),
+                                ),
+                                graph,
+                            ))
+                        }
+                    }
+
                     if let Some(overflow_handler) = int_handler && *checked {
-                        // SUBS arm_dst_temp, left_reg, right_reg
-                        // BLVS overflow_handler
-                        let subtraction = simple_node(
-                            Stat::ApplyOp(
-                                RegOp::Sub,
-                                Cond::Al,
-                                true,
-                                arm_dst_temp,
-                                left_reg,
-                                FlexOperand::ShiftReg(right_reg, None),
-                            ),
-                            graph,
-                        );
-                        let check =
-                            simple_node(Stat::Link(Cond::Vs, overflow_handler.clone()), graph);
-                        link_two_chains(subtraction, check)
-                    } else {
-                        // SUB arm_dst_temp, left_reg, right_reg
-                        simple_node(
-                            Stat::ApplyOp(
-                                RegOp::Sub,
-                                Cond::Al,
-                                false,
-                                arm_dst_temp,
-                                left_reg,
-                                FlexOperand::ShiftReg(right_reg, None),
-                            ),
-                            graph,
-                        )
+                        nodes.push(simple_node(Stat::Link(Cond::Vs, overflow_handler.clone()), graph))
                     }
                 }
                 BinOp::Mul => {
+                    let arg1_temp = opsrc_to_reg(first_op, &mut nodes, temp_map, graph);
+                    let arg2_temp = opsrc_to_reg(second_op, &mut nodes, temp_map, graph);
+
                     if let Some(overflow_handler) = int_handler && *checked {
-                        // SMULL holder_temp, arm_dst_temp, left_reg, right_reg
-                        // CMP arm_dst_temp, holder_temp, ASR #31
-                        // BLNE overflow_fun
                         let holder_temp = temp_map.get_new_temp();
-                        link_stats(
-                            vec![
-                                Stat::MulOp(
-                                    MulOp::SMulL,
-                                    Cond::Al,
-                                    true,
-                                    arm_dst_temp,
-                                    holder_temp,
-                                    left_reg,
-                                    right_reg,
-                                ),
-                                Stat::Cmp(
-                                    CmpOp::Cmp,
-                                    Cond::Al,
-                                    holder_temp,
-                                    FlexOperand::ShiftReg(
-                                        arm_dst_temp,
-                                        Some(Shift::Asr(31.into())),
-                                    ),
-                                ),
-                                Stat::Link(Cond::Ne, overflow_handler.clone()),
-                            ],
-                            graph,
-                        )
+
+                        nodes.push(simple_node(Stat::MulOp(
+                            MulOp::SMulL,
+                            Cond::Al,
+                            true,
+                            arm_dst_temp,
+                            holder_temp,
+                            arg1_temp,
+                            arg2_temp,
+                        ), graph));
+                        nodes.push(simple_node(Stat::Cmp(
+                            CmpOp::Cmp,
+                            Cond::Al,
+                            holder_temp,
+                            FlexOperand::ShiftReg(
+                                arm_dst_temp,
+                                Some(Shift::Asr(31.into())),
+                            ),
+                        ), graph));
+                        nodes.push(simple_node(Stat::Link(Cond::Ne, overflow_handler.clone()), graph))
                     } else {
-                        // MUL arm_dst_temp, left_reg, right_reg
-                        simple_node(
-                            Stat::Mul(Cond::Al, false, arm_dst_temp, left_reg, right_reg),
+                        nodes.push(simple_node(
+                            Stat::Mul(Cond::Al, false, arm_dst_temp, arg1_temp, arg2_temp),
                             graph,
-                        )
+                        ))
                     }
                 }
-                BinOp::Div =>
-                // CALL to the standard library function for division
-                {
-                    simple_node(
+                BinOp::Div => {
+                    let arg1_temp = opsrc_to_reg(first_op, &mut nodes, temp_map, graph);
+                    let arg2_temp = opsrc_to_reg(second_op, &mut nodes, temp_map, graph);
+
+                    nodes.push(simple_node(
                         Stat::Call(
                             String::from("__aeabi_idiv"),
                             Some(arm_dst_temp.get_temp()),
-                            vec![left_reg.get_temp(), right_reg.get_temp()],
+                            vec![arg1_temp.get_temp(), arg2_temp.get_temp()],
                         ),
                         graph,
-                    )
+                    ))
                 }
-                BinOp::Mod =>
-                // CALL to the standard library function for modulus
-                {
-                    simple_node(
+                BinOp::Mod => {
+                    let arg1_temp = opsrc_to_reg(first_op, &mut nodes, temp_map, graph);
+                    let arg2_temp = opsrc_to_reg(second_op, &mut nodes, temp_map, graph);
+
+                    nodes.push(simple_node(
                         Stat::Call(
                             String::from("__modsi3"),
                             Some(arm_dst_temp.get_temp()),
-                            vec![left_reg.get_temp(), right_reg.get_temp()],
+                            vec![arg1_temp.get_temp(), arg2_temp.get_temp()],
                         ),
                         graph,
-                    )
+                    ))
                 }
-                BinOp::Eq => compare_op(Cond::Eq, graph),
-                BinOp::Ne => compare_op(Cond::Ne, graph),
-                BinOp::Gt => compare_op(Cond::Gt, graph),
-                BinOp::Gte => compare_op(Cond::Ge, graph),
-                BinOp::Lt => compare_op(Cond::Lt, graph),
-                BinOp::Lte => compare_op(Cond::Le, graph),
-                BinOp::And => basic_apply_op(RegOp::And, graph),
-                BinOp::Or => basic_apply_op(RegOp::Orr, graph),
-                BinOp::Xor => basic_apply_op(RegOp::Eor, graph),
-            });
+                BinOp::Eq => cmp_op(Cond::Eq, Cond::Eq),
+                BinOp::Ne => cmp_op(Cond::Ne, Cond::Ne),
+                BinOp::Gt => cmp_op(Cond::Lt, Cond::Gt),
+                BinOp::Gte => cmp_op(Cond::Le, Cond::Ge),
+                BinOp::Lt => cmp_op(Cond::Gt, Cond::Lt),
+                BinOp::Lte => cmp_op(Cond::Ge, Cond::Le),
+                BinOp::And => assoc_op(RegOp::And, None, &mut nodes, graph, temp_map),
+                BinOp::Or => assoc_op(RegOp::Orr, None, &mut nodes, graph, temp_map),
+                BinOp::Xor => assoc_op(RegOp::Eor, None, &mut nodes, graph, temp_map),
+            };
 
             link_chains(nodes).expect("Had more than one statement")
         }
