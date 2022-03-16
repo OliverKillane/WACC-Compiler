@@ -27,6 +27,7 @@ use nom_supreme::{
     multi::collect_separated_terminated,
     ParserExt,
 };
+use rayon::prelude::*;
 use std::{
     collections::{HashMap, LinkedList},
     iter::zip,
@@ -65,9 +66,8 @@ pub fn parse<'a>(
 ) -> Result<Program<&'a str, &'a str>, Summary<'a>> {
     let main_semantic_info = final_parser(parse_program)(main_input);
     let module_semantic_infos = module_inputs
-        .iter()
-        .cloned()
-        .map(final_parser(parse_module))
+        .par_iter()
+        .map(|source| final_parser(parse_module)(source))
         .collect::<LinkedList<_>>();
     let mut error_trees = Vec::new();
     let ast = match main_semantic_info {
