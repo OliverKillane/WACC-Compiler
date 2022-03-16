@@ -6,7 +6,6 @@ begin
 
     # Print the given integer array
     void print_int_array(string ident, int[] arr) is
-
         int arr_len = len arr ;
         if (arr_len == 0) then 
             print ident ;
@@ -23,12 +22,10 @@ begin
             print arr[i] ;
             println "]" ;
         fi 
-
     end
 
     # Print the given boolean array
-    void print_bool_array(string ident, bool[] arr) is
-        
+    void print_bool_array(string ident, bool[] arr) is 
         int arr_len = len arr ;
         if (arr_len == 0) then 
             print ident ;
@@ -45,12 +42,10 @@ begin
             print arr[i] ;
             println "]" ;
         fi 
-
     end
 
     # Print the given characater array
-    void print_char_array(string ident, char[] arr) is
-        
+    void print_char_array(string ident, char[] arr) is   
         int arr_len = len arr ;
         if (arr_len == 0) then 
             print ident ;
@@ -67,7 +62,6 @@ begin
             print arr[i] ;
             println "]" ;
         fi 
-
     end
 
     ##### ARRAY FILL FUNCTIONS #####
