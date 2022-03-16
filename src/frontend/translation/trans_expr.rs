@@ -66,7 +66,9 @@ pub(super) fn translate_expr(
             ast::Type::String | ast::Type::Pair(_, _) | ast::Type::Array(_, _) => {
                 ir::Expr::Ptr(ir::PtrExpr::Var(var))
             }
-            ast::Type::Generic(_) | ast::Type::Any => panic!("Expected a concrete type"),
+            ast::Type::Generic(_) | ast::Type::Any | ast::Type::Void => {
+                panic!("Expected a concrete type")
+            }
         },
 
         Expr::ArrayElem(var, mut indices) => {
@@ -145,7 +147,9 @@ pub(super) fn translate_expr(
                         ],
                     )))
                 }
-                ast::Type::Generic(_) | ast::Type::Any => panic!("Expected a concrete type"),
+                ast::Type::Generic(_) | ast::Type::Any | ast::Type::Void => {
+                    panic!("Expected a concrete type")
+                }
             }
         }
 
@@ -191,7 +195,7 @@ pub(super) fn translate_expr(
                         ast::Type::Array(_, _) | ast::Type::Pair(_, _) | ast::Type::String => {
                             ir::Expr::Ptr(ir::PtrExpr::Deref(box ptr))
                         }
-                        ast::Type::Generic(_) | ast::Type::Any => {
+                        ast::Type::Generic(_) | ast::Type::Any | ast::Type::Void => {
                             panic!("Expected a concrete type")
                         }
                     }
@@ -213,7 +217,7 @@ pub(super) fn translate_expr(
                         ast::Type::Array(_, _) | ast::Type::Pair(_, _) | ast::Type::String => {
                             ir::Expr::Ptr(ir::PtrExpr::Deref(box offset_ptr))
                         }
-                        ast::Type::Generic(_) | ast::Type::Any => {
+                        ast::Type::Generic(_) | ast::Type::Any | ast::Type::Void => {
                             panic!("Expected a concrete type")
                         }
                     }

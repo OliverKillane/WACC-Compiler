@@ -1,0 +1,14 @@
+# simple use of void function call to print a string
+
+# Output:
+# The answer is 42
+
+# Program:
+
+begin
+  void print_a(int a) is 
+    println a
+  end
+
+  int a = call print_a(5)
+end

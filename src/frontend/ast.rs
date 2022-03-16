@@ -25,6 +25,9 @@ pub type GenericId = u64;
 /// Type specification in WACC.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Type {
+    /// Void function type
+    Void,
+
     /// Integer primitive type.
     Int,
 
@@ -466,7 +469,7 @@ pub enum Stat<W, IdRepr> {
     ///     return 2 * b
     /// end
     /// ```
-    Return(ExprWrap<W, IdRepr>),
+    Return(Option<ExprWrap<W, IdRepr>>),
 
     /// End the program and return the exit code.
     /// ```text
@@ -521,6 +524,14 @@ pub enum Stat<W, IdRepr> {
     /// end ;
     /// ```
     Block(Vec<StatWrap<W, IdRepr>>),
+
+    /// Void function call
+    /// ```text
+    /// begin
+    ///     call print_hello_world()
+    /// end ;
+    /// ```
+    VoidCall(ASTWrapper<W, String>, Vec<ExprWrap<W, IdRepr>>),
 }
 
 /// Alias for WarpSpans around statements

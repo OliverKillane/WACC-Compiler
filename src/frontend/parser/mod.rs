@@ -313,6 +313,20 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str, &str>, ErrorTree<&str>> {
         .context("If Statement"),
     );
 
+    let call = context(
+        "Function call",
+        delimited(
+            Lexer::Call.parser(),
+            separated_pair(
+                parse_ident,
+                Lexer::OpenParen.parser(),
+                separated_list0(Lexer::Comma.parser(), parse_expr).cut(),
+            )
+            .cut(),
+            Lexer::CloseParen.parser(),
+        ),
+    );
+
     context(
         "Statement",
         alt((
@@ -327,14 +341,13 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str, &str>, ErrorTree<&str>> {
             ),
             preceded(Lexer::Read.parser(), map(parse_lhs.cut(), Stat::Read)),
             preceded(Lexer::Free.parser(), map(parse_expr.cut(), Stat::Free)),
-            preceded(Lexer::Return.parser(), map(parse_expr.cut(), Stat::Return)),
+            preceded(Lexer::Return.parser(), map(opt(parse_expr), Stat::Return)),
             preceded(Lexer::Exit.parser(), map(parse_expr.cut(), Stat::Exit)),
             preceded(
                 Lexer::Println.parser(),
                 map(parse_expr.cut(), Stat::PrintLn),
             ),
             preceded(Lexer::Print.parser(), map(parse_expr.cut(), Stat::Print)),
-            preceded(Lexer::Return.parser(), map(parse_expr.cut(), Stat::Return)),
             map(parse_if, |((e, st), sf)| Stat::If(e, st, sf)),
             map(parse_while, |(e, s)| Stat::While(e, s)),
             preceded(
@@ -348,6 +361,9 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str, &str>, ErrorTree<&str>> {
                     |(lhs, rhs)| Stat::Assign(lhs, rhs),
                 ),
             ),
+            map(call, |(id, es)| {
+                Stat::VoidCall(ASTWrapper(id, id.into()), es)
+            }),
         )),
     )(input)
 }
@@ -451,6 +467,7 @@ fn parse_pair_elem_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
 /// Parser for the [Type] AST node.
 fn parse_base_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     ws(alt((
+        value(Type::Void, Lexer::Void.parser()),
         value(Type::Int, Lexer::Int.parser()),
         value(Type::Bool, Lexer::Bool.parser()),
         value(Type::Char, Lexer::Char.parser()),
