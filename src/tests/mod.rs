@@ -235,6 +235,7 @@ fn all_types_test() {
 #[case("static/pairsExtended")]
 #[case("static/while")]
 #[case("static/voidCalls")]
+#[case("static/stdlib")]
 fn examples_test(
     #[case] path: &str,
     #[values(true, false)] dead_code_removal: bool,
