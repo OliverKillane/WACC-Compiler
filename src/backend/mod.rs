@@ -8,24 +8,17 @@ mod three_code;
 
 use self::const_prop::prop_consts;
 use self::tail_call_optimisation::tail_call_optimise;
-use crate::{backend::three_code::hashed, intermediate::Program};
+use crate::intermediate::Program;
 use arm::ArmResult;
 use inlining::inline;
 use same_branch::same_branch_optimization;
 use three_code::ThreeCode;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum PropagationOpt {
-    Symbolic,
-    Constant,
-    None,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Options {
     pub sethi_ullman_weights: bool,
     pub dead_code_removal: bool,
-    pub propagation: PropagationOpt,
+    pub const_propagation: bool,
     pub inlining: Option<usize>,
     pub tail_call: bool,
     pub hoisting: bool,

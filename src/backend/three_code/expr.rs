@@ -501,10 +501,7 @@ pub(super) fn translate_expr(
 #[cfg(test)]
 mod tests {
     use super::{
-        super::{
-            super::{Options, PropagationOpt},
-            OpSrc, Size, StatCode, StatType,
-        },
+        super::{super::Options, OpSrc, Size, StatCode, StatType},
         translate_expr,
     };
     use crate::{
@@ -535,7 +532,7 @@ mod tests {
                 &Options {
                     sethi_ullman_weights: false,
                     dead_code_removal: false,
-                    propagation: PropagationOpt::None,
+                    const_propagation: false,
                     inlining: Some(1000),
                     tail_call: false,
                     hoisting: false,

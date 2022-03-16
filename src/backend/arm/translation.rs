@@ -19,11 +19,9 @@ use super::{
         is_8_bit, link_chains, link_stats, link_two_chains, link_two_nodes, simple_node, Chain,
     },
     arm_repr::{
-        ArmCode, ArmNode, CmpOp, Cond, ControlFlow, Data, DataIdent, DataType, FlexOffset,
-        FlexOperand, Ident, MemOp, MemOperand, MovOp, MulOp, RegOp, Shift, Stat, Subroutine,
-        Temporary,
+        ArmCode, ArmNode, CmpOp, Cond, ControlFlow, Data, DataIdent, DataType, FlexOperand, Ident,
+        MemOp, MemOperand, MovOp, MulOp, RegOp, Shift, Stat, Subroutine, Temporary,
     },
-    int_constraints::ConstrainedInt,
 };
 
 use std::collections::{HashMap, HashSet};
@@ -422,7 +420,6 @@ fn dataref_to_reg(
     dst_ident: Ident,
     data_ident: DataIdent,
     offset: i32,
-    temp_map: &mut TempMap,
     graph: &mut Graph<ControlFlow>,
 ) -> Chain {
     // LDR dst_ident, =data_ident + offset
@@ -458,7 +455,6 @@ fn opsrc_to_temp(
                     new_temp,
                     convert_data_ref(*dataref),
                     *offset,
-                    temp_map,
                     graph,
                 )),
             )
@@ -487,13 +483,9 @@ fn translate_statcode(
             let arm_temp = temp_map.use_temp(*three_temp);
             match opsrc {
                 OpSrc::Const(i) => const_to_reg(arm_temp, *i, graph),
-                OpSrc::DataRef(dataref, offset) => dataref_to_reg(
-                    arm_temp,
-                    convert_data_ref(*dataref),
-                    *offset,
-                    temp_map,
-                    graph,
-                ),
+                OpSrc::DataRef(dataref, offset) => {
+                    dataref_to_reg(arm_temp, convert_data_ref(*dataref), *offset, graph)
+                }
                 OpSrc::Var(other_three_temp) => {
                     // Mov arm_tep other_arm_temp
                     let other_arm_temp = temp_map.use_temp(*other_three_temp);

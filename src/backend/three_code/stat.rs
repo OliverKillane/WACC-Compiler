@@ -376,10 +376,7 @@ pub(super) fn translate_statement(
 
 #[cfg(test)]
 pub(super) mod tests {
-    use super::super::{
-        super::{Options, PropagationOpt},
-        DataRefType, OpSrc, Size, StatCode, StatNode, StatType,
-    };
+    use super::super::{super::Options, DataRefType, OpSrc, Size, StatCode, StatNode, StatType};
     use super::translate_statement;
     use crate::{
         backend::three_code::{stat::FmtDataRefFlags, StatLine},
@@ -478,7 +475,7 @@ pub(super) mod tests {
             &Options {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
-                propagation: PropagationOpt::None,
+                const_propagation: false,
                 inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
@@ -680,7 +677,7 @@ pub(super) mod tests {
             &Options {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
-                propagation: PropagationOpt::None,
+                const_propagation: false,
                 inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,

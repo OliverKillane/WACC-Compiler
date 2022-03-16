@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::backend::{compile, Options, PropagationOpt};
+use crate::backend::{compile, Options};
 use crate::frontend::{analyse, gather_modules};
 use glob::glob;
 use indoc::indoc;
@@ -266,7 +266,7 @@ fn compiler_test(filename: &str, input: String, output: Behaviour, _exit_code: O
     let options = Options {
         sethi_ullman_weights: false,
         dead_code_removal: false,
-        propagation: PropagationOpt::None,
+        const_propagation: false,
         inlining: Some(1000),
         tail_call: true,
         hoisting: false,

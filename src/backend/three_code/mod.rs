@@ -977,9 +977,8 @@ impl From<(ir::Program, &Options)> for ThreeCode {
 mod tests {
     use super::stat::tests::match_graph;
     use super::{
-        super::{Options, PropagationOpt},
-        translate_block, translate_block_graph, translate_function, DataRefType, Function, OpSrc,
-        Size, StatCode, StatType, ThreeCode,
+        super::Options, translate_block, translate_block_graph, translate_function, DataRefType,
+        Function, OpSrc, Size, StatCode, StatType, ThreeCode,
     };
     use crate::{
         backend::three_code::stat::FmtDataRefFlags,
@@ -1014,7 +1013,7 @@ mod tests {
             &Options {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
-                propagation: PropagationOpt::None,
+                const_propagation: false,
                 inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
@@ -1128,7 +1127,7 @@ mod tests {
             &Options {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
-                propagation: PropagationOpt::None,
+                const_propagation: false,
                 inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
@@ -1202,7 +1201,7 @@ mod tests {
             &Options {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
-                propagation: PropagationOpt::None,
+                const_propagation: false,
                 inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
@@ -1241,7 +1240,7 @@ mod tests {
             &Options {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
-                propagation: PropagationOpt::None,
+                const_propagation: false,
                 inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
@@ -1282,7 +1281,7 @@ mod tests {
             &Options {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
-                propagation: PropagationOpt::None,
+                const_propagation: false,
                 inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
