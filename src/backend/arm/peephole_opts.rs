@@ -2,7 +2,7 @@
 //! representation.
 
 use super::{
-    arm_repr::{ControlFlow, FlexOperand, Stat},
+    arm_repr::{ControlFlow, FlexOperand, MovOp, Stat},
     ArmCode,
 };
 use rayon::prelude::*;
@@ -20,7 +20,7 @@ pub fn remove_self_moves(program: ArmCode) -> ArmCode {
             for node in graph.iter() {
                 if let ControlFlow::Simple(
                     Some(prev),
-                    Stat::Move(_, _, _, dst_ident, FlexOperand::ShiftReg(arg_ident, _)),
+                    Stat::Move(MovOp::Mov, _, _, dst_ident, FlexOperand::ShiftReg(arg_ident, _)),
                     next,
                 ) = node.get_mut().deref_mut()
                 {
