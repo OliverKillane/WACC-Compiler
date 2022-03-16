@@ -52,12 +52,12 @@ begin
         fi
     end
 
-    # Provides the floored int square root of the given num
-    int floor_sqrt(int num) is
+    # Provides the truncated int square root of the given num
+    int trunc_sqrt(int num) is
         if (num < 0) then
             print "The given number ( " ;
             print num ;
-            println " ) whose floored square root were to be calculated is not positive!" ;
+            println " ) whose truncated square root were to be calculated is not positive!" ;
             exit 255
         else
             if (num == 0 || num == 1) then
@@ -74,12 +74,12 @@ begin
         fi
     end
 
-    # Returns the floored log2 of the given num
-    int floor_log2(int num) is
+    # Returns the truncated log2 of the given num
+    int trunc_log2(int num) is
         if (num <= 0) then
             print "The given number ( " ;
             print num ;
-            println " ) whose floored log2 were to be calculated is not positive!" ;
+            println " ) whose truncated log2 were to be calculated is not positive!" ;
             exit 255
         else
             int hi = 0 ;
@@ -104,7 +104,7 @@ begin
 
                 # while (temp_diff >= precision) do
                 #     int mid = (lo + hi) / 2 ;
-                #     int mid_val = call floor_sqrt(l_bound * r_bound) ;
+                #     int mid_val = call trunc_sqrt(l_bound * r_bound) ;
                 #     if (mid_val > num) then
                 #         hi = mid ;
                 #         r_bound = mid_val
@@ -169,6 +169,7 @@ begin
     ##### MATH OPERATIONS ON ARRAYS #####
 
     # Returns the sum of all elements in integer array
+    # Empty Sum is 0 by convention
     int sum_int_arr(int[] arr) is
         int sum = 0 ;
         int i = 0 ; 
@@ -181,6 +182,7 @@ begin
     end
 
     # Returns the product of all elements in integer array
+    # Empty Product is 1 by convention
     int prod_int_arr(int[] arr) is
         int prod = 1 ;
         int i = 0 ; 
@@ -194,16 +196,21 @@ begin
 
     ##### STATISTICS #####
 
-    # Returns the floored mean of all elements in integer array
-    int floor_mean_int_arr(int[] arr) is
+    # Returns the truncated mean of all elements in integer array
+    int trunc_mean_int_arr(int[] arr) is
         int sum = call sum_int_arr(arr);
         int arr_len = len arr ;
-        return (sum / arr_len)
+        if (arr_len == 0) then
+            println "The mean of an empty data set is undefined!" ;
+            exit 255
+        else
+            return (sum / arr_len)
+        fi
     end
 
-    # Returns the floored population variance of all elements in integer array
-    int floor_pop_var_int_arr(int[] arr) is
-        int mean = call floor_mean_int_arr(arr) ;
+    # Returns the truncated population variance of all elements in integer array
+    int trunc_pop_var_int_arr(int[] arr) is
+        int mean = call trunc_mean_int_arr(arr) ;
         int i = 0 ; 
         int arr_len = len arr ;
         int diff_sum = 0 ;
@@ -216,16 +223,16 @@ begin
         return (diff_sum / arr_len)
     end
 
-    # Returns the floored population standard deviation of all elements in integer array
-    int floor_pop_sd_int_arr(int[] arr) is
-        int var = call floor_pop_var_int_arr(arr) ;
-        int sd = call floor_sqrt(var) ;
+    # Returns the truncated population standard deviation of all elements in integer array
+    int trunc_pop_sd_int_arr(int[] arr) is
+        int var = call trunc_pop_var_int_arr(arr) ;
+        int sd = call trunc_sqrt(var) ;
         return sd
     end
 
-    # Returns the floored sample variance of all elements in integer array
-    int floor_sam_var_int_arr(int[] arr) is
-        int mean = call floor_mean_int_arr(arr) ;
+    # Returns the truncated sample variance of all elements in integer array
+    int trunc_sam_var_int_arr(int[] arr) is
+        int mean = call trunc_mean_int_arr(arr) ;
         int i = 0 ; 
         int arr_len = len arr ;
         int diff_sum = 0 ;
@@ -238,10 +245,10 @@ begin
         return (diff_sum / (arr_len - 1))
     end
 
-    # Returns the floored sample standard deviation of all elements in integer array
-    int floor_sam_sd_int_arr(int[] arr) is
-        int var = call floor_sam_var_int_arr(arr) ;
-        int sd = call floor_sqrt(var) ;
+    # Returns the truncated sample standard deviation of all elements in integer array
+    int trunc_sam_sd_int_arr(int[] arr) is
+        int var = call trunc_sam_var_int_arr(arr) ;
+        int sd = call trunc_sqrt(var) ;
         return sd
     end
 
