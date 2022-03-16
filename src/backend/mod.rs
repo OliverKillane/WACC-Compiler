@@ -46,23 +46,21 @@ pub fn compile(program: Program, options: Options) -> BackendOutput {
     if let Some(instructions_limit) = options.inlining {
         three_code = inline(three_code, instructions_limit);
     }
-
     if options.tail_call {
         three_code = tail_call_optimise(three_code)
     }
-
     #[cfg(debug_assertions)]
     three_code
         .check_dummy()
         .expect("There are left-over dummy nodes in the ThreeCode");
-    // println!(
-    //     "{}",
-    //     three_code
-    //         .graph
-    //         .iter()
-    //         .map(|node| format!("{} {:?}\n", hashed(&node), &*node.get()))
-    //         .collect::<String>()
-    // );
+    println!(
+        "{}",
+        three_code
+            .graph
+            .iter()
+            .map(|node| format!("{} {:?}\n", hashed(&node), &*node.get()))
+            .collect::<String>()
+    );
     let three_code = prop_consts(three_code);
 
     // the arm result can return a printable intermediate representation.

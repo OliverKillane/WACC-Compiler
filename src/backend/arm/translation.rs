@@ -425,76 +425,18 @@ fn dataref_to_reg(
     temp_map: &mut TempMap,
     graph: &mut Graph<ControlFlow>,
 ) -> Chain {
-    if offset == 0 {
-        // LDR dst_ident, =data_ident
-        simple_node(
-            Stat::MemOp(
-                MemOp::Ldr,
-                Cond::Al,
-                false,
-                dst_ident,
-                MemOperand::Label(data_ident),
-            ),
-            graph,
-        )
-    } else if offset >= -4095 && offset <= 4095 {
-        // LDR arm_temp, =dataref
-        // LDR arm_temp, [arm_temp, #offset]
-        link_stats(
-            vec![
-                Stat::MemOp(
-                    MemOp::Ldr,
-                    Cond::Al,
-                    false,
-                    dst_ident,
-                    MemOperand::Label(data_ident),
-                ),
-                Stat::MemOp(
-                    MemOp::Ldr,
-                    Cond::Al,
-                    false,
-                    dst_ident,
-                    MemOperand::PreIndex(dst_ident, FlexOffset::Expr(ConstrainedInt::from(offset))),
-                ),
-            ],
-            graph,
-        )
-    } else {
-        // LDR arm_temp, =dataref
-        // LDR other_temp, =offset
-        // ADD arm_temp, arm_temp, other_temp
-        // note: no overflow checking for offset
-        let other_temp = temp_map.get_new_temp();
-        link_stats(
-            vec![
-                Stat::MemOp(
-                    MemOp::Ldr,
-                    Cond::Al,
-                    false,
-                    dst_ident,
-                    MemOperand::Label(data_ident),
-                ),
-                Stat::MemOp(
-                    MemOp::Ldr,
-                    Cond::Al,
-                    false,
-                    other_temp,
-                    MemOperand::Expression(offset),
-                ),
-                Stat::ApplyOp(
-                    RegOp::Add,
-                    Cond::Al,
-                    false,
-                    dst_ident,
-                    dst_ident,
-                    FlexOperand::ShiftReg(other_temp, None),
-                ),
-            ],
-            graph,
-        )
-    }
+    // LDR dst_ident, =data_ident + offset
+    simple_node(
+        Stat::MemOp(
+            MemOp::Ldr,
+            Cond::Al,
+            false,
+            dst_ident,
+            MemOperand::Label(data_ident, offset),
+        ),
+        graph,
+    )
 }
-
 /// Move an opsrc into a temporary.
 fn opsrc_to_temp(
     opsrc: &OpSrc,
@@ -791,19 +733,8 @@ fn translate_statcode(
                     )
                 }
                 OpSrc::Var(temp_ptr) => (MemOperand::Zero(temp_map.use_temp(*temp_ptr)), None),
-                OpSrc::DataRef(dref, 0) => (MemOperand::Label(convert_data_ref(*dref)), None),
                 OpSrc::DataRef(dref, offset) => {
-                    let new_temp = temp_map.get_new_temp();
-                    (
-                        MemOperand::Zero(new_temp),
-                        Some(dataref_to_reg(
-                            new_temp,
-                            convert_data_ref(*dref),
-                            *offset,
-                            temp_map,
-                            graph,
-                        )),
-                    )
+                    (MemOperand::Label(convert_data_ref(*dref), *offset), None)
                 }
                 OpSrc::ReadRef => {
                     let new_temp = temp_map.get_new_temp();
@@ -852,19 +783,8 @@ fn translate_statcode(
                     )
                 }
                 OpSrc::Var(temp_ptr) => (MemOperand::Zero(temp_map.use_temp(*temp_ptr)), None),
-                OpSrc::DataRef(dref, 0) => (MemOperand::Label(convert_data_ref(*dref)), None),
                 OpSrc::DataRef(dref, offset) => {
-                    let new_temp = temp_map.get_new_temp();
-                    (
-                        MemOperand::Zero(new_temp),
-                        Some(dataref_to_reg(
-                            new_temp,
-                            convert_data_ref(*dref),
-                            *offset,
-                            temp_map,
-                            graph,
-                        )),
-                    )
+                    (MemOperand::Label(convert_data_ref(*dref), *offset), None)
                 }
                 OpSrc::ReadRef => {
                     let new_temp = temp_map.get_new_temp();
