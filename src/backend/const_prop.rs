@@ -6,8 +6,7 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, LinkedList};
 use std::rc::Rc;
 
-type LiveAnalysis = Rc<HashSet<VarRepr>>;
-
+/// Returns the variable defined in this node, if one exists.
 fn get_defined_var(node: &StatNode) -> Option<VarRepr> {
     match &*node.get() {
         StatType::Simple(
@@ -22,6 +21,7 @@ fn get_defined_var(node: &StatNode) -> Option<VarRepr> {
     }
 }
 
+/// Retreives the variable used in the [op source](OpSrc), if one exists.
 fn get_use_op_src(op_src: &OpSrc) -> Option<VarRepr> {
     if let &OpSrc::Var(var) = op_src {
         Some(var)
@@ -30,6 +30,10 @@ fn get_use_op_src(op_src: &OpSrc) -> Option<VarRepr> {
     }
 }
 
+/// Liveness analysis set type.
+type LiveAnalysis = Rc<HashSet<VarRepr>>;
+
+/// Retreives the used variables that can be substituted for a constant [op source](OpSrc).
 fn get_const_prop_uses(node: &StatNode) -> HashSet<VarRepr> {
     match &*node.get() {
         StatType::Simple(
@@ -55,6 +59,7 @@ fn get_const_prop_uses(node: &StatNode) -> HashSet<VarRepr> {
     }
 }
 
+/// Constructs the LiveIn set from the LiveOut set for the dataflow analysis.
 fn construct_live_in(node: &StatNode, live_out: LiveAnalysis) -> LiveAnalysis {
     let mut cow_live_out = Cow::Borrowed(&*live_out);
     if let Some(kill) = get_defined_var(node) && cow_live_out.contains(&kill) {
@@ -72,11 +77,14 @@ fn construct_live_in(node: &StatNode, live_out: LiveAnalysis) -> LiveAnalysis {
     }
 }
 
+/// Constructs the initial values for LiveIn and LiveOut for the node.
 fn live_init(node: &StatNode) -> (LiveAnalysis, LiveAnalysis) {
     let live_out = Rc::new(HashSet::new());
     (live_out.clone(), construct_live_in(node, live_out))
 }
 
+/// Constructs the new values for LiveIn and LiveOut, after an iteration of
+/// the dataflow analysis.
 fn live_update(
     _: Vec<&LiveAnalysis>,
     live_in: &LiveAnalysis,
@@ -107,8 +115,11 @@ fn live_update(
     (new_live_in, new_live_out, updated)
 }
 
+/// Definitions analysis set type.
 type DefsAnalysis = HashMap<VarRepr, Rc<HashSet<StatNode>>>;
 
+/// Constructs the DefOut map from the DefIn map, provided a node is actually
+/// needed further in the graph (based on the LiveIn set).
 fn construct_defs_out(
     node: &StatNode,
     defs_in: &DefsAnalysis,
@@ -146,6 +157,10 @@ fn construct_defs_out(
     defs_in
 }
 
+/// Constructs the initial DefIn and DefOut sets for the node based on the node itself,
+/// its LiveOut set and some additional definitions that we might want to add on
+/// top of those defined by the node (for example arguments to a function if the
+/// node is the root of the code).
 fn defs_init(
     node: &StatNode,
     live_out: &LiveAnalysis,
@@ -159,6 +174,8 @@ fn defs_init(
     (defs_in, defs_out)
 }
 
+/// Constructs the new values for DefIn and DefOut, after an iteration of the
+/// dataflow analysis.
 fn defs_update(
     pred_defs_out: Vec<&DefsAnalysis>,
     defs_in: &DefsAnalysis,
@@ -197,6 +214,8 @@ fn defs_update(
     (new_defs_in, new_defs_out, updated)
 }
 
+/// Substitutes all uses of a variable in a node with a constant [op source](OpSrc).
+/// The op source must not be a variable.
 fn substitute_const_use(node: &StatNode, var: VarRepr, const_op: OpSrc) {
     if let OpSrc::Var(_) = const_op {
         panic!("Op source should be a constant");
@@ -225,12 +244,17 @@ fn substitute_const_use(node: &StatNode, var: VarRepr, const_op: OpSrc) {
     }
 }
 
+/// The result of a constant evaluation attempt.
 enum PropagateOpResult {
+    /// Constant evaluation failed
     Failed,
+    /// Result overflows
     Oob,
+    /// Evaluated to a constant [op source](OpSrc)
     Const(OpSrc),
 }
 
+/// Attempts a constant evaluation.
 fn propagate_op(op_src1: OpSrc, bin_op: BinOp, op_src2: OpSrc, checked: bool) -> PropagateOpResult {
     use PropagateOpResult::*;
     match (op_src1, bin_op, op_src2) {
@@ -276,6 +300,7 @@ fn propagate_op(op_src1: OpSrc, bin_op: BinOp, op_src2: OpSrc, checked: bool) ->
     }
 }
 
+/// Attempts a constant evaluation on a node.
 fn prop_const_node(node: &StatNode, int_handler: &Option<String>) -> Option<VarRepr> {
     let (assigned_var, op_src1, bin_op, op_src2, checked) = if let StatType::Simple(
         _,
@@ -309,6 +334,8 @@ fn prop_const_node(node: &StatNode, int_handler: &Option<String>) -> Option<VarR
     }
 }
 
+/// Performs a constant evaluation on a code starting in the given node, with
+/// given argument variables and a given integer overflow handler.
 fn prop_const_graph(code: &StatNode, args: &[VarRepr], int_handler: &Option<String>) {
     let mut fake_defs_graph = Graph::new();
     let args_nodes = args
@@ -448,6 +475,7 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr], int_handler: &Option<Stri
     }
 }
 
+/// Performs constant propagation on the [three code](ThreeCode).
 pub(super) fn prop_consts(
     ThreeCode {
         mut functions,
