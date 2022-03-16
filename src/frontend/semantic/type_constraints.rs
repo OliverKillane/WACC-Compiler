@@ -75,10 +75,7 @@ fn type_match(
         (Type::Generic(a), t) => match generics.get(a) {
             Some(conc_type) => {
                 let gen_type = conc_type.clone();
-                match type_match(&gen_type, t, generics) {
-                    Ok(conc_type) => Ok(conc_type),
-                    Err(t) => Err(t),
-                }
+                type_match(&gen_type, t, generics)
             }
             None => {
                 generics.insert(*a, t.clone());
