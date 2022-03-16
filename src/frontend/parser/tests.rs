@@ -264,6 +264,8 @@ use rstest::rstest;
 #[case("../tests/invalid/semanticErr/pairs/sndNull.wacc")]
 #[case("../tests/invalid/semanticErr/pairs/fstNull.wacc")]
 #[case("../tests/invalid/semanticErr/pairs/freeNonPair.wacc")]
+#[case("../tests/invalid/semanticErr/pairsExtended/invalidNewPairAssignment.wacc")]
+#[case("../tests/invalid/semanticErr/pairsExtended/invalidPairAssignment.wacc")]
 fn parse_pass(#[case] file_name: &str) {
     let mut absolute_prefix = Path::new(file!()).to_owned();
     absolute_prefix.pop();
@@ -337,6 +339,9 @@ fn parse_pass(#[case] file_name: &str) {
 #[case("../tests/invalid/syntaxErr/basic/bgnErr.wacc")]
 #[case("../tests/invalid/syntaxErr/basic/noBody.wacc")]
 #[case("../tests/invalid/syntaxErr/basic/skpErr.wacc")]
+#[case("../tests/invalid/syntaxErr/pairsExtended/invalidInnerPair.wacc")]
+#[case("../tests/invalid/syntaxErr/pairsExtended/invalidPairArray.wacc")]
+#[case("../tests/invalid/syntaxErr/pairsExtended/invalidPairNested.wacc")]
 fn parse_fail(#[case] file_name: &str) {
     let mut absolute_prefix = Path::new(file!()).to_owned();
     absolute_prefix.pop();
