@@ -29,7 +29,9 @@ fn translate_function_call(
             successors(Some(result), |arg_result| Some(*arg_result + 1)),
         )
         .map(|(expr, arg_result)| {
-            translate_expr(expr, arg_result, stat_line, vars, function_types, options);
+            let (_, op_src) =
+                translate_expr(expr, arg_result, stat_line, vars, function_types, options);
+            assign_op_src(arg_result, op_src, stat_line);
             arg_result
         })
         .collect(),
@@ -59,10 +61,19 @@ impl From<ir::ArithOp> for BinOp {
     }
 }
 
+pub(super) fn assign_op_src(result: VarRepr, op_src: OpSrc, stat_line: &mut StatLine) {
+    if let OpSrc::Var(var) = op_src {
+        assert_eq!(var, result);
+        return;
+    }
+    stat_line.add_stat(StatCode::Assign(result, op_src));
+}
+
 /// Translates a [numerical expression](ir::NumExpr) into a [series of statements](StatLine). The result of the
 /// expression tree is placed in the result field. Returns the size of the resulting
 /// numerical expression, i.e. the size of the variable placed in result.
-/// It is assumed that no variables after the result variable are used.
+/// It is assumed that no variables after the result variable are used. Returns the [op source](OpSrc) to use for
+/// the statement.
 pub(super) fn translate_num_expr(
     num_expr: ir::NumExpr,
     result: VarRepr,
@@ -70,38 +81,32 @@ pub(super) fn translate_num_expr(
     vars: &HashMap<VarRepr, ir::Type>,
     function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
-) -> ir::NumSize {
+) -> (ir::NumSize, OpSrc) {
     match num_expr {
         ir::NumExpr::SizeOf(expr_type) => {
-            let type_width: i32 = get_type_width(expr_type).into();
-            stat_line.add_stat(StatCode::Assign(result, OpSrc::from(type_width)));
-            ir::NumSize::DWord
+            let width: i32 = get_type_width(expr_type).into();
+            (ir::NumSize::DWord, OpSrc::from(width))
         }
-        ir::NumExpr::SizeOfWideAlloc => {
-            stat_line.add_stat(StatCode::Assign(result, OpSrc::from(4)));
-            ir::NumSize::DWord
-        }
-        ir::NumExpr::Const(size, val) => {
-            stat_line.add_stat(StatCode::Assign(result, OpSrc::from(val)));
-            size
-        }
+        ir::NumExpr::SizeOfWideAlloc => (ir::NumSize::DWord, OpSrc::from(4)),
+        ir::NumExpr::Const(size, val) => (size, OpSrc::from(val)),
         ir::NumExpr::Var(var) => {
-            stat_line.add_stat(StatCode::Assign(result, OpSrc::Var(var)));
             let size = match vars.get(&var).expect("Variable not found") {
                 ir::Type::Num(size) => *size,
                 _ => panic!("Variable of a wrong type"),
             };
-            size
+            stat_line.add_stat(StatCode::Assign(result, OpSrc::Var(var)));
+            (size, OpSrc::Var(result))
         }
         ir::NumExpr::Deref(size, ptr_expr) => {
-            translate_ptr_expr(ptr_expr, result, stat_line, vars, function_types, options);
-            stat_line.add_stat(StatCode::Load(result, result, size.into()));
-            size
+            let op_src =
+                translate_ptr_expr(ptr_expr, result, stat_line, vars, function_types, options);
+            stat_line.add_stat(StatCode::Load(result, op_src, size.into()));
+            (size, OpSrc::Var(result))
         }
         ir::NumExpr::ArithOp(box num_expr1, arith_op, box num_expr2) => {
-            let size1 =
+            let (size, op_src1) =
                 translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
-            translate_num_expr(
+            let (_, op_src2) = translate_num_expr(
                 num_expr2,
                 result + 1,
                 stat_line,
@@ -111,35 +116,39 @@ pub(super) fn translate_num_expr(
             );
             stat_line.add_stat(StatCode::AssignOp(
                 result,
-                OpSrc::Var(result),
+                op_src1,
                 arith_op.into(),
-                OpSrc::Var(result + 1),
+                op_src2,
+                true,
             ));
-            size1
+            (size, OpSrc::Var(result))
         }
         ir::NumExpr::Cast(size, box num_expr) => {
-            let old_size =
+            let (old_size, op_src) =
                 translate_num_expr(num_expr, result, stat_line, vars, function_types, options);
             match (size, old_size) {
                 (ir::NumSize::Byte, ir::NumSize::DWord | ir::NumSize::Word) => {
                     stat_line.add_stat(StatCode::AssignOp(
                         result,
-                        OpSrc::Var(result),
+                        op_src,
                         BinOp::And,
                         OpSrc::from(0xFF),
+                        false,
                     ));
+                    (size, OpSrc::Var(result))
                 }
                 (ir::NumSize::Word, ir::NumSize::DWord) => {
                     stat_line.add_stat(StatCode::AssignOp(
                         result,
-                        OpSrc::Var(result),
+                        op_src,
                         BinOp::And,
                         OpSrc::from(0xFFFF),
+                        false,
                     ));
+                    (size, OpSrc::Var(result))
                 }
-                _ => {}
+                _ => (size, op_src),
             }
-            size
         }
         ir::NumExpr::Call(name, args) => {
             let size = if let Some(ir::Type::Num(size)) =
@@ -150,7 +159,7 @@ pub(super) fn translate_num_expr(
                 panic!("Function has a wrong return type")
             };
             translate_function_call(name, args, result, stat_line, vars, function_types, options);
-            size
+            (size, OpSrc::Var(result))
         }
     }
 }
@@ -167,7 +176,8 @@ impl From<ir::BoolOp> for BinOp {
 
 /// Translates a [boolean expression](ir::BoolExpr) into a [series of statements](StatLine). The result of the
 /// expression tree is placed in the result field. It is assumed that no variables
-/// after the result variable are used.
+/// after the result variable are used. Returns the [op source](OpSrc) to use for
+/// the statement.
 pub(super) fn translate_bool_expr(
     bool_expr: ir::BoolExpr,
     result: VarRepr,
@@ -175,27 +185,30 @@ pub(super) fn translate_bool_expr(
     vars: &HashMap<VarRepr, ir::Type>,
     function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
-) {
+) -> OpSrc {
     match bool_expr {
-        ir::BoolExpr::Const(bool_const) => {
-            stat_line.add_stat(StatCode::Assign(result, OpSrc::from(bool_const as i32)));
-        }
+        ir::BoolExpr::Const(bool_const) => OpSrc::from(bool_const as i32),
         ir::BoolExpr::Var(var) => {
             stat_line.add_stat(StatCode::Assign(result, OpSrc::Var(var)));
+            OpSrc::Var(result)
         }
         ir::BoolExpr::Deref(ptr_expr) => {
-            translate_ptr_expr(ptr_expr, result, stat_line, vars, function_types, options);
-            stat_line.add_stat(StatCode::Load(result, result, Size::Byte));
+            let op_src =
+                translate_ptr_expr(ptr_expr, result, stat_line, vars, function_types, options);
+            stat_line.add_stat(StatCode::Load(result, op_src, Size::Byte));
             stat_line.add_stat(StatCode::AssignOp(
                 result,
                 OpSrc::Var(result),
                 BinOp::And,
                 OpSrc::from(0x01),
+                false,
             ));
+            OpSrc::Var(result)
         }
         ir::BoolExpr::NumEq(num_expr1, num_expr2) => {
-            translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
-            translate_num_expr(
+            let (_, op_src1) =
+                translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
+            let (_, op_src2) = translate_num_expr(
                 num_expr2,
                 result + 1,
                 stat_line,
@@ -205,14 +218,17 @@ pub(super) fn translate_bool_expr(
             );
             stat_line.add_stat(StatCode::AssignOp(
                 result,
-                OpSrc::Var(result),
+                op_src1,
                 BinOp::Eq,
-                OpSrc::Var(result + 1),
+                op_src2,
+                false,
             ));
+            OpSrc::Var(result)
         }
         ir::BoolExpr::NumLt(num_expr1, num_expr2) => {
-            translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
-            translate_num_expr(
+            let (_, op_src1) =
+                translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
+            let (_, op_src2) = translate_num_expr(
                 num_expr2,
                 result + 1,
                 stat_line,
@@ -222,14 +238,17 @@ pub(super) fn translate_bool_expr(
             );
             stat_line.add_stat(StatCode::AssignOp(
                 result,
-                OpSrc::Var(result),
+                op_src1,
                 BinOp::Lt,
-                OpSrc::Var(result + 1),
+                op_src2,
+                false,
             ));
+            OpSrc::Var(result)
         }
         ir::BoolExpr::PtrEq(ptr_expr1, ptr_expr2) => {
-            translate_ptr_expr(ptr_expr1, result, stat_line, vars, function_types, options);
-            translate_ptr_expr(
+            let op_src1 =
+                translate_ptr_expr(ptr_expr1, result, stat_line, vars, function_types, options);
+            let op_src2 = translate_ptr_expr(
                 ptr_expr2,
                 result + 1,
                 stat_line,
@@ -239,14 +258,17 @@ pub(super) fn translate_bool_expr(
             );
             stat_line.add_stat(StatCode::AssignOp(
                 result,
-                OpSrc::Var(result),
+                op_src1,
                 BinOp::Eq,
-                OpSrc::Var(result + 1),
+                op_src2,
+                false,
             ));
+            OpSrc::Var(result)
         }
         ir::BoolExpr::BoolOp(box bool_expr1, bool_op, box bool_expr2) => {
-            translate_bool_expr(bool_expr1, result, stat_line, vars, function_types, options);
-            translate_bool_expr(
+            let op_src1 =
+                translate_bool_expr(bool_expr1, result, stat_line, vars, function_types, options);
+            let op_src2 = translate_bool_expr(
                 bool_expr2,
                 result + 1,
                 stat_line,
@@ -256,14 +278,17 @@ pub(super) fn translate_bool_expr(
             );
             stat_line.add_stat(StatCode::AssignOp(
                 result,
-                OpSrc::Var(result),
+                op_src1,
                 bool_op.into(),
-                OpSrc::Var(result + 1),
+                op_src2,
+                false,
             ));
+            OpSrc::Var(result)
         }
         ir::BoolExpr::Not(box ir::BoolExpr::NumEq(num_expr1, num_expr2)) => {
-            translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
-            translate_num_expr(
+            let (_, op_src1) =
+                translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
+            let (_, op_src2) = translate_num_expr(
                 num_expr2,
                 result + 1,
                 stat_line,
@@ -273,14 +298,17 @@ pub(super) fn translate_bool_expr(
             );
             stat_line.add_stat(StatCode::AssignOp(
                 result,
-                OpSrc::Var(result),
+                op_src1,
                 BinOp::Ne,
-                OpSrc::Var(result + 1),
+                op_src2,
+                false,
             ));
+            OpSrc::Var(result)
         }
         ir::BoolExpr::Not(box ir::BoolExpr::NumLt(num_expr1, num_expr2)) => {
-            translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
-            translate_num_expr(
+            let (_, op_src1) =
+                translate_num_expr(num_expr1, result, stat_line, vars, function_types, options);
+            let (_, op_src2) = translate_num_expr(
                 num_expr2,
                 result + 1,
                 stat_line,
@@ -290,30 +318,37 @@ pub(super) fn translate_bool_expr(
             );
             stat_line.add_stat(StatCode::AssignOp(
                 result,
-                OpSrc::Var(result),
+                op_src1,
                 BinOp::Gte,
-                OpSrc::Var(result + 1),
+                op_src2,
+                false,
             ));
+            OpSrc::Var(result)
         }
 
         ir::BoolExpr::Not(box bool_expr) => {
-            translate_bool_expr(bool_expr, result, stat_line, vars, function_types, options);
+            let op_src =
+                translate_bool_expr(bool_expr, result, stat_line, vars, function_types, options);
             stat_line.add_stat(StatCode::AssignOp(
                 result,
-                OpSrc::Var(result),
+                op_src,
                 BinOp::Xor,
                 OpSrc::from(0x01),
+                false,
             ));
+            OpSrc::Var(result)
         }
         ir::BoolExpr::Call(name, args) => {
             translate_function_call(name, args, result, stat_line, vars, function_types, options);
+            OpSrc::Var(result)
         }
     }
 }
 
 /// Translates a [pointer expression](ir::PtrExpr) into a [series of statements](StatLine). The result of the
 /// expression tree is placed in the result field. It is assumed that no variables
-/// after the result variable are used.
+/// after the result variable are used. Returns the [op source](OpSrc) to use for
+/// the statement.
 pub(super) fn translate_ptr_expr(
     ptr_expr: ir::PtrExpr,
     result: VarRepr,
@@ -321,24 +356,24 @@ pub(super) fn translate_ptr_expr(
     vars: &HashMap<VarRepr, ir::Type>,
     function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
-) {
+) -> OpSrc {
     match ptr_expr {
-        ir::PtrExpr::Null => {
-            stat_line.add_stat(StatCode::Assign(result, OpSrc::Const(0)));
-        }
-        ir::PtrExpr::DataRef(data_ref) => {
-            stat_line.add_stat(StatCode::Assign(result, OpSrc::DataRef(data_ref, 0)));
-        }
+        ir::PtrExpr::Null => OpSrc::Const(0),
+        ir::PtrExpr::DataRef(data_ref) => OpSrc::DataRef(data_ref, 0),
         ir::PtrExpr::Var(var) => {
             stat_line.add_stat(StatCode::Assign(result, OpSrc::Var(var)));
+            OpSrc::Var(result)
         }
         ir::PtrExpr::Deref(box ptr_expr) => {
-            translate_ptr_expr(ptr_expr, result, stat_line, vars, function_types, options);
-            stat_line.add_stat(StatCode::Load(result, result, Size::DWord));
+            let op_src =
+                translate_ptr_expr(ptr_expr, result, stat_line, vars, function_types, options);
+            stat_line.add_stat(StatCode::Load(result, op_src, Size::DWord));
+            OpSrc::Var(result)
         }
         ir::PtrExpr::Offset(box ptr_expr, box num_expr) => {
-            translate_ptr_expr(ptr_expr, result, stat_line, vars, function_types, options);
-            translate_num_expr(
+            let op_src1 =
+                translate_ptr_expr(ptr_expr, result, stat_line, vars, function_types, options);
+            let (_, op_src2) = translate_num_expr(
                 num_expr,
                 result + 1,
                 stat_line,
@@ -348,10 +383,12 @@ pub(super) fn translate_ptr_expr(
             );
             stat_line.add_stat(StatCode::AssignOp(
                 result,
-                OpSrc::Var(result),
+                op_src1,
                 BinOp::Add,
-                OpSrc::Var(result + 1),
+                op_src2,
+                false,
             ));
+            OpSrc::Var(result)
         }
         malloc @ ir::PtrExpr::Malloc(_) | malloc @ ir::PtrExpr::WideMalloc(_) => {
             let is_wide = matches!(malloc, ir::PtrExpr::WideMalloc(_));
@@ -367,7 +404,7 @@ pub(super) fn translate_ptr_expr(
                 .into_iter()
                 .map(|expr| {
                     let mut setting_stat_line = StatLine::new(stat_line.graph());
-                    let expr_type = translate_expr(
+                    let (expr_type, op_src) = translate_expr(
                         expr,
                         result + 1,
                         &mut setting_stat_line,
@@ -375,6 +412,7 @@ pub(super) fn translate_ptr_expr(
                         function_types,
                         options,
                     );
+                    assign_op_src(result + 1, op_src, &mut setting_stat_line);
                     (
                         if is_wide {
                             4
@@ -411,22 +449,30 @@ pub(super) fn translate_ptr_expr(
                         OpSrc::Var(result),
                         BinOp::Add,
                         OpSrc::from(offset),
+                        false,
                     ));
-                    stat_line.add_stat(StatCode::Store(result + 2, result + 1, store_width))
+                    stat_line.add_stat(StatCode::Store(
+                        OpSrc::Var(result + 2),
+                        result + 1,
+                        store_width,
+                    ))
                 }
+                OpSrc::Var(result)
             } else {
-                stat_line.add_stat(StatCode::Assign(result, OpSrc::Const(0)))
+                OpSrc::Const(0)
             }
         }
         ir::PtrExpr::Call(name, args) => {
             translate_function_call(name, args, result, stat_line, vars, function_types, options);
+            OpSrc::Var(result)
         }
     }
 }
 
 /// Translates a single [general expression](ir::Expr). The result of the expression is placed
 /// in the result variable. Returns the type of the expression. It is assumed that
-/// no variables after the result variable are used.
+/// no variables after the result variable are used. Returns the [op source](OpSrc) to use for
+/// the statement.
 pub(super) fn translate_expr(
     expr: ir::Expr,
     result: VarRepr,
@@ -434,31 +480,28 @@ pub(super) fn translate_expr(
     vars: &HashMap<VarRepr, ir::Type>,
     function_types: &HashMap<String, Option<ir::Type>>,
     options: &Options,
-) -> ir::Type {
+) -> (ir::Type, OpSrc) {
     match expr {
         ir::Expr::Num(num_expr) => {
-            let size =
+            let (size, op_src) =
                 translate_num_expr(num_expr, result, stat_line, vars, function_types, options);
-            ir::Type::Num(size)
+            (ir::Type::Num(size), op_src)
         }
-        ir::Expr::Bool(bool_expr) => {
-            translate_bool_expr(bool_expr, result, stat_line, vars, function_types, options);
-            ir::Type::Bool
-        }
-        ir::Expr::Ptr(ptr_expr) => {
-            translate_ptr_expr(ptr_expr, result, stat_line, vars, function_types, options);
-            ir::Type::Ptr
-        }
+        ir::Expr::Bool(bool_expr) => (
+            ir::Type::Bool,
+            translate_bool_expr(bool_expr, result, stat_line, vars, function_types, options),
+        ),
+        ir::Expr::Ptr(ptr_expr) => (
+            ir::Type::Ptr,
+            translate_ptr_expr(ptr_expr, result, stat_line, vars, function_types, options),
+        ),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        super::{
-            super::{Options, PropagationOpt},
-            OpSrc, Size, StatCode, StatType,
-        },
+        super::{super::Options, OpSrc, Size, StatCode, StatType},
         translate_expr,
     };
     use crate::{
@@ -475,6 +518,7 @@ mod tests {
         vars: HashMap<VarRepr, ir::Type>,
         function_types: HashMap<String, Option<ir::Type>>,
         expr_type: ir::Type,
+        op_src: OpSrc,
     ) {
         let graph = Rc::new(RefCell::new(Graph::new()));
         let mut stat_line = StatLine::new(graph.clone());
@@ -488,7 +532,7 @@ mod tests {
                 &Options {
                     sethi_ullman_weights: false,
                     dead_code_removal: false,
-                    propagation: PropagationOpt::None,
+                    const_propagation: false,
                     inlining: Some(1000),
                     tail_call: false,
                     hoisting: false,
@@ -498,8 +542,11 @@ mod tests {
                     show_arm_temp_rep: false
                 }
             ),
-            expr_type
+            (expr_type, op_src)
         );
+        if stats.is_empty() {
+            return;
+        }
         let mut node = stat_line.start_node().expect("No start node");
         let mut stats = stats.into_iter();
         while node != stat_line.end_node().expect("No end node") {
@@ -531,18 +578,20 @@ mod tests {
         match_line_stat_vec(
             ir::Expr::Num(ir::NumExpr::SizeOf(ir::Type::Bool)),
             0,
-            vec![StatCode::Assign(0, OpSrc::Const(1))],
+            vec![],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Num(ir::NumSize::DWord),
+            OpSrc::Const(1),
         );
         match_line_stat_vec(
             ir::Expr::Num(ir::NumExpr::SizeOfWideAlloc),
             0,
-            vec![StatCode::Assign(0, OpSrc::Const(4))],
+            vec![],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Num(ir::NumSize::DWord),
+            OpSrc::Const(4),
         );
     }
 
@@ -551,10 +600,11 @@ mod tests {
         match_line_stat_vec(
             ir::Expr::Num(ir::NumExpr::Const(ir::NumSize::Word, 42)),
             0,
-            vec![StatCode::Assign(0, OpSrc::Const(42))],
+            vec![],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Num(ir::NumSize::Word),
+            OpSrc::Const(42),
         )
     }
 
@@ -567,6 +617,7 @@ mod tests {
             HashMap::from([(1, ir::Type::Num(ir::NumSize::Word))]),
             HashMap::new(),
             ir::Type::Num(ir::NumSize::Word),
+            OpSrc::Var(0),
         )
     }
 
@@ -578,13 +629,11 @@ mod tests {
                 ir::PtrExpr::DataRef(0),
             )),
             0,
-            vec![
-                StatCode::Assign(0, OpSrc::DataRef(0, 0)),
-                StatCode::Load(0, 0, Size::Word),
-            ],
+            vec![StatCode::Load(0, OpSrc::DataRef(0, 0), Size::Word)],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Num(ir::NumSize::Word),
+            OpSrc::Var(0),
         )
     }
 
@@ -597,14 +646,17 @@ mod tests {
                 box ir::NumExpr::Const(ir::NumSize::Byte, 2),
             )),
             0,
-            vec![
-                StatCode::Assign(0, OpSrc::Const(1)),
-                StatCode::Assign(1, OpSrc::Const(2)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Add, OpSrc::Var(1)),
-            ],
+            vec![StatCode::AssignOp(
+                0,
+                OpSrc::Const(1),
+                BinOp::Add,
+                OpSrc::Const(2),
+                true,
+            )],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Num(ir::NumSize::Byte),
+            OpSrc::Var(0),
         )
     }
 
@@ -618,11 +670,12 @@ mod tests {
             0,
             vec![
                 StatCode::Assign(0, OpSrc::Var(1)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::And, OpSrc::Const(0xff)),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::And, OpSrc::Const(0xff), false),
             ],
             HashMap::from([(1, ir::Type::Num(ir::NumSize::DWord))]),
             HashMap::new(),
             ir::Type::Num(ir::NumSize::Byte),
+            OpSrc::Var(0),
         )
     }
 
@@ -645,6 +698,7 @@ mod tests {
             HashMap::new(),
             HashMap::from([("f".to_string(), Some(ir::Type::Num(ir::NumSize::Word)))]),
             ir::Type::Num(ir::NumSize::Word),
+            OpSrc::Var(0),
         )
     }
 
@@ -653,10 +707,11 @@ mod tests {
         match_line_stat_vec(
             ir::Expr::Bool(ir::BoolExpr::Const(true)),
             0,
-            vec![StatCode::Assign(0, OpSrc::Const(1))],
+            vec![],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Bool,
+            OpSrc::Const(1),
         )
     }
 
@@ -669,6 +724,7 @@ mod tests {
             HashMap::from([(1, ir::Type::Bool)]),
             HashMap::new(),
             ir::Type::Bool,
+            OpSrc::Var(0),
         )
     }
 
@@ -678,13 +734,13 @@ mod tests {
             ir::Expr::Bool(ir::BoolExpr::Deref(ir::PtrExpr::DataRef(0))),
             0,
             vec![
-                StatCode::Assign(0, OpSrc::DataRef(0, 0)),
-                StatCode::Load(0, 0, Size::Byte),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::And, OpSrc::Const(0x01)),
+                StatCode::Load(0, OpSrc::DataRef(0, 0), Size::Byte),
+                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::And, OpSrc::Const(0x01), false),
             ],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Bool,
+            OpSrc::Var(0),
         )
     }
 
@@ -696,14 +752,17 @@ mod tests {
                 ir::NumExpr::Const(ir::NumSize::Word, 69),
             )),
             0,
-            vec![
-                StatCode::Assign(0, OpSrc::Const(420)),
-                StatCode::Assign(1, OpSrc::Const(69)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Eq, OpSrc::Var(1)),
-            ],
+            vec![StatCode::AssignOp(
+                0,
+                OpSrc::Const(420),
+                BinOp::Eq,
+                OpSrc::Const(69),
+                false,
+            )],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Bool,
+            OpSrc::Var(0),
         )
     }
 
@@ -715,14 +774,17 @@ mod tests {
                 ir::NumExpr::Const(ir::NumSize::Word, 69),
             )),
             0,
-            vec![
-                StatCode::Assign(0, OpSrc::Const(420)),
-                StatCode::Assign(1, OpSrc::Const(69)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Lt, OpSrc::Var(1)),
-            ],
+            vec![StatCode::AssignOp(
+                0,
+                OpSrc::Const(420),
+                BinOp::Lt,
+                OpSrc::Const(69),
+                false,
+            )],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Bool,
+            OpSrc::Var(0),
         )
     }
 
@@ -734,14 +796,17 @@ mod tests {
                 ir::NumExpr::Const(ir::NumSize::Word, 69),
             ))),
             0,
-            vec![
-                StatCode::Assign(0, OpSrc::Const(420)),
-                StatCode::Assign(1, OpSrc::Const(69)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Ne, OpSrc::Var(1)),
-            ],
+            vec![StatCode::AssignOp(
+                0,
+                OpSrc::Const(420),
+                BinOp::Ne,
+                OpSrc::Const(69),
+                false,
+            )],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Bool,
+            OpSrc::Var(0),
         )
     }
 
@@ -753,14 +818,17 @@ mod tests {
                 ir::NumExpr::Const(ir::NumSize::Word, 69),
             ))),
             0,
-            vec![
-                StatCode::Assign(0, OpSrc::Const(420)),
-                StatCode::Assign(1, OpSrc::Const(69)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Gte, OpSrc::Var(1)),
-            ],
+            vec![StatCode::AssignOp(
+                0,
+                OpSrc::Const(420),
+                BinOp::Gte,
+                OpSrc::Const(69),
+                false,
+            )],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Bool,
+            OpSrc::Var(0),
         )
     }
 
@@ -769,14 +837,17 @@ mod tests {
         match_line_stat_vec(
             ir::Expr::Bool(ir::BoolExpr::PtrEq(ir::PtrExpr::Null, ir::PtrExpr::Null)),
             0,
-            vec![
-                StatCode::Assign(0, OpSrc::Const(0)),
-                StatCode::Assign(1, OpSrc::Const(0)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Eq, OpSrc::Var(1)),
-            ],
+            vec![StatCode::AssignOp(
+                0,
+                OpSrc::Const(0),
+                BinOp::Eq,
+                OpSrc::Const(0),
+                false,
+            )],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Bool,
+            OpSrc::Var(0),
         )
     }
 
@@ -789,14 +860,17 @@ mod tests {
                 box ir::BoolExpr::Const(false),
             )),
             0,
-            vec![
-                StatCode::Assign(0, OpSrc::Const(1)),
-                StatCode::Assign(1, OpSrc::Const(0)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::And, OpSrc::Var(1)),
-            ],
+            vec![StatCode::AssignOp(
+                0,
+                OpSrc::Const(1),
+                BinOp::And,
+                OpSrc::Const(0),
+                false,
+            )],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Bool,
+            OpSrc::Var(0),
         )
     }
 
@@ -819,6 +893,7 @@ mod tests {
             HashMap::new(),
             HashMap::from([("f".to_string(), Some(ir::Type::Bool))]),
             ir::Type::Bool,
+            OpSrc::Var(0),
         )
     }
 
@@ -827,10 +902,11 @@ mod tests {
         match_line_stat_vec(
             ir::Expr::Ptr(ir::PtrExpr::Null),
             0,
-            vec![StatCode::Assign(0, OpSrc::Const(0))],
+            vec![],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Ptr,
+            OpSrc::Const(0),
         )
     }
 
@@ -839,10 +915,11 @@ mod tests {
         match_line_stat_vec(
             ir::Expr::Ptr(ir::PtrExpr::DataRef(1)),
             0,
-            vec![StatCode::Assign(0, OpSrc::DataRef(1, 0))],
+            vec![],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Ptr,
+            OpSrc::DataRef(1, 0),
         )
     }
 
@@ -855,6 +932,7 @@ mod tests {
             HashMap::from([(1, ir::Type::Ptr)]),
             HashMap::new(),
             ir::Type::Ptr,
+            OpSrc::Var(0),
         )
     }
 
@@ -863,13 +941,11 @@ mod tests {
         match_line_stat_vec(
             ir::Expr::Ptr(ir::PtrExpr::Deref(box ir::PtrExpr::DataRef(0))),
             0,
-            vec![
-                StatCode::Assign(0, OpSrc::DataRef(0, 0)),
-                StatCode::Load(0, 0, Size::DWord),
-            ],
+            vec![StatCode::Load(0, OpSrc::DataRef(0, 0), Size::DWord)],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Ptr,
+            OpSrc::Var(0),
         )
     }
 
@@ -881,14 +957,17 @@ mod tests {
                 box ir::NumExpr::Const(ir::NumSize::DWord, 2),
             )),
             0,
-            vec![
-                StatCode::Assign(0, OpSrc::Const(0)),
-                StatCode::Assign(1, OpSrc::Const(2)),
-                StatCode::AssignOp(0, OpSrc::Var(0), BinOp::Add, OpSrc::Var(1)),
-            ],
+            vec![StatCode::AssignOp(
+                0,
+                OpSrc::Const(0),
+                BinOp::Add,
+                OpSrc::Const(2),
+                false,
+            )],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Ptr,
+            OpSrc::Var(0),
         )
     }
 
@@ -904,15 +983,16 @@ mod tests {
                 StatCode::Assign(0, OpSrc::Const(5)),
                 StatCode::Call(0, "malloc".to_string(), vec![0]),
                 StatCode::Assign(1, OpSrc::Const(1)),
-                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(0)),
-                StatCode::Store(2, 1, Size::Byte),
+                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(0), false),
+                StatCode::Store(OpSrc::Var(2), 1, Size::Byte),
                 StatCode::Assign(1, OpSrc::Const(0)),
-                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(1)),
-                StatCode::Store(2, 1, Size::DWord),
+                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(1), false),
+                StatCode::Store(OpSrc::Var(2), 1, Size::DWord),
             ],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Ptr,
+            OpSrc::Var(0),
         );
         match_line_stat_vec(
             ir::Expr::Ptr(ir::PtrExpr::WideMalloc(vec![
@@ -924,23 +1004,25 @@ mod tests {
                 StatCode::Assign(0, OpSrc::Const(8)),
                 StatCode::Call(0, "malloc".to_string(), vec![0]),
                 StatCode::Assign(1, OpSrc::Const(1)),
-                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(0)),
-                StatCode::Store(2, 1, Size::Byte),
+                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(0), false),
+                StatCode::Store(OpSrc::Var(2), 1, Size::Byte),
                 StatCode::Assign(1, OpSrc::Const(0)),
-                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(4)),
-                StatCode::Store(2, 1, Size::DWord),
+                StatCode::AssignOp(2, OpSrc::Var(0), BinOp::Add, OpSrc::Const(4), false),
+                StatCode::Store(OpSrc::Var(2), 1, Size::DWord),
             ],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Ptr,
+            OpSrc::Var(0),
         );
         match_line_stat_vec(
             ir::Expr::Ptr(ir::PtrExpr::Malloc(vec![])),
             0,
-            vec![StatCode::Assign(0, OpSrc::Const(0))],
+            vec![],
             HashMap::new(),
             HashMap::new(),
             ir::Type::Ptr,
+            OpSrc::Const(0),
         );
     }
 
@@ -963,6 +1045,7 @@ mod tests {
             HashMap::new(),
             HashMap::from([("f".to_string(), Some(ir::Type::Ptr))]),
             ir::Type::Ptr,
+            OpSrc::Var(0),
         )
     }
 }

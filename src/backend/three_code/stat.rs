@@ -1,6 +1,8 @@
 use super::{
     super::Options,
-    expr::{translate_bool_expr, translate_expr, translate_num_expr, translate_ptr_expr},
+    expr::{
+        assign_op_src, translate_bool_expr, translate_expr, translate_num_expr, translate_ptr_expr,
+    },
     DataRefType, OpSrc, Size, StatCode, StatLine, StatType,
 };
 use crate::{
@@ -123,19 +125,16 @@ pub(super) fn translate_statement(
 ) {
     match stat {
         ir::Stat::AssignVar(var, expr) => {
-            translate_expr(expr, free_var, stat_line, vars, function_types, options);
-            stat_line.add_stat(StatCode::Assign(var, OpSrc::Var(free_var)));
+            let (_, op_src) =
+                translate_expr(expr, free_var, stat_line, vars, function_types, options);
+            stat_line.add_stat(StatCode::Assign(var, op_src));
         }
         ir::Stat::AssignPtr(ptr_expr, expr) => {
-            let store_width = get_type_width(translate_expr(
-                expr,
-                free_var,
-                stat_line,
-                vars,
-                function_types,
-                options,
-            ));
-            translate_ptr_expr(
+            let (expr_type, op_src) =
+                translate_expr(expr, free_var, stat_line, vars, function_types, options);
+            assign_op_src(free_var, op_src, stat_line);
+            let store_width = get_type_width(expr_type);
+            let op_src = translate_ptr_expr(
                 ptr_expr,
                 free_var + 1,
                 stat_line,
@@ -143,10 +142,14 @@ pub(super) fn translate_statement(
                 function_types,
                 options,
             );
-            stat_line.add_stat(StatCode::Store(free_var + 1, free_var, store_width));
+            stat_line.add_stat(StatCode::Store(op_src, free_var, store_width));
         }
         ir::Stat::Free(ptr_expr) => {
-            translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
+            assign_op_src(
+                free_var,
+                translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options),
+                stat_line,
+            );
             stat_line.add_stat(StatCode::VoidCall("free".to_string(), vec![free_var]));
         }
         ir::Stat::Call(name, args) => {
@@ -157,7 +160,9 @@ pub(super) fn translate_statement(
                     successors(Some(free_var), |arg_result| Some(*arg_result + 1)),
                 )
                 .map(|(expr, arg_result)| {
-                    translate_expr(expr, arg_result, stat_line, vars, function_types, options);
+                    let (_, op_src) =
+                        translate_expr(expr, arg_result, stat_line, vars, function_types, options);
+                    assign_op_src(arg_result, op_src, stat_line);
                     arg_result
                 })
                 .collect(),
@@ -168,9 +173,8 @@ pub(super) fn translate_statement(
             *read_ref = true;
             let integer_format =
                 ensure_format(free_data_ref, data_refs, "%d", &mut fmt_flags.integer);
-
+            stat_line.add_stat(StatCode::Store(OpSrc::ReadRef, var, Size::DWord));
             stat_line.add_stat(StatCode::Assign(free_var, OpSrc::ReadRef));
-            stat_line.add_stat(StatCode::Store(free_var, var, Size::DWord));
             stat_line.add_stat(StatCode::Assign(
                 free_var + 1,
                 OpSrc::DataRef(integer_format, 0),
@@ -179,10 +183,14 @@ pub(super) fn translate_statement(
                 "scanf".to_string(),
                 vec![free_var + 1, free_var],
             ));
-            stat_line.add_stat(StatCode::Load(var, free_var, Size::DWord));
+            stat_line.add_stat(StatCode::Load(var, OpSrc::ReadRef, Size::DWord));
         }
         ir::Stat::ReadIntPtr(ptr_expr) => {
-            translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
+            assign_op_src(
+                free_var,
+                translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options),
+                stat_line,
+            );
             let integer_format =
                 ensure_format(free_data_ref, data_refs, "%d", &mut fmt_flags.integer);
             stat_line.add_stat(StatCode::Assign(
@@ -198,8 +206,8 @@ pub(super) fn translate_statement(
             *read_ref = true;
             let char_format =
                 ensure_format(free_data_ref, data_refs, " %c", &mut fmt_flags.char_in);
+            stat_line.add_stat(StatCode::Store(OpSrc::ReadRef, var, Size::Byte));
             stat_line.add_stat(StatCode::Assign(free_var, OpSrc::ReadRef));
-            stat_line.add_stat(StatCode::Store(free_var, var, Size::Byte));
             stat_line.add_stat(StatCode::Assign(
                 free_var + 1,
                 OpSrc::DataRef(char_format, 0),
@@ -208,10 +216,14 @@ pub(super) fn translate_statement(
                 "scanf".to_string(),
                 vec![free_var + 1, free_var],
             ));
-            stat_line.add_stat(StatCode::Load(var, free_var, Size::Byte));
+            stat_line.add_stat(StatCode::Load(var, OpSrc::ReadRef, Size::Byte));
         }
         ir::Stat::ReadCharPtr(ptr_expr) => {
-            translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
+            assign_op_src(
+                free_var,
+                translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options),
+                stat_line,
+            );
             let char_format =
                 ensure_format(free_data_ref, data_refs, " %c", &mut fmt_flags.char_in);
             stat_line.add_stat(StatCode::Assign(
@@ -224,7 +236,9 @@ pub(super) fn translate_statement(
             ));
         }
         ir::Stat::PrintExpr(ir::Expr::Num(num_expr)) => {
-            translate_num_expr(num_expr, free_var, stat_line, vars, function_types, options);
+            let (_, op_src) =
+                translate_num_expr(num_expr, free_var, stat_line, vars, function_types, options);
+            assign_op_src(free_var, op_src, stat_line);
             let integer_format =
                 ensure_format(free_data_ref, data_refs, "%d", &mut fmt_flags.integer);
             stat_line.add_stat(StatCode::Assign(
@@ -238,7 +252,7 @@ pub(super) fn translate_statement(
             add_flush(free_var, stat_line);
         }
         ir::Stat::PrintExpr(ir::Expr::Bool(bool_expr)) => {
-            translate_bool_expr(
+            let op_src = translate_bool_expr(
                 bool_expr,
                 free_var,
                 stat_line,
@@ -281,7 +295,7 @@ pub(super) fn translate_statement(
                 .graph()
                 .borrow_mut()
                 .new_node(StatType::new_branch(
-                    free_var,
+                    op_src,
                     true_set.clone(),
                     false_set.clone(),
                 ));
@@ -292,7 +306,11 @@ pub(super) fn translate_statement(
             add_flush(free_var, stat_line);
         }
         ir::Stat::PrintExpr(ir::Expr::Ptr(ptr_expr)) => {
-            translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
+            assign_op_src(
+                free_var,
+                translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options),
+                stat_line,
+            );
             let hex_format = ensure_format(free_data_ref, data_refs, "%p", &mut fmt_flags.ptr);
             stat_line.add_stat(StatCode::Assign(
                 free_var + 1,
@@ -305,7 +323,9 @@ pub(super) fn translate_statement(
             add_flush(free_var, stat_line);
         }
         ir::Stat::PrintChar(num_expr) => {
-            translate_num_expr(num_expr, free_var, stat_line, vars, function_types, options);
+            let (_, op_src) =
+                translate_num_expr(num_expr, free_var, stat_line, vars, function_types, options);
+            assign_op_src(free_var, op_src, stat_line);
             let integer_format =
                 ensure_format(free_data_ref, data_refs, "%c", &mut fmt_flags.char_out);
             stat_line.add_stat(StatCode::Assign(
@@ -319,8 +339,12 @@ pub(super) fn translate_statement(
             add_flush(free_var, stat_line);
         }
         ir::Stat::PrintStr(ptr_expr, num_expr) => {
-            translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options);
-            translate_num_expr(
+            assign_op_src(
+                free_var,
+                translate_ptr_expr(ptr_expr, free_var, stat_line, vars, function_types, options),
+                stat_line,
+            );
+            let (_, op_src) = translate_num_expr(
                 num_expr,
                 free_var + 1,
                 stat_line,
@@ -328,6 +352,7 @@ pub(super) fn translate_statement(
                 function_types,
                 options,
             );
+            assign_op_src(free_var + 1, op_src, stat_line);
             let string_format =
                 ensure_format(free_data_ref, data_refs, "%.*s", &mut fmt_flags.string);
             stat_line.add_stat(StatCode::Assign(
@@ -351,10 +376,7 @@ pub(super) fn translate_statement(
 
 #[cfg(test)]
 pub(super) mod tests {
-    use super::super::{
-        super::{Options, PropagationOpt},
-        DataRefType, OpSrc, Size, StatCode, StatNode, StatType,
-    };
+    use super::super::{super::Options, DataRefType, OpSrc, Size, StatCode, StatNode, StatType};
     use super::translate_statement;
     use crate::{
         backend::three_code::{stat::FmtDataRefFlags, StatLine},
@@ -453,7 +475,7 @@ pub(super) mod tests {
             &Options {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
-                propagation: PropagationOpt::None,
+                const_propagation: false,
                 inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
@@ -498,10 +520,7 @@ pub(super) mod tests {
         match_line_stat_vec(
             ir::Stat::AssignVar(0, ir::Expr::Bool(ir::BoolExpr::Const(true))),
             1,
-            vec![
-                StatCode::Assign(1, OpSrc::Const(1)),
-                StatCode::Assign(0, OpSrc::Var(1)),
-            ],
+            vec![StatCode::Assign(0, OpSrc::Const(1))],
             HashMap::from([(0, ir::Type::Bool)]),
             HashMap::new(),
             HashMap::new(),
@@ -517,8 +536,7 @@ pub(super) mod tests {
             0,
             vec![
                 StatCode::Assign(0, OpSrc::Const(1)),
-                StatCode::Assign(1, OpSrc::Const(0)),
-                StatCode::Store(1, 0, Size::Byte),
+                StatCode::Store(OpSrc::Const(0), 0, Size::Byte),
             ],
             HashMap::new(),
             HashMap::new(),
@@ -534,11 +552,11 @@ pub(super) mod tests {
             ir::Stat::ReadIntVar(0),
             1,
             vec![
+                StatCode::Store(OpSrc::ReadRef, 0, Size::DWord),
                 StatCode::Assign(1, OpSrc::ReadRef),
-                StatCode::Store(1, 0, Size::DWord),
                 StatCode::Assign(2, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("scanf".to_string(), vec![2, 1]),
-                StatCode::Load(0, 1, Size::DWord),
+                StatCode::Load(0, OpSrc::ReadRef, Size::DWord),
             ],
             HashMap::from([(0, ir::Type::Num(ir::NumSize::DWord))]),
             HashMap::new(),
@@ -554,11 +572,11 @@ pub(super) mod tests {
             ir::Stat::ReadCharVar(0),
             1,
             vec![
+                StatCode::Store(OpSrc::ReadRef, 0, Size::Byte),
                 StatCode::Assign(1, OpSrc::ReadRef),
-                StatCode::Store(1, 0, Size::Byte),
                 StatCode::Assign(2, OpSrc::DataRef(0, 0)),
                 StatCode::VoidCall("scanf".to_string(), vec![2, 1]),
-                StatCode::Load(0, 1, Size::Byte),
+                StatCode::Load(0, OpSrc::ReadRef, Size::Byte),
             ],
             HashMap::from([(0, ir::Type::Num(ir::NumSize::Byte))]),
             HashMap::new(),
@@ -659,7 +677,7 @@ pub(super) mod tests {
             &Options {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
-                propagation: PropagationOpt::None,
+                const_propagation: false,
                 inlining: Some(1000),
                 tail_call: false,
                 hoisting: false,
@@ -701,14 +719,13 @@ pub(super) mod tests {
             StatCode::Assign(0, OpSrc::DataRef(1, 0)),
             call_node,
         ));
-        let branch_node =
-            template_graph.new_node(StatType::new_branch(0, true_branch_node, false_branch_node));
-        let calc_node = template_graph.new_node(StatType::new_simple(
-            StatCode::Assign(0, OpSrc::Const(1)),
-            branch_node,
+        let branch_node = template_graph.new_node(StatType::new_branch(
+            OpSrc::Const(1),
+            true_branch_node,
+            false_branch_node,
         ));
 
-        match_graph(stat_line.start_node().expect("No start node"), calc_node);
+        match_graph(stat_line.start_node().expect("No start node"), branch_node);
     }
 
     #[test]

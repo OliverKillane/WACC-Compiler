@@ -170,33 +170,34 @@ fn substitute_vars(
             get_mapping(*var, new_variable, variable_mappings),
             substitute_op_src(*op_src, new_variable, variable_mappings),
         ),
-        StatCode::AssignOp(var, op_src1, bin_op, op_src2) => StatCode::AssignOp(
+        StatCode::AssignOp(var, op_src1, bin_op, op_src2, check) => StatCode::AssignOp(
             get_mapping(*var, new_variable, variable_mappings),
             substitute_op_src(*op_src1, new_variable, variable_mappings),
             *bin_op,
             substitute_op_src(*op_src2, new_variable, variable_mappings),
+            *check,
         ),
-        StatCode::Load(var1, var2, size) => StatCode::Load(
-            get_mapping(*var1, new_variable, variable_mappings),
-            get_mapping(*var2, new_variable, variable_mappings),
+        StatCode::Load(var, op_src, size) => StatCode::Load(
+            get_mapping(*var, new_variable, variable_mappings),
+            substitute_op_src(*op_src, new_variable, variable_mappings),
             *size,
         ),
-        StatCode::Store(var1, var2, size) => StatCode::Store(
-            get_mapping(*var1, new_variable, variable_mappings),
-            get_mapping(*var2, new_variable, variable_mappings),
+        StatCode::Store(op_src1, op_src2, size) => StatCode::Store(
+            substitute_op_src(*op_src1, new_variable, variable_mappings),
+            get_mapping(*op_src2, new_variable, variable_mappings),
             *size,
         ),
         StatCode::Call(var, fname, args) => StatCode::Call(
             get_mapping(*var, new_variable, variable_mappings),
             fname.clone(),
             args.iter()
-                .map(|var| get_mapping(*var, new_variable, variable_mappings))
+                .map(|op_src| get_mapping(*op_src, new_variable, variable_mappings))
                 .collect(),
         ),
         StatCode::VoidCall(fname, args) => StatCode::VoidCall(
             fname.clone(),
             args.iter()
-                .map(|var| get_mapping(*var, new_variable, variable_mappings))
+                .map(|op_src| get_mapping(*op_src, new_variable, variable_mappings))
                 .collect(),
         ),
     }
@@ -258,7 +259,7 @@ fn inline_code_dfs(
             ));
             new_node
         }
-        StatType::Branch(_, var, true_node, false_node) => {
+        StatType::Branch(_, op_src, true_node, false_node) => {
             let new_node = new_graph.new_node(StatType::deleted());
             mappings.insert(node.clone(), new_node.clone());
             let true_node = inline_code_dfs(
@@ -290,7 +291,7 @@ fn inline_code_dfs(
             let incoming = (&*new_node.get()).incoming().into_iter().cloned().collect();
             new_node.set(StatType::Branch(
                 incoming,
-                get_mapping(*var, new_variable, variable_mappings),
+                substitute_op_src(*op_src, new_variable, variable_mappings),
                 true_node,
                 false_node,
             ));
@@ -301,12 +302,12 @@ fn inline_code_dfs(
             mappings.insert(node.clone(), new_node.clone());
             new_node
         }
-        StatType::Return(_, var) => {
-            if let (Some(assigned_var), Some(var)) = (assigned_var, var) {
+        StatType::Return(_, op_src) => {
+            if let (Some(assigned_var), Some(op_src)) = (assigned_var, op_src) {
                 let new_node = new_graph.new_node(StatType::new_simple(
                     StatCode::Assign(
                         assigned_var,
-                        OpSrc::Var(get_mapping(*var, new_variable, variable_mappings)),
+                        substitute_op_src(*op_src, new_variable, variable_mappings),
                     ),
                     call_successor.clone(),
                 ));
@@ -364,7 +365,7 @@ fn copy_code_dfs(
             ));
             (new_node, instruction_sum + node_instruction_heuristic)
         }
-        StatType::Branch(_, var, true_node, false_node) => {
+        StatType::Branch(_, op_src, true_node, false_node) => {
             let new_node = new_graph.new_node(StatType::deleted());
             mappings.insert(node.clone(), new_node.clone());
             let (true_node, true_instruction_sum) = copy_code_dfs(
@@ -392,7 +393,7 @@ fn copy_code_dfs(
             let incoming = (&*new_node.get()).incoming().into_iter().cloned().collect();
             new_node.set(StatType::Branch(
                 incoming,
-                get_mapping(*var, new_variable, variable_mappings),
+                substitute_op_src(*op_src, new_variable, variable_mappings),
                 true_node,
                 false_node,
             ));
@@ -406,9 +407,9 @@ fn copy_code_dfs(
             mappings.insert(node.clone(), new_node.clone());
             (new_node, node_instruction_heuristic)
         }
-        StatType::Return(_, var) => {
+        StatType::Return(_, op_src) => {
             let new_node = new_graph.new_node(StatType::new_return(
-                var.map(|var| get_mapping(var, new_variable, variable_mappings)),
+                op_src.map(|op_src| substitute_op_src(op_src, new_variable, variable_mappings)),
             ));
             mappings.insert(node.clone(), new_node.clone());
             (new_node, node_instruction_heuristic)

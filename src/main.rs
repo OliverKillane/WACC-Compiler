@@ -7,8 +7,8 @@
 #![feature(backtrace)]
 #![feature(map_try_insert)]
 #![feature(iter_intersperse)]
-#![allow(dead_code)]
 #![feature(cow_is_borrowed)]
+#![allow(dead_code)]
 //! # The group 33 WACC Compiler project.
 //!
 //! Lovingly developed by:
@@ -51,7 +51,7 @@ mod graph;
 mod intermediate;
 mod tests;
 
-use backend::{compile, Options, PropagationOpt};
+use backend::{compile, Options};
 use clap::{ArgEnum, Parser};
 use frontend::{analyse, gather_modules, GatherModulesError};
 use path_absolutize::Absolutize;
@@ -83,12 +83,15 @@ struct Args {
     #[clap(
         short,
         long,
-        help = "print the backend representations (arm with temporaries)"
+        help = "Print the backend representations (arm with temporaries)"
     )]
     backend_temps: bool,
 
-    #[clap(short, long, help = "print the intermediate representation generated")]
+    #[clap(short, long, help = "Print the intermediate representation generated")]
     ir_print: bool,
+
+    #[clap(long, help = "run tail call optimisation")]
+    tail_call: bool,
 
     #[clap(
         long,
@@ -98,6 +101,9 @@ struct Args {
         value_name = "MODE"
     )]
     inlining: InlineMode,
+
+    #[clap(short, long, help = "Enable constant propagation")]
+    const_prop: bool,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
@@ -141,7 +147,9 @@ fn main() -> io::Result<()> {
         outputpath,
         backend_temps: temp_arm,
         ir_print,
+        tail_call,
         inlining,
+        const_prop,
     } = Args::parse();
 
     let (main_file, module_files) = match gather_modules(&main_file_path) {
@@ -203,9 +211,9 @@ fn main() -> io::Result<()> {
             let options = Options {
                 sethi_ullman_weights: false,
                 dead_code_removal: false,
-                propagation: PropagationOpt::None,
+                const_propagation: const_prop,
                 inlining: inlining.into(),
-                tail_call: false,
+                tail_call,
                 hoisting: false,
                 strength_reduction: false,
                 loop_unrolling: false,
