@@ -80,7 +80,7 @@ fn translate_rhs(
                     ir::Expr::Ptr(ir::PtrExpr::Call(prefixed_name, args))
                 }
                 Type::Generic(_) | Type::Any => panic!("Expected a concrete type"),
-                Type::Void => panic!("Cannot assign a void type"),
+                Type::Void => panic!("Returning call to a void function"),
             }
         }
         AssignRhs::Array(ASTWrapper(_, fields)) => ir::Expr::Ptr(ir::PtrExpr::Malloc(
