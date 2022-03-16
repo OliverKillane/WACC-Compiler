@@ -1,0 +1,21 @@
+# simple use of void function call to print a string
+
+# Output:
+# The answer is 42
+
+# Program:
+
+begin
+  void print_a(int a) is 
+    println a;
+    return
+  end
+
+  int answer(int a) is
+    print "The answer is ";
+    call print_a(a + 1);
+    return a + 1
+  end
+  
+  call answer(41)
+end
