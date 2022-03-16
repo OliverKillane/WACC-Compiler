@@ -272,7 +272,7 @@ fn compiler_test(filename: &str, input: String, output: Behaviour, _exit_code: O
         hoisting: false,
         strength_reduction: false,
         loop_unrolling: false,
-        common_expressions: false,
+        common_expressions: true,
         show_arm_temp_rep: false,
     };
     let assembly = compile(
