@@ -1,0 +1,7 @@
+            mod ../another_include.wacc;
+            begin
+                int add_one(int x) is
+                    return x + 1
+                end
+                # So on and so forth
+            end
