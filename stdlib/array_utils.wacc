@@ -57,11 +57,15 @@ begin
             print ident ;
             print " = [" ;
             while (i < arr_len - 1) do
+                print "\'" ;
                 print arr[i] ;
+                print "\'" ;
                 i = i + 1 ;
                 print ", "
             done ;
+            print "\'" ;
             print arr[i] ;
+            print "\'" ;
             println "]"
         fi ;
         return
