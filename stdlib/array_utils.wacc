@@ -20,8 +20,9 @@ begin
                 print ", "
             done ;
             print arr[i] ;
-            println "]" ;
-        fi 
+            println "]"
+        fi ;
+        return
     end
 
     # Print the given boolean array
@@ -40,8 +41,9 @@ begin
                 print ", "
             done ;
             print arr[i] ;
-            println "]" ;
-        fi 
+            println "]"
+        fi ;
+        return
     end
 
     # Print the given characater array
@@ -60,8 +62,9 @@ begin
                 print ", "
             done ;
             print arr[i] ;
-            println "]" ;
-        fi 
+            println "]"
+        fi ;
+        return
     end
 
     ##### ARRAY FILL FUNCTIONS #####
@@ -74,6 +77,7 @@ begin
             arr[i] = elem ;
             i = i + 1
         done ;
+        return
     end
 
     # Fill given boolean array with given boolean
@@ -84,6 +88,7 @@ begin
             arr[i] = elem ;
             i = i + 1
         done ;
+        return
     end
 
     # Fill given character array with given character
@@ -94,6 +99,7 @@ begin
             arr[i] = elem ;
             i = i + 1
         done ;
+        return
     end
 
     ##### ARRAY COUNT FUNCTIONS #####
@@ -387,7 +393,7 @@ begin
             println "One, or both, of the given indices is out of bounds!" ;
             return false
         else
-            int temp = arr[i1] ;
+            bool temp = arr[i1] ;
             arr[i1] = arr[i2] ;
             arr[i2] = temp ;
             return true
@@ -401,7 +407,7 @@ begin
             println "One, or both, of the given indices is out of bounds!" ;
             return false
         else
-            int temp = arr[i1] ;
+            char temp = arr[i1] ;
             arr[i1] = arr[i2] ;
             arr[i2] = temp ;
             return true
@@ -768,6 +774,7 @@ begin
         else
             skip
         fi ;
+        return
     end
 
     # Main QuickSort function - performs Quick Sort on given integer array
@@ -776,6 +783,7 @@ begin
         int lo = 0 ;
         int hi = (len arr) - 1;
         call quick_sort_int_helper(lo, hi, arr, desc) ;
+        return
     end
 
     #### CHARACTER ARRAYS ####
@@ -941,6 +949,7 @@ begin
         else
             skip
         fi ;
+        return
     end
 
     # Main QuickSort function - performs Quick Sort on given character array
@@ -949,6 +958,7 @@ begin
         int lo = 0 ;
         int hi = (len arr) - 1;
         call quick_sort_char_helper(lo, hi, arr, desc) ;
+        return
     end
 
     ##### WILL NEED TO ADD NEW 'new' OPERATOR #####
