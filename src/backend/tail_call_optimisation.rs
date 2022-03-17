@@ -19,10 +19,10 @@
 //!
 //! This can also be done for void functions.
 
-use rayon::prelude::*;
 use super::three_code::{Function, OpSrc, StatCode, StatNode, StatType, ThreeCode};
 use crate::{graph::Graph, intermediate::VarRepr};
 use lazy_static::__Deref;
+use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
     ops::DerefMut,

@@ -10,13 +10,13 @@ use std::{
     sync::Arc,
 };
 
-use lazy_static::__Deref;
-use rayon::prelude::*;
 use super::{
     data_flow::dataflow_analysis,
     three_code::{OpSrc, StatCode, StatNode, StatType, ThreeCode},
 };
 use crate::intermediate::VarRepr;
+use lazy_static::__Deref;
+use rayon::prelude::*;
 
 /// Remove all dead code from a threecode program
 pub(super) fn remove_dead_code(mut threecode: ThreeCode) -> ThreeCode {
