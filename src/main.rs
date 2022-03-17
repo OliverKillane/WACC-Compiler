@@ -33,12 +33,16 @@
 //!     <FILE>    
 //!
 //! OPTIONS:
-//!     -b, --backend-temps        print the backend representations (arm with temporaries)
+//!     -a, --arm-temp             Print the backend representations (arm with temporaries)
+//!         --const-prop           Enable constant propagation
+//!         --dead-code            Enable dead code elimination
 //!     -h, --help                 Print help information
-//!     -i, --ir-print             print the intermediate representation generated
+//!     -i, --ir-print             Print the intermediate representation generated
 //!         --inlining <MODE>      Set the function inlining mode [default: off] [possible values: off,
 //!                                low, medium, high]
 //!     -o, --outputpath <FILE>    The name of the output file
+//!     -t, --three-code           Print the three code representation of the program
+//!         --tail-call            run tail call optimisation
 //!     -V, --version              Print version information
 //! ```
 
@@ -85,7 +89,14 @@ struct Args {
         long,
         help = "Print the backend representations (arm with temporaries)"
     )]
-    backend_temps: bool,
+    arm_temp: bool,
+
+    #[clap(
+        short,
+        long,
+        help = "Print the three code representation of the program"
+    )]
+    three_code: bool,
 
     #[clap(short, long, help = "Print the intermediate representation generated")]
     ir_print: bool,
@@ -148,7 +159,8 @@ fn main() -> io::Result<()> {
     let Args {
         filepath: mut main_file_path,
         outputpath,
-        backend_temps: temp_arm,
+        arm_temp,
+        three_code,
         ir_print,
         tail_call,
         inlining,
@@ -222,15 +234,15 @@ fn main() -> io::Result<()> {
                 strength_reduction: false,
                 loop_unrolling: false,
                 common_expressions: false,
-                show_arm_temp_rep: temp_arm,
+                show_arm_temp_rep: arm_temp,
+                show_three_code: three_code,
             };
 
             let result = compile(ir, options);
 
-            if temp_arm {
-                for temp in result.intermediates {
-                    println!("{}", temp)
-                }
+            for (name, temp) in result.intermediates {
+                println!("{}:", name);
+                println!("{}", temp)
             }
 
             let mut file = if let Some(outpath) = outputpath {

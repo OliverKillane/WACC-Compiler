@@ -483,6 +483,7 @@ pub(super) mod tests {
                 loop_unrolling: false,
                 common_expressions: false,
                 show_arm_temp_rep: false,
+                show_three_code: false,
             },
         );
 
@@ -685,6 +686,7 @@ pub(super) mod tests {
                 loop_unrolling: false,
                 common_expressions: false,
                 show_arm_temp_rep: false,
+                show_three_code: false,
             },
         );
 

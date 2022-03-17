@@ -539,7 +539,8 @@ mod tests {
                     strength_reduction: false,
                     loop_unrolling: false,
                     common_expressions: false,
-                    show_arm_temp_rep: false
+                    show_arm_temp_rep: false,
+                    show_three_code: false
                 }
             ),
             (expr_type, op_src)
