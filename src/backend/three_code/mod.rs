@@ -1038,6 +1038,7 @@ mod tests {
                 const_branch: false,
                 show_arm_temp_rep: false,
                 show_three_code: false,
+                show_optimised_three_code: false,
             },
         );
 
@@ -1149,6 +1150,7 @@ mod tests {
                 const_branch: false,
                 show_arm_temp_rep: false,
                 show_three_code: false,
+                show_optimised_three_code: false,
             },
         );
 
@@ -1220,6 +1222,7 @@ mod tests {
                 const_branch: false,
                 show_arm_temp_rep: false,
                 show_three_code: false,
+                show_optimised_three_code: false,
             },
         );
         assert_eq!(args, vec![0]);
@@ -1256,6 +1259,7 @@ mod tests {
                 const_branch: false,
                 show_arm_temp_rep: false,
                 show_three_code: false,
+                show_optimised_three_code: false,
             },
         );
         assert_eq!(args, vec![0]);
@@ -1294,6 +1298,7 @@ mod tests {
                 const_branch: false,
                 show_arm_temp_rep: false,
                 show_three_code: false,
+                show_optimised_three_code: false,
             },
         )
             .into();

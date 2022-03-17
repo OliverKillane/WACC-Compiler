@@ -266,6 +266,7 @@ fn compiler_test(filename: &str, input: String, output: Behaviour, _exit_code: O
         const_branch: true,
         show_arm_temp_rep: false,
         show_three_code: false,
+        show_optimised_three_code: false,
     };
     let assembly = compile(
         analyse(&main_file, module_files.iter().collect()).unwrap(),

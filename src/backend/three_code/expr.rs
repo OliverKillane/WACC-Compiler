@@ -543,7 +543,8 @@ mod tests {
                     tail_call: false,
                     const_branch: false,
                     show_arm_temp_rep: false,
-                    show_three_code: false
+                    show_three_code: false,
+                    show_optimised_three_code: false,
                 }
             ),
             (expr_type, op_src)

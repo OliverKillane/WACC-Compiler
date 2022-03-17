@@ -487,6 +487,7 @@ pub(super) mod tests {
                 const_branch: false,
                 show_arm_temp_rep: false,
                 show_three_code: false,
+                show_optimised_three_code: false,
             },
         );
 
@@ -686,6 +687,7 @@ pub(super) mod tests {
                 const_branch: false,
                 show_arm_temp_rep: false,
                 show_three_code: false,
+                show_optimised_three_code: false,
             },
         );
 

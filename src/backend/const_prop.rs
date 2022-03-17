@@ -487,7 +487,8 @@ pub(super) fn prop_consts(threecode: ThreeCode) -> ThreeCode {
 
     threecode
         .functions
-        .par_iter().for_each(|(_, fun)| prop_const_graph(&fun.code, &fun.args, &threecode.int_handler));
+        .par_iter()
+        .for_each(|(_, fun)| prop_const_graph(&fun.code, &fun.args, &threecode.int_handler));
 
     threecode
 }

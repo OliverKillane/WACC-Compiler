@@ -25,25 +25,26 @@
 //! wacc_33 0.6.9
 //! Jordan Hall, Bartłomiej Cieślar, Panayiotis Gavriil and Oliver Killane
 //! WACC compiler
-//!
+//! 
 //! USAGE:
 //!     compile [OPTIONS] <FILE>
-//!
+//! 
 //! ARGS:
 //!     <FILE>    
-//!
+//! 
 //! OPTIONS:
-//!     -a, --arm-temp             Print the backend representations (arm with temporaries)
-//!         --const-prop           Enable constant propagation
-//!         --dead-code            Enable dead code elimination
-//!     -h, --help                 Print help information
-//!     -i, --ir-print             Print the intermediate representation generated
-//!         --inlining <MODE>      Set the function inlining mode [default: off] [possible values: off,
-//!                                low, medium, high]
-//!     -o, --outputpath <FILE>    The name of the output file
-//!     -t, --three-code           Print the three code representation of the program
-//!         --tail-call            run tail call optimisation
-//!     -V, --version              Print version information
+//!     -a, --arm-temp                  Print the backend representations (arm with temporaries)
+//!         --const-prop                Enable constant propagation
+//!         --dead-code                 Enable dead code elimination
+//!     -f, --final-three-code          Print the three code optimised threecode of the program
+//!     -h, --help                      Print help information
+//!     -i, --ir-print                  Print the intermediate representation generated
+//!         --inlining <MODE>           Set the function inlining mode [default: off] [possible values:
+//!                                     off, low, medium, high]
+//!     -o, --outputpath <FILE>         The name of the output file
+//!         --tail-call                 run tail call optimisation
+//!     -u, --unoptimised-three-code    Print the three code representation of the program
+//!     -V, --version                   Print version information
 //! ```
 
 #[macro_use]
@@ -96,7 +97,14 @@ struct Args {
         long,
         help = "Print the three code representation of the program"
     )]
-    three_code: bool,
+    unoptimised_three_code: bool,
+
+    #[clap(
+        short,
+        long,
+        help = "Print the three code optimised threecode of the program"
+    )]
+    final_three_code: bool,
 
     #[clap(short, long, help = "Print the intermediate representation generated")]
     ir_print: bool,
@@ -163,7 +171,8 @@ fn main() -> io::Result<()> {
         filepath: mut main_file_path,
         outputpath,
         arm_temp,
-        three_code,
+        unoptimised_three_code,
+        final_three_code,
         ir_print,
         tail_call,
         inlining,
@@ -235,7 +244,8 @@ fn main() -> io::Result<()> {
                 inlining: inlining.into(),
                 tail_call,
                 show_arm_temp_rep: arm_temp,
-                show_three_code: three_code,
+                show_three_code: unoptimised_three_code,
+                show_optimised_three_code: final_three_code,
             };
 
             let result = compile(ir, options);

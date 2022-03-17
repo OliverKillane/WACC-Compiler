@@ -57,6 +57,7 @@ pub struct Options {
     pub tail_call: bool,
     pub show_arm_temp_rep: bool,
     pub show_three_code: bool,
+    pub show_optimised_three_code: bool,
 }
 
 pub struct BackendOutput {
@@ -106,10 +107,8 @@ pub fn compile(program: Program, options: Options) -> BackendOutput {
         .check_dummy()
         .expect("There are left-over dummy nodes in the ThreeCode");
 
-    let mut intermediates = vec![];
-
-    if options.show_three_code {
-        intermediates.push(("ThreeCode".to_string(), three_code.to_string()))
+    if options.show_optimised_three_code {
+        intermediates.push(("Optimised ThreeCode".to_string(), three_code.to_string()))
     }
 
     // the arm result can return a printable intermediate representation.

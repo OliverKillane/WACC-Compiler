@@ -28,7 +28,7 @@ pub fn remove_self_moves(mut start_node: ArmNode, cfg: &mut Graph<ControlFlow>) 
                         }
                     }
                     (None, Some(next_node)) => {
-                        if next_node != &node && node == start_node{
+                        if next_node != &node && node == start_node {
                             start_node = next_node.clone();
                             next_node.remove_predecessor(&node);
                         }
