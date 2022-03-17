@@ -5,7 +5,7 @@ begin
     ##### ARRAY PRINTING FUNCTIONS #####
 
     # Print the given integer array
-    void print_int_array(string ident, int[] arr) is
+    void print_int_arr(string ident, int[] arr) is
         int arr_len = len arr ;
         if (arr_len == 0) then 
             print ident ;
@@ -25,7 +25,7 @@ begin
     end
 
     # Print the given boolean array
-    void print_bool_array(string ident, bool[] arr) is 
+    void print_bool_arr(string ident, bool[] arr) is 
         int arr_len = len arr ;
         if (arr_len == 0) then 
             print ident ;
@@ -45,7 +45,7 @@ begin
     end
 
     # Print the given characater array
-    void print_char_array(string ident, char[] arr) is   
+    void print_char_arr(string ident, char[] arr) is   
         int arr_len = len arr ;
         if (arr_len == 0) then 
             print ident ;
@@ -67,7 +67,7 @@ begin
     ##### ARRAY FILL FUNCTIONS #####
 
     # Fill given integer array with given integer
-    void fill_int_array(int elem, int[] arr) is
+    void fill_int_arr(int elem, int[] arr) is
         int i = 0 ;
         int arr_len = len arr ;
         while (i < arr_len) do
@@ -77,7 +77,7 @@ begin
     end
 
     # Fill given boolean array with given boolean
-    void fill_bool_array(bool elem, bool[] arr) is
+    void fill_bool_arr(bool elem, bool[] arr) is
         int i = 0 ;
         int arr_len = len arr ;
         while (i < arr_len) do
@@ -87,7 +87,7 @@ begin
     end
 
     # Fill given character array with given character
-    void fill_char_array(char elem, char[] arr) is
+    void fill_char_arr(char elem, char[] arr) is
         int i = 0 ;
         int arr_len = len arr ;
         while (i < arr_len) do
@@ -100,7 +100,7 @@ begin
 
     # Returns a pair with the 1st element being the number of appearances of given element in given integer array
     # and the 2nd element being the index of the last appearance of given element (or -1 if count is 0) 
-    pair(int, int) count_last_int_array(int elem, int[] arr) is
+    pair(int, int) count_last_int_arr(int elem, int[] arr) is
         int count = 0 ;
         int i = 0 ;
         int arr_len = len arr ;
@@ -120,7 +120,7 @@ begin
 
     # Returns a pair with the 1st element being the number of appearances of given element in given boolean array
     # and the 2nd element being the index of the last appearance of given element (or -1 if count is 0) 
-    pair(int, int) count_last_bool_array(bool elem, bool[] arr) is
+    pair(int, int) count_last_bool_arr(bool elem, bool[] arr) is
         int count = 0 ;
         int i = 0 ;
         int arr_len = len arr ;
@@ -140,7 +140,7 @@ begin
 
     # Returns a pair with the 1st element being the number of appearances of given element in given character array
     # and the 2nd element being the index of the last appearance of given element (or -1 if count is 0) 
-    pair(int, int) count_last_char_array(char elem, char[] arr) is
+    pair(int, int) count_last_char_arr(char elem, char[] arr) is
         int count = 0 ;
         int i = 0 ;
         int arr_len = len arr ;
@@ -159,22 +159,22 @@ begin
     end
 
     # Returns the number of appearances of given element in given integer array
-    int count_int_array(int elem, int[] arr) is
-        pair(int, int) count_last = call count_last_int_array(elem, arr) ;
+    int count_int_arr(int elem, int[] arr) is
+        pair(int, int) count_last = call count_last_int_arr(elem, arr) ;
         int count = fst count_last ;
         return count
     end
 
     # Returns the number of appearances of given element in given boolean array
-    int count_bool_array(bool elem, bool[] arr) is
-    pair(int, int) count_last = call count_last_bool_array(elem, arr) ;
+    int count_bool_arr(bool elem, bool[] arr) is
+    pair(int, int) count_last = call count_last_bool_arr(elem, arr) ;
     int count = fst count_last ;
     return count
     end
 
     # Returns the index of the appearance of given element in given character array
-    int count_char_array(char elem, char[] arr) is
-    pair(int, int) count_last = call count_last_char_array(elem, arr) ;
+    int count_char_arr(char elem, char[] arr) is
+    pair(int, int) count_last = call count_last_char_arr(elem, arr) ;
     int count = fst count_last ;
     return count
     end
@@ -183,7 +183,7 @@ begin
 
     # Returns the index of the nth appearance of given element in given integer array
     # Returns -1 if given element is not present in given array n times
-    int find_nth_int_array(int elem, int n, int[] arr) is
+    int find_nth_int_arr(int elem, int n, int[] arr) is
         int count = 0 ;
         int i = 0 ;
         int arr_len = len arr ;
@@ -205,7 +205,7 @@ begin
 
     # Returns the index of the nth appearance of given element in given boolean array
     # Returns -1 if given element is not present in given array n times
-    int find_nth_bool_array(bool elem, int n, bool[] arr) is
+    int find_nth_bool_arr(bool elem, int n, bool[] arr) is
         int count = 0 ;
         int i = 0 ;
         int arr_len = len arr ;
@@ -227,7 +227,7 @@ begin
 
     # Returns the index of the nth appearance of given element in given character array
     # Returns -1 if given element is not present in given array n times
-    int find_nth_char_array(char elem, int n, char[] arr) is
+    int find_nth_char_arr(char elem, int n, char[] arr) is
         int count = 0 ;
         int i = 0 ;
         int arr_len = len arr ;
@@ -250,44 +250,44 @@ begin
     # Returns the index of the 1st appearance of given element in given integer array
     # Returns -1 if given element is not present in given array
     int find_first_int_arr(int elem, int[] arr) is
-        int i = call find_nth_int_array(elem, 1, arr) ;
+        int i = call find_nth_int_arr(elem, 1, arr) ;
         return i
     end
 
     # Returns the index of the 1st appearance of given element in given boolean array
     # Returns -1 if given element is not present in given array
     int find_first_bool_arr(bool elem, bool[] arr) is
-        int i = call find_nth_bool_array(elem, 1, arr) ;
+        int i = call find_nth_bool_arr(elem, 1, arr) ;
         return i
     end
 
     # Returns the index of the 1st appearance of given element in given character array
     # Returns -1 if given element is not present in given array
     int find_first_char_arr(char elem, char[] arr) is
-        int i = call find_nth_char_array(elem, 1, arr) ;
+        int i = call find_nth_char_arr(elem, 1, arr) ;
         return i
     end
 
     # Returns the index of the last appearance of given element in given integer array
     # Returns -1 if given element is not present in given array
-    int find_last_int_array(int elem, int[] arr) is
-        pair(int, int) count_last = call count_last_int_array(elem, arr) ;
+    int find_last_int_arr(int elem, int[] arr) is
+        pair(int, int) count_last = call count_last_int_arr(elem, arr) ;
         int last = snd count_last ;
         return last
     end
 
     # Returns the index of the last appearance of given element in given boolean array
     # Returns -1 if given element is not present in given array
-    int find_last_bool_array(bool elem, bool[] arr) is
-        pair(int, int) count_last = call count_last_bool_array(elem, arr) ;
+    int find_last_bool_arr(bool elem, bool[] arr) is
+        pair(int, int) count_last = call count_last_bool_arr(elem, arr) ;
         int last = snd count_last ;
         return last
     end
 
      # Returns the index of the last appearance of given element in given character array
      # Returns -1 if given element is not present in given array
-    int find_last_char_array(char elem, char[] arr) is
-        pair(int, int) count_last = call count_last_char_array(elem, arr) ;
+    int find_last_char_arr(char elem, char[] arr) is
+        pair(int, int) count_last = call count_last_char_arr(elem, arr) ;
         int last = snd count_last ;
         return last
     end
@@ -295,8 +295,8 @@ begin
     # Returns the index of the first encountered appearance of the given target in an integer array
     # after following the binary search algorithm
     # Returns -1 if given target is not present in given array
-    # The given array MUST be sorted
-    int binary_search_int_array(int target, int[] arr) is
+    # The given arr MUST be sorted
+    int binary_search_int_arr(int target, int[] arr) is
         int arr_len = len arr ;
         int left = 0 ;
         int right = arr_len - 1 ;
@@ -322,7 +322,7 @@ begin
     # after following the binary search algorithm
     # Returns -1 if given target is not present in given array
     # The given array MUST be sorted
-    int binary_search_char_array(char target, char[] arr) is
+    int binary_search_char_arr(char target, char[] arr) is
         int arr_len = len arr ;
         int left = 0 ;
         int right = arr_len - 1 ;
@@ -347,19 +347,19 @@ begin
     ##### ARRAY CONTAINS FUNCTIONS #####
 
     # Returns true if given element exists in given integer array
-    bool contains_int_array(int elem, int[] arr) is
+    bool contains_int_arr(int elem, int[] arr) is
         int found = call find_first_int_arr(elem, arr) ;
         return (found != -1)
     end
 
     # Returns true if given element exists in given boolean array
-    bool contains_bool_array(bool elem, bool[] arr) is
+    bool contains_bool_arr(bool elem, bool[] arr) is
         int found = call find_first_bool_arr(elem, arr) ;
         return (found != -1)
     end
 
     # Returns true if given element exists in given character array
-    bool contains_char_array(char elem, char[] arr) is
+    bool contains_char_arr(char elem, char[] arr) is
         int found = call find_first_char_arr(elem, arr) ;
         return (found != -1)
     end
@@ -410,7 +410,7 @@ begin
 
     # Copies the elements of given integer array 'arr' into the given buffer array 'buff'
     # If the 'rev' flag is set, then the order is reversed
-    bool copy_int_array(int[] arr, int[] buff, bool rev) is
+    bool copy_int_arr(int[] arr, int[] buff, bool rev) is
         int arr_len = len arr ;
         int buff_len = len buff ;
         if (buff_len != arr_len) then
@@ -433,7 +433,7 @@ begin
 
     # Copies the elements of given boolean array 'arr' into the given buffer array 'buff'
     # If the 'rev' flag is set, then the order is reversed
-    bool copy_bool_array(bool[] arr, bool[] buff, bool rev) is
+    bool copy_bool_arr(bool[] arr, bool[] buff, bool rev) is
         int arr_len = len arr ;
         int buff_len = len buff ;
         if (buff_len != arr_len) then
@@ -456,7 +456,7 @@ begin
 
     # Copies the elements of given character array 'arr' into the given buffer array 'buff'
     # If the 'rev' flag is set, then the order is reversed
-    bool copy_char_array(char[] arr, char[] buff, bool rev) is
+    bool copy_char_arr(char[] arr, char[] buff, bool rev) is
         int arr_len = len arr ;
         int buff_len = len buff ;
         if (buff_len != arr_len) then
@@ -479,31 +479,31 @@ begin
 
     # Copies the given integer array 'arr' into the given buffer array 'buff' and frees 'arr'
     # If the 'rev' flag is set, then the order is reversed
-    bool move_int_array(int[] arr, int[] buff, bool reverse) is
-        bool copied = call copy_int_array(arr, buff, reverse) ;
+    bool move_int_arr(int[] arr, int[] buff, bool reverse) is
+        bool copied = call copy_int_arr(arr, buff, reverse) ;
         free arr ;
         return copied
     end
 
     # Copies the given boolean array 'arr' into the given buffer array 'buff' and frees 'arr'
     # If the 'rev' flag is set, then the order is reversed
-    bool move_bool_array(bool[] arr, bool[] buff, bool reverse) is
-        bool copied = call copy_bool_array(arr, buff, reverse) ;
+    bool move_bool_arr(bool[] arr, bool[] buff, bool reverse) is
+        bool copied = call copy_bool_arr(arr, buff, reverse) ;
         free arr ;
         return copied
     end
 
     # Copies the given character array 'arr' into the given buffer array 'buff' and frees 'arr'
     # If the 'rev' flag is set, then the order is reversed
-    bool move_char_array(char[] arr, char[] buff, bool reverse) is
-        bool copied = call copy_char_array(arr, buff, reverse) ;
+    bool move_char_arr(char[] arr, char[] buff, bool reverse) is
+        bool copied = call copy_char_arr(arr, buff, reverse) ;
         free arr ;
         return copied
     end
 
     # Concatenates the two given integer arrays, 'arr1' and 'arr2', and stores the result in
     # the given buffer array 'buff'
-    bool concat_int_arrays(int[] arr1, int[] arr2, int[] buff) is
+    bool concat_int_arrs(int[] arr1, int[] arr2, int[] buff) is
         int arr1_len = len arr1 ;
         int arr2_len = len arr2 ;
         int buff_len = len buff ;
@@ -526,7 +526,7 @@ begin
 
     # Concatenates the two given boolean arrays, 'arr1' and 'arr2', and stores the result in
     # the given buffer array 'buff'
-    bool concat_bool_arrays(bool[] arr1, bool[] arr2, bool[] buff) is
+    bool concat_bool_arrs(bool[] arr1, bool[] arr2, bool[] buff) is
         int arr1_len = len arr1 ;
         int arr2_len = len arr2 ;
         int buff_len = len buff ;
@@ -549,7 +549,7 @@ begin
 
     # Concatenates the two given character arrays, 'arr1' and 'arr2', and stores the result in
     # the given buffer array 'buff'
-    bool concat_char_arrays(char[] arr1, char[] arr2, char[] buff) is
+    bool concat_char_arrs(char[] arr1, char[] arr2, char[] buff) is
         int arr1_len = len arr1 ;
         int arr2_len = len arr2 ;
         int buff_len = len buff ;
@@ -950,23 +950,23 @@ begin
     ##### WILL NEED TO ADD NEW 'new' OPERATOR #####
 
     # # Initialize integer array of given size with given integer
-    # int[] init_int_array(int elem, int size) is
+    # int[] init_int_arr(int elem, int size) is
     #     int[] arr = new arr[size] ;
-    #     arr = call fill_int_array(elem, arr) ;
+    #     arr = call fill_int_arr(elem, arr) ;
     #     return arr
     # end
 
     # # Initialize boolean array of given size with given boolean
-    # bool[] init_bool_array(bool elem, int size) is
+    # bool[] init_bool_arr(bool elem, int size) is
     #     bool[] arr = new arr[size] ;
-    #     arr = call fill_bool_array(elem, arr) ;
+    #     arr = call fill_bool_arr(elem, arr) ;
     #     return arr
     # end
 
     # # Initialize character array of given size with given character
-    # char[] init_char_array(char elem, int size) is
+    # char[] init_char_arr(char elem, int size) is
     #     char[] arr = new arr[size] ;
-    #     arr = call fill_char_array(elem, arr) ;
+    #     arr = call fill_char_arr(elem, arr) ;
     #     return arr
     # end
     
