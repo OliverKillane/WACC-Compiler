@@ -1,0 +1,29 @@
+# deeply nested full pair type
+
+# Output:
+# 3
+# (nil)
+# c
+# hello
+# world
+
+# Program:
+
+begin
+    pair(int, pair) a = newpair(3, null);
+    pair(pair(int, pair), char) b = newpair(a, 'c');
+    pair(string,string) c = newpair("hello", "world");
+    pair(pair(pair(int, pair), char),pair(string,string)) d = newpair(b,c);
+    
+    int print_1 = fst a;
+    pair(pair, pair) print_2 = snd a;
+    char print_3 = snd b;
+    string print_4 = fst c;
+    string print_5 = snd c;
+    
+    println print_1;
+    println print_2;
+    println print_3;
+    println print_4;
+    println print_5
+end

@@ -1,0 +1,10 @@
+# checking handling of ints and keywords 
+
+# Output:
+# #empty#
+
+# Program:
+begin
+  begin
+    int x = 125end
+end

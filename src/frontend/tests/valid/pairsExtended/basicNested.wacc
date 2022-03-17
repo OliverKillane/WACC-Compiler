@@ -1,0 +1,26 @@
+# create a nested pair of type pair(pair(int, int), char)
+
+# Output:
+# c
+# #addrs#
+# 3
+# 4
+
+# Program:
+
+begin
+    pair(pair(int, int), char) a = null;
+    pair(int, int) b = newpair(3,4);
+    a = newpair(b,'c');
+    
+    # printing
+    char p_1 = snd a;
+    pair(int, int) p_2 = fst a;
+    int p_3 = fst p_2;
+    int p_4 = snd p_2;
+
+    println p_1;
+    println p_2;
+    println p_3;
+    println p_4
+end

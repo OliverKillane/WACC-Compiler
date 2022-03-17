@@ -48,7 +48,8 @@ The compiler can be build and run with the `cargo run` command.
 When building for release, the binary will be `target/compile`
 
 ## Documentation
+The documentation of the current master is available [here](https://lab2122_spring.pages.doc.ic.ac.uk/WACC_33) and is updated by the CI.
+
 To build the documentation run `cargo doc`, this will create a website at 
 `target/doc/compile/index.html` containing all documentation generated from 
 the doc comments placed in our source.
-

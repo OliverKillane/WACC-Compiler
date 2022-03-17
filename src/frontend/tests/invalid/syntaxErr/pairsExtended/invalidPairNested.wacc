@@ -1,0 +1,5 @@
+# Check that pair cannot be used as a type
+
+begin
+    pair a = null
+end

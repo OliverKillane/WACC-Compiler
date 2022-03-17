@@ -1,211 +1,273 @@
-#[macro_use]
-use lazy_static::lazy_static;
+//! Lexes individual string tokens and handles whitespace.
+//!
+//! ## Errors
+//! Two new errors are introduced: [KeywordIdentError](KeywordIdentError) and
+//! [OutOfBoundsInt](OutOfBoundsInt).
 
 lazy_static! {
-    static ref HASHSET: HashSet<&'static str> = {
+    static ref KEYWORD_HASHSET: HashSet<&'static str> = {
         let arr = [
             "if", "then", "else", "fi", "fst", "snd", "int", "bool", "char", "string", "pair",
             "newpair", "begin", "end", "is", "while", "do", "done", "exit", "return", "call",
             "println", "print", "skip", "read", "free", "chr", "ord", "len", "null", "false",
-            "true",
+            "true", "mod", "void",
         ];
         HashSet::from_iter(arr)
     };
 }
 
-const NO_WS_KEYWORDS: [Lexer; 4] = [Lexer::Int, Lexer::Bool, Lexer::Char, Lexer::String];
-
 use core::fmt;
 use nom::{
     branch::alt,
-    bytes::complete::{escaped, escaped_transform, is_a, is_not, take_until, take_while},
-    character::{
-        complete::{
-            alpha1, alphanumeric1, anychar, char, digit1, multispace0, multispace1, none_of,
-            not_line_ending, one_of, space0,
-        },
-        is_alphabetic, is_alphanumeric,
-    },
-    combinator::{cond, map, map_res, not, opt, recognize, value},
-    error::{context, ParseError},
-    multi::{many0, many1, separated_list0, separated_list1},
-    sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
-    IResult,
+    bytes::complete::is_not,
+    character::complete::{alpha1, alphanumeric1, char, digit1, multispace1, none_of, one_of},
+    combinator::{map, map_res, not, opt, recognize},
+    multi::many0,
+    sequence::{delimited, pair, preceded, terminated},
+    IResult, Parser,
 };
-use nom_supreme::{
-    error::{BaseErrorKind, ErrorTree, Expectation, StackContext},
-    final_parser::final_parser,
-    tag::complete::tag,
-    ParserExt,
-};
-use std::{collections::HashSet, error::Error};
+use nom_supreme::{error::ErrorTree, tag::complete::tag, ParserExt};
+use std::collections::HashSet;
 
-use crate::frontend::ast;
-
+/// Parser for WACC comments. Returns the parsed comment on success.
 pub fn comments(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
     recognize(pair(char('#'), alt((is_not("\n\r"), tag("")))))(input)
 }
 
+/// Trims trailing whitespace and potential comments.
 pub fn ws<'a, F: 'a, O>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, ErrorTree<&str>>
 where
-    F: FnMut(&'a str) -> IResult<&'a str, O, ErrorTree<&str>>,
+    F: Parser<&'a str, O, ErrorTree<&'a str>>,
 {
     terminated(inner, many0(alt((comments, multispace1))))
 }
 
-// pub fn cond_two_parsers<'a, F1: 'a, F2: 'a, O>(first: bool, inner1: F1, inner2: F2) -> impl FnMut(&'a str) -> IResult<&'a str, O, ErrorTree<&str>>
-// where
-//     F1: FnMut(&'a str) -> IResult<&'a str, O, ErrorTree<&str>>,
-//     F2: FnMut(&'a str) -> IResult<&'a str, O, ErrorTree<&str>>,
-// {
-//     move |input| {
-//         if first {
-//             inner1(input)
-//         } else {
-//             inner2(input)
-//         }
-//     }
-// }
-
+/// All possible tokens to be lexed. Allows for a compile-time guarantee that we
+/// lex every possible token.
 #[derive(PartialEq)]
 pub enum Lexer {
+    /// "fst"
     Fst,
+    /// "snd"
     Snd,
+    /// "int"
     Int,
+    /// "bool"
     Bool,
+    /// "char"
     Char,
+    /// "string"
     String,
+    /// "begin"
     Begin,
+    /// "end"
     End,
+    /// "&&"
     And,
+    /// "||"
     Or,
+    /// "+"
     Plus,
+    /// "-"
     Minus,
+    /// "/"
     Div,
+    /// "*"
     Mult,
+    /// "%"
     Mod,
+    /// ">"
     Gt,
+    /// ">="
     Gte,
+    /// "=="
     Eq,
+    /// "!="
     Ne,
+    /// "<"
     Lt,
+    /// "<="
     Lte,
+    /// "pair"
     Pair,
+    /// "["
     OpenBracket,
+    /// "]"
     CloseBracket,
+    /// "("
     OpenParen,
+    /// ")"
     CloseParen,
+    /// "if"
     If,
+    /// "fi"
     Fi,
+    /// ","
     Comma,
+    /// ";"
     SemiColon,
+    /// "is"
     Is,
+    /// "while"
     While,
+    /// "do"
     Do,
+    /// "done"
     Done,
+    /// "="
     Assign,
+    /// "then"
     Then,
+    /// "exit"
     Exit,
+    /// "return"
     Return,
+    /// "call"
     Call,
+    /// "println"
     Println,
+    /// "print"
     Print,
+    /// "skip"
     Skip,
+    /// "read"
     Read,
+    /// "free"
     Free,
+    /// "else"
     Else,
+    /// "newpair"
     Newpair,
+    /// "!"
     Bang,
+    /// "true"
     True,
+    /// "false"
     False,
+    /// "null"
     Null,
+    /// "len"
     Len,
+    /// "ord"
     Ord,
+    /// "chr"
     Chr,
+    /// "mod"
+    Module,
+    /// "void"
+    Void,
 }
 
 impl Lexer {
+    /// Returns parser for desired parser. Returned parser returns the desired token, with no
+    /// trailing whitespace, and a result with an [ErrorTree](ErrorTree) if parsing the token fails.
+    /// Whitespace is always consumed, but is not in the matched token.
+    /// If the token exists in [KEYWORD_HASHSET](static@KEYWORD_HASHSET) then an assertion is made
+    /// that no possible identifier follows before a whitespace.
+    /// Example:
+    /// ```
+    /// let success = Lexer::Println.parser()("println");
+    /// let fail = Lexer::Println.parser()("print");
+    /// assert!(success.is_ok());
+    /// assert!(fail.is_err());
+    /// ```
     pub fn parser<'a>(
         self,
     ) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, ErrorTree<&'a str>> + 'a {
-        let parser = match &self {
-            Self::Fst => tag("fst"),
-            Self::Snd => tag("snd"),
-            Self::Int => tag("int"),
-            Self::Bool => tag("bool"),
-            Self::Char => tag("char"),
-            Self::Int => tag("int"),
-            Self::String => tag("string"),
-            Self::Begin => tag("begin"),
-            Self::End => tag("end"),
-            Self::Plus => tag("+"),
-            Self::Minus => tag("-"),
-            Self::Mult => tag("*"),
-            Self::Div => tag("/"),
-            Self::Mod => tag("%"),
-            Self::And => tag("&&"),
-            Self::Or => tag("||"),
-            Self::Gt => tag(">"),
-            Self::Gte => tag(">="),
-            Self::Lt => tag("<"),
-            Self::Lte => tag("<="),
-            Self::Eq => tag("=="),
-            Self::Ne => tag("!="),
-            Self::Pair => tag("pair"),
-            Self::OpenBracket => tag("["),
-            Self::CloseBracket => tag("]"),
-            Self::OpenParen => tag("("),
-            Self::CloseParen => tag(")"),
-            Self::Comma => tag(","),
-            Self::If => tag("if"),
-            Self::Then => tag("then"),
-            Self::Else => tag("else"),
-            Self::Fi => tag("fi"),
-            Self::SemiColon => tag(";"),
-            Self::Is => tag("is"),
-            Self::While => tag("while"),
-            Self::Do => tag("do"),
-            Self::Done => tag("done"),
-            Self::Assign => tag("="),
-            Self::Call => tag("call"),
-            Self::Exit => tag("exit"),
-            Self::Println => tag("println"),
-            Self::Print => tag("print"),
-            Self::Skip => tag("skip"),
-            Self::Read => tag("read"),
-            Self::Free => tag("free"),
-            Self::Return => tag("return"),
-            Self::Newpair => tag("newpair"),
-            Self::Bang => tag("!"),
-            Self::True => tag("true"),
-            Self::False => tag("false"),
-            Self::Null => tag("null"),
-            Self::Len => tag("len"),
-            Self::Ord => tag("ord"),
-            Self::Chr => tag("chr"),
+        let literal = match self {
+            Lexer::Fst => "fst",
+            Lexer::Snd => "snd",
+            Lexer::Int => "int",
+            Lexer::Bool => "bool",
+            Lexer::Char => "char",
+            Lexer::String => "string",
+            Lexer::Begin => "begin",
+            Lexer::End => "end",
+            Lexer::Plus => "+",
+            Lexer::Minus => "-",
+            Lexer::Mult => "*",
+            Lexer::Div => "/",
+            Lexer::Mod => "%",
+            Lexer::And => "&&",
+            Lexer::Or => "||",
+            Lexer::Gt => ">",
+            Lexer::Gte => ">=",
+            Lexer::Lt => "<",
+            Lexer::Lte => "<=",
+            Lexer::Eq => "==",
+            Lexer::Ne => "!=",
+            Lexer::Pair => "pair",
+            Lexer::OpenBracket => "[",
+            Lexer::CloseBracket => "]",
+            Lexer::OpenParen => "(",
+            Lexer::CloseParen => ")",
+            Lexer::Comma => ",",
+            Lexer::If => "if",
+            Lexer::Then => "then",
+            Lexer::Else => "else",
+            Lexer::Fi => "fi",
+            Lexer::SemiColon => ";",
+            Lexer::Is => "is",
+            Lexer::While => "while",
+            Lexer::Do => "do",
+            Lexer::Done => "done",
+            Lexer::Assign => "=",
+            Lexer::Call => "call",
+            Lexer::Exit => "exit",
+            Lexer::Println => "println",
+            Lexer::Print => "print",
+            Lexer::Skip => "skip",
+            Lexer::Read => "read",
+            Lexer::Free => "free",
+            Lexer::Return => "return",
+            Lexer::Newpair => "newpair",
+            Lexer::Bang => "!",
+            Lexer::True => "true",
+            Lexer::False => "false",
+            Lexer::Null => "null",
+            Lexer::Len => "len",
+            Lexer::Ord => "ord",
+            Lexer::Chr => "chr",
+            Lexer::Module => "mod",
+            Lexer::Void => "void",
         };
 
-        move |input| {
-            if NO_WS_KEYWORDS.contains(&self) {
-                ws(terminated(parser.clone(), not(parse_ident)))(input)
-                // ws(parser.clone())(input)
-            } else {
-                ws(parser.clone())(input)
-            }
+        move |input| match KEYWORD_HASHSET.get(literal) {
+            None => ws(tag(literal))(input),
+            Some(_) => ws(terminated(tag(literal), not(parse_ident)))(input),
         }
     }
 }
 
 #[derive(Debug, Clone)]
+/// Error defined for the case where an identifier was matched that also exists
+/// in [KEYWORD_HASHSET](static@KEYWORD_HASHSET). This ensures that no potential
+/// variable/function name can also match a keyword.
 struct KeywordIdentError;
 
 impl fmt::Display for KeywordIdentError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Expected identifier, found keyword")
+        write!(f, "a non-keyword identifier")
     }
 }
 impl std::error::Error for KeywordIdentError {}
 
+/// Only 32-bit integers can be parsed in WACC. However our lexer can handle
+/// integers of arbitrary size. To aid this, we return this error whenever Rust
+/// cannot parse the lexed integer into a i32 (32-bit integer).
+#[derive(Debug, Clone)]
+struct OutOfBoundsInt;
+
+impl fmt::Display for OutOfBoundsInt {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "a 32-bit integer")
+    }
+}
+impl std::error::Error for OutOfBoundsInt {}
+
+/// Parses an identifier. On success, a [&str](str) is produced. Else,
+/// an [ErrorTree](ErrorTree) is produced with the context of the error to be
+/// converted into a syntax error later.
 pub fn parse_ident(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
     ws(map_res(
         recognize(pair(
@@ -213,46 +275,56 @@ pub fn parse_ident(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
             many0(alt((alphanumeric1, tag("_")))),
         ))
         .context("identifier"),
-        |s| match HASHSET.get(s) {
+        |s| match KEYWORD_HASHSET.get(s) {
             None => Ok(s),
             _ => Err(KeywordIdentError),
         },
     ))(input)
 }
 
+/// Parses a 32-bit integer. On success, an [i32](i32) is produced. Else,
+/// an [ErrorTree](ErrorTree) is produced with the context of the error to be
+/// converted into a syntax error later.
 pub fn parse_int(input: &str) -> IResult<&str, i32, ErrorTree<&str>> {
-    ws(map_res(
-        recognize(pair(opt(alt((char('-'), char('+')))), digit1)),
-        &str::parse,
-    ))(input)
+    ws(recognize(pair(opt(alt((char('-'), char('+')))), digit1))
+        .map_res_cut(|s: &str| match s.parse() {
+            Err(_) => Err(OutOfBoundsInt),
+            Ok(i) => Ok(i),
+        })
+        .context("Integer"))(input)
 }
 
+/// There are two cases in WACC where we want to produce escaped errors:
+/// ```text
+/// "hello\nworld"
+/// ```
+/// ```text
+/// '\n'
+/// ```
+/// To prevent duplication of the parser, this combinator takes in the
+/// delimiters, and produces a parser that can parse escaped string and char
+/// literals. Fails if escaped character is illegal.
 pub fn str_delimited<'a>(
     del: &'static str,
-) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, ErrorTree<&str>> {
-    ws(delimited(
-        tag(del),
-        alt((
-            escaped(none_of("\\\'\""), '\\', one_of("'0nt\"b\\rf").cut()),
-            tag(""),
-        ))
-        .cut(),
-        tag(del).cut(),
+) -> impl FnMut(&'a str) -> IResult<&'a str, String, ErrorTree<&str>> {
+    ws(map(
+        delimited(
+            tag(del),
+            many0(alt((
+                none_of("\\\'\""),
+                map(preceded(char('\\'), one_of("'0nt\"b\\rf\'")), |c| match c {
+                    'b' => '\u{0008}',
+                    'n' => '\n',
+                    't' => '\t',
+                    'r' => '\r',
+                    'f' => '\u{0012}',
+                    '0' => '\0',
+                    c => c,
+                }),
+            )))
+            .cut(),
+            tag(del).cut(),
+        ),
+        |s| s.into_iter().collect::<String>(),
     ))
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     #[test]
-//     #[should_panic]
-//     fn parse_ident_catches_keyword() {
-//         let input = "hello";
-//         let output: Result<&str, ErrorTree<&str>> = final_parser(parse_ident)(input);
-//         match output {
-//             Err(wow) => println!("{}", wow),
-//             Ok(wow) => println!("{}", wow)
-//         }
-//         // println!("{:?}", parse_ident(input));
-//     }
-// }

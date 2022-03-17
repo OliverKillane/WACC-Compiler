@@ -1,0 +1,39 @@
+# multiple string assignments and comparisons
+
+# Output:
+# s1 is Hi
+# s2 is Hello
+# They are not the same string.
+# Now make s1 = s2
+# s1 is Hello
+# s2 is Hello
+# They are the same string.
+
+# Program:
+
+begin
+  string s1 = "Hi" ;
+  string s2 = "Hello" ;
+  print "s1 is " ;
+  println s1 ;
+  print "s2 is " ;
+  println s2 ;
+  if s1 == s2 then
+    println "They are the same string." 
+  else 
+    println "They are not the same string."
+  fi ;
+
+  println "Now make s1 = s2" ;
+  s1 = s2 ;
+
+  print "s1 is " ;
+  println s1 ;
+  print "s2 is " ;
+  println s2 ;
+  if s1 == s2 then
+    println "They are the same string." 
+  else 
+    println "They are not the same string."
+  fi
+end

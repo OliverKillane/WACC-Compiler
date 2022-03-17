@@ -1,0 +1,275 @@
+# Demonstration of more complex code being optimised.
+#
+# Here we have several functions containing dead code (as well as the main), 
+# these can be eliminated with '--dead-code', however the function calls may 
+# result in some side effects (wacc functions are not pure) so we cannot remove 
+# the calls... initally.
+#
+# By inlining, calls are removed, so further more thorough analysis can be 
+# completed.
+#
+#
+# No flags:             105 lines (excluding .data and .text & .global labels)
+# dead code:            70 lines 
+# dead code + inlining: 46 lines (19 of which are an unused integer overflow function)
+
+begin
+	int fun1(int a) is
+        a = a + 5 * 7;
+        int b = a * 2;
+        int c = a + b;
+        return 100
+    end
+
+    char fun2(char c) is
+        println "hello there";
+        int d = ord c;
+        return c
+    end
+
+    void fun3() is
+        int i = 7;
+        i = i * 23 + 45;
+        int d = 5;
+        return
+    end
+
+    int num = call fun1(4);
+    int dead_var = num * 23;
+    char letter = call fun2('c');
+    dead_var = dead_var + (ord letter);
+    call fun3()
+end
+
+# Original Code: No flags ======================================================
+# 
+# .global main
+# main:
+# 	SUB	sp,	sp,	#72
+# 	MOV	R0,	#4
+# 	STR	R0,	[sp, #56]
+# 	STR	lr,	[sp, #4]
+# 	BL	f_fun1
+# 	MOV	R1,	#23
+# 	SMULLS	R0,	R1,	R0,	R1
+# 	CMP	R1,	R0,	ASR #31
+# 	BLNE	overflow_handler
+# 	MOV	R1,	#99
+# 	STR	R1,	[sp, #56]
+# 	STR	R0,	[sp, #52]
+# 	MOV	R0,	R1
+# 	BL	f_fun2
+# 	LDR	R1,	[sp, #52]
+# 	ADDS	R1,	R1,	R0
+# 	BLVS	overflow_handler
+# 	MOV	R0,	R1
+# 	BL	f_fun3
+# 	MOV	R0,	#0
+# 	BL	exit
+# 	LDR	lr,	[sp, #4]
+# 	ADD	sp,	sp,	#72
+# 	MOV	pc,	lr
+# 	.ltorg
+# 
+# f_fun2:
+# 	SUB	sp,	sp,	#68
+# 	LDR	R1,	=d_ref_0
+# 	MOV	R2,	R1
+# 	ADD	R2,	R2,	#4
+# 	LDR	R1,	[R1]
+# 	LDR	R3,	=d_ref_2
+# 	STR	R0,	[sp, #60]
+# 	MOV	R0,	R3
+# 	STR	lr,	[sp, #4]
+# 	BL	printf
+# 	MOV	R0,	#0
+# 	BL	fflush
+# 	LDR	R0,	=d_ref_3
+# 	BL	printf
+# 	MOV	R0,	#0
+# 	BL	fflush
+# 	LDR	R0,	[sp, #60]
+# 	MOV	R1,	R0
+# 	LDR	lr,	[sp, #4]
+# 	ADD	sp,	sp,	#68
+# 	MOV	pc,	lr
+# 	.ltorg
+# 
+# overflow_handler:
+# 	SUB	sp,	sp,	#60
+# 	LDR	R0,	=d_ref_1
+# 	ADD	R0,	R0,	#4
+# 	MOV	R1,	#79
+# 	LDR	R2,	=d_ref_2
+# 	STR	R0,	[sp, #56]
+# 	MOV	R0,	R2
+# 	LDR	R2,	[sp, #56]
+# 	STR	lr,	[sp, #4]
+# 	BL	printf
+# 	MOV	R0,	#0
+# 	BL	fflush
+# 	MOV	R0,	#255
+# 	BL	exit
+# 	LDR	lr,	[sp, #4]
+# 	ADD	sp,	sp,	#60
+# 	MOV	pc,	lr
+# 	.ltorg
+# 
+# f_fun1:
+# 	SUB	sp,	sp,	#88
+# 	MOV	R1,	#5
+# 	MOV	R2,	#7
+# 	SMULLS	R1,	R2,	R1,	R2
+# 	CMP	R2,	R1,	ASR #31
+# 	BLNE	overflow_handler
+# 	ADDS	R0,	R0,	R1
+# 	BLVS	overflow_handler
+# 	MOV	R1,	R0
+# 	MOV	R2,	#2
+# 	SMULLS	R1,	R2,	R1,	R2
+# 	CMP	R2,	R1,	ASR #31
+# 	BLNE	overflow_handler
+# 	ADDS	R0,	R0,	R1
+# 	BLVS	overflow_handler
+# 	MOV	R0,	#100
+# 	ADD	sp,	sp,	#88
+# 	MOV	pc,	lr
+# 	.ltorg
+# 
+# f_fun3:
+# 	SUB	sp,	sp,	#64
+# 	MOV	R0,	#7
+# 	MOV	R1,	#23
+# 	SMULLS	R0,	R1,	R0,	R1
+# 	CMP	R1,	R0,	ASR #31
+# 	BLNE	overflow_handler
+# 	ADDS	R0,	R0,	#45
+# 	BLVS	overflow_handler
+# 	MOV	R0,	#5
+# 	ADD	sp,	sp,	#64
+# 	MOV	pc,	lr
+# 	.ltorg
+
+# With flag '--dead-code' ======================================================
+#
+#.global main
+# main:
+# 	SUB	sp,	sp,	#48
+# 	MOV	R0,	#4
+# 	STR	lr,	[sp, #4]
+# 	BL	f_fun1
+# 	MOV	R0,	#99
+# 	BL	f_fun2
+# 	BL	f_fun3
+# 	MOV	R0,	#0
+# 	BL	exit
+# 	LDR	lr,	[sp, #4]
+# 	ADD	sp,	sp,	#48
+# 	MOV	pc,	lr
+# 	.ltorg
+# 
+# f_fun1:
+# 	SUB	sp,	sp,	#52
+# 	MOV	R0,	#100
+# 	ADD	sp,	sp,	#52
+# 	MOV	pc,	lr
+# 	.ltorg
+# 
+# f_fun3:
+# 	SUB	sp,	sp,	#44
+# 	ADD	sp,	sp,	#44
+# 	MOV	pc,	lr
+# 	.ltorg
+# 
+# overflow_handler:
+# 	SUB	sp,	sp,	#60
+# 	LDR	R0,	=d_ref_1
+# 	ADD	R0,	R0,	#4
+# 	MOV	R1,	#79
+# 	LDR	R2,	=d_ref_2
+# 	STR	R0,	[sp, #48]
+# 	MOV	R0,	R2
+# 	LDR	R2,	[sp, #48]
+# 	STR	lr,	[sp, #4]
+# 	BL	printf
+# 	MOV	R0,	#0
+# 	BL	fflush
+# 	MOV	R0,	#255
+# 	BL	exit
+# 	LDR	lr,	[sp, #4]
+# 	ADD	sp,	sp,	#60
+# 	MOV	pc,	lr
+# 	.ltorg
+# 
+# f_fun2:
+# 	SUB	sp,	sp,	#64
+# 	LDR	R1,	=d_ref_0
+# 	MOV	R2,	R1
+# 	ADD	R2,	R2,	#4
+# 	LDR	R1,	[R1]
+# 	LDR	R3,	=d_ref_2
+# 	STR	R0,	[sp, #44]
+# 	MOV	R0,	R3
+# 	STR	lr,	[sp, #4]
+# 	BL	printf
+# 	MOV	R0,	#0
+# 	BL	fflush
+# 	LDR	R0,	=d_ref_3
+# 	BL	printf
+# 	MOV	R0,	#0
+# 	BL	fflush
+# 	LDR	R0,	[sp, #44]
+# 	LDR	lr,	[sp, #4]
+# 	ADD	sp,	sp,	#64
+# 	MOV	pc,	lr
+# 	.ltorg
+
+# With flags '--dead-code --inlining high' =====================================
+#
+# .global main
+# main:
+# 	SUB	sp,	sp,	#64
+# 	LDR	R0,	=d_ref_0
+# 	MOV	R1,	R0
+# 	ADD	R1,	R1,	#4
+# 	LDR	R0,	[R0]
+# 	LDR	R2,	=d_ref_2
+# 	STR	R0,	[sp, #44]
+# 	MOV	R0,	R2
+# 	STR	R1,	[sp, #56]
+# 	LDR	R1,	[sp, #44]
+# 	LDR	R2,	[sp, #56]
+# 	STR	lr,	[sp, #4]
+# 	BL	printf
+# 	MOV	R0,	#0
+# 	BL	fflush
+# 	LDR	R0,	=d_ref_3
+# 	BL	printf
+# 	MOV	R0,	#0
+# 	BL	fflush
+# 	MOV	R0,	#0
+# 	BL	exit
+# 	LDR	lr,	[sp, #4]
+# 	ADD	sp,	sp,	#64
+# 	MOV	pc,	lr
+# 	.ltorg
+# 
+# overflow_handler:
+# 	SUB	sp,	sp,	#60
+# 	LDR	R0,	=d_ref_1
+# 	ADD	R0,	R0,	#4
+# 	MOV	R1,	#79
+# 	LDR	R2,	=d_ref_2
+# 	STR	R0,	[sp, #56]
+# 	MOV	R0,	R2
+# 	LDR	R2,	[sp, #56]
+# 	STR	lr,	[sp, #4]
+# 	BL	printf
+# 	MOV	R0,	#0
+# 	BL	fflush
+# 	MOV	R0,	#255
+# 	BL	exit
+# 	LDR	lr,	[sp, #4]
+# 	ADD	sp,	sp,	#60
+# 	MOV	pc,	lr
+# 	.ltorg

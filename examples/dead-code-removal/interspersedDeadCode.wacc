@@ -1,0 +1,67 @@
+# Demonstration of dead code and live code interspersed.
+#
+# As i is used in the exit call, it is in 'alive' code, the dead code makes use 
+# of i, but does not define any variable values which are used in side-effectful 
+# code, and hence while the definition of i and the exit are kept, dead code is 
+# removed.
+# 
+# Temporary Arm Assembly:
+# main:
+#   MOV     T1,     #4
+#   MOV     T2,     #5
+#   SMULLS  T0,     T3,     T1,     T2
+#   CMP     T3,     T0,     ASR #31
+#   BLNE    overflow_handler
+#   ADDS    T4,     T0,     #3
+#   BLVS    overflow_handler
+#   ADDS    T4,     T4,     #3
+#   BLVS    overflow_handler
+#   MOV     T5,     T4
+#   MOV     T4,     T5
+#   INTERNAL OPERATION: CALL        exit    No Return, ARGS(T4)
+#   INTERNAL OPERATION: RETURN      no value returned
+#
+# Actual Arm Assembly:
+# main:
+# 	SUB	sp,	sp,	#68
+# 	MOV	R0,	#4
+# 	MOV	R1,	#5
+# 	SMULLS	R0,	R1,	R0,	R1
+# 	CMP	R1,	R0,	ASR #31
+# 	BLNE	overflow_handler
+# 	ADDS	R0,	R0,	#3
+# 	BLVS	overflow_handler
+# 	ADDS	R0,	R0,	#3
+# 	BLVS	overflow_handler
+# 	STR	lr,	[sp, #4]
+# 	BL	exit
+# 	LDR	lr,	[sp, #4]
+# 	ADD	sp,	sp,	#68
+# 	MOV	pc,	lr
+# 	.ltorg
+
+begin
+	int i = 3 + 4 * 5 + 3;        
+
+    int a = i + 2 * 3;            # dead code
+    int b = i + a * 4 + (a * 2);  # dead code
+    int c = a + b + b * (a * 99); # dead code
+    int d = 6 + a * b + c;        # dead code
+    c = 3 * i + 13;               # dead code
+    d = a + b * 97 - 44;          # dead code
+    a = b * c * d;                # dead code
+    c = 3 * i + 13;               # dead code
+    d = a + b * 97 - 44;          # dead code
+    a = b * c * d;                # dead code
+    c = 3 * i + 13;               # dead code
+    d = a + b * 97 - 44;          # dead code
+    a = b * c * d;                # dead code
+    c = 3 * i + 13;               # dead code
+    d = a + b * 97 - 44;          # dead code
+    a = b * c * d;                # dead code
+    c = 3 * i + 13;               # dead code
+    d = a + b * 97 - 44;          # dead code
+    a = b * c * d;                # dead code
+
+    exit i
+end

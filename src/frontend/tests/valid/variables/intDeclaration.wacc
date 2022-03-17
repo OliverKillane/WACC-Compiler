@@ -1,0 +1,10 @@
+# simple integer variable declaration
+
+# Output:
+# #empty#
+
+# Program:
+
+begin
+  int x = 42
+end

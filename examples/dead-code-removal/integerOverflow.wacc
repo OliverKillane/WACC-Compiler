@@ -1,0 +1,19 @@
+# A demonstration of dead code removal altering program behaviour.
+#
+# As integer assignment and increment do not have any side effects, or result in 
+# a return value, they can be optimised out.
+#
+# As a result the integer overflowing code is removed, resulting in a correct 
+# exit, rather than an integer overflow error.
+# 
+# main:
+#     MOV     T0,     #0
+#     INTERNAL OPERATION: CALL        exit    No Return, ARGS(T0)
+#     INTERNAL OPERATION: RETURN      no value returned
+
+begin
+	int i = 2147483647; # dead code
+    i = i + 1; # dead code
+
+    exit 0
+end

@@ -15,6 +15,12 @@
 //! The spans associated with errors are returned, this ensures that the span
 //! of erroneous code in the source is kept for error printing later.
 //!
+//! If no errors occur, the types (if relevant) of reach ast node is used in
+//! the [ASTWrapper]. The type is contained for:
+//! - Function names in calls
+//! - All expressions (will be some)
+//! - Right hand sides of assignments
+//!
 //! For each statement the errors is given as:
 //! (span of statement, [list of semantic errors (can contain internal spans)])
 //! this is covered in more detail in [semantic errors](semantic_errors).
@@ -45,21 +51,19 @@ mod statement_analysis;
 pub mod symbol_table;
 mod type_constraints;
 
+use rayon::prelude::*;
 use std::collections::HashMap;
-
-use nom::error::convert_error;
 
 use self::{
     error_conversion::convert_errors,
     function_analysis::analyse_function,
-    semantic_errors::{SemanticError, StatementErrors},
     statement_analysis::analyse_block,
     symbol_table::{get_fn_symbols, LocalSymbolTable, VariableSymbolTable},
 };
 
 use super::{
-    ast::{FunSpan, Function, Program, StatSpan, WrapSpan},
-    error::{Summary, SummaryCell},
+    ast::{ASTWrapper, Function, Program, Type},
+    error::Summary,
 };
 
 /// Analyses a program, either returning a flat variable and function symbol table
@@ -75,35 +79,39 @@ use super::{
 /// - Vector of syntax error summary cells
 #[allow(clippy::type_complexity)]
 pub fn analyse_semantics<'a>(
-    Program(fn_defs, main_block): Program<'a, &'a str>,
-    source_code: &'a str,
+    Program(fn_defs, main_block): Program<&'a str, &'a str>,
 ) -> Result<
     (
-        Vec<StatSpan<'a, usize>>,
+        Program<Option<Type>, usize>,
+        HashMap<String, VariableSymbolTable>,
         VariableSymbolTable,
-        HashMap<&'a str, (FunSpan<'a, usize>, VariableSymbolTable)>,
     ),
-    Vec<Summary<'a>>,
+    Summary<'a>,
 > {
     // get function definitions
     let (fun_symb, filtered_fn_defs, fun_def_errs) = get_fn_symbols(fn_defs);
 
-    let mut errors = Vec::new();
-    let mut correct = HashMap::with_capacity(filtered_fn_defs.len());
-
     // traverse and analyse functions
-    for WrapSpan(fun_name, fun) in filtered_fn_defs {
-        match analyse_function(WrapSpan(fun_name, fun), &fun_symb) {
-            Ok(res) => {
-                correct.insert(fun_name, res);
+    let (e, (fst, fs)): (Vec<_>, (Vec<_>, Vec<_>)) = filtered_fn_defs
+        .into_par_iter()
+        .map(|ASTWrapper(fun_name, fun)| {
+            match analyse_function(ASTWrapper(fun_name, fun), &fun_symb) {
+                Ok((function, var_symb)) => {
+                    let ASTWrapper(_, Function(_, ASTWrapper(_, fun_name), _, _)) = &function;
+                    (None, (Some((fun_name.clone(), var_symb)), Some(function)))
+                }
+                Err(fun_err) => (Some(fun_err), (None, None)),
             }
-            Err(fun_err) => errors.push(fun_err),
-        }
-    }
+        })
+        .unzip();
+
+    let errors: Vec<_> = e.into_iter().flatten().collect();
+    let fun_symbol_tables: HashMap<_, _> = fst.into_iter().flatten().collect();
+    let functions: Vec<_> = fs.into_iter().flatten().collect();
 
     // analyse main code block
     let mut main_var_symb = VariableSymbolTable::new();
-    let mut main_errors = Vec::with_capacity(0);
+    let mut main_errors = Vec::new();
 
     match analyse_block(
         main_block,
@@ -116,16 +124,15 @@ pub fn analyse_semantics<'a>(
     ) {
         Some(block_ast) => {
             if errors.is_empty() && fun_def_errs.is_empty() {
-                Ok((block_ast, main_var_symb, correct))
+                Ok((
+                    Program(functions, block_ast),
+                    fun_symbol_tables,
+                    main_var_symb,
+                ))
             } else {
-                Err(convert_errors(fun_def_errs, vec![], errors, source_code))
+                Err(convert_errors(fun_def_errs, vec![], errors))
             }
         }
-        None => Err(convert_errors(
-            fun_def_errs,
-            main_errors,
-            errors,
-            source_code,
-        )),
+        None => Err(convert_errors(fun_def_errs, main_errors, errors)),
     }
 }

@@ -1,0 +1,11 @@
+# simple use of void function call to print a string
+
+# Program:
+
+begin
+  void print_hello_world() is 
+    return 5
+  end
+  
+  skip
+end

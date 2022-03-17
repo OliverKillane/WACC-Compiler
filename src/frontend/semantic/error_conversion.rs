@@ -36,12 +36,12 @@
 
 use super::{
     super::{
-        ast::{BinOp, GenericId, Type, UnOp, WrapSpan},
+        ast::{ASTWrapper, BinOp, GenericId, Type, UnOp},
         error::{Summary, SummaryCell, SummaryComponent, SummaryStage, SummaryType},
     },
-    semantic_errors::{self, SemanticError, StatementErrors},
+    semantic_errors::{SemanticError, StatementErrors},
 };
-use std::{fmt::Display, ops::Add};
+use std::fmt::Display;
 
 /// Takes errors from semantic analysis and converts them into:
 /// - A vector of erroneous (semantic) statements/definitions
@@ -50,10 +50,9 @@ pub fn convert_errors<'a>(
     def_errs: Vec<StatementErrors<'a>>,
     main_errs: Vec<StatementErrors<'a>>,
     fun_errs: Vec<(&str, Vec<StatementErrors<'a>>)>,
-    source_code: &'a str,
-) -> Vec<Summary<'a>> {
-    let mut semantic_errors = Summary::new(source_code, SummaryStage::Semantic);
-    let mut syntax_errors = Summary::new(source_code, SummaryStage::Parser);
+) -> Summary<'a> {
+    let mut semantic_errors = Summary::new(SummaryStage::Semantic);
+    let mut syntax_errors = Summary::new(SummaryStage::Parser);
 
     create_cells(
         String::from("In Function Declarations"),
@@ -76,18 +75,11 @@ pub fn convert_errors<'a>(
         )
     }
 
-    // syntax errors rare, generally expected to have a single semantics summary
-    let mut summaries = Vec::with_capacity(1);
-
     if !syntax_errors.is_empty() {
-        summaries.push(syntax_errors)
+        syntax_errors
+    } else {
+        semantic_errors
     }
-
-    if !semantic_errors.is_empty() {
-        summaries.push(semantic_errors)
-    }
-
-    summaries
 }
 
 /// Generates an error cell for each statement in the vector of [statement errors](StatementErrors)
@@ -98,7 +90,7 @@ fn create_cells<'a>(
     semantic_errs: &mut Summary<'a>,
     syntax_errs: &mut Summary<'a>,
 ) {
-    for WrapSpan(span, errs) in statements {
+    for ASTWrapper(span, errs) in statements {
         let (syn, sem): (Vec<SemanticError>, Vec<SemanticError>) =
             errs.into_iter().partition(|err| {
                 matches!(err, SemanticError::FunctionNoReturnOrExit(_, _))
@@ -187,7 +179,7 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                     SummaryType::Error,
                     208,
                     binop_span,
-                    format!("Invalid application of operator {} on {} and {}.", found_left, found_right, found_op)
+                    format!("Invalid application of operator {} on {} and {}.", found_op, found_left, found_right)
                 ).set_shorthand(format!("{} {}",
                         if possible_types.is_empty() {
                             format!("There are no possible input types for the operator {}.", found_op)
@@ -243,7 +235,8 @@ impl<'a> Into<SummaryComponent<'a>> for SemanticError<'a> {
                     fun_span,
                     format!("Repeat definition of function {}.", fun_span)
                 ).set_shorthand(format!("To amend change the function name to something other than {}.", fun_span))
-                .set_note(String::from("A function can only be defined once, to amend use a different identifier.")),
+                .set_note(String::from("A function can only be defined once, to amend use a different identifier."))
+                .set_declaration(orig_def_span),
             SemanticError::FunctionParametersLengthMismatch(fun_span, expected, found) =>
                 SummaryComponent::new(
                     SummaryType::Error,
@@ -394,12 +387,13 @@ impl Display for Type {
             Type::Bool => write!(f, "bool"),
             Type::Char => write!(f, "char"),
             Type::String => write!(f, "string"),
-            Type::Any => write!(f, ""),
+            Type::Any => write!(f, "any"),
             Type::Generic(n) => write!(f, "{}", generic_to_alpha(*n)),
             Type::Pair(box t1, box t2) => write!(f, "pair({},{})", t1, t2),
             Type::Array(box t, n) => {
                 write!(f, "{}{}", t, (0..*n).map(|_| "[]").collect::<String>())
             }
+            Type::Void => write!(f, "void"),
         }
     }
 }
