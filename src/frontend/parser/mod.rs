@@ -15,7 +15,7 @@ use lexer::{parse_ident, ws, Lexer};
 use nom::{
     branch::alt,
     character::complete::{char, none_of, one_of},
-    combinator::{cut, eof, map, opt, success, value, map_res},
+    combinator::{cut, eof, map, map_res, opt, success, value},
     error::{context, ParseError},
     multi::{many0, many1, separated_list0},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
@@ -30,8 +30,9 @@ use nom_supreme::{
 use rayon::prelude::*;
 use std::{
     collections::{HashMap, LinkedList},
+    fmt,
     iter::zip,
-    path::{Path, PathBuf}, fmt,
+    path::{Path, PathBuf},
 };
 
 use lexer::{parse_int, str_delimited};
@@ -696,7 +697,6 @@ fn parse_expr_atom(input: &str) -> IResult<&str, Expr<&str, &str>, ErrorTree<&st
             } else {
                 Ok(Expr::Char(s.chars().next().unwrap_or_default()))
             }
-            
         })
         .context("Char Literal"),
         map(parse_int, Expr::Int),
