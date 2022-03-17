@@ -1,3 +1,5 @@
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+
 use super::three_code::*;
 use crate::{
     backend::data_flow::DataflowNode,
@@ -5,6 +7,7 @@ use crate::{
 };
 use std::collections::LinkedList;
 
+/// Performs the same branch reduction on a single graph.
 fn same_branch_opt_graph(graph: &mut Graph<StatType>, code: &mut StatNode) {
     let mut needless_branches = LinkedList::new();
     for node in &*graph {
@@ -23,6 +26,10 @@ fn same_branch_opt_graph(graph: &mut Graph<StatType>, code: &mut StatNode) {
         };
         if *code == node {
             *code = next_node.clone()
+        }
+        if next_node == node {
+            node.set(StatType::Loop(incoming));
+            continue;
         }
         for incoming_node in &incoming {
             incoming_node.get_mut().substitute_child(&node, &next_node);
@@ -47,48 +54,15 @@ fn same_branch_opt_graph(graph: &mut Graph<StatType>, code: &mut StatNode) {
 
 /// Applies an optimization so that nodes pointing with both branches to the same
 /// successor node get removed.
-pub(super) fn same_branch_optimization(
-    ThreeCode {
-        functions,
-        data_refs,
-        mut graph,
-        read_ref,
-        mut code,
-        int_handler,
-    }: ThreeCode,
-) -> ThreeCode {
-    let functions = functions
-        .into_iter()
-        .map(
-            |(
-                fname,
-                Function {
-                    mut graph,
-                    args,
-                    mut code,
-                    read_ref,
-                },
-            )| {
-                same_branch_opt_graph(&mut graph, &mut code);
-                (
-                    fname,
-                    Function {
-                        graph,
-                        args,
-                        code,
-                        read_ref,
-                    },
-                )
-            },
-        )
+pub(super) fn same_branch_optimization(mut three_code: ThreeCode) -> ThreeCode {
+    same_branch_opt_graph(&mut three_code.graph, &mut three_code.code);
+    three_code.functions = three_code
+        .functions
+        .into_par_iter()
+        .map(|(fname, mut function)| {
+            same_branch_opt_graph(&mut function.graph, &mut function.code);
+            (fname, function)
+        })
         .collect();
-    same_branch_opt_graph(&mut graph, &mut code);
-    ThreeCode {
-        functions,
-        data_refs,
-        graph,
-        read_ref,
-        code,
-        int_handler,
-    }
+    three_code
 }

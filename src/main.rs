@@ -116,6 +116,9 @@ struct Args {
     #[clap(long, help = "Enable constant propagation")]
     const_prop: bool,
 
+    #[clap(long, help = "Enable constant branch optimization")]
+    const_branch: bool,
+
     #[clap(long, help = "Enable dead code elimination")]
     dead_code: bool,
 }
@@ -165,6 +168,7 @@ fn main() -> io::Result<()> {
         tail_call,
         inlining,
         const_prop,
+        const_branch,
         dead_code,
     } = Args::parse();
 
@@ -228,12 +232,9 @@ fn main() -> io::Result<()> {
                 sethi_ullman_weights: false,
                 dead_code_removal: dead_code,
                 const_propagation: const_prop,
+                const_branch,
                 inlining: inlining.into(),
                 tail_call,
-                hoisting: false,
-                strength_reduction: false,
-                loop_unrolling: false,
-                common_expressions: false,
                 show_arm_temp_rep: arm_temp,
                 show_three_code: three_code,
             };

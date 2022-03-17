@@ -1,4 +1,5 @@
 mod arm;
+mod const_branch;
 mod const_prop;
 mod data_flow;
 mod dead_code;
@@ -13,6 +14,7 @@ use self::{
 };
 use crate::intermediate::Program;
 use arm::ArmResult;
+use const_branch::const_branch_optimization;
 use inlining::inline;
 use same_branch::same_branch_optimization;
 use three_code::ThreeCode;
@@ -22,12 +24,9 @@ pub struct Options {
     pub sethi_ullman_weights: bool,
     pub dead_code_removal: bool,
     pub const_propagation: bool,
+    pub const_branch: bool,
     pub inlining: Option<usize>,
     pub tail_call: bool,
-    pub hoisting: bool,
-    pub strength_reduction: bool,
-    pub loop_unrolling: bool,
-    pub common_expressions: bool,
     pub show_arm_temp_rep: bool,
     pub show_three_code: bool,
 }
@@ -37,25 +36,41 @@ pub struct BackendOutput {
     pub intermediates: Vec<(String, String)>,
 }
 
+const CONST_LOOP_ITER_COUNT: u32 = 3;
+
 /// Compiles the given program into an arm32 assembly
 pub fn compile(program: Program, options: Options) -> BackendOutput {
-    let mut three_code = same_branch_optimization(ThreeCode::from((program, &options)));
+    let mut three_code = ThreeCode::from((program, &options));
     if let Some(instructions_limit) = options.inlining {
-        three_code = same_branch_optimization(inline(three_code, instructions_limit));
+        three_code = inline(three_code, instructions_limit);
     }
 
     if options.tail_call {
-        three_code = tail_call_optimise(three_code);
+        if options.const_branch {
+            three_code = const_branch_optimization(three_code);
+        }
+        three_code = tail_call_optimise(same_branch_optimization(three_code));
     }
 
-    if options.const_propagation {
-        three_code = prop_consts(three_code);
+    if options.const_propagation && options.dead_code_removal && options.const_branch {
+        for _ in 0..CONST_LOOP_ITER_COUNT {
+            three_code = prop_consts(three_code);
+            three_code = const_branch_optimization(three_code);
+            three_code = same_branch_optimization(three_code);
+            three_code = remove_dead_code(three_code);
+        }
+    } else {
+        if options.const_propagation {
+            three_code = prop_consts(three_code);
+        }
+        if options.dead_code_removal {
+            three_code = remove_dead_code(three_code);
+        }
     }
 
-    if options.dead_code_removal {
-        three_code = remove_dead_code(three_code);
+    if options.const_branch {
+        three_code = const_branch_optimization(three_code);
     }
-
     three_code = same_branch_optimization(three_code);
 
     #[cfg(debug_assertions)]
