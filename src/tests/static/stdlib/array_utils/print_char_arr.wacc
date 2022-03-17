@@ -1,0 +1,68 @@
+# Correctness of print_char_arr()
+
+# Output:
+# arr = []
+# arr = ['W']
+# arr = ['6', ''']
+# arr = ['n', '|', 'o']
+# arr = ['b', '=', ']', '7']
+# arr = ['$', ']', 'X', '/', 'D']
+# arr = ['_', '/', 'r', 'b', '6', 'i']
+# arr = ['/', ']', '8', 'c', 'S', 'w', '5']
+# arr = [' ', '&', '>', ']', '(', '1', 'B', '5']
+# arr = ['p', '1', 'v', '3', 'H', 'H', ';', '8', 'F']
+# arr = ['8', 'C', 'T', '(', '~', '_', 'Y', '}', '*', '3']
+# arr = ['6', 'n', '(', ''', 's', '8', 'I', ''', 'm', 'j', '|']
+# arr = ['-', 'h', 'J', 'T', 'x', 'i', '9', '2', '4', 'j', 'u', 'N']
+# arr = ['d', '?', '8', '/', '4', 'w', 'i', '~', 'L', '0', 'Y', 'P', 'p']
+# arr = ['x', 'c', 'D', 'u', 'g', 'p', 'B', '}', 'S', 'f', 'p', 'D', '-', 'S']
+# arr = ['U', '@', 'o', '$', '~', 'H', '1', '1', 'Z', '=', 'M', '<', 'k', '_', '0']
+# arr = ['g', 'U', '?', '1', '|', 'c', 'k', 'J', 'n', 'h', 't', '5', 'j', 'o', 'e', 'C']
+# arr = ['&', '-', 'N', 'D', '_', '7', 'm', '.', 'w', 'T', ',', '`', 'K', '"', '/', '|', 'K']
+# arr = ['2', '\', 'w', '(', '}', 'a', '_', '-', 'n', ')', '>', ':', '|', '?', 'N', '-', 'a', '8']
+# arr = ['W', ' ', ',', 'g', '{', 'x', 'j', 'T', 's', ''', 'I', 'R', 'R', '`', '0', ']', '5', 'S', 'q']
+
+mod ../../../../../stdlib/array_utils.wacc;
+
+begin
+   	char[] arr = [] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['W'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['6', '\''] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['n', '|', 'o'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['b', '=', ']', '7'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['$', ']', 'X', '/', 'D'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['_', '/', 'r', 'b', '6', 'i'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['/', ']', '8', 'c', 'S', 'w', '5'] ;
+	call print_char_arr("arr", arr) ;
+	arr = [' ', '&', '>', ']', '(', '1', 'B', '5'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['p', '1', 'v', '3', 'H', 'H', ';', '8', 'F'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['8', 'C', 'T', '(', '~', '_', 'Y', '}', '*', '3'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['6', 'n', '(', '\'', 's', '8', 'I', '\'', 'm', 'j', '|'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['-', 'h', 'J', 'T', 'x', 'i', '9', '2', '4', 'j', 'u', 'N'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['d', '?', '8', '/', '4', 'w', 'i', '~', 'L', '0', 'Y', 'P', 'p'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['x', 'c', 'D', 'u', 'g', 'p', 'B', '}', 'S', 'f', 'p', 'D', '-', 'S'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['U', '@', 'o', '$', '~', 'H', '1', '1', 'Z', '=', 'M', '<', 'k', '_', '0'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['g', 'U', '?', '1', '|', 'c', 'k', 'J', 'n', 'h', 't', '5', 'j', 'o', 'e', 'C'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['&', '-', 'N', 'D', '_', '7', 'm', '.', 'w', 'T', ',', '`', 'K', '\"', '/', '|', 'K'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['2', '\\', 'w', '(', '}', 'a', '_', '-', 'n', ')', '>', ':', '|', '?', 'N', '-', 'a', '8'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['W', ' ', ',', 'g', '{', 'x', 'j', 'T', 's', '\'', 'I', 'R', 'R', '`', '0', ']', '5', 'S', 'q'] ;
+	call print_char_arr("arr", arr)
+end
