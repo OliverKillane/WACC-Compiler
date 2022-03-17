@@ -15,7 +15,7 @@ use lexer::{parse_ident, ws, Lexer};
 use nom::{
     branch::alt,
     character::complete::{char, none_of, one_of},
-    combinator::{cut, eof, map, opt, success, value},
+    combinator::{cut, eof, map, map_res, opt, success, value},
     error::{context, ParseError},
     multi::{many0, many1, separated_list0},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
@@ -30,6 +30,7 @@ use nom_supreme::{
 use rayon::prelude::*;
 use std::{
     collections::{HashMap, LinkedList},
+    fmt,
     iter::zip,
     path::{Path, PathBuf},
 };
@@ -668,6 +669,16 @@ fn parse_literal_keywords(input: &str) -> IResult<&str, ExprWrap<&str, &str>, Er
     ))(input)
 }
 
+#[derive(Debug, Clone)]
+struct CharLiteralError;
+
+impl fmt::Display for CharLiteralError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "a character")
+    }
+}
+impl std::error::Error for CharLiteralError {}
+
 /// Parser for atomic expressions such as newpair, integers, string/character
 /// literals, unary expressions and '('expr')'.
 fn parse_expr_atom(input: &str) -> IResult<&str, Expr<&str, &str>, ErrorTree<&str>> {
@@ -680,8 +691,12 @@ fn parse_expr_atom(input: &str) -> IResult<&str, Expr<&str, &str>, ErrorTree<&st
         map(new_pair, |(left, right)| {
             Expr::BinOp(box left, BinOp::Newpair, box right)
         }),
-        map(str_delimited("\'"), |s| {
-            Expr::Char(s.chars().next().unwrap_or_default())
+        map_res(str_delimited("\'"), |s| {
+            if s.len() != 1 {
+                Err(CharLiteralError)
+            } else {
+                Ok(Expr::Char(s.chars().next().unwrap_or_default()))
+            }
         })
         .context("Char Literal"),
         map(parse_int, Expr::Int),
