@@ -2,6 +2,7 @@ use super::data_flow::dataflow_analysis;
 use super::three_code::*;
 use crate::graph::{Deleted, Graph};
 use crate::intermediate::VarRepr;
+use rayon::prelude::*;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, LinkedList};
 use std::rc::Rc;
@@ -476,32 +477,17 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr], int_handler: &Option<Stri
 }
 
 /// Performs constant propagation on the [three code](ThreeCode).
-pub(super) fn prop_consts(
-    ThreeCode {
-        mut functions,
-        data_refs,
-        graph,
-        read_ref,
-        code,
-        int_handler,
-    }: ThreeCode,
-) -> ThreeCode {
-    prop_const_graph(&code, &[], &int_handler);
-    for Function {
-        args,
-        code,
-        graph: _,
-        read_ref: _,
-    } in functions.values_mut()
-    {
-        prop_const_graph(code, args, &int_handler);
-    }
-    ThreeCode {
-        functions,
-        data_refs,
-        graph,
-        read_ref,
-        code,
-        int_handler,
-    }
+pub(super) fn prop_consts(mut threecode: ThreeCode) -> ThreeCode {
+    prop_const_graph(&threecode.code, &[], &threecode.int_handler);
+
+    threecode.functions = threecode
+        .functions
+        .into_par_iter()
+        .map(|(name, fun)| {
+            prop_const_graph(&fun.code, &fun.args, &threecode.int_handler);
+            (name, fun)
+        })
+        .collect();
+
+    threecode
 }
