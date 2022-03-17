@@ -1031,7 +1031,6 @@ mod tests {
             &HashMap::from([(0, ir::Type::Num(ir::NumSize::DWord))]),
             &HashMap::new(),
             &Options {
-                sethi_ullman_weights: false,
                 dead_code_removal: false,
                 const_propagation: false,
                 inlining: Some(1000),
@@ -1143,7 +1142,6 @@ mod tests {
             &HashMap::from([(0, ir::Type::Bool)]),
             &HashMap::new(),
             &Options {
-                sethi_ullman_weights: false,
                 dead_code_removal: false,
                 const_propagation: false,
                 inlining: Some(1000),
@@ -1215,7 +1213,6 @@ mod tests {
             &mut FmtDataRefFlags::default(),
             &HashMap::from([("function".to_string(), Some(ir::Type::Bool))]),
             &Options {
-                sethi_ullman_weights: false,
                 dead_code_removal: false,
                 const_propagation: false,
                 inlining: Some(1000),
@@ -1252,7 +1249,6 @@ mod tests {
             &mut FmtDataRefFlags::default(),
             &HashMap::from([("function".to_string(), None)]),
             &Options {
-                sethi_ullman_weights: false,
                 dead_code_removal: false,
                 const_propagation: false,
                 inlining: Some(1000),
@@ -1291,7 +1287,6 @@ mod tests {
                 Some("malloc".to_string()),
             ),
             &Options {
-                sethi_ullman_weights: false,
                 dead_code_removal: false,
                 const_propagation: false,
                 inlining: Some(1000),

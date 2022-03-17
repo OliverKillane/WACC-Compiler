@@ -15,6 +15,7 @@ use super::{
         Stat, Subroutine, Temporary,
     },
     live_ranges::{get_live_ranges, LiveRanges},
+    peephole_opts::remove_self_moves
 };
 use crate::graph::Graph;
 use rayon::prelude::*;
@@ -71,13 +72,13 @@ pub fn allocate_registers(program: ArmCode) -> ArmCode {
                     );
                     (
                         name,
-                        Subroutine {
+                        remove_self_moves(Subroutine {
                             args,
                             start_node,
                             temps,
                             reserved_stack,
                             cfg,
-                        },
+                        }),
                     )
                 },
             )

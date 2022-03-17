@@ -22,7 +22,7 @@
 //! arm, and between), which makes it significantly easier to debug.
 
 use self::{
-    peephole_opts::remove_self_moves, register_allocation::allocate_registers,
+    register_allocation::allocate_registers,
     translation::translate_threecode,
 };
 use super::{three_code::ThreeCode, Options};
@@ -50,12 +50,12 @@ impl From<(ThreeCode, &Options)> for ArmResult {
             let arm_temp = translate_threecode(three_code);
             let temp_string = arm_temp.to_string();
             ArmResult(
-                remove_self_moves(allocate_registers(arm_temp)),
+                allocate_registers(arm_temp),
                 Some(temp_string),
             )
         } else {
             ArmResult(
-                remove_self_moves(allocate_registers(translate_threecode(three_code))),
+                allocate_registers(translate_threecode(three_code)),
                 None,
             )
         }

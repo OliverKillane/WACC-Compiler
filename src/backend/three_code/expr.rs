@@ -537,7 +537,6 @@ mod tests {
                 &vars,
                 &function_types,
                 &Options {
-                    sethi_ullman_weights: false,
                     dead_code_removal: false,
                     const_propagation: false,
                     inlining: Some(1000),

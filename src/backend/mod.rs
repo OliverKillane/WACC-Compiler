@@ -50,7 +50,6 @@ use three_code::ThreeCode;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Options {
-    pub sethi_ullman_weights: bool,
     pub dead_code_removal: bool,
     pub const_propagation: bool,
     pub const_branch: bool,
@@ -110,7 +109,7 @@ pub fn compile(program: Program, options: Options) -> BackendOutput {
     let mut intermediates = vec![];
 
     if options.show_three_code {
-        intermediates.push(("ThreeCode:".to_string(), three_code.to_string()))
+        intermediates.push(("ThreeCode".to_string(), three_code.to_string()))
     }
 
     // the arm result can return a printable intermediate representation.

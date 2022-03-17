@@ -307,20 +307,21 @@ impl Display for Stat {
             Stat::Link(cond, link_to) => write!(f, "\tBL{}\t{}", cond, link_to),
             Stat::Call(fun_name, ret_temp, arg_temps) => write!(
                 f,
-                "\tINTERNAL OPERATION: CALL {} {}, ARGS({})",
+                "\tCALL\t{} ({}) {} (INTERNAL OPERATION)",
                 fun_name,
-                match ret_temp {
-                    Some(t) => format!("T{}", t),
-                    None => "No Return".to_string(),
-                },
                 arg_temps
                     .iter()
                     .map(|t| format!("T{}", t))
                     .collect::<Vec<_>>()
-                    .join(",")
+                    .join(","),
+                if let Some(ret) = ret_temp {
+                    format!("-> T{}", ret)
+                } else {
+                    "".to_string()
+                }
             ),
             Stat::AssignStackWord(ident) => {
-                write!(f, "\tINTERNAL OPERATION: ASSIGN WORD OF STACK TO {}", ident)
+                write!(f, "\tASSIGN STACK WORD {} (INTERNAL OPERATION)", ident)
             }
             Stat::Nop => write!(f, "\tNOP"),
         }
@@ -417,11 +418,11 @@ fn display_routine(
                 ControlFlow::Return(_, ret) => {
                     writeln!(
                         f,
-                        "\tINTERNAL OPERATION: RETURN {}",
+                        "\tRETURN\t{}(INTERNAL OPERATION)",
                         if let Some(ret_temp) = ret {
-                            format! {"T{}", ret_temp}
+                            format! {"T{} ", ret_temp}
                         } else {
-                            "no value returned".to_string()
+                            "".to_string()
                         }
                     )?;
                     None

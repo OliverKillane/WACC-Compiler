@@ -229,7 +229,6 @@ fn main() -> io::Result<()> {
                 println!("Intermediate Representation:\n{}", ir);
             }
             let options = Options {
-                sethi_ullman_weights: false,
                 dead_code_removal: dead_code,
                 const_propagation: const_prop,
                 const_branch,
