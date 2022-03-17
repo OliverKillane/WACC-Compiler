@@ -339,7 +339,7 @@ fn get_next_node(label_map: &HashMap<ArmNode, (usize, bool)>) -> Option<ArmNode>
 /// Display from a start node:
 /// - Create the subroutine label
 /// - Ensures all instructions are in range of a literal pool
-/// - Determines the 
+/// - Determines the
 fn display_routine(
     start_node: &ArmNode,
     name: &str,

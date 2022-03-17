@@ -18,8 +18,8 @@
 //! ```
 //!
 //! This can also be done for void functions.
-//! 
-//! Tail call optimisation is behaviour changing, as some functions which would 
+//!
+//! Tail call optimisation is behaviour changing, as some functions which would
 //! ordinarily stack overflow, can be optimized into loops which do not.
 
 use super::three_code::{Function, OpSrc, StatCode, StatNode, StatType, ThreeCode};

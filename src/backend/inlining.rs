@@ -1,22 +1,22 @@
 //! Function inlining using a max-size heuristic.
-//! 
-//! Based on the provided inlining value (passed from low, medium, high inlining 
-//! options in the compiler's CLI), functions are checked to determine if they 
+//!
+//! Based on the provided inlining value (passed from low, medium, high inlining
+//! options in the compiler's CLI), functions are checked to determine if they
 //! are small enough to be inlined.
-//! 
-//! Strongly connected components such as directly mutually recursive, or 
+//!
+//! Strongly connected components such as directly mutually recursive, or
 //! recursive functions are not inlined.
-//! 
-//! This operation is very expensive, and is time consuming on very high 
+//!
+//! This operation is very expensive, and is time consuming on very high
 //! inlining levels, however it opens many other potential optimisation, namely:
-//! - Dead Code removal cannot optimise function calls, inlining calls allows their 
+//! - Dead Code removal cannot optimise function calls, inlining calls allows their
 //!   dead code to be removed.
-//! - Tail Call Optimisation also cannot optimise around potentially 
+//! - Tail Call Optimisation also cannot optimise around potentially
 //!   side-effectual function calls, inlining can alleviate this.
-//! - Constant propagation cannot be done through function calls (as function 
-//!   may be called from many locations, and we want the function to be capable 
-//!   of being linked, so it must respect the arm calling convention). Hence 
-//!   when the user does not want to link, they can use inlining to allow 
+//! - Constant propagation cannot be done through function calls (as function
+//!   may be called from many locations, and we want the function to be capable
+//!   of being linked, so it must respect the arm calling convention). Hence
+//!   when the user does not want to link, they can use inlining to allow
 //!   constants to be propagated through the function's definition.
 
 use super::data_flow::DataflowNode;
@@ -655,13 +655,11 @@ pub(super) fn inline(
         called_functions.insert(int_handler.clone());
     }
 
-
     for node in &new_graph {
         if let Some(fname) = get_call_name(&node, &new_functions) {
             called_functions.insert(fname);
         }
     }
-
 
     for Function {
         graph: new_function_graph,
@@ -676,7 +674,6 @@ pub(super) fn inline(
             }
         }
     }
-
 
     let new_functions: HashMap<_, _> = new_functions
         .into_iter()

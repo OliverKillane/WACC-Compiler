@@ -1,20 +1,20 @@
-//! Definition of (and translation from [ir] to) the architecture-agnostic 
+//! Definition of (and translation from [ir] to) the architecture-agnostic
 //! [threecode](ThreeCode) representation.
-//! 
-//! It is designed to be a generalized assembly language to allow for extension 
-//! to many different architectures. It supports basic operations, calls (including 
-//! void), stack memory references associated with functions (readref), and 
+//!
+//! It is designed to be a generalized assembly language to allow for extension
+//! to many different architectures. It supports basic operations, calls (including
+//! void), stack memory references associated with functions (readref), and
 //! structs in its data section.
-//! 
-//! It is structured as a control flow graph with a single statement per node, 
+//!
+//! It is structured as a control flow graph with a single statement per node,
 //! which allows for fine grained analysis of live ranges, dead code, etc.
-//! 
-//! Control flow is managed by the [stat type](StatType) enumeration. While most 
-//! statements are contained in [stat code nodes](StatCode), including binary 
-//! operations (which can be set as overflow checked), assignments, load/store and 
+//!
+//! Control flow is managed by the [stat type](StatType) enumeration. While most
+//! statements are contained in [stat code nodes](StatCode), including binary
+//! operations (which can be set as overflow checked), assignments, load/store and
 //! function calls.
-//! 
-//! Display is implemented for the threecode to allow for debugging, and analysis 
+//!
+//! Display is implemented for the threecode to allow for debugging, and analysis
 //! of the optimizations performed on threecode.
 
 mod eval;

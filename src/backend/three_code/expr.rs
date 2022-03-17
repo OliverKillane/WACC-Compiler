@@ -1,7 +1,7 @@
 //! Translation of [IR expressions](ir::Expr) into three code graphs by flattening.
-//! 
-//! By converting expressions from trees to flattened threecode further analysis 
-//! and optimisation can be easily performed (e.g dead code removal or inlining 
+//!
+//! By converting expressions from trees to flattened threecode further analysis
+//! and optimisation can be easily performed (e.g dead code removal or inlining
 //! of functions).
 
 use super::{super::Options, stat::get_type_width, BinOp, OpSrc, Size, StatCode, StatLine};

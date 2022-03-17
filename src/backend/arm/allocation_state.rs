@@ -10,12 +10,12 @@
 //!
 //! Uses 'instructions till use' associated with live ranges to determine when
 //! to spill values from registers.
-//! 
+//!
 //! ## Registers are organised as:
 //! | R0   | R1   | R2   | R3   | R4      | R5      | R6      | R7      | R8      | R9      | R10     | R11     | R12      | SP        | LR       | PC        |
 //! |------|------|------|------|---------|---------|---------|---------|---------|---------|---------|---------|----------|-----------|----------|-----------|
 //! | Arg1 | Arg2 | Arg3 | Arg4 | Preserve| Preserve| Preserve| Preserve| Preserve| Preserve| Preserve| Preserve| Preserve | Protected | Preserve | Protected |
-//! 
+//!
 //! ## Stack frame is composed of:
 //! |            | Stack Contents         |
 //! |------------|------------------------|
