@@ -85,7 +85,14 @@ struct Args {
         long,
         help = "Print the backend representations (arm with temporaries)"
     )]
-    backend_temps: bool,
+    arm_temp: bool,
+
+    #[clap(
+        short,
+        long,
+        help = "Print the three code representation of the program"
+    )]
+    three_code: bool,
 
     #[clap(short, long, help = "Print the intermediate representation generated")]
     ir_print: bool,
@@ -148,7 +155,8 @@ fn main() -> io::Result<()> {
     let Args {
         filepath: mut main_file_path,
         outputpath,
-        backend_temps: temp_arm,
+        arm_temp,
+        three_code,
         ir_print,
         tail_call,
         inlining,
@@ -222,15 +230,15 @@ fn main() -> io::Result<()> {
                 strength_reduction: false,
                 loop_unrolling: false,
                 common_expressions: false,
-                show_arm_temp_rep: temp_arm,
+                show_arm_temp_rep: arm_temp,
+                show_three_code: three_code,
             };
 
             let result = compile(ir, options);
 
-            if temp_arm {
-                for temp in result.intermediates {
-                    println!("{}", temp)
-                }
+            for (name, temp) in result.intermediates {
+                println!("{}:", name);
+                println!("{}", temp)
             }
 
             let mut file = if let Some(outpath) = outputpath {

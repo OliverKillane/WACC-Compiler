@@ -1,6 +1,7 @@
 mod eval;
 mod expr;
 mod stat;
+pub mod three_code_display;
 
 use self::expr::assign_op_src;
 
@@ -1021,6 +1022,7 @@ mod tests {
                 loop_unrolling: false,
                 common_expressions: false,
                 show_arm_temp_rep: false,
+                show_three_code: false,
             },
         );
 
@@ -1135,6 +1137,7 @@ mod tests {
                 loop_unrolling: false,
                 common_expressions: false,
                 show_arm_temp_rep: false,
+                show_three_code: false,
             },
         );
 
@@ -1209,6 +1212,7 @@ mod tests {
                 loop_unrolling: false,
                 common_expressions: false,
                 show_arm_temp_rep: false,
+                show_three_code: false,
             },
         );
         assert_eq!(args, vec![0]);
@@ -1248,6 +1252,7 @@ mod tests {
                 loop_unrolling: false,
                 common_expressions: false,
                 show_arm_temp_rep: false,
+                show_three_code: false,
             },
         );
         assert_eq!(args, vec![0]);
@@ -1289,6 +1294,7 @@ mod tests {
                 loop_unrolling: false,
                 common_expressions: false,
                 show_arm_temp_rep: false,
+                show_three_code: false,
             },
         )
             .into();
