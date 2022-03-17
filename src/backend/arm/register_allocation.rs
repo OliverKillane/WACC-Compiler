@@ -17,6 +17,7 @@ use super::{
     live_ranges::{get_live_ranges, LiveRanges},
 };
 use crate::graph::Graph;
+use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
     ops::DerefMut,
@@ -48,7 +49,7 @@ pub fn allocate_registers(program: ArmCode) -> ArmCode {
         main: allocate_for_routine(main, &[], reserved_stack, &temps, &live_ranges, &mut cfg),
         temps,
         subroutines: functions
-            .into_iter()
+            .into_par_iter()
             .map(
                 |(
                     name,
@@ -642,9 +643,9 @@ fn translate_from_node(
 }
 
 impl Ident {
-    /// used to extract temporaries for temporary idents. Used when a mutable
-    /// reference to the entire ident is required, so no immutable references to
-    /// the temporary value inside the ident can be made.
+    /// used to extract temporaries for temporary [identifiers](Ident). Used when
+    /// a mutable reference to the entire ident is required, so no immutable
+    /// references to the temporary value inside the ident can be made.
     pub fn get_temp(&self) -> Temporary {
         if let Ident::Temp(t) = self {
             *t

@@ -1,5 +1,12 @@
-//! Converts [ARM Representation](Program) into a string format, suitable for
+//! Converts [ARM Representation](ArmCode) into a string format, suitable for
 //! assembly.
+//!
+//! Traverses along a linear chain of the graph, adding label entires for every
+//! branch from the chain, and every node in the chain that has multiple
+//! predecessors.
+//!
+//! Can then continually translate un-translated entries (potentially adding more
+//! entires to the label map) in the label map until all are translated.
 
 use lazy_static::__Deref;
 
@@ -300,7 +307,7 @@ impl Display for Stat {
             Stat::Link(cond, link_to) => write!(f, "\tBL{}\t{}", cond, link_to),
             Stat::Call(fun_name, ret_temp, arg_temps) => write!(
                 f,
-                "\tINTERNAL OPERATION: CALL\t{}\t{}, ARGS({})",
+                "\tINTERNAL OPERATION: CALL {} {}, ARGS({})",
                 fun_name,
                 match ret_temp {
                     Some(t) => format!("T{}", t),
@@ -329,6 +336,10 @@ fn get_next_node(label_map: &HashMap<ArmNode, (usize, bool)>) -> Option<ArmNode>
     None
 }
 
+/// Display from a start node:
+/// - Create the subroutine label
+/// - Ensures all instructions are in range of a literal pool
+/// -
 fn display_routine(
     start_node: &ArmNode,
     name: &str,
@@ -357,7 +368,7 @@ fn display_routine(
 
     while next.is_some() {
         while let Some(current) = next {
-            if since_lit > 2000 {
+            if since_lit >= 2000 {
                 writeln!(f, "\tB\t{}", lit_label_conv(&lit_branch_ident))?;
                 writeln!(f, "\t.ltorg")?;
                 writeln!(f, "{}:", lit_label_conv(&lit_branch_ident))?;
@@ -367,7 +378,8 @@ fn display_routine(
 
             match label_map.get_mut(&current) {
                 Some((id, true)) => {
-                    writeln!(f, "\tB\t{}", label_conv(id))?;
+                    writeln!(f, "\tB\t{}\n\t.ltorg", label_conv(id))?;
+                    since_lit = 0;
                     break;
                 }
                 Some((id, l)) => {
@@ -394,16 +406,18 @@ fn display_routine(
                     };
 
                     writeln!(f, "\tB{}\t{}", cond, label_conv(&id))?;
+
                     branch_false.clone()
                 }
                 ControlFlow::Ltorg(_) => {
                     writeln!(f, "\t.ltorg")?;
+                    since_lit = 0;
                     None
                 }
                 ControlFlow::Return(_, ret) => {
                     writeln!(
                         f,
-                        "\tINTERNAL OPERATION: RETURN\t{}",
+                        "\tINTERNAL OPERATION: RETURN {}",
                         if let Some(ret_temp) = ret {
                             format! {"T{}", ret_temp}
                         } else {

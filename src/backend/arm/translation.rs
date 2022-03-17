@@ -21,7 +21,7 @@ use super::{
         MemOp, MemOperand, MovOp, MulOp, RegOp, Shift, Stat, Subroutine, Temporary,
     },
 };
-
+use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 /// A struct for tracking names of arm representation temporaries. Is used to
@@ -91,7 +91,7 @@ pub(super) fn translate_threecode(
         main: translate_routine(code, int_handler, &mut temp_map, &mut cfg),
         temps: temp_map.get_hashset(),
         subroutines: functions
-            .into_iter()
+            .into_par_iter()
             .map(|(name, fun)| (name, translate_function(fun, int_handler)))
             .collect::<HashMap<_, _>>(),
         cfg,

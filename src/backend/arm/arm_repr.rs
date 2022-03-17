@@ -9,7 +9,7 @@
 //! - Multis are used for nodes jumped to by more than one node, they become
 //!   labels in the assembly (as do some other nodes)
 //! - Some special nodes are considered (e.g return) which are converted into
-//! many arm instructions during register allocation.
+//!   many arm instructions during register allocation.
 
 use super::super::data_flow::DataflowNode;
 use super::int_constraints::ConstrainedInt;
@@ -209,7 +209,8 @@ pub enum MemOperand {
     /// If [bool] is true then we update the value in the register with offset
     /// before accessing the memory location.
     PreIndex(Ident, FlexOffset),
-    /// Direct from the label in the data section indicated by [String], offset by a set amount.
+    /// Direct from the label in the data section indicated by [String], offset
+    /// by a set amount.
     Label(DataIdent, i32),
     /// Immediate 32-bit integer value.
     Expression(i32),
