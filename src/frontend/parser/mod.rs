@@ -148,18 +148,14 @@ pub fn parse_path(input: &str) -> IResult<&str, PathBuf, ErrorTree<&str>> {
         )),
         |(first_component, path)| {
             let s = &vec![first_component]
-            .into_iter()
-            .chain(path)
-            .into_iter()
-            .map(|component| component.into_iter().collect::<String>())
-            .intersperse("/".to_string())
-            .collect::<String>();
-            
-            Path::new(
-                s.trim_end(),
-            )
-            .iter()
-            .collect::<PathBuf>()
+                .into_iter()
+                .chain(path)
+                .into_iter()
+                .map(|component| component.into_iter().collect::<String>())
+                .intersperse("/".to_string())
+                .collect::<String>();
+
+            Path::new(s.trim_end()).iter().collect::<PathBuf>()
         },
     )(input)
 }
