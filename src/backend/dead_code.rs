@@ -7,7 +7,7 @@
 use std::{
     collections::{HashMap, HashSet},
     ops::DerefMut,
-    sync::Arc,
+    rc::Rc,
 };
 
 use super::{
@@ -173,7 +173,7 @@ fn get_node_effects(node: &StatNode) -> (Option<VarRepr>, Vec<VarRepr>, bool) {
     }
 }
 
-type CodeAnalysis = Arc<HashSet<VarRepr>>;
+type CodeAnalysis = Rc<HashSet<VarRepr>>;
 
 /// initialise a set, if the statement is has side-effects then its uses are
 /// propagated to its live-in set.
@@ -182,11 +182,11 @@ fn initialise_node(node: &StatNode) -> (CodeAnalysis, CodeAnalysis) {
 
     (
         if sideeffect {
-            Arc::new(HashSet::from_iter(uses.into_iter()))
+            Rc::new(HashSet::from_iter(uses.into_iter()))
         } else {
-            Arc::new(HashSet::new())
+            Rc::new(HashSet::new())
         },
-        Arc::new(HashSet::new()),
+        Rc::new(HashSet::new()),
     )
 }
 
@@ -207,7 +207,7 @@ fn update_node(
         succ_live_ins[0].clone()
     } else {
         // iterate through all successor's live ins, add each to new set.
-        Arc::new(
+        Rc::new(
             succ_live_ins
                 .into_iter()
                 .fold(HashSet::new(), |mut liveout, livein| {
@@ -238,7 +238,7 @@ fn update_node(
         }
     }
 
-    let new_in_set = Arc::new(side_effect_in);
+    let new_in_set = Rc::new(side_effect_in);
 
     // check for a change in set contents.
     let updated = in_set != &new_in_set || out_set != &new_out_set;

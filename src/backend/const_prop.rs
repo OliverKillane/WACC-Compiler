@@ -5,7 +5,7 @@ use crate::intermediate::VarRepr;
 use rayon::prelude::*;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, LinkedList};
-use std::sync::Arc;
+use std::rc::Rc;
 
 /// Returns the variable defined in this node, if one exists.
 fn get_defined_var(node: &StatNode) -> Option<VarRepr> {
@@ -32,7 +32,7 @@ fn get_use_op_src(op_src: &OpSrc) -> Option<VarRepr> {
 }
 
 /// Liveness analysis set type.
-type LiveAnalysis = Arc<HashSet<VarRepr>>;
+type LiveAnalysis = Rc<HashSet<VarRepr>>;
 
 /// Retreives the used variables that can be substituted for a constant [op source](OpSrc).
 fn get_const_prop_uses(node: &StatNode) -> HashSet<VarRepr> {
@@ -74,13 +74,13 @@ fn construct_live_in(node: &StatNode, live_out: LiveAnalysis) -> LiveAnalysis {
     if cow_live_out.is_borrowed() {
         live_out
     } else {
-        Arc::new(cow_live_out.into_owned())
+        Rc::new(cow_live_out.into_owned())
     }
 }
 
 /// Constructs the initial values for LiveIn and LiveOut for the node.
 fn live_init(node: &StatNode) -> (LiveAnalysis, LiveAnalysis) {
-    let live_out = Arc::new(HashSet::new());
+    let live_out = Rc::new(HashSet::new());
     (construct_live_in(node, live_out.clone()), live_out)
 }
 
@@ -101,7 +101,7 @@ fn live_update(
             (construct_live_in(node, new_live_out.clone()), new_live_out)
         }
     } else {
-        let new_live_out = Arc::new(succ_live_in.into_iter().fold(
+        let new_live_out = Rc::new(succ_live_in.into_iter().fold(
             HashSet::new(),
             |mut live_out, live_in| {
                 for live_in_var in live_in.iter() {
@@ -117,7 +117,7 @@ fn live_update(
 }
 
 /// Definitions analysis set type.
-type DefsAnalysis = HashMap<VarRepr, Arc<HashSet<StatNode>>>;
+type DefsAnalysis = HashMap<VarRepr, Rc<HashSet<StatNode>>>;
 
 /// Constructs the DefOut map from the DefIn map, provided a node is actually
 /// needed further in the graph (based on the LiveIn set).
@@ -144,13 +144,13 @@ fn construct_defs_out(
     let def_in = defs_in
         .get(&def_var)
         .cloned()
-        .unwrap_or_else(|| Arc::new(HashSet::new()));
+        .unwrap_or_else(|| Rc::new(HashSet::new()));
     defs_in.insert(
         def_var,
         if !def_in.contains(node) {
             let mut def_in = (&*def_in).clone();
             def_in.insert(node.clone());
-            Arc::new(def_in)
+            Rc::new(def_in)
         } else {
             def_in
         },
@@ -169,7 +169,7 @@ fn defs_init(
 ) -> (DefsAnalysis, DefsAnalysis) {
     let defs_in: DefsAnalysis = additional_defs
         .iter()
-        .map(|(var, def)| (*var, Arc::new(HashSet::from([def.clone()]))))
+        .map(|(var, def)| (*var, Rc::new(HashSet::from([def.clone()]))))
         .collect();
     let defs_out = construct_defs_out(node, &defs_in, live_out);
     (defs_in, defs_out)
@@ -197,13 +197,13 @@ fn defs_update(
         let new_defs_in = pred_defs_out.into_iter().fold(
             additional_defs
                 .iter()
-                .map(|(var, def)| (*var, Arc::new(HashSet::from([def.clone()]))))
+                .map(|(var, def)| (*var, Rc::new(HashSet::from([def.clone()]))))
                 .collect(),
             |mut defs_in: DefsAnalysis, defs_out| {
                 for (&var, defs) in defs_out {
                     let def_in = defs_in.entry(var).or_default();
                     let new_def_in = def_in.union(&**defs).cloned().collect();
-                    *def_in = Arc::new(new_def_in);
+                    *def_in = Rc::new(new_def_in);
                 }
                 defs_in
             },
