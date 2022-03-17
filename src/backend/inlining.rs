@@ -431,7 +431,7 @@ fn inline_graph(
     function_instruction_counts: &HashMap<&str, usize>,
     sccs_group: Arc<HashSet<&str>>,
     sccs_groups: &HashMap<&str, Arc<HashSet<&str>>>,
-) -> (StatNode, Vec<VarRepr>) {
+) -> (StatNode, Vec<VarRepr>, bool) {
     let mut call_nodes = LinkedList::new();
     let mut main_variable_mappings = HashMap::new();
     let mut new_variable = 0;
@@ -450,6 +450,7 @@ fn inline_graph(
         .map(|&arg| get_mapping(arg, &mut new_variable, &mut main_variable_mappings))
         .collect();
     let mut code_instruction_count = code_instruction_count.ceil() as usize;
+    let mut read_ref_needed = false;
     while let Some(call_node) = call_nodes.pop_front() {
         let fname = get_call_name(&call_node, functions).expect("Not a call node");
         let function_instruction_count = function_instruction_counts[fname.as_str()];
@@ -481,7 +482,7 @@ fn inline_graph(
             args: function_args,
             code: function_code,
             graph: _,
-            read_ref: _,
+            read_ref,
         } = &functions[&fname];
         let mut variable_mappings = HashMap::new();
         let mut new_call_node = inline_code_dfs(
@@ -522,8 +523,9 @@ fn inline_graph(
             new_code = new_call_node;
         }
         new_graph.remove_node(call_node);
+        read_ref_needed |= read_ref;
     }
-    (new_code, args)
+    (new_code, args, read_ref_needed)
 }
 
 /// Performs the inlining optimization. Converts the old three code graph
@@ -578,7 +580,7 @@ pub(super) fn inline(
     let sccs = get_function_sccs(&call_graph, &transpose_call_graph);
 
     let mut new_graph = Graph::new();
-    let (code, _) = inline_graph(
+    let (code, _, read_ref_needed) = inline_graph(
         &code,
         &mut new_graph,
         instructions_limit,
@@ -603,7 +605,7 @@ pub(super) fn inline(
                 },
             )| {
                 let mut new_function_graph = Graph::new();
-                let (code, args) = inline_graph(
+                let (code, args, read_ref_needed) = inline_graph(
                     code,
                     &mut new_function_graph,
                     instructions_limit,
@@ -619,7 +621,7 @@ pub(super) fn inline(
                         args,
                         code,
                         graph: new_function_graph,
-                        read_ref: *read_ref,
+                        read_ref: *read_ref | read_ref_needed,
                     },
                 )
             },
@@ -657,7 +659,7 @@ pub(super) fn inline(
         functions: new_functions,
         data_refs,
         graph: new_graph,
-        read_ref,
+        read_ref: read_ref | read_ref_needed,
         code,
         int_handler,
     }
