@@ -482,17 +482,12 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr], int_handler: &Option<Stri
 }
 
 /// Performs constant propagation on the [three code](ThreeCode).
-pub(super) fn prop_consts(mut threecode: ThreeCode) -> ThreeCode {
+pub(super) fn prop_consts(threecode: ThreeCode) -> ThreeCode {
     prop_const_graph(&threecode.code, &[], &threecode.int_handler);
 
-    threecode.functions = threecode
+    threecode
         .functions
-        .into_par_iter()
-        .map(|(name, fun)| {
-            prop_const_graph(&fun.code, &fun.args, &threecode.int_handler);
-            (name, fun)
-        })
-        .collect();
+        .par_iter().for_each(|(_, fun)| prop_const_graph(&fun.code, &fun.args, &threecode.int_handler));
 
     threecode
 }

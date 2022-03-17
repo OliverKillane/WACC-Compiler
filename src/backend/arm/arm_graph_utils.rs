@@ -171,6 +171,23 @@ impl ArmNode {
         }
     }
 
+    pub fn remove_predecessor(&mut self, predecessor: &Self) {
+        match self.get_mut().deref_mut() {
+            ControlFlow::Simple(prev, _, _) |
+            ControlFlow::Branch(prev, _, _, _) |
+            ControlFlow::Ltorg(prev) |
+            ControlFlow::Return(prev, _) => {
+                if let Some(prev_node) = prev && prev_node == predecessor {
+                    *prev = None
+                } else {
+                    panic!("Could not remove, predecessor was not true predecessor")
+                }
+            },
+            ControlFlow::Multi(precs, _) => precs.retain(|other_node| other_node != predecessor),
+            ControlFlow::Removed => panic!("cannot remove predecessor of removed node"),
+        }
+    }
+
     pub fn has_successor(&self, other: &Self) -> bool {
         match self.get().deref() {
             ControlFlow::Simple(_, _, succ) | ControlFlow::Multi(_, succ) => {
