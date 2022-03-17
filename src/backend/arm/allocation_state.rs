@@ -10,6 +10,29 @@
 //!
 //! Uses 'instructions till use' associated with live ranges to determine when
 //! to spill values from registers.
+//! 
+//! ## Registers are organised as:
+//! | R0   | R1   | R2   | R3   | R4      | R5      | R6      | R7      | R8      | R9      | R10     | R11     | R12      | SP        | LR       | PC        |
+//! |------|------|------|------|---------|---------|---------|---------|---------|---------|---------|---------|----------|-----------|----------|-----------|
+//! | Arg1 | Arg2 | Arg3 | Arg4 | Preserve| Preserve| Preserve| Preserve| Preserve| Preserve| Preserve| Preserve| Preserve | Protected | Preserve | Protected |
+//! 
+//! ## Stack frame is composed of:
+//! |            | Stack Contents         |
+//! |------------|------------------------|
+//! |            | (Temp) Arg 4           |
+//! |            | (Temp) Arg 5           |
+//! |            | (Temp) Arg 6           |
+//! |            | (Temp) Arg 7           |
+//! |            | ...                    |
+//! | SP at Call | Temps                  |
+//! |            | ...                    |
+//! |            | preserved register R4  |
+//! |            | preserved register R5  |
+//! |            | ...                    |
+//! |            | preserved register R14 |
+//! |            | reserved stack space   |
+//! |            | reserved stack space   |
+//! |            | ...                    |
 
 use crate::graph::Graph;
 use std::{
@@ -44,25 +67,6 @@ enum Alloc {
 }
 
 /// Tracks the state of the registers, and the stack frame.
-/// Stack frame is composed of:
-/// |------------|------------------------|
-/// |            | Stack Contents         |
-/// |------------|------------------------|
-/// |            | (Temp) Arg 4           |
-/// |            | (Temp) Arg 5           |
-/// |            | (Temp) Arg 6           |
-/// |            | (Temp) Arg 7           |
-/// |            | ...                    |
-/// | SP at Call | Temps                  |
-/// |            | ...                    |
-/// |            | preserved register R4  |
-/// |            | preserved register R5  |
-/// |            | ...                    |
-/// |            | preserved register R14 |
-/// |            | reserved stack space   |
-/// |            | reserved stack space   |
-/// |            | ...                    |
-/// |------------|------------------------|
 #[derive(Debug, Clone)]
 pub struct AllocationState {
     /// Represents the usable registers:

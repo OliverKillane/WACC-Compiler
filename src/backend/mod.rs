@@ -1,3 +1,32 @@
+//! # The WACC compiler Backend
+//! 
+//! ## Representations
+//! The two main representations used are the architecure-agnostic [threecode](ThreeCode)
+//! upon which high-level optimisation are performed, and the lower-level arm 
+//! representation (which is initially temporaries upon which register allocation 
+//! using live ranges & next use distance is done).
+//! 
+//! ## Optimisations
+//! The main optimisations performed are:
+//! - Inlining
+//! - Constant Propagation
+//! - Tail Call Optimisation
+//! - Dead Code Removal
+//! - Same Branch Removal
+//! 
+//! These are done on the threecode graph, as this means any architecture specific 
+//! backend we develop requires no code changes to have these optimizations (just 
+//! need to translate from threecode)
+//! 
+//! ## Assembly Generation
+//! We translate the threecode to arm with temporaries, and live range analysis 
+//! (implemented using [data flow analysis](data_flow)) to allocate registers, 
+//! stack slots, and convert faux instructions (call, return) into arm instructions.
+//! 
+//! ## Display
+//! The backend can produce the display for intermediate code generated for both 
+//! the threecode, and arm with temporaries.
+
 mod arm;
 mod const_branch;
 mod const_prop;
@@ -44,7 +73,7 @@ pub fn compile(program: Program, options: Options) -> BackendOutput {
     if let Some(instructions_limit) = options.inlining {
         three_code = inline(three_code, instructions_limit);
     }
-
+    
     if options.tail_call {
         if options.const_branch {
             three_code = const_branch_optimization(three_code);

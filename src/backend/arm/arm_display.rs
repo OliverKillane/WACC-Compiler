@@ -339,7 +339,7 @@ fn get_next_node(label_map: &HashMap<ArmNode, (usize, bool)>) -> Option<ArmNode>
 /// Display from a start node:
 /// - Create the subroutine label
 /// - Ensures all instructions are in range of a literal pool
-/// -
+/// - Determines the 
 fn display_routine(
     start_node: &ArmNode,
     name: &str,
@@ -354,7 +354,7 @@ fn display_routine(
     //
     // This is done by placing a pool every 2000 instructions (literal pools always <= 4000 bytes away).
     // Starts at 1000 since there are no literal pools at the start of the program.
-    let mut since_lit = 1000;
+    let mut since_lit = 500;
     let mut lit_branch_ident = 0;
 
     // Label identifier conversion to strings.
@@ -368,7 +368,7 @@ fn display_routine(
 
     while next.is_some() {
         while let Some(current) = next {
-            if since_lit >= 2000 {
+            if since_lit >= 1000 {
                 writeln!(f, "\tB\t{}", lit_label_conv(&lit_branch_ident))?;
                 writeln!(f, "\t.ltorg")?;
                 writeln!(f, "{}:", lit_label_conv(&lit_branch_ident))?;

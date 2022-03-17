@@ -1,3 +1,10 @@
+//! Translation of [ir statements](ir::Stat) into [threecode statements](StatCode) 
+//! 
+//! Flattening allows for better analysis for optimisations.
+//! 
+//! The [ir](ir) is constructed as a block graph, and is split into nodes per 
+//! statement.
+
 use super::{
     super::Options,
     expr::{

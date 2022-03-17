@@ -3,6 +3,10 @@
 //! Any code which does not affect memory, control flow, or is a call/return and
 //! that does not create values used in any such side-effectual operations is
 //! considered dead and can be removed.
+//! 
+//! Function inlining greatly helps this optimisation as dead code removal 
+//! cannot yet peer into and remove function calls, even if the result/return value 
+//! is not side-effectual.
 
 use std::{
     collections::{HashMap, HashSet},

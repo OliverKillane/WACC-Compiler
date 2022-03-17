@@ -1,3 +1,8 @@
+//! Constant propagation on the [threecode](ThreeCode) control flow graph.
+//! 
+//! Constants can include integers and data references (with offsets), and can 
+//! be propagated through any control flow structure (graph).
+
 use super::data_flow::dataflow_analysis;
 use super::three_code::*;
 use crate::graph::{Deleted, Graph};

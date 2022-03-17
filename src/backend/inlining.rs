@@ -1,3 +1,24 @@
+//! Function inlining using a max-size heuristic.
+//! 
+//! Based on the provided inlining value (passed from low, medium, high inlining 
+//! options in the compiler's CLI), functions are checked to determine if they 
+//! are small enough to be inlined.
+//! 
+//! Strongly connected components such as directly mutually recursive, or 
+//! recursive functions are not inlined.
+//! 
+//! This operation is very expensive, and is time consuming on very high 
+//! inlining levels, however it opens many other potential optimisation, namely:
+//! - Dead Code removal cannot optimise function calls, inlining calls allows their 
+//!   dead code to be removed.
+//! - Tail Call Optimisation also cannot optimise around potentially 
+//!   side-effectual function calls, inlining can alleviate this.
+//! - Constant propagation cannot be done through function calls (as function 
+//!   may be called from many locations, and we want the function to be capable 
+//!   of being linked, so it must respect the arm calling convention). Hence 
+//!   when the user does not want to link, they can use inlining to allow 
+//!   constants to be propagated through the function's definition.
+
 use super::data_flow::DataflowNode;
 use super::three_code::*;
 use crate::{
@@ -568,6 +589,7 @@ pub(super) fn inline(
             )
         })
         .collect::<HashMap<&str, Vec<&str>>>();
+
     let mut transpose_call_graph: HashMap<_, Vec<_>> = functions
         .keys()
         .map(|fname| (fname.as_str(), Vec::new()))
@@ -577,6 +599,7 @@ pub(super) fn inline(
             transpose_call_graph.get_mut(call).unwrap().push(fname);
         }
     }
+
     let sccs = get_function_sccs(&call_graph, &transpose_call_graph);
 
     let mut new_graph = Graph::new();
@@ -591,7 +614,6 @@ pub(super) fn inline(
         &sccs,
     );
 
-    // let sscs_ref =
     let new_functions = functions
         .par_iter()
         .map(
@@ -632,11 +654,15 @@ pub(super) fn inline(
     if let Some(int_handler) = &int_handler {
         called_functions.insert(int_handler.clone());
     }
+
+
     for node in &new_graph {
         if let Some(fname) = get_call_name(&node, &new_functions) {
             called_functions.insert(fname);
         }
     }
+
+
     for Function {
         graph: new_function_graph,
         args: _,
@@ -650,6 +676,8 @@ pub(super) fn inline(
             }
         }
     }
+
+
     let new_functions: HashMap<_, _> = new_functions
         .into_iter()
         .filter(|(fname, _)| called_functions.contains(fname))

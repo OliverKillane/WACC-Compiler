@@ -7,7 +7,7 @@
 //! x = recursion(arg_1, ..., arg_n)
 //! return x
 //! ```
-//! Can be optimised into
+//! Can be optimized into
 //! ```text
 //! function(param_1, ..., param_n)
 //!
@@ -18,6 +18,9 @@
 //! ```
 //!
 //! This can also be done for void functions.
+//! 
+//! Tail call optimisation is behaviour changing, as some functions which would 
+//! ordinarily stack overflow, can be optimized into loops which do not.
 
 use super::three_code::{Function, OpSrc, StatCode, StatNode, StatType, ThreeCode};
 use crate::{graph::Graph, intermediate::VarRepr};
