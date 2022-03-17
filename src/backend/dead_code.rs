@@ -1,4 +1,8 @@
 //! Removal of dead code (no side effects, is not part of routine).
+//!
+//! Any code which does not affect memory, control flow, or is a call/return and
+//! that does not create values used in any such side-effectual operations is
+//! considered dead and can be removed.
 
 use std::{
     collections::{HashMap, HashSet},

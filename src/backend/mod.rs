@@ -55,6 +55,8 @@ pub fn compile(program: Program, options: Options) -> BackendOutput {
         three_code = remove_dead_code(three_code);
     }
 
+    three_code = same_branch_optimization(three_code);
+
     #[cfg(debug_assertions)]
     three_code
         .check_dummy()
