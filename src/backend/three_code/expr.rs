@@ -535,10 +535,7 @@ mod tests {
                     const_propagation: false,
                     inlining: Some(1000),
                     tail_call: false,
-                    hoisting: false,
-                    strength_reduction: false,
-                    loop_unrolling: false,
-                    common_expressions: false,
+                    const_branch: false,
                     show_arm_temp_rep: false,
                     show_three_code: false
                 }
