@@ -102,8 +102,11 @@ struct Args {
     )]
     inlining: InlineMode,
 
-    #[clap(short, long, help = "Enable constant propagation")]
+    #[clap(long, help = "Enable constant propagation")]
     const_prop: bool,
+
+    #[clap(long, help = "Enable dead code elimination")]
+    dead_code: bool,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
@@ -150,6 +153,7 @@ fn main() -> io::Result<()> {
         tail_call,
         inlining,
         const_prop,
+        dead_code,
     } = Args::parse();
 
     let (main_file, module_files) = match gather_modules(&main_file_path) {
@@ -210,7 +214,7 @@ fn main() -> io::Result<()> {
             }
             let options = Options {
                 sethi_ullman_weights: false,
-                dead_code_removal: false,
+                dead_code_removal: dead_code,
                 const_propagation: const_prop,
                 inlining: inlining.into(),
                 tail_call,
