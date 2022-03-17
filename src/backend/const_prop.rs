@@ -80,7 +80,7 @@ fn construct_live_in(node: &StatNode, live_out: LiveAnalysis) -> LiveAnalysis {
 /// Constructs the initial values for LiveIn and LiveOut for the node.
 fn live_init(node: &StatNode) -> (LiveAnalysis, LiveAnalysis) {
     let live_out = Rc::new(HashSet::new());
-    (live_out.clone(), construct_live_in(node, live_out))
+    (construct_live_in(node, live_out.clone()), live_out)
 }
 
 /// Constructs the new values for LiveIn and LiveOut, after an iteration of
