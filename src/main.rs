@@ -25,13 +25,13 @@
 //! wacc_33 0.6.9
 //! Jordan Hall, Bartłomiej Cieślar, Panayiotis Gavriil and Oliver Killane
 //! WACC compiler
-//! 
+//!
 //! USAGE:
 //!     compile [OPTIONS] <FILE>
-//! 
+//!
 //! ARGS:
 //!     <FILE>    
-//! 
+//!
 //! OPTIONS:
 //!     -a, --arm-temp             Print the backend representations (arm with temporaries)
 //!         --const-prop           Enable constant propagation
