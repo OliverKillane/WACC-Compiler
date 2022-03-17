@@ -29,18 +29,19 @@ pub struct Options {
     pub loop_unrolling: bool,
     pub common_expressions: bool,
     pub show_arm_temp_rep: bool,
+    pub show_three_code: bool,
 }
 
 pub struct BackendOutput {
     pub assembly: String,
-    pub intermediates: Vec<String>,
+    pub intermediates: Vec<(String, String)>,
 }
 
 /// Compiles the given program into an arm32 assembly
 pub fn compile(program: Program, options: Options) -> BackendOutput {
     let mut three_code = same_branch_optimization(ThreeCode::from((program, &options)));
     if let Some(instructions_limit) = options.inlining {
-        three_code = inline(three_code, instructions_limit);
+        three_code = same_branch_optimization(inline(three_code, instructions_limit));
     }
 
     if options.tail_call {
@@ -62,15 +63,22 @@ pub fn compile(program: Program, options: Options) -> BackendOutput {
         .check_dummy()
         .expect("There are left-over dummy nodes in the ThreeCode");
 
+    let mut intermediates = vec![];
+
+    if options.show_three_code {
+        intermediates.push(("ThreeCode:".to_string(), three_code.to_string()))
+    }
+
     // the arm result can return a printable intermediate representation.
     let ArmResult(armcode, temp_rep) = ArmResult::from((three_code, &options));
+
+    if let Some(temp_arm) = temp_rep {
+        intermediates.push(("Temporary Arm".to_string(), temp_arm))
+    }
 
     // return the final arm code, and any intermediate representations selected by options
     BackendOutput {
         assembly: armcode.to_string(),
-        intermediates: match temp_rep {
-            Some(temp_rep) => vec![temp_rep],
-            None => vec![],
-        },
+        intermediates,
     }
 }
