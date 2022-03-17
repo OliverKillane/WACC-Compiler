@@ -15,7 +15,7 @@ use lexer::{parse_ident, ws, Lexer};
 use nom::{
     branch::alt,
     character::complete::{char, none_of, one_of},
-    combinator::{cut, eof, map, opt, success, value},
+    combinator::{cut, eof, map, map_res, opt, success, value},
     error::{context, ParseError},
     multi::{many0, many1, separated_list0},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
@@ -27,8 +27,10 @@ use nom_supreme::{
     multi::collect_separated_terminated,
     ParserExt,
 };
+use rayon::prelude::*;
 use std::{
     collections::{HashMap, LinkedList},
+    fmt,
     iter::zip,
     path::{Path, PathBuf},
 };
@@ -65,9 +67,8 @@ pub fn parse<'a>(
 ) -> Result<Program<&'a str, &'a str>, Summary<'a>> {
     let main_semantic_info = final_parser(parse_program)(main_input);
     let module_semantic_infos = module_inputs
-        .iter()
-        .cloned()
-        .map(final_parser(parse_module))
+        .par_iter()
+        .map(|source| final_parser(parse_module)(source))
         .collect::<LinkedList<_>>();
     let mut error_trees = Vec::new();
     let ast = match main_semantic_info {
@@ -147,17 +148,15 @@ pub fn parse_path(input: &str) -> IResult<&str, PathBuf, ErrorTree<&str>> {
             many0(preceded(char('/'), path_component)),
         )),
         |(first_component, path)| {
-            Path::new(
-                &vec![first_component]
-                    .into_iter()
-                    .chain(path)
-                    .into_iter()
-                    .map(|component| component.into_iter().collect::<String>())
-                    .intersperse("/".to_string())
-                    .collect::<String>(),
-            )
-            .iter()
-            .collect::<PathBuf>()
+            let s = &vec![first_component]
+                .into_iter()
+                .chain(path)
+                .into_iter()
+                .map(|component| component.into_iter().collect::<String>())
+                .intersperse("/".to_string())
+                .collect::<String>();
+
+            Path::new(s.trim_end()).iter().collect::<PathBuf>()
         },
     )(input)
 }
@@ -313,6 +312,20 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str, &str>, ErrorTree<&str>> {
         .context("If Statement"),
     );
 
+    let call = context(
+        "Function call",
+        delimited(
+            Lexer::Call.parser(),
+            separated_pair(
+                parse_ident,
+                Lexer::OpenParen.parser(),
+                separated_list0(Lexer::Comma.parser(), parse_expr).cut(),
+            )
+            .cut(),
+            Lexer::CloseParen.parser(),
+        ),
+    );
+
     context(
         "Statement",
         alt((
@@ -327,14 +340,13 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str, &str>, ErrorTree<&str>> {
             ),
             preceded(Lexer::Read.parser(), map(parse_lhs.cut(), Stat::Read)),
             preceded(Lexer::Free.parser(), map(parse_expr.cut(), Stat::Free)),
-            preceded(Lexer::Return.parser(), map(parse_expr.cut(), Stat::Return)),
+            preceded(Lexer::Return.parser(), map(opt(parse_expr), Stat::Return)),
             preceded(Lexer::Exit.parser(), map(parse_expr.cut(), Stat::Exit)),
             preceded(
                 Lexer::Println.parser(),
                 map(parse_expr.cut(), Stat::PrintLn),
             ),
             preceded(Lexer::Print.parser(), map(parse_expr.cut(), Stat::Print)),
-            preceded(Lexer::Return.parser(), map(parse_expr.cut(), Stat::Return)),
             map(parse_if, |((e, st), sf)| Stat::If(e, st, sf)),
             map(parse_while, |(e, s)| Stat::While(e, s)),
             preceded(
@@ -348,6 +360,9 @@ fn parse_stat(input: &str) -> IResult<&str, Stat<&str, &str>, ErrorTree<&str>> {
                     |(lhs, rhs)| Stat::Assign(lhs, rhs),
                 ),
             ),
+            map(call, |(id, es)| {
+                Stat::VoidCall(ASTWrapper(id, id.into()), es)
+            }),
         )),
     )(input)
 }
@@ -451,6 +466,7 @@ fn parse_pair_elem_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
 /// Parser for the [Type] AST node.
 fn parse_base_type(input: &str) -> IResult<&str, Type, ErrorTree<&str>> {
     ws(alt((
+        value(Type::Void, Lexer::Void.parser()),
         value(Type::Int, Lexer::Int.parser()),
         value(Type::Bool, Lexer::Bool.parser()),
         value(Type::Char, Lexer::Char.parser()),
@@ -653,6 +669,16 @@ fn parse_literal_keywords(input: &str) -> IResult<&str, ExprWrap<&str, &str>, Er
     ))(input)
 }
 
+#[derive(Debug, Clone)]
+struct CharLiteralError;
+
+impl fmt::Display for CharLiteralError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "a character")
+    }
+}
+impl std::error::Error for CharLiteralError {}
+
 /// Parser for atomic expressions such as newpair, integers, string/character
 /// literals, unary expressions and '('expr')'.
 fn parse_expr_atom(input: &str) -> IResult<&str, Expr<&str, &str>, ErrorTree<&str>> {
@@ -665,8 +691,12 @@ fn parse_expr_atom(input: &str) -> IResult<&str, Expr<&str, &str>, ErrorTree<&st
         map(new_pair, |(left, right)| {
             Expr::BinOp(box left, BinOp::Newpair, box right)
         }),
-        map(str_delimited("\'"), |s| {
-            Expr::Char(s.chars().next().unwrap_or_default())
+        map_res(str_delimited("\'"), |s| {
+            if s.len() != 1 {
+                Err(CharLiteralError)
+            } else {
+                Ok(Expr::Char(s.chars().next().unwrap_or_default()))
+            }
         })
         .context("Char Literal"),
         map(parse_int, Expr::Int),

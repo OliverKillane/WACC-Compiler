@@ -393,7 +393,7 @@ fn translate_from_node(
                         cond,
                         _,
                         dst_ident,
-                        MemOperand::Label(_) | MemOperand::Expression(_),
+                        MemOperand::Label(_, _) | MemOperand::Expression(_),
                     ) => {
                         // single destination
                         let dst_t = dst_ident.get_temp();
@@ -497,7 +497,7 @@ fn translate_from_node(
                         _,
                         _,
                         arg_ident,
-                        MemOperand::Label(_) | MemOperand::Expression(_),
+                        MemOperand::Label(_, _) | MemOperand::Expression(_),
                     )
                     | Stat::Cmp(_, _, arg_ident, FlexOperand::Imm(_)) => {
                         // single argument used (a store)

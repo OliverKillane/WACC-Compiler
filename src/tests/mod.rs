@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::backend::{compile, Options, PropagationOpt};
+use crate::backend::{compile, Options};
 use crate::frontend::{analyse, gather_modules};
 use glob::glob;
 use indoc::indoc;
@@ -124,7 +124,7 @@ impl PartialEq<&str> for Behaviour {
             }
         }
 
-        true
+        iter.next().is_none()
     }
 }
 
@@ -154,18 +154,14 @@ fn test_output_eq_behaviour() {
 
     let input = include_str!("static/pairs/printPair.wacc");
 
-    let expected_output = indoc! {
-    "0x22150 = (10, a)
-    "
-    };
+    let expected_output = "0x22150 = (10, a)\n";
 
     assert_eq!(parse_behaviour(input).unwrap().1 .0, expected_output);
 
     let input = include_str!("static/array/printRef.wacc");
 
     let expected_output = indoc! {
-    "Printing an array variable gives an address, such as 0x234234
-    "
+    "Printing an array variable gives an address, such as 0x234234\n"
     };
 
     assert_eq!(parse_behaviour(input).unwrap().1 .0, expected_output);
@@ -175,8 +171,7 @@ fn test_output_eq_behaviour() {
     let expected_output = indoc! {
     "2147483
     2147483000
-    OverflowError: the result is too small/large to store in a 4-byte signed-integer.
-    "
+    OverflowError: the result is too small/large to store in a 4-byte signed-integer.\n"
     };
 
     assert_eq!(parse_behaviour(input).unwrap().1 .0, expected_output);
@@ -184,8 +179,7 @@ fn test_output_eq_behaviour() {
     let input = include_str!("static/runtimeErr/divideByZero/divZero.wacc");
 
     let expected_output = indoc! {
-    "DivideByZeroError: divide or modulo by zero
-    "
+    "DivideByZeroError: divide or modulo by zero\n"
     };
 
     assert_eq!(parse_behaviour(input).unwrap().1 .0, expected_output);
@@ -240,6 +234,7 @@ fn all_types_test() {
 #[case("static/variables")]
 #[case("static/pairsExtended")]
 #[case("static/while")]
+#[case("static/voidCalls")]
 fn examples_test(#[case] path: &str) {
     examples_dir_test(path).expect("Unable to test directory:");
 }
@@ -265,15 +260,16 @@ fn compiler_test(filename: &str, input: String, output: Behaviour, _exit_code: O
 
     let options = Options {
         sethi_ullman_weights: false,
-        dead_code_removal: false,
-        propagation: PropagationOpt::None,
+        dead_code_removal: true,
+        const_propagation: false,
         inlining: Some(1000),
-        tail_call: false,
+        tail_call: true,
         hoisting: false,
         strength_reduction: false,
         loop_unrolling: false,
-        common_expressions: false,
+        common_expressions: true,
         show_arm_temp_rep: false,
+        show_three_code: false,
     };
     let assembly = compile(
         analyse(&main_file, module_files.iter().collect()).unwrap(),

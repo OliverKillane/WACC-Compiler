@@ -7,8 +7,8 @@
 #![feature(backtrace)]
 #![feature(map_try_insert)]
 #![feature(iter_intersperse)]
-#![allow(dead_code)]
 #![feature(cow_is_borrowed)]
+#![allow(dead_code)]
 //! # The group 33 WACC Compiler project.
 //!
 //! Lovingly developed by:
@@ -33,12 +33,16 @@
 //!     <FILE>    
 //!
 //! OPTIONS:
-//!     -b, --backend-temps        print the backend representations (arm with temporaries)
+//!     -a, --arm-temp             Print the backend representations (arm with temporaries)
+//!         --const-prop           Enable constant propagation
+//!         --dead-code            Enable dead code elimination
 //!     -h, --help                 Print help information
-//!     -i, --ir-print             print the intermediate representation generated
+//!     -i, --ir-print             Print the intermediate representation generated
 //!         --inlining <MODE>      Set the function inlining mode [default: off] [possible values: off,
 //!                                low, medium, high]
 //!     -o, --outputpath <FILE>    The name of the output file
+//!     -t, --three-code           Print the three code representation of the program
+//!         --tail-call            run tail call optimisation
 //!     -V, --version              Print version information
 //! ```
 
@@ -51,7 +55,7 @@ mod graph;
 mod intermediate;
 mod tests;
 
-use backend::{compile, Options, PropagationOpt};
+use backend::{compile, Options};
 use clap::{ArgEnum, Parser};
 use frontend::{analyse, gather_modules, GatherModulesError};
 use path_absolutize::Absolutize;
@@ -83,12 +87,22 @@ struct Args {
     #[clap(
         short,
         long,
-        help = "print the backend representations (arm with temporaries)"
+        help = "Print the backend representations (arm with temporaries)"
     )]
-    backend_temps: bool,
+    arm_temp: bool,
 
-    #[clap(short, long, help = "print the intermediate representation generated")]
+    #[clap(
+        short,
+        long,
+        help = "Print the three code representation of the program"
+    )]
+    three_code: bool,
+
+    #[clap(short, long, help = "Print the intermediate representation generated")]
     ir_print: bool,
+
+    #[clap(long, help = "run tail call optimisation")]
+    tail_call: bool,
 
     #[clap(
         long,
@@ -98,6 +112,12 @@ struct Args {
         value_name = "MODE"
     )]
     inlining: InlineMode,
+
+    #[clap(long, help = "Enable constant propagation")]
+    const_prop: bool,
+
+    #[clap(long, help = "Enable dead code elimination")]
+    dead_code: bool,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
@@ -139,9 +159,13 @@ fn main() -> io::Result<()> {
     let Args {
         filepath: mut main_file_path,
         outputpath,
-        backend_temps: temp_arm,
+        arm_temp,
+        three_code,
         ir_print,
+        tail_call,
         inlining,
+        const_prop,
+        dead_code,
     } = Args::parse();
 
     let (main_file, module_files) = match gather_modules(&main_file_path) {
@@ -202,23 +226,23 @@ fn main() -> io::Result<()> {
             }
             let options = Options {
                 sethi_ullman_weights: false,
-                dead_code_removal: false,
-                propagation: PropagationOpt::None,
+                dead_code_removal: dead_code,
+                const_propagation: const_prop,
                 inlining: inlining.into(),
-                tail_call: false,
+                tail_call,
                 hoisting: false,
                 strength_reduction: false,
                 loop_unrolling: false,
                 common_expressions: false,
-                show_arm_temp_rep: temp_arm,
+                show_arm_temp_rep: arm_temp,
+                show_three_code: three_code,
             };
 
             let result = compile(ir, options);
 
-            if temp_arm {
-                for temp in result.intermediates {
-                    println!("{}", temp)
-                }
+            for (name, temp) in result.intermediates {
+                println!("{}:", name);
+                println!("{}", temp)
             }
 
             let mut file = if let Some(outpath) = outputpath {

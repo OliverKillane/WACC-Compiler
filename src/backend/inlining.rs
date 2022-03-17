@@ -4,10 +4,11 @@ use crate::{
     graph::{Deleted, Graph},
     intermediate::VarRepr,
 };
+use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet, LinkedList},
     iter::zip,
-    rc::Rc,
+    sync::Arc,
 };
 
 /// Heuristic for how many instructions more or less a [stat type](StatType) is
@@ -107,7 +108,7 @@ fn get_function_sccs_scc<'l>(
 fn get_function_sccs<'l>(
     call_graph: &HashMap<&'l str, Vec<&'l str>>,
     transpose_call_graph: &HashMap<&'l str, Vec<&'l str>>,
-) -> HashMap<&'l str, Rc<HashSet<&'l str>>> {
+) -> HashMap<&'l str, Arc<HashSet<&'l str>>> {
     let mut visited = HashSet::new();
     let mut post_order = Vec::new();
     for &fname in call_graph.keys() {
@@ -118,7 +119,7 @@ fn get_function_sccs<'l>(
     for fname in post_order.into_iter().rev() {
         let mut group = HashSet::new();
         get_function_sccs_scc(&mut group, fname, &mut visited, transpose_call_graph);
-        let group = Rc::new(group);
+        let group = Arc::new(group);
         for &group_fname in group.iter() {
             sccs.insert(group_fname, group.clone());
         }
@@ -169,33 +170,34 @@ fn substitute_vars(
             get_mapping(*var, new_variable, variable_mappings),
             substitute_op_src(*op_src, new_variable, variable_mappings),
         ),
-        StatCode::AssignOp(var, op_src1, bin_op, op_src2) => StatCode::AssignOp(
+        StatCode::AssignOp(var, op_src1, bin_op, op_src2, check) => StatCode::AssignOp(
             get_mapping(*var, new_variable, variable_mappings),
             substitute_op_src(*op_src1, new_variable, variable_mappings),
             *bin_op,
             substitute_op_src(*op_src2, new_variable, variable_mappings),
+            *check,
         ),
-        StatCode::Load(var1, var2, size) => StatCode::Load(
-            get_mapping(*var1, new_variable, variable_mappings),
-            get_mapping(*var2, new_variable, variable_mappings),
+        StatCode::Load(var, op_src, size) => StatCode::Load(
+            get_mapping(*var, new_variable, variable_mappings),
+            substitute_op_src(*op_src, new_variable, variable_mappings),
             *size,
         ),
-        StatCode::Store(var1, var2, size) => StatCode::Store(
-            get_mapping(*var1, new_variable, variable_mappings),
-            get_mapping(*var2, new_variable, variable_mappings),
+        StatCode::Store(op_src1, op_src2, size) => StatCode::Store(
+            substitute_op_src(*op_src1, new_variable, variable_mappings),
+            get_mapping(*op_src2, new_variable, variable_mappings),
             *size,
         ),
         StatCode::Call(var, fname, args) => StatCode::Call(
             get_mapping(*var, new_variable, variable_mappings),
             fname.clone(),
             args.iter()
-                .map(|var| get_mapping(*var, new_variable, variable_mappings))
+                .map(|op_src| get_mapping(*op_src, new_variable, variable_mappings))
                 .collect(),
         ),
         StatCode::VoidCall(fname, args) => StatCode::VoidCall(
             fname.clone(),
             args.iter()
-                .map(|var| get_mapping(*var, new_variable, variable_mappings))
+                .map(|op_src| get_mapping(*op_src, new_variable, variable_mappings))
                 .collect(),
         ),
     }
@@ -224,7 +226,7 @@ fn inline_code_dfs(
     new_variable: &mut VarRepr,
     variable_mappings: &mut HashMap<VarRepr, VarRepr>,
     functions: &HashMap<String, Function>,
-    sccs_group: Rc<HashSet<&str>>,
+    sccs_group: Arc<HashSet<&str>>,
 ) -> StatNode {
     if mappings.contains_key(node) {
         return mappings[node].clone();
@@ -257,7 +259,7 @@ fn inline_code_dfs(
             ));
             new_node
         }
-        StatType::Branch(_, var, true_node, false_node) => {
+        StatType::Branch(_, op_src, true_node, false_node) => {
             let new_node = new_graph.new_node(StatType::deleted());
             mappings.insert(node.clone(), new_node.clone());
             let true_node = inline_code_dfs(
@@ -289,7 +291,7 @@ fn inline_code_dfs(
             let incoming = (&*new_node.get()).incoming().into_iter().cloned().collect();
             new_node.set(StatType::Branch(
                 incoming,
-                get_mapping(*var, new_variable, variable_mappings),
+                substitute_op_src(*op_src, new_variable, variable_mappings),
                 true_node,
                 false_node,
             ));
@@ -300,12 +302,12 @@ fn inline_code_dfs(
             mappings.insert(node.clone(), new_node.clone());
             new_node
         }
-        StatType::Return(_, var) => {
-            if let (Some(assigned_var), Some(var)) = (assigned_var, var) {
+        StatType::Return(_, op_src) => {
+            if let (Some(assigned_var), Some(op_src)) = (assigned_var, op_src) {
                 let new_node = new_graph.new_node(StatType::new_simple(
                     StatCode::Assign(
                         assigned_var,
-                        OpSrc::Var(get_mapping(*var, new_variable, variable_mappings)),
+                        substitute_op_src(*op_src, new_variable, variable_mappings),
                     ),
                     call_successor.clone(),
                 ));
@@ -331,7 +333,7 @@ fn copy_code_dfs(
     new_variable: &mut VarRepr,
     variable_mappings: &mut HashMap<VarRepr, VarRepr>,
     functions: &HashMap<String, Function>,
-    sccs_group: Rc<HashSet<&str>>,
+    sccs_group: Arc<HashSet<&str>>,
 ) -> (StatNode, f64) {
     if mappings.contains_key(node) {
         return (mappings[node].clone(), 0.0);
@@ -363,7 +365,7 @@ fn copy_code_dfs(
             ));
             (new_node, instruction_sum + node_instruction_heuristic)
         }
-        StatType::Branch(_, var, true_node, false_node) => {
+        StatType::Branch(_, op_src, true_node, false_node) => {
             let new_node = new_graph.new_node(StatType::deleted());
             mappings.insert(node.clone(), new_node.clone());
             let (true_node, true_instruction_sum) = copy_code_dfs(
@@ -391,7 +393,7 @@ fn copy_code_dfs(
             let incoming = (&*new_node.get()).incoming().into_iter().cloned().collect();
             new_node.set(StatType::Branch(
                 incoming,
-                get_mapping(*var, new_variable, variable_mappings),
+                substitute_op_src(*op_src, new_variable, variable_mappings),
                 true_node,
                 false_node,
             ));
@@ -405,9 +407,9 @@ fn copy_code_dfs(
             mappings.insert(node.clone(), new_node.clone());
             (new_node, node_instruction_heuristic)
         }
-        StatType::Return(_, var) => {
+        StatType::Return(_, op_src) => {
             let new_node = new_graph.new_node(StatType::new_return(
-                var.map(|var| get_mapping(var, new_variable, variable_mappings)),
+                op_src.map(|op_src| substitute_op_src(op_src, new_variable, variable_mappings)),
             ));
             mappings.insert(node.clone(), new_node.clone());
             (new_node, node_instruction_heuristic)
@@ -427,9 +429,9 @@ fn inline_graph(
     args: &[VarRepr],
     functions: &HashMap<String, Function>,
     function_instruction_counts: &HashMap<&str, usize>,
-    sccs_group: Rc<HashSet<&str>>,
-    sccs_groups: &HashMap<&str, Rc<HashSet<&str>>>,
-) -> (StatNode, Vec<VarRepr>) {
+    sccs_group: Arc<HashSet<&str>>,
+    sccs_groups: &HashMap<&str, Arc<HashSet<&str>>>,
+) -> (StatNode, Vec<VarRepr>, bool) {
     let mut call_nodes = LinkedList::new();
     let mut main_variable_mappings = HashMap::new();
     let mut new_variable = 0;
@@ -448,6 +450,7 @@ fn inline_graph(
         .map(|&arg| get_mapping(arg, &mut new_variable, &mut main_variable_mappings))
         .collect();
     let mut code_instruction_count = code_instruction_count.ceil() as usize;
+    let mut read_ref_needed = false;
     while let Some(call_node) = call_nodes.pop_front() {
         let fname = get_call_name(&call_node, functions).expect("Not a call node");
         let function_instruction_count = function_instruction_counts[fname.as_str()];
@@ -479,7 +482,7 @@ fn inline_graph(
             args: function_args,
             code: function_code,
             graph: _,
-            read_ref: _,
+            read_ref,
         } = &functions[&fname];
         let mut variable_mappings = HashMap::new();
         let mut new_call_node = inline_code_dfs(
@@ -520,8 +523,9 @@ fn inline_graph(
             new_code = new_call_node;
         }
         new_graph.remove_node(call_node);
+        read_ref_needed |= read_ref;
     }
-    (new_code, args)
+    (new_code, args, read_ref_needed)
 }
 
 /// Performs the inlining optimization. Converts the old three code graph
@@ -576,18 +580,20 @@ pub(super) fn inline(
     let sccs = get_function_sccs(&call_graph, &transpose_call_graph);
 
     let mut new_graph = Graph::new();
-    let (code, _) = inline_graph(
+    let (code, _, read_ref_needed) = inline_graph(
         &code,
         &mut new_graph,
         instructions_limit,
         &[],
         &functions,
         &function_instruction_counts,
-        Rc::new(HashSet::new()),
+        Arc::new(HashSet::new()),
         &sccs,
     );
+
+    // let sscs_ref =
     let new_functions = functions
-        .iter()
+        .par_iter()
         .map(
             |(
                 fname,
@@ -599,7 +605,7 @@ pub(super) fn inline(
                 },
             )| {
                 let mut new_function_graph = Graph::new();
-                let (code, args) = inline_graph(
+                let (code, args, read_ref_needed) = inline_graph(
                     code,
                     &mut new_function_graph,
                     instructions_limit,
@@ -615,7 +621,7 @@ pub(super) fn inline(
                         args,
                         code,
                         graph: new_function_graph,
-                        read_ref: *read_ref,
+                        read_ref: *read_ref | read_ref_needed,
                     },
                 )
             },
@@ -653,7 +659,7 @@ pub(super) fn inline(
         functions: new_functions,
         data_refs,
         graph: new_graph,
-        read_ref,
+        read_ref: read_ref | read_ref_needed,
         code,
         int_handler,
     }

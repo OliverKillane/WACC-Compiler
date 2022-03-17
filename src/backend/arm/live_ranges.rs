@@ -21,9 +21,10 @@ use super::arm_repr::{
     Temporary,
 };
 use lazy_static::__Deref;
-use std::{cmp::min, collections::HashMap, rc::Rc};
+use rayon::prelude::*;
+use std::{cmp::min, collections::HashMap, sync::Arc};
 
-type LiveAnalysis = Rc<HashMap<Temporary, usize>>;
+type LiveAnalysis = Arc<HashMap<Temporary, usize>>;
 fn construct_live_in(node: &ArmNode, live_out: LiveAnalysis) -> LiveAnalysis {
     let mut live_out = (&*live_out).clone();
     let mut defs = vec![];
@@ -39,30 +40,30 @@ fn construct_live_in(node: &ArmNode, live_out: LiveAnalysis) -> LiveAnalysis {
     for temp in uses {
         live_out.insert(temp, 0);
     }
-    Rc::new(live_out)
+    Arc::new(live_out)
 }
 
 fn live_init(node: &ArmNode) -> (LiveAnalysis, LiveAnalysis) {
-    let live_out = Rc::new(HashMap::new());
+    let live_out = Arc::new(HashMap::new());
     (construct_live_in(node, live_out.clone()), live_out)
 }
 
 fn live_update(
     _: Vec<&LiveAnalysis>,
-    live_in: LiveAnalysis,
+    live_in: &LiveAnalysis,
     node: &ArmNode,
-    live_out: LiveAnalysis,
+    live_out: &LiveAnalysis,
     succ_live_in: Vec<&LiveAnalysis>,
 ) -> (LiveAnalysis, LiveAnalysis, bool) {
     let (new_live_in, new_live_out) = if succ_live_in.len() == 1 {
-        if succ_live_in[0] == &live_out {
-            return (live_in, live_out, false);
+        if succ_live_in[0] == live_out {
+            return (live_in.clone(), live_out.clone(), false);
         } else {
             let new_live_out = succ_live_in[0].clone();
             (construct_live_in(node, new_live_out.clone()), new_live_out)
         }
     } else {
-        let new_live_out = Rc::new(succ_live_in.into_iter().fold(
+        let new_live_out = Arc::new(succ_live_in.into_iter().fold(
             HashMap::new(),
             |mut live_out, live_in| {
                 for (&live_in_var, &new_distance) in live_in.iter() {
@@ -76,16 +77,16 @@ fn live_update(
         ));
         (construct_live_in(node, new_live_out.clone()), new_live_out)
     };
-    let updated = live_in != new_live_in || live_out != new_live_out;
+    let updated = live_in != &new_live_in || live_out != &new_live_out;
     (new_live_in, new_live_out, updated)
 }
 
 pub type LiveRanges = HashMap<ArmNode, (Vec<Temporary>, Vec<Temporary>)>;
 pub fn get_live_ranges(arm_code: &ArmCode) -> LiveRanges {
     dataflow_analysis(&arm_code.main, live_init, live_update, false)
-        .into_iter()
-        .chain(arm_code.subroutines.values().flat_map(|subroutine| {
-            dataflow_analysis(&subroutine.start_node, live_init, live_update, false).into_iter()
+        .into_par_iter()
+        .chain(arm_code.subroutines.par_iter().flat_map(|(_, subroutine)| {
+            dataflow_analysis(&subroutine.start_node, live_init, live_update, false).into_par_iter()
         }))
         .map(|(node, (live_in, live_out))| {
             let mut live_in = live_in

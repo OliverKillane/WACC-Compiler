@@ -18,7 +18,7 @@ use std::{
 
 use super::{
     arm_graph_utils::{
-        is_shifted_8_bit, link_optional_chains, link_stats, link_two_chains, simple_node, Chain,
+        is_8_bit, link_optional_chains, link_stats, link_two_chains, simple_node, Chain,
     },
     arm_repr::{
         ArmNode, Cond, ControlFlow, FlexOffset, FlexOperand, Ident, MemOp, MemOperand, MovOp,
@@ -183,7 +183,7 @@ impl AllocationState {
             (RegOp::Sub, words * -4)
         };
 
-        if is_shifted_8_bit(byte_displacement) {
+        if is_8_bit(byte_displacement) {
             simple_node(
                 Stat::ApplyOp(
                     op,
@@ -782,7 +782,7 @@ impl AllocationState {
     pub fn assign_stack_reserved(&self, reg: Register, graph: &mut Graph<ControlFlow>) -> Chain {
         // given they are loading a stack reserve to a register.
         let sp_displacement = self.stack_reserve;
-        if is_shifted_8_bit(sp_displacement) {
+        if is_8_bit(sp_displacement) {
             // We use an immediate operand added to sp
 
             // ADD reg, sp, #sp_displacement

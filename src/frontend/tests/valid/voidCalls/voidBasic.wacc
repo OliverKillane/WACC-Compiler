@@ -1,0 +1,15 @@
+# simple use of void function call to print a string
+
+# Output:
+# Hello World!
+
+# Program:
+
+begin
+  void print_hello_world() is 
+    println "Hello World!";
+    return
+  end
+  
+  call print_hello_world()
+end

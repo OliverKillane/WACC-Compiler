@@ -197,7 +197,15 @@ impl Display for MemOperand {
             match self {
                 MemOperand::Zero(reg) => format!("[{}]", reg),
                 MemOperand::PreIndex(reg, flex) => format!("[{}, {}]", reg, flex),
-                MemOperand::Label(label) => format!("={}", display_data_ref(*label)),
+                MemOperand::Label(label, offset) => format!(
+                    "={}{}",
+                    display_data_ref(*label),
+                    if *offset == 0 {
+                        String::new()
+                    } else {
+                        format!(" + {}", offset)
+                    }
+                ),
                 MemOperand::Expression(expr) => format!("={}", expr),
             }
         )
@@ -369,10 +377,10 @@ fn display_routine(
                 None => (),
             }
 
-            // print out
+            since_lit += 1;
+
             next = match current.get().deref() {
                 ControlFlow::Simple(_, stat, next) => {
-                    since_lit += 1;
                     writeln!(f, "{}", stat)?;
                     next.clone()
                 }
