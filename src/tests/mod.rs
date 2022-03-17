@@ -264,10 +264,7 @@ fn compiler_test(filename: &str, input: String, output: Behaviour, _exit_code: O
         const_propagation: false,
         inlining: Some(1000),
         tail_call: true,
-        hoisting: false,
-        strength_reduction: false,
-        loop_unrolling: false,
-        common_expressions: true,
+        const_branch: true,
         show_arm_temp_rep: false,
         show_three_code: false,
     };
