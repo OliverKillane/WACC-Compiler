@@ -147,17 +147,15 @@ pub fn parse_path(input: &str) -> IResult<&str, PathBuf, ErrorTree<&str>> {
             many0(preceded(char('/'), path_component)),
         )),
         |(first_component, path)| {
-            Path::new(
-                &vec![first_component]
-                    .into_iter()
-                    .chain(path)
-                    .into_iter()
-                    .map(|component| component.into_iter().collect::<String>())
-                    .intersperse("/".to_string())
-                    .collect::<String>(),
-            )
-            .iter()
-            .collect::<PathBuf>()
+            let s = &vec![first_component]
+                .into_iter()
+                .chain(path)
+                .into_iter()
+                .map(|component| component.into_iter().collect::<String>())
+                .intersperse("/".to_string())
+                .collect::<String>();
+
+            Path::new(s.trim_end()).iter().collect::<PathBuf>()
         },
     )(input)
 }
