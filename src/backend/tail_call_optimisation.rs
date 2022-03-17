@@ -22,6 +22,7 @@
 use super::three_code::{Function, OpSrc, StatCode, StatNode, StatType, ThreeCode};
 use crate::{graph::Graph, intermediate::VarRepr};
 use lazy_static::__Deref;
+use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
     ops::DerefMut,
@@ -30,7 +31,7 @@ use std::{
 pub(super) fn tail_call_optimise(mut threecode: ThreeCode) -> ThreeCode {
     threecode.functions = threecode
         .functions
-        .into_iter()
+        .into_par_iter()
         .map(|(name, function)| {
             let opt_function = tail_call_opt(&name, function);
             (name, opt_function)
