@@ -11,7 +11,7 @@ use std::{
 };
 
 use lazy_static::__Deref;
-
+use rayon::prelude::*;
 use super::{
     data_flow::dataflow_analysis,
     three_code::{OpSrc, StatCode, StatNode, StatType, ThreeCode},
@@ -22,7 +22,7 @@ use crate::intermediate::VarRepr;
 pub(super) fn remove_dead_code(mut threecode: ThreeCode) -> ThreeCode {
     threecode.functions = threecode
         .functions
-        .into_iter()
+        .into_par_iter()
         .map(|(name, mut function)| {
             function.code = remove_dead_code_from(function.code);
             (name, function)
