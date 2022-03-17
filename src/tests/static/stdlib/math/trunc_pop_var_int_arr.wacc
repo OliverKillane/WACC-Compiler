@@ -1,4 +1,4 @@
-# corectness of trunc_pop_var_int_arr()
+# Correctness of trunc_pop_var_int_arr()
 
 # Output:
 # 17606
