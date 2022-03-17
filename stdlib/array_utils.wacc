@@ -9,7 +9,7 @@ begin
         int arr_len = len arr ;
         if (arr_len == 0) then 
             print ident ;
-            println " = [] "
+            println " = []"
         else
             int i = 0 ;
             print ident ;
@@ -30,7 +30,7 @@ begin
         int arr_len = len arr ;
         if (arr_len == 0) then 
             print ident ;
-            println " = [] "
+            println " = []"
         else
             int i = 0 ;
             print ident ;
@@ -51,7 +51,7 @@ begin
         int arr_len = len arr ;
         if (arr_len == 0) then 
             print ident ;
-            println " = [] "
+            println " = []"
         else
             int i = 0 ;
             print ident ;
