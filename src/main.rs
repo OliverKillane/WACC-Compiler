@@ -25,20 +25,24 @@
 //! wacc_33 0.6.9
 //! Jordan Hall, Bartłomiej Cieślar, Panayiotis Gavriil and Oliver Killane
 //! WACC compiler
-//!
+//! 
 //! USAGE:
 //!     compile [OPTIONS] <FILE>
-//!
+//! 
 //! ARGS:
 //!     <FILE>    
-//!
+//! 
 //! OPTIONS:
-//!     -b, --backend-temps        print the backend representations (arm with temporaries)
+//!     -a, --arm-temp             Print the backend representations (arm with temporaries)
+//!         --const-prop           Enable constant propagation
+//!         --dead-code            Enable dead code elimination
 //!     -h, --help                 Print help information
-//!     -i, --ir-print             print the intermediate representation generated
+//!     -i, --ir-print             Print the intermediate representation generated
 //!         --inlining <MODE>      Set the function inlining mode [default: off] [possible values: off,
 //!                                low, medium, high]
 //!     -o, --outputpath <FILE>    The name of the output file
+//!     -t, --three-code           Print the three code representation of the program
+//!         --tail-call            run tail call optimisation
 //!     -V, --version              Print version information
 //! ```
 
