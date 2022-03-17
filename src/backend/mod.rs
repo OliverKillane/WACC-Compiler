@@ -1,13 +1,16 @@
 mod arm;
 mod const_prop;
 mod data_flow;
+mod dead_code;
 mod inlining;
 mod same_branch;
 mod tail_call_optimisation;
 mod three_code;
 
-use self::const_prop::prop_consts;
-use self::tail_call_optimisation::tail_call_optimise;
+use self::{
+    const_prop::prop_consts, dead_code::remove_dead_code,
+    tail_call_optimisation::tail_call_optimise,
+};
 use crate::intermediate::Program;
 use arm::ArmResult;
 use inlining::inline;
@@ -39,12 +42,21 @@ pub fn compile(program: Program, options: Options) -> BackendOutput {
     if let Some(instructions_limit) = options.inlining {
         three_code = inline(three_code, instructions_limit);
     }
+
     if options.tail_call {
         three_code = tail_call_optimise(three_code);
     }
+
     if options.const_propagation {
         three_code = prop_consts(three_code);
     }
+
+    if options.dead_code_removal {
+        three_code = remove_dead_code(three_code);
+    }
+
+    three_code = same_branch_optimization(three_code);
+
     #[cfg(debug_assertions)]
     three_code
         .check_dummy()
