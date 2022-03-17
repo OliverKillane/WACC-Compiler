@@ -4,6 +4,7 @@ use super::{data_flow::DataflowNode, three_code::*};
 use crate::graph::{Deleted, Graph};
 use std::collections::{HashSet, LinkedList};
 
+/// Searches for the nodes reachable from the given node.
 fn live_node_dfs(node: &StatNode, visited: &mut HashSet<StatNode>) {
     if visited.contains(node) {
         return;
@@ -14,6 +15,7 @@ fn live_node_dfs(node: &StatNode, visited: &mut HashSet<StatNode>) {
     }
 }
 
+/// Performs the constant branch reduction on a single graph.
 fn const_branch_opt_graph(graph: &mut Graph<StatType>, code: &mut StatNode) {
     let needless_branches = graph
         .iter()
@@ -58,6 +60,8 @@ fn const_branch_opt_graph(graph: &mut Graph<StatType>, code: &mut StatNode) {
     }
 }
 
+/// Applies an optimization so that nodes with a constant operand as the branch
+/// condition get removed, since only one path is possible.
 pub(super) fn const_branch_optimization(mut three_code: ThreeCode) -> ThreeCode {
     three_code.functions = three_code
         .functions

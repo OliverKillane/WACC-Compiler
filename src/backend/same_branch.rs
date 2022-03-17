@@ -7,6 +7,7 @@ use crate::{
 };
 use std::collections::LinkedList;
 
+/// Performs the same branch reduction on a single graph.
 fn same_branch_opt_graph(graph: &mut Graph<StatType>, code: &mut StatNode) {
     let mut needless_branches = LinkedList::new();
     for node in &*graph {
