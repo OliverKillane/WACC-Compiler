@@ -1,0 +1,69 @@
+# Correctness of binary_search_char_arr()
+
+# Output:
+# -1
+# -1
+# -1
+# 1
+# -1
+# -1
+# 4
+# -1
+# 2
+# 6
+# 1
+# 3
+# 11
+# 0
+# 6
+
+
+mod ../../../../../stdlib/array_utils.wacc;
+
+begin
+	char[] arr = [] ;
+	int index = call binary_search_char_arr('Z', arr) ;
+	println index ;
+	arr = ['a'] ;
+	index = call binary_search_char_arr('Y', arr) ;
+	println index ;
+	arr = ['`', 'a'] ;
+	index = call binary_search_char_arr('^', arr) ;
+	println index ;
+	arr = ['^', '`', 'c'] ;
+	index = call binary_search_char_arr('`', arr) ;
+	println index ;
+	arr = ['Y', '_', 'b', 'c'] ;
+	index = call binary_search_char_arr('`', arr) ;
+	println index ;
+	arr = ['X', 'Z', '[', 'a', 'b'] ;
+	index = call binary_search_char_arr('_', arr) ;
+	println index ;
+	arr = ['[', ']', '^', '_', '`', 'b'] ;
+	index = call binary_search_char_arr('`', arr) ;
+	println index ;
+	arr = ['X', 'X', 'Z', ']', '^', 'b', 'c'] ;
+	index = call binary_search_char_arr('a', arr) ;
+	println index ;
+	arr = ['X', 'Y', '^', '`', 'a', 'a', 'a', 'c'] ;
+	index = call binary_search_char_arr('^', arr) ;
+	println index ;
+	arr = ['X', 'X', 'X', 'Y', 'Z', '^', '^', '`', 'a'] ;
+	index = call binary_search_char_arr('^', arr) ;
+	println index ;
+	arr = ['X', 'Y', 'Y', 'Z', '^', '^', '^', '_', '_', 'a'] ;
+	index = call binary_search_char_arr('Y', arr) ;
+	println index ;
+	arr = ['X', 'Z', 'Z', '[', '[', ']', '_', '`', '`', 'b', 'c'] ;
+	index = call binary_search_char_arr('[', arr) ;
+	println index ;
+	arr = ['Y', 'Y', 'Z', 'Z', '^', '^', '^', '_', '`', 'a', 'b', 'c'] ;
+	index = call binary_search_char_arr('c', arr) ;
+	println index ;
+	arr = ['X', '[', '[', '[', ']', ']', ']', ']', ']', '^', '^', 'b', 'c'] ;
+	index = call binary_search_char_arr('X', arr) ;
+	println index ;
+	arr = ['X', 'X', 'Z', ']', '^', '_', '_', '_', '_', '_', '`', 'b', 'b', 'b'] ;
+	index = call binary_search_char_arr('_', arr) ;
+	println index
+end

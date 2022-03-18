@@ -1,0 +1,69 @@
+# Correctness of contains_bool_arr()
+
+# Output:
+# false
+# false
+# true
+# false
+# true
+# true
+# true
+# true
+# true
+# true
+# true
+# true
+# true
+# true
+# true
+
+
+mod ../../../../../stdlib/array_utils.wacc;
+
+begin
+	bool[] arr = [] ;
+	bool contains = call contains_bool_arr(true, arr) ;
+	println contains ;
+	arr = [false] ;
+	contains = call contains_bool_arr(true, arr) ;
+	println contains ;
+	arr = [true, true] ;
+	contains = call contains_bool_arr(true, arr) ;
+	println contains ;
+	arr = [false, false, false] ;
+	contains = call contains_bool_arr(true, arr) ;
+	println contains ;
+	arr = [true, true, true, true] ;
+	contains = call contains_bool_arr(true, arr) ;
+	println contains ;
+	arr = [true, true, true, false, true] ;
+	contains = call contains_bool_arr(true, arr) ;
+	println contains ;
+	arr = [true, true, false, false, true, true] ;
+	contains = call contains_bool_arr(true, arr) ;
+	println contains ;
+	arr = [true, false, false, false, false, false, true] ;
+	contains = call contains_bool_arr(true, arr) ;
+	println contains ;
+	arr = [false, true, true, true, true, true, true, false] ;
+	contains = call contains_bool_arr(false, arr) ;
+	println contains ;
+	arr = [false, true, false, false, false, true, false, true, true] ;
+	contains = call contains_bool_arr(false, arr) ;
+	println contains ;
+	arr = [false, true, true, true, true, true, true, true, true, false] ;
+	contains = call contains_bool_arr(false, arr) ;
+	println contains ;
+	arr = [false, false, true, true, true, false, true, false, false, false, false] ;
+	contains = call contains_bool_arr(true, arr) ;
+	println contains ;
+	arr = [true, true, false, true, true, false, false, true, true, true, false, false] ;
+	contains = call contains_bool_arr(false, arr) ;
+	println contains ;
+	arr = [true, false, true, true, false, true, false, false, false, true, true, false, false] ;
+	contains = call contains_bool_arr(true, arr) ;
+	println contains ;
+	arr = [true, true, false, false, true, true, false, false, true, false, true, false, true, true] ;
+	contains = call contains_bool_arr(false, arr) ;
+	println contains
+end
