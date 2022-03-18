@@ -235,11 +235,28 @@ fn all_types_test() {
 #[case("static/pairsExtended")]
 #[case("static/while")]
 #[case("static/voidCalls")]
-fn examples_test(#[case] path: &str) {
-    examples_dir_test(path).expect("Unable to test directory:");
+fn examples_test(
+    #[case] path: &str,
+    #[values(true, false)] dead_code_removal: bool,
+    #[values(true, false)] const_propagation: bool,
+    #[values(true, false)] tail_call: bool,
+    #[values(true, false)] const_branch: bool,
+    #[values(None, Some(100), Some(2000), Some(100000))] inlining: Option<usize>,
+) {
+    let options = Options {
+        show_optimised_three_code: false,
+        dead_code_removal: dead_code_removal,
+        const_propagation: const_propagation,
+        inlining: inlining,
+        tail_call: tail_call,
+        const_branch: const_branch,
+        show_arm_temp_rep: false,
+        show_three_code: false,
+    };
+    examples_dir_test(path, options).expect("Unable to test directory:");
 }
 
-fn examples_dir_test(dir: &str) -> Result<(), i32> {
+fn examples_dir_test(dir: &str, options: Options) -> Result<(), i32> {
     for file in glob(&format!("{}{}{}", "src/tests/", dir, "/**/*.wacc"))
         .unwrap()
         .map(|e| e.unwrap())
@@ -247,7 +264,13 @@ fn examples_dir_test(dir: &str) -> Result<(), i32> {
         println!("{}", file.to_str().unwrap());
         let contents = read_to_string(&file).unwrap();
         let (output, exit_code) = dbg!(parse_behaviour(&contents).unwrap().1);
-        compiler_test(file.to_str().unwrap(), String::new(), output, exit_code);
+        compiler_test(
+            file.to_str().unwrap(),
+            String::new(),
+            output,
+            exit_code,
+            options,
+        );
     }
     Ok(())
 }
@@ -255,19 +278,15 @@ lazy_static! {
     static ref FILE_SYSTEM_ID: AtomicUsize = AtomicUsize::new(0);
 }
 
-fn compiler_test(filename: &str, input: String, output: Behaviour, _exit_code: Option<i32>) {
+fn compiler_test(
+    filename: &str,
+    input: String,
+    output: Behaviour,
+    _exit_code: Option<i32>,
+    options: Options,
+) {
     let (main_file, module_files) = gather_modules(Path::new(filename)).unwrap();
 
-    let options = Options {
-        dead_code_removal: true,
-        const_propagation: true,
-        inlining: Some(1000),
-        tail_call: true,
-        const_branch: true,
-        show_arm_temp_rep: false,
-        show_three_code: false,
-        show_optimised_three_code: false,
-    };
     let assembly = compile(
         analyse(&main_file, module_files.iter().collect()).unwrap(),
         options,
