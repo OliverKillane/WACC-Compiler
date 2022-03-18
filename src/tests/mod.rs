@@ -259,7 +259,7 @@ fn examples_test(
 
 #[rstest]
 #[case("static/stdlib")]
-fn std_lib_test(#[case] path: &str) {
+fn examples_test2(#[case] path: &str) {
     let options = Options {
         show_optimised_three_code: false,
         dead_code_removal: false,
