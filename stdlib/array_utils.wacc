@@ -1,5 +1,8 @@
 ################ ARRAY UTILITIES LIBRARY ################
 
+### POSSIBLE ADDITIONS ###
+## Array equality/comparison
+
 begin
     
     ##### ARRAY PRINTING FUNCTIONS #####
@@ -303,7 +306,7 @@ begin
     end
 
     # Returns the index of the first encountered appearance of the given target in an integer array
-    # after following the binary search algorithm
+    # after following the binary search algorithm (i.e. not necessarily the element's first occurence in the array)
     # Returns -1 if given target is not present in given array
     # The given arr MUST be sorted
     int binary_search_int_arr(int target, int[] arr) is
@@ -329,7 +332,7 @@ begin
     end
 
     # Returns the index of the first encountered appearance of the given target in an character array
-    # after following the binary search algorithm
+    # after following the binary search algorithm (i.e. not necessarily the element's first occurence in the array)
     # Returns -1 if given target is not present in given array
     # The given array MUST be sorted
     int binary_search_char_arr(char target, char[] arr) is
