@@ -1,0 +1,255 @@
+################ MATH FUNCTION LIBRARY ################
+
+begin
+
+    ##### STANDARD MATH FUNCTIONS #####
+
+    # Returns the minimum between num1 and num2
+    int min(int num1, int num2) is
+        if (num1 <= num2) then
+            return num1
+        else
+            return num2
+        fi
+    end
+
+    # Returns the maximum between num1 and num2
+    int max(int num1, int num2) is
+        if (num1 >= num2) then
+            return num1
+        else
+            return num2
+        fi
+    end
+
+    # Returns the absolute value of the given num
+    int abs(int num) is
+        if (num >= 0) then
+            return num
+        else 
+            return (- num)
+        fi
+    end
+
+    # Returns the value equal to the base raised to the exp
+    int pow(int base, int exp) is
+        if (exp < 0) then
+            print "The given exponent ( " ;
+            print exp ;
+            println " ) is negative!" ;
+            exit 255
+        else
+            if exp == 0 then
+                return 1
+            else
+                int temp = call pow(base, exp / 2) ; 
+                if (exp % 2 == 0) then
+                return temp * temp
+                else 
+                    return base * temp * temp
+                fi
+            fi
+        fi
+    end
+
+    # Provides the truncated int square root of the given num
+    int trunc_sqrt(int num) is
+        if (num < 0) then
+            print "The given number ( " ;
+            print num ;
+            println " ) whose truncated square root were to be calculated is not positive!" ;
+            exit 255
+        else
+            if (num == 0 || num == 1) then
+                return num
+            else
+                int i = 1 ;
+                int temp = 1 ;
+                while (temp  <= num) do
+                    i = i + 1 ;
+                    temp = call pow(i, 2)
+                done ;
+                return i - 1
+            fi
+        fi
+    end
+
+    # Returns the truncated log2 of the given num
+    int trunc_log2(int num) is
+        if (num <= 0) then
+            print "The given number ( " ;
+            print num ;
+            println " ) whose truncated log2 were to be calculated is not positive!" ;
+            exit 255
+        else
+            int hi = 0 ;
+            int temp_hi = call pow(2, hi) ;
+
+            while (temp_hi < num) do
+                hi = hi + 1 ;
+                temp_hi = call pow(2, hi)
+            done ;
+
+            if (temp_hi == num) then
+                return hi
+            else
+                int lo = hi - 1 ;
+
+                # The below would be useful for floating point numbers
+
+                # int precision = 1 ;
+                # int l_bound = call pow(2, lo) ;
+                # int r_bound = call pow(2, hi) ;
+                # int temp_diff = call abs(l_bound - num) ;
+
+                # while (temp_diff >= precision) do
+                #     int mid = (lo + hi) / 2 ;
+                #     int mid_val = call trunc_sqrt(l_bound * r_bound) ;
+                #     if (mid_val > num) then
+                #         hi = mid ;
+                #         r_bound = mid_val
+                #         fi
+                #     else
+                #         lo = mid ;
+                #         l_bound = mid_val
+                #         fi
+                #     fi ;
+                #     temp_diff = call abs(l_bound - num) ;
+                # done ;
+
+                return lo
+            fi
+        fi
+    end
+
+    ##### TRIGONOMETRIC FUNCTIONS #####
+
+    # Returns the sign of the sine trigonometric function for the given angle (in degrees)
+    int sin_sign(int angle) is
+        angle = ((angle % 360) + 360) % 360 ;
+        if (angle == 0 || angle == 180) then
+            return 0
+        else
+            if (angle > 0 && angle < 180) then
+                return 1
+            else
+                return (- 1)
+            fi
+        fi
+    end
+
+    # Returns the sign of the cosine trigonometric function for the given angle (in degrees)
+    int cos_sign(int angle) is
+        angle = ((angle % 360) + 360) % 360 ;
+        if (angle == 90 || angle == 270) then
+            return 0
+        else
+            if (angle > 270 || angle < 90) then
+                return 1
+            else
+                return (- 1)
+            fi
+        fi
+    end
+
+    # Returns the sign of the tangent trigonometric function for the given angle (in degrees)
+    int tan_sign(int angle) is
+        int sin_sign = call sin_sign(angle) ;
+        int cos_sign = call cos_sign(angle) ;
+        if (cos_sign == 0) then
+            print "The tangent trigonometric function is undefined for " ;
+            print angle ;
+            println " degrees!" ;
+            exit 255
+        else
+            return sin_sign / cos_sign
+        fi
+    end
+
+    ##### MATH OPERATIONS ON ARRAYS #####
+
+    # Returns the sum of all elements in integer array
+    # Empty Sum is 0 by convention
+    int sum_int_arr(int[] arr) is
+        int sum = 0 ;
+        int i = 0 ; 
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            sum = sum + arr[i] ;
+            i = i + 1
+        done ;
+        return sum
+    end
+
+    # Returns the product of all elements in integer array
+    # Empty Product is 1 by convention
+    int prod_int_arr(int[] arr) is
+        int prod = 1 ;
+        int i = 0 ; 
+        int arr_len = len arr ;
+        while (i < arr_len) do
+            prod = prod * arr[i] ;
+            i = i + 1
+        done ;
+        return prod
+    end
+
+    ##### STATISTICS #####
+
+    # Returns the truncated mean of all elements in integer array
+    int trunc_mean_int_arr(int[] arr) is
+        int sum = call sum_int_arr(arr);
+        int arr_len = len arr ;
+        if (arr_len == 0) then
+            println "The mean of an empty data set is undefined!" ;
+            exit 255
+        else
+            return (sum / arr_len)
+        fi
+    end
+
+    # Returns the truncated population variance of all elements in integer array
+    int trunc_pop_var_int_arr(int[] arr) is
+        int mean = call trunc_mean_int_arr(arr) ;
+        int i = 0 ; 
+        int arr_len = len arr ;
+        int diff_sum = 0 ;
+        int curr_diff_sum_sq = 0 ;
+        while (i < arr_len) do
+            curr_diff_sum_sq = call pow((arr[i] - mean), 2) ;
+            diff_sum = diff_sum + curr_diff_sum_sq ;
+            i = i + 1
+        done ;
+        return (diff_sum / arr_len)
+    end
+
+    # Returns the truncated population standard deviation of all elements in integer array
+    int trunc_pop_sd_int_arr(int[] arr) is
+        int var = call trunc_pop_var_int_arr(arr) ;
+        int sd = call trunc_sqrt(var) ;
+        return sd
+    end
+
+    # Returns the truncated sample variance of all elements in integer array
+    int trunc_sam_var_int_arr(int[] arr) is
+        int mean = call trunc_mean_int_arr(arr) ;
+        int i = 0 ; 
+        int arr_len = len arr ;
+        int diff_sum = 0 ;
+        int curr_diff_sum_sq = 0 ;
+        while (i < arr_len) do
+            curr_diff_sum_sq = call pow((arr[i] - mean), 2) ;
+            diff_sum = diff_sum + curr_diff_sum_sq ;
+            i = i + 1
+        done ;
+        return (diff_sum / (arr_len - 1))
+    end
+
+    # Returns the truncated sample standard deviation of all elements in integer array
+    int trunc_sam_sd_int_arr(int[] arr) is
+        int var = call trunc_sam_var_int_arr(arr) ;
+        int sd = call trunc_sqrt(var) ;
+        return sd
+    end
+
+end

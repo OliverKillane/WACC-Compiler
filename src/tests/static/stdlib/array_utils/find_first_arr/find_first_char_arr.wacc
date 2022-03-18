@@ -1,0 +1,69 @@
+# Correctness of find_first_char_arr()
+
+# Output:
+# -1
+# -1
+# -1
+# 1
+# -1
+# -1
+# 3
+# -1
+# -1
+# 4
+# 0
+# 10
+# 2
+# -1
+# 2
+
+
+mod ../../../../../../stdlib/array_utils.wacc;
+
+begin
+	char[] arr = [] ;
+	int index = call find_first_char_arr('Y', arr) ;
+	println index ;
+	arr = ['c'] ;
+	index = call find_first_char_arr('X', arr) ;
+	println index ;
+	arr = ['c', '^'] ;
+	index = call find_first_char_arr('_', arr) ;
+	println index ;
+	arr = ['`', '^', '`'] ;
+	index = call find_first_char_arr('^', arr) ;
+	println index ;
+	arr = ['X', '_', 'Z', 'b'] ;
+	index = call find_first_char_arr(']', arr) ;
+	println index ;
+	arr = ['a', '[', ']', 'X', 'Y'] ;
+	index = call find_first_char_arr('_', arr) ;
+	println index ;
+	arr = ['X', 'X', 'X', '[', '`', 'c'] ;
+	index = call find_first_char_arr('[', arr) ;
+	println index ;
+	arr = ['_', 'a', 'a', '[', ']', '_', '['] ;
+	index = call find_first_char_arr('X', arr) ;
+	println index ;
+	arr = ['`', '_', 'a', 'Z', 'a', '[', '`', 'Y'] ;
+	index = call find_first_char_arr('b', arr) ;
+	println index ;
+	arr = ['b', '[', ']', 'a', 'X', '`', 'c', 'Z', 'b'] ;
+	index = call find_first_char_arr('X', arr) ;
+	println index ;
+	arr = [']', 'X', ']', 'c', 'Z', 'X', '`', ']', 'Y', '^'] ;
+	index = call find_first_char_arr(']', arr) ;
+	println index ;
+	arr = ['^', '_', '^', 'b', 'c', '[', '[', 'Z', 'a', '^', 'Y'] ;
+	index = call find_first_char_arr('Y', arr) ;
+	println index ;
+	arr = ['^', '_', '`', '`', 'X', '`', 'b', 'Y', 'c', ']', '`', 'b'] ;
+	index = call find_first_char_arr('`', arr) ;
+	println index ;
+	arr = ['Y', 'a', 'a', '[', 'c', 'a', '`', '_', '^', 'b', 'b', 'Z', '['] ;
+	index = call find_first_char_arr(']', arr) ;
+	println index ;
+	arr = [']', '[', '_', 'Z', 'X', 'a', 'X', '[', '_', '`', 'c', '`', 'a', 'c'] ;
+	index = call find_first_char_arr('_', arr) ;
+	println index
+end

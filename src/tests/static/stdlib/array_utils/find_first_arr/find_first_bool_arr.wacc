@@ -1,0 +1,69 @@
+# Correctness of find_first_bool_arr()
+
+# Output:
+# -1
+# -1
+# -1
+# 0
+# 1
+# 2
+# 2
+# 0
+# 0
+# 1
+# 0
+# 0
+# 2
+# 0
+# 2
+
+
+mod ../../../../../../stdlib/array_utils.wacc;
+
+begin
+	bool[] arr = [] ;
+	int index = call find_first_bool_arr(true, arr) ;
+	println index ;
+	arr = [true] ;
+	index = call find_first_bool_arr(false, arr) ;
+	println index ;
+	arr = [false, false] ;
+	index = call find_first_bool_arr(true, arr) ;
+	println index ;
+	arr = [true, true, true] ;
+	index = call find_first_bool_arr(true, arr) ;
+	println index ;
+	arr = [false, true, true, true] ;
+	index = call find_first_bool_arr(true, arr) ;
+	println index ;
+	arr = [true, true, false, false, false] ;
+	index = call find_first_bool_arr(false, arr) ;
+	println index ;
+	arr = [false, false, true, false, true, false] ;
+	index = call find_first_bool_arr(true, arr) ;
+	println index ;
+	arr = [true, false, true, false, true, false, true] ;
+	index = call find_first_bool_arr(true, arr) ;
+	println index ;
+	arr = [false, true, false, true, true, true, true, true] ;
+	index = call find_first_bool_arr(false, arr) ;
+	println index ;
+	arr = [false, true, false, false, false, true, true, true, false] ;
+	index = call find_first_bool_arr(true, arr) ;
+	println index ;
+	arr = [true, false, false, true, true, false, false, true, false, true] ;
+	index = call find_first_bool_arr(true, arr) ;
+	println index ;
+	arr = [false, false, false, false, true, true, true, false, false, true, false] ;
+	index = call find_first_bool_arr(false, arr) ;
+	println index ;
+	arr = [false, false, true, true, false, true, true, true, false, true, true, false] ;
+	index = call find_first_bool_arr(true, arr) ;
+	println index ;
+	arr = [true, true, true, true, true, false, false, false, true, true, false, true, false] ;
+	index = call find_first_bool_arr(true, arr) ;
+	println index ;
+	arr = [false, false, true, true, true, false, false, false, false, false, false, false, false, true] ;
+	index = call find_first_bool_arr(true, arr) ;
+	println index
+end

@@ -1,0 +1,112 @@
+# Correctness of cos_sign()
+
+# Output:
+# 1
+# 1
+# 0
+# -1
+# -1
+# -1
+# 0
+# 1
+# 1
+# 1
+# 0
+# -1
+# -1
+# -1
+# 0
+# 1
+# 1
+# 1
+# 0
+# -1
+# -1
+# -1
+# 0
+# 1
+# 1
+# 1
+# 0
+# -1
+# -1
+# -1
+# 0
+# 1
+# 1
+
+mod ../../../../../stdlib/math.wacc;
+
+begin
+    # -ve angles
+    int test = call cos_sign(-720) ;
+	println test ;
+	test = call cos_sign(-675) ;
+	println test ;
+	test = call cos_sign(-630) ;
+	println test ;
+	test = call cos_sign(-585) ;
+	println test ;
+	test = call cos_sign(-540) ;
+	println test ;
+	test = call cos_sign(-495) ;
+	println test ;
+	test = call cos_sign(-450) ;
+	println test ;
+	test = call cos_sign(-405) ;
+	println test ;
+	test = call cos_sign(-360) ;
+	println test ;
+	test = call cos_sign(-315) ;
+	println test ;
+	test = call cos_sign(-270) ;
+	println test ;
+	test = call cos_sign(-225) ;
+	println test ;
+	test = call cos_sign(-180) ;
+	println test ;
+	test = call cos_sign(-135) ;
+	println test ;
+	test = call cos_sign(-90) ;
+	println test ;
+	test = call cos_sign(-45) ;
+	println test ;
+    
+    # zero angle
+	test = call cos_sign(0) ;
+	println test ;
+
+    # positive angles
+	test = call cos_sign(45) ;
+	println test ;
+	test = call cos_sign(90) ;
+	println test ;
+	test = call cos_sign(135) ;
+	println test ;
+	test = call cos_sign(180) ;
+	println test ;
+	test = call cos_sign(225) ;
+	println test ;
+	test = call cos_sign(270) ;
+	println test ;
+	test = call cos_sign(315) ;
+	println test ;
+	test = call cos_sign(360) ;
+	println test ;
+	test = call cos_sign(405) ;
+	println test ;
+	test = call cos_sign(450) ;
+	println test ;
+	test = call cos_sign(495) ;
+	println test ;
+	test = call cos_sign(540) ;
+	println test ;
+	test = call cos_sign(585) ;
+	println test ;
+	test = call cos_sign(630) ;
+	println test ;
+	test = call cos_sign(675) ;
+	println test ;
+	test = call cos_sign(720) ;
+	println test 
+end

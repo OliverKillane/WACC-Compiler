@@ -1,0 +1,69 @@
+# Correctness of pow()
+
+# Output:
+# 1
+# 1
+# 1
+# 1
+# 8
+# 144
+# 161051
+# 429981696
+# -1
+# 1
+# 1
+# 1
+# -8
+# 144
+# -161051
+# 429981696
+# The given exponent ( -10 ) is negative!
+
+# Exit:
+# 255
+
+mod ../../../../../stdlib/math.wacc;
+
+begin
+    # +ve bases & +ve exponents
+    int test = call pow(1, 1) ;
+    println test ;
+    test = call pow(1, 20) ;
+    println test ;
+    test = call pow(2, 0) ;
+    println test ;
+    test = call pow(0, 0) ;
+    println test ;
+    test = call pow(2, 3) ;
+    println test ;
+    test = call pow(12, 2) ;
+    println test ;
+    test = call pow(11, 5) ;
+    println test ;
+    test = call pow(12, 8) ;
+    println test ;
+
+    # -ve bases & +ve exponents
+    test = call pow(- 1, 1) ;
+    println test ;
+    test = call pow(- 1, 20) ;
+    println test ;
+    test = call pow(- 2, 0) ;
+    println test ;
+    test = call pow(- 0, 0) ;
+    println test ;
+    test = call pow(- 2, 3) ;
+    println test ;
+    test = call pow(- 12, 2) ;
+    println test ;
+    test = call pow(- 11, 5) ;
+    println test ;
+    test = call pow(- 12, 8) ;
+    println test ;
+    
+    # -ve exponent
+    test = call pow(1, - 10) ;
+    # Should exit before reaching this
+    println test 
+
+end

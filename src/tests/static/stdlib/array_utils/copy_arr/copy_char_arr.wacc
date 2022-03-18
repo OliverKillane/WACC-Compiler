@@ -1,0 +1,119 @@
+# Correctness of copy_char_arr()
+
+# Output:
+# arr_before = []
+# buff_before = []
+# arr_after = []
+# buff_after = []
+# arr_before = ['(']
+# buff_before = ['~']
+# arr_after = ['(']
+# buff_after = ['(']
+# arr_before = ['r', 'E']
+# buff_before = ['=', 'L']
+# arr_after = ['r', 'E']
+# buff_after = ['r', 'E']
+# arr_before = ['`', '?', 'U']
+# buff_before = ['m', 'g', 'O']
+# arr_after = ['`', '?', 'U']
+# buff_after = ['`', '?', 'U']
+# arr_before = ['=', '7', 'c', 'B']
+# buff_before = ['F', '}', 'F', 'I']
+# arr_after = ['=', '7', 'c', 'B']
+# buff_after = ['=', '7', 'c', 'B']
+# arr_before = ['a', 'G', 'e', 'h', '6']
+# buff_before = ['x', '<', '[', '_', 'N']
+# arr_after = ['a', 'G', 'e', 'h', '6']
+# buff_after = ['a', 'G', 'e', 'h', '6']
+# arr_before = ['k', '0', ' ', '4', 'W', '&']
+# buff_before = ['B', '|', 'R', 'o', 'B', 'C']
+# arr_after = ['k', '0', ' ', '4', 'W', '&']
+# buff_after = ['&', 'W', '4', ' ', '0', 'k']
+# arr_before = ['}', '9', 's', ';', '_', 'V', 'f']
+# buff_before = ['l', 'Y', 'c', '^', 'B', 'i', 'e']
+# arr_after = ['}', '9', 's', ';', '_', 'V', 'f']
+# buff_after = ['}', '9', 's', ';', '_', 'V', 'f']
+# arr_before = ['i', '+', '$', 'y', '8', '[', '(', 'X']
+# buff_before = ['8', 'X', '_', 'Q', 'q', 'D', 's', 'q']
+# arr_after = ['i', '+', '$', 'y', '8', '[', '(', 'X']
+# buff_after = ['X', '(', '[', '8', 'y', '$', '+', 'i']
+# arr_before = ['~', '%', 'l', '4', 'f', 'X', 'g', 'C', 'l']
+# buff_before = ['J', '-', '6', 'Z', 'M', '2', 'D', 'Q', 'b']
+# arr_after = ['~', '%', 'l', '4', 'f', 'X', 'g', 'C', 'l']
+# buff_after = ['~', '%', 'l', '4', 'f', 'X', 'g', 'C', 'l']
+
+
+mod ../../../../../../stdlib/array_utils.wacc;
+
+begin
+	char[] arr = [] ;
+	char[] buff_arr = [] ;
+	call print_char_arr("arr_before", arr) ;
+	call print_char_arr("buff_before", buff_arr) ;
+	call copy_char_arr(arr, buff_arr, false) ;
+	call print_char_arr("arr_after", arr) ;
+	call print_char_arr("buff_after", buff_arr) ;
+	arr = ['('] ;
+	buff_arr = ['~'] ;
+	call print_char_arr("arr_before", arr) ;
+	call print_char_arr("buff_before", buff_arr) ;
+	call copy_char_arr(arr, buff_arr, false) ;
+	call print_char_arr("arr_after", arr) ;
+	call print_char_arr("buff_after", buff_arr) ;
+	arr = ['r', 'E'] ;
+	buff_arr = ['=', 'L'] ;
+	call print_char_arr("arr_before", arr) ;
+	call print_char_arr("buff_before", buff_arr) ;
+	call copy_char_arr(arr, buff_arr, false) ;
+	call print_char_arr("arr_after", arr) ;
+	call print_char_arr("buff_after", buff_arr) ;
+	arr = ['`', '?', 'U'] ;
+	buff_arr = ['m', 'g', 'O'] ;
+	call print_char_arr("arr_before", arr) ;
+	call print_char_arr("buff_before", buff_arr) ;
+	call copy_char_arr(arr, buff_arr, false) ;
+	call print_char_arr("arr_after", arr) ;
+	call print_char_arr("buff_after", buff_arr) ;
+	arr = ['=', '7', 'c', 'B'] ;
+	buff_arr = ['F', '}', 'F', 'I'] ;
+	call print_char_arr("arr_before", arr) ;
+	call print_char_arr("buff_before", buff_arr) ;
+	call copy_char_arr(arr, buff_arr, false) ;
+	call print_char_arr("arr_after", arr) ;
+	call print_char_arr("buff_after", buff_arr) ;
+	arr = ['a', 'G', 'e', 'h', '6'] ;
+	buff_arr = ['x', '<', '[', '_', 'N'] ;
+	call print_char_arr("arr_before", arr) ;
+	call print_char_arr("buff_before", buff_arr) ;
+	call copy_char_arr(arr, buff_arr, false) ;
+	call print_char_arr("arr_after", arr) ;
+	call print_char_arr("buff_after", buff_arr) ;
+	arr = ['k', '0', ' ', '4', 'W', '&'] ;
+	buff_arr = ['B', '|', 'R', 'o', 'B', 'C'] ;
+	call print_char_arr("arr_before", arr) ;
+	call print_char_arr("buff_before", buff_arr) ;
+	call copy_char_arr(arr, buff_arr, true) ;
+	call print_char_arr("arr_after", arr) ;
+	call print_char_arr("buff_after", buff_arr) ;
+	arr = ['}', '9', 's', ';', '_', 'V', 'f'] ;
+	buff_arr = ['l', 'Y', 'c', '^', 'B', 'i', 'e'] ;
+	call print_char_arr("arr_before", arr) ;
+	call print_char_arr("buff_before", buff_arr) ;
+	call copy_char_arr(arr, buff_arr, false) ;
+	call print_char_arr("arr_after", arr) ;
+	call print_char_arr("buff_after", buff_arr) ;
+	arr = ['i', '+', '$', 'y', '8', '[', '(', 'X'] ;
+	buff_arr = ['8', 'X', '_', 'Q', 'q', 'D', 's', 'q'] ;
+	call print_char_arr("arr_before", arr) ;
+	call print_char_arr("buff_before", buff_arr) ;
+	call copy_char_arr(arr, buff_arr, true) ;
+	call print_char_arr("arr_after", arr) ;
+	call print_char_arr("buff_after", buff_arr) ;
+	arr = ['~', '%', 'l', '4', 'f', 'X', 'g', 'C', 'l'] ;
+	buff_arr = ['J', '-', '6', 'Z', 'M', '2', 'D', 'Q', 'b'] ;
+	call print_char_arr("arr_before", arr) ;
+	call print_char_arr("buff_before", buff_arr) ;
+	call copy_char_arr(arr, buff_arr, false) ;
+	call print_char_arr("arr_after", arr) ;
+	call print_char_arr("buff_after", buff_arr)
+end

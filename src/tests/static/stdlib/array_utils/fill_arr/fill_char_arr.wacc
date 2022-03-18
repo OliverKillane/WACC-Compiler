@@ -1,0 +1,99 @@
+# Correctness of fill_char_arr()
+
+# Output:
+# arr_before = []
+# arr_after = []
+# arr_before = ['k']
+# arr_after = ['m']
+# arr_before = ['H', 'E']
+# arr_after = ['R', 'R']
+# arr_before = ['8', 'G', 'b']
+# arr_after = ['5', '5', '5']
+# arr_before = ['Q', '+', 'v', 'v']
+# arr_after = ['`', '`', '`', '`']
+# arr_before = ['{', '6', '6', '2', 'O']
+# arr_after = [';', ';', ';', ';', ';']
+# arr_before = ['j', ';', 'd', '7', '}', 'B']
+# arr_after = ['Q', 'Q', 'Q', 'Q', 'Q', 'Q']
+# arr_before = ['m', 'G', '/', 'A', 'K', 'M', ':']
+# arr_after = ['O', 'O', 'O', 'O', 'O', 'O', 'O']
+# arr_before = ['H', 'v', ':', '%', 'F', 'X', 'V', '3']
+# arr_after = ['N', 'N', 'N', 'N', 'N', 'N', 'N', 'N']
+# arr_before = ['W', ' ', 'T', 'K', 'q', '|', 'W', 'b', 'q']
+# arr_after = ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']
+# arr_before = ['.', '2', 'o', 'y', 'L', 'i', '*', 's', 'R', 'i']
+# arr_after = ['@', '@', '@', '@', '@', '@', '@', '@', '@', '@']
+# arr_before = ['-', 'm', 'D', '2', '?', 'c', '(', '.', '.', 'w', 'Y']
+# arr_after = ['J', 'J', 'J', 'J', 'J', 'J', 'J', 'J', 'J', 'J', 'J']
+# arr_before = ['b', 'o', 'X', 'a', 'b', '%', '-', 'g', 'i', 'r', 'r', 't']
+# arr_after = ['O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O']
+# arr_before = ['T', 'S', 'Y', ':', 'M', '1', ']', ':', 'u', 'X', 'Y', 'D', 'o']
+# arr_after = ['5', '5', '5', '5', '5', '5', '5', '5', '5', '5', '5', '5', '5']
+# arr_before = ['D', 'z', '&', 'K', '?', 'r', '7', '&', 'Q', '[', 'K', 'I', '=', 'R']
+# arr_after = ['>', '>', '>', '>', '>', '>', '>', '>', '>', '>', '>', '>', '>', '>']
+
+
+mod ../../../../../../stdlib/array_utils.wacc;
+
+begin
+	char[] arr = [] ;
+	call print_char_arr("arr_before", arr) ;
+	call fill_char_arr('h', arr) ;
+	call print_char_arr("arr_after", arr) ;
+	arr = ['k'] ;
+	call print_char_arr("arr_before", arr) ;
+	call fill_char_arr('m', arr) ;
+	call print_char_arr("arr_after", arr) ;
+	arr = ['H', 'E'] ;
+	call print_char_arr("arr_before", arr) ;
+	call fill_char_arr('R', arr) ;
+	call print_char_arr("arr_after", arr) ;
+	arr = ['8', 'G', 'b'] ;
+	call print_char_arr("arr_before", arr) ;
+	call fill_char_arr('5', arr) ;
+	call print_char_arr("arr_after", arr) ;
+	arr = ['Q', '+', 'v', 'v'] ;
+	call print_char_arr("arr_before", arr) ;
+	call fill_char_arr('`', arr) ;
+	call print_char_arr("arr_after", arr) ;
+	arr = ['{', '6', '6', '2', 'O'] ;
+	call print_char_arr("arr_before", arr) ;
+	call fill_char_arr(';', arr) ;
+	call print_char_arr("arr_after", arr) ;
+	arr = ['j', ';', 'd', '7', '}', 'B'] ;
+	call print_char_arr("arr_before", arr) ;
+	call fill_char_arr('Q', arr) ;
+	call print_char_arr("arr_after", arr) ;
+	arr = ['m', 'G', '/', 'A', 'K', 'M', ':'] ;
+	call print_char_arr("arr_before", arr) ;
+	call fill_char_arr('O', arr) ;
+	call print_char_arr("arr_after", arr) ;
+	arr = ['H', 'v', ':', '%', 'F', 'X', 'V', '3'] ;
+	call print_char_arr("arr_before", arr) ;
+	call fill_char_arr('N', arr) ;
+	call print_char_arr("arr_after", arr) ;
+	arr = ['W', ' ', 'T', 'K', 'q', '|', 'W', 'b', 'q'] ;
+	call print_char_arr("arr_before", arr) ;
+	call fill_char_arr('C', arr) ;
+	call print_char_arr("arr_after", arr) ;
+	arr = ['.', '2', 'o', 'y', 'L', 'i', '*', 's', 'R', 'i'] ;
+	call print_char_arr("arr_before", arr) ;
+	call fill_char_arr('@', arr) ;
+	call print_char_arr("arr_after", arr) ;
+	arr = ['-', 'm', 'D', '2', '?', 'c', '(', '.', '.', 'w', 'Y'] ;
+	call print_char_arr("arr_before", arr) ;
+	call fill_char_arr('J', arr) ;
+	call print_char_arr("arr_after", arr) ;
+	arr = ['b', 'o', 'X', 'a', 'b', '%', '-', 'g', 'i', 'r', 'r', 't'] ;
+	call print_char_arr("arr_before", arr) ;
+	call fill_char_arr('O', arr) ;
+	call print_char_arr("arr_after", arr) ;
+	arr = ['T', 'S', 'Y', ':', 'M', '1', ']', ':', 'u', 'X', 'Y', 'D', 'o'] ;
+	call print_char_arr("arr_before", arr) ;
+	call fill_char_arr('5', arr) ;
+	call print_char_arr("arr_after", arr) ;
+	arr = ['D', 'z', '&', 'K', '?', 'r', '7', '&', 'Q', '[', 'K', 'I', '=', 'R'] ;
+	call print_char_arr("arr_before", arr) ;
+	call fill_char_arr('>', arr) ;
+	call print_char_arr("arr_after", arr)
+end

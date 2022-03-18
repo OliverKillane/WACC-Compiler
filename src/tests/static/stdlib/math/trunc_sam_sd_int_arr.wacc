@@ -1,0 +1,33 @@
+# Correctness of trunc_sam_sd_int_arr()
+
+# Output:
+# 141
+# 0
+# 0
+# 7
+# 7
+# The mean of an empty data set is undefined!
+
+mod ../../../../../stdlib/math.wacc;
+
+begin
+    int[] arr = [1, 2, 3, 10, 42, 53, 69, 420] ;
+    int mean = call trunc_sam_sd_int_arr(arr) ;
+    println mean ;
+    arr = [0, 0, 0] ;
+    mean = call trunc_sam_sd_int_arr(arr) ;
+    println mean ;
+    arr = [0, 0, 1, -1] ;
+    mean = call trunc_sam_sd_int_arr(arr) ;
+    println mean ;
+    arr = [-12, 2, -10] ;
+    mean = call trunc_sam_sd_int_arr(arr) ;
+    println mean ;
+    arr = [12, -2, 10] ;
+    mean = call trunc_sam_sd_int_arr(arr) ;
+    println mean ;
+    arr = [] ;
+    mean = call trunc_sam_sd_int_arr(arr) ;
+    # Should exit before reaching this
+    println mean
+end
