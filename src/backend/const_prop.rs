@@ -302,8 +302,10 @@ fn prop_const_node(node: &StatNode, int_handler: &Option<String>) -> Option<VarR
     ) = *node.get()
     {
         (assigned_var, op_src1, bin_op, op_src2, checked)
+    } else if let StatType::Simple(_, StatCode::Assign(assigned_var, op_src), _) = *node.get() && !matches!(op_src, OpSrc::Var(_)) {
+        return Some(assigned_var)
     } else {
-        return None;
+        return None
     };
     let propagate_op_result =
         propagate_op(op_src1, bin_op, op_src2, checked || int_handler.is_some());
@@ -382,20 +384,7 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr], int_handler: &Option<Stri
                     .iter()
                     .filter_map(|(var, defs)| {
                         if uses.contains(var) {
-                            Some((
-                                *var,
-                                defs.iter()
-                                    .filter(|def| {
-                                        if let StatType::Simple(_, StatCode::Assign(_, op_src), _) =
-                                            &*def.get()
-                                        {
-                                            matches!(op_src, OpSrc::Var(_))
-                                        } else {
-                                            true
-                                        }
-                                    })
-                                    .count(),
-                            ))
+                            Some((*var, defs.iter().count()))
                         } else {
                             None
                         }
@@ -427,6 +416,7 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr], int_handler: &Option<Stri
         }
     }
     while let Some((node, var)) = const_prop.pop_front() {
+        println!("{}", hashed(&node));
         let mut substitute_op_src = None;
         for def in &*(&live_defs[&node].0)[&var] {
             if let StatType::Simple(_, StatCode::Assign(_, op_src), _) = &*def.get() {
@@ -440,6 +430,7 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr], int_handler: &Option<Stri
                 panic!("Not a constant definition")
             }
         }
+        println!("substituting");
         let substitute_op_src = if let Some(substitute_op_src) = substitute_op_src {
             substitute_op_src
         } else {
@@ -456,11 +447,16 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr], int_handler: &Option<Stri
             continue;
         };
         for use_node in defs_uses.get(&node).unwrap_or(&HashSet::new()) {
+            println!("use node: {}", hashed(use_node));
             *non_const_defs
                 .get_mut(use_node)
                 .unwrap()
                 .get_mut(&assigned_var)
                 .unwrap() -= 1;
+            println!(
+                "remaining non const defs: {}",
+                non_const_defs[use_node][&assigned_var]
+            );
             if non_const_defs[use_node][&assigned_var] == 0 {
                 const_prop.push_back((use_node.clone(), assigned_var));
             }
@@ -469,13 +465,14 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr], int_handler: &Option<Stri
 }
 
 /// Performs constant propagation on the [three code](ThreeCode).
-pub(super) fn prop_consts(threecode: ThreeCode) -> ThreeCode {
-    prop_const_graph(&threecode.code, &[], &threecode.int_handler);
+pub(super) fn prop_consts(three_code: ThreeCode) -> ThreeCode {
+    println!("{}", hashed(&three_code.code));
+    prop_const_graph(&three_code.code, &[], &three_code.int_handler);
 
-    threecode
-        .functions
-        .par_iter()
-        .for_each(|(_, fun)| prop_const_graph(&fun.code, &fun.args, &threecode.int_handler));
+    three_code.functions.par_iter().for_each(|(_, fun)| {
+        println!("{}", hashed(&three_code.code));
+        prop_const_graph(&fun.code, &fun.args, &three_code.int_handler)
+    });
 
-    threecode
+    three_code
 }
