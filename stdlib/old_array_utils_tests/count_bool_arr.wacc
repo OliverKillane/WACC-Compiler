@@ -1,0 +1,69 @@
+# Correctness of count_bool_arr()
+
+# Output:
+# 0
+# 1
+# 0
+# 3
+# 1
+# 4
+# 4
+# 5
+# 1
+# 5
+# 5
+# 1
+# 10
+# 6
+# 4
+
+
+mod ../../../../../stdlib/array_utils.wacc;
+
+begin
+	bool[] arr = [] ;
+	int count = call count_bool_arr(true, arr) ;
+	println count ;
+	arr = [false] ;
+	count = call count_bool_arr(false, arr) ;
+	println count ;
+	arr = [true, true] ;
+	count = call count_bool_arr(false, arr) ;
+	println count ;
+	arr = [true, true, true] ;
+	count = call count_bool_arr(true, arr) ;
+	println count ;
+	arr = [true, true, false, true] ;
+	count = call count_bool_arr(false, arr) ;
+	println count ;
+	arr = [false, true, true, true, true] ;
+	count = call count_bool_arr(true, arr) ;
+	println count ;
+	arr = [false, true, true, false, true, true] ;
+	count = call count_bool_arr(true, arr) ;
+	println count ;
+	arr = [true, true, true, true, true, false, false] ;
+	count = call count_bool_arr(true, arr) ;
+	println count ;
+	arr = [true, false, false, false, false, false, false, false] ;
+	count = call count_bool_arr(true, arr) ;
+	println count ;
+	arr = [true, true, true, true, false, false, false, true, false] ;
+	count = call count_bool_arr(true, arr) ;
+	println count ;
+	arr = [true, false, true, false, true, false, true, true, false, false] ;
+	count = call count_bool_arr(true, arr) ;
+	println count ;
+	arr = [false, false, false, true, false, false, false, false, false, false, false] ;
+	count = call count_bool_arr(true, arr) ;
+	println count ;
+	arr = [false, false, false, false, false, false, true, false, true, false, false, false] ;
+	count = call count_bool_arr(false, arr) ;
+	println count ;
+	arr = [true, true, false, true, false, false, true, false, false, true, false, true, false] ;
+	count = call count_bool_arr(true, arr) ;
+	println count ;
+	arr = [false, true, true, false, true, true, true, true, true, true, false, true, true, false] ;
+	count = call count_bool_arr(false, arr) ;
+	println count
+end

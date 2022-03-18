@@ -1,0 +1,69 @@
+# Correctness of find_nth_int_arr()
+
+# Output:
+# -1
+# -1
+# -1
+# -1
+# -1
+# 4
+# 0
+# 2
+# 5
+# -1
+# 5
+# 8
+# -1
+# 3
+# -1
+
+
+mod ../../../../../stdlib/array_utils.wacc;
+
+begin
+	int[]	arr = [] ;
+	int index = call find_nth_int_arr(2, 2, arr) ;
+	println index ;
+	arr = [1] ;
+	index = call find_nth_int_arr(0, 1, arr) ;
+	println index ;
+	arr = [0, -1] ;
+	index = call find_nth_int_arr(1, 2, arr) ;
+	println index ;
+	arr = [-2, 2, -2] ;
+	index = call find_nth_int_arr(-2, 3, arr) ;
+	println index ;
+	arr = [2, -1, 2, -1] ;
+	index = call find_nth_int_arr(1, 2, arr) ;
+	println index ;
+	arr = [-1, 1, -1, -1, 1] ;
+	index = call find_nth_int_arr(1, 2, arr) ;
+	println index ;
+	arr = [-1, -1, 0, -1, 1, 0] ;
+	index = call find_nth_int_arr(-1, 1, arr) ;
+	println index ;
+	arr = [-1, 1, -2, 1, -1, 0, 0] ;
+	index = call find_nth_int_arr(-2, 1, arr) ;
+	println index ;
+	arr = [-2, 0, 0, 0, -1, 2, 0, -2] ;
+	index = call find_nth_int_arr(2, 1, arr) ;
+	println index ;
+	arr = [2, -2, -1, -2, 2, 1, 1, 1, -2] ;
+	index = call find_nth_int_arr(0, 3, arr) ;
+	println index ;
+	arr = [2, 1, 0, -1, 0, 2, -1, -2, -2, 2] ;
+	index = call find_nth_int_arr(2, 2, arr) ;
+	println index ;
+	arr = [-2, -2, 2, 2, -2, 1, -2, -2, 0, 2, -2] ;
+	index = call find_nth_int_arr(0, 1, arr) ;
+	println index ;
+	arr = [0, 2, 2, 0, -2, -1, -2, 1, -2, -2, -1, -2] ;
+	index = call find_nth_int_arr(2, 3, arr) ;
+	println index ;
+	arr = [1, 0, 1, 1, 1, 0, -1, -1, 1, 2, 1, 1, 2] ;
+	index = call find_nth_int_arr(1, 3, arr) ;
+	println index ;
+	arr = [0, 0, -2, -1, -2, -1, 1, 0, -1, -2, 1, 0, 0, 2] ;
+	index = call find_nth_int_arr(2, 2, arr) ;
+	println index
+end
