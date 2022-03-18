@@ -187,35 +187,104 @@
         % standard library
         
         We implemented a number of extensions, we will go through them and explain our implementation:
+        \subsection*{Void Functions}
+        We implemented void functions and void function calls to help supplement the standard library. We have also allowed functions to be called as statements, as well as right-hand-sides of assignments and declarations. The new syntax is straight forward:
+        \begin{minted}{bash}
+        begin
+            void print_int_arr(int[] arr) is
+                int i = 0;
+                while i < len arr do
+                    print arr[i];
+                    print " "
+                end
+                return
+            end
+            int add_one(int i) is
+                return i + 1
+            end
+            int[] arr = [1, 2, 3];
+            call print_int_arr(arr);
+            call add_one(3)
+        end
+        \end{minted}
+        Notice that we can call non-void functions as well. In this case, we discard the returned value. Calls to void functions cannot be a part of a declaration or assignment statement
         \subsection*{Full Pair Types}
         Our compiler now supports full pair types, keeping all the semantic information about the nested types. This required a change to the parser, as our semantic analyser supported full pair types during the frontend milestone. We still allow users to write code using the old pairs and so the new feature is also backwards compatible.
+        
         \subsection*{Modules/includes}
         The extended compiler now supports modules and includes through the following syntax:
         \begin{minted}{rust}
-            mod ../tic_tac_toe_ai.wacc;
+        mod ../tic_tac_toe_ai.wacc;
         \end{minted}
         Modules themselves can only have functions, and the syntax looks like:
         \begin{minted}{rust}
-            mod ../another_include.wacc;
-            begin
-                int add_one(int x) is
-                    return x + 1
-                end
-                # So on and so forth
+        mod ../another_include.wacc;
+        begin
+            int add_one(int x) is
+                return x + 1
             end
+            # So on and so forth
+        end
         \end{minted}
         The way we manage this is by first parsing the beginning of the main file, collecting the locations of each of these module files. We then parse each of these modules individually along with the main file. We then put the module functions into the main file's AST, to be processed as a whole by the rest of the compiler. It is also worth noting that we automatically resolve circular module imports.
         
-        \subsection{Parallel Compilation}
+        \subsection*{Parallel Compilation}
         Our compiler performs a lot of expensive optimizations also mentioned in this list. In order to efficiently make use of the fact that most processors have multiple cores, we decided to perform all the major compilation steps in parallel. In total, we have the following steps parallelized:
         \begin{enumerate}
-            \item Parsing of modules
+            \item Parsing of modules.
             \item Semantic analysis.
-            \item Conversion from AST to IR over functions
+            \item Conversion from AST to IR over functions.
             \item Every optimization on Three-Code.
             \item Translation from Three-Code to the Arm Representation.
-            \item 
+            \item Live range analysis
+            \item Register allocation
         \end{enumerate}
+        
+        In each of these cases, we iterated over all the functions to perform these optimizations. This was a purposeful design choice because iterators are very easy to parallelize in Rust. 
+        For example, the code that analyses the WACC functions is as follows:
+        \begin{minted}{rust}
+        let (e, (fst, fs)): (Vec<_>, (Vec<_>, Vec<_>)) = filtered_fn_defs
+        .into_iter()
+        .map(|ASTWrapper(fun_name, fun)| {
+            match analyse_function(ASTWrapper(fun_name, fun), &fun_symb) {
+                Ok((function, var_symb)) => {
+                    let ASTWrapper(_, Function(_, ASTWrapper(_, fun_name), _, _)) = &function;
+                    (None, (Some((fun_name.clone(), var_symb)), Some(function)))
+                }
+                Err(fun_err) => (Some(fun_err), (None, None)),
+            }
+        })
+        .unzip();
+        \end{minted}
+        Can be parallelized with guaranteed no data races by changing \mintinline{rust}{into_iter} to  \mintinline{rust}{into_par_iter}:
+        \begin{minted}{rust}
+        let (e, (fst, fs)): (Vec<_>, (Vec<_>, Vec<_>)) = filtered_fn_defs
+        .into_par_iter()
+        .map(|ASTWrapper(fun_name, fun)| {
+            match analyse_function(ASTWrapper(fun_name, fun), &fun_symb) {
+                Ok((function, var_symb)) => {
+                    let ASTWrapper(_, Function(_, ASTWrapper(_, fun_name), _, _)) = &function;
+                    (None, (Some((fun_name.clone(), var_symb)), Some(function)))
+                }
+                Err(fun_err) => (Some(fun_err), (None, None)),
+            }
+        })
+        .unzip();
+        \end{minted}
+        
+        \subsection*{Function Inlining}
+        We inline calls to functions up to a certain size, which can be determined by via one of four settings: Off, Low, Medium and High. We chose to inline functions up to a certain point, determined by a heuristic of the number, and type of, nodes in the function's three code branch. We then perform a breadth-first-search through the functions of the program and choose to expand them based on the heuristic. Inlining has the advantage of not requiring a new stack frame when an inlined function executes, improving speed of program execution and in some edge cases reducing program size. Inlining becomes more powerful when using constant propagation and dead code removal, as it provides greater information to those optimizations.
+        
+        \subsection*{Tail Call Optimization}
+        
+        \unfinished
+        
+        \subsection*{Efficient Register Allocation}
+        We implemented a home-brew algorithm for efficient register allocation.
+        \subsection*{Constant Propagation}
+        \subsection*{Dead Code Removal}
+        \subsection*{Standard Library}
+        
         
 
     
@@ -232,6 +301,18 @@
         % CI pushed documentation - for easy reading & catchup for current state of master.
         % 
         % More in-person -> easy help, can more easiy assist others & better idea of how tasks are progressing
+        
+        \subsection*{What went well}
+        During the course of this lab, we made sure to set up good communication channels to keep the group synchronized and well-planned. For centralized communication, we set up a Discord server. We also attended weekly meetings, where we discussed what we had done, what we had to do, and divided tasks among the group.
+        
+        We created a branch for each major compiler feature. Coupled with a strict CI compliance, code reviews before merge, and the protected master branch, this ensured that changes to the master branch would not corrupt previous changes, and not make the master branch fail any tests it had in its test suite.
+        
+        Furthermore, the CI had 4 stages. These included: building, testing, linting, documentation reports, and deploying the documentation to GitLab pages. These proved sufficient for keeping the master branch at a high standard of code hygiene.
+        
+        Finally, we hosted many group-programming sessions in person. The high channel of communication and pair-programming allowed us to accelerate the speed at which we programmed, and relieving stress among the group mates.
+        
+        \subsection*{What could be improved}
+        During the backend milestone, we over scoped what we were expecting from our compiler. This caused the final product to not be finished until after the backend deadline. To improve this, we would make a simplified, working version of the compiler early on in the milestone, and iterate over that design until we had our finished product. This would ensure that we have a working product by the submission deadline.
 
     \section*{Future Improvements}
         % Compiler allows for great extensibility
@@ -249,6 +330,24 @@
         %  - etc...
         % As the IR already supports all features required for these, the entire backend already supports these features, simply a case of
         % altering the AST, parser, semantic analyser and the translation to IR
+        
+        As it is now, our compiler is highly extensible. This makes adding features to the compiler very easy, and aided us in the extension task.
+        
+        Some possible future improvements we could make to our compiler are:
+        \begin{itemize}
+            \item Adding an x86 backend.
+            \item Compile to LLVM.
+            \item Splitting ARM stack and register allocation to allow for smaller stack frames.
+            \item Add an SSA IR to allow for more optimizations.
+            \item Improve upon the WACC language (already possible in our backend and IR, but not in the compiler):
+                \begin{itemize}
+                    \item For loops
+                    \item Do-While loops
+                    \item Pointer arithmetic
+                    \item Case statements
+                    \item Structs
+                \end{itemize}
+        \end{itemize}
 
 
 \end{document}
