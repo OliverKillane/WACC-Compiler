@@ -1,3 +1,4 @@
+from functools import reduce
 from operator import countOf
 import os
 from sys import exit
@@ -23,14 +24,23 @@ def binary_search(arr, tar, lo=0, hi=None):
             return mid
     return -1
 
+# Function that returns the ANDing of two booleans
+def bool_and(b1, b2):
+    return (b1 and b2)
+
+# Function that returns the ORing of two booleans
+def bool_or(b1, b2):
+    return (b1 or b2)
+
 
 ##### RELATIVE LIBRARY IMPORT PATH #####
-path = "../../../../../stdlib/array_utils.wacc"
+path = "../../../../../../stdlib/array_utils.wacc"
 
 ##### DATA TO CHOOSE FROM DEPENDING ON THE TYPE #####
 rand_per_type = {
     "int": "randint(-2147483648, 2147483647)",
     "bool": "str(bool(getrandbits(1))).lower()",
+    "real_bool": "bool(getrandbits(1))",
     "char": "chr(choice(list(set(range(32, 127)) - set([34, 35, 39, 92]))))",
     "short_int": "randint(-3, 3)",
     "positive_short_int": "randint(1, 3)",
@@ -303,9 +313,11 @@ def copy_arr(function_name, type, no_of_test_cases, file, clear=False):
             f'\tarr = {arrs[i]} ;\n\tbuff_arr = {buff_arrs[i]} ;\n\tcall print_{type}_arr("arr_before", arr) ;\n\tcall print_{type}_arr("buff_before", buff_arr) ;\n\tcall {wacc_fun}(arr, buff_arr, {str(reverse[i]).lower().replace(single_quote, "")}) ;\n\tcall print_{type}_arr("arr_after", arr) ;\n\tcall print_{type}_arr("buff_after", buff_arr) ;\n'
         )
 
+
 ##### FUNCTION TO GENERATE MOVE TESTS #####
 def move_arr(function_name, type, no_of_test_cases, file, clear=True):
     copy_arr(function_name, type, no_of_test_cases, file, clear)
+
 
 ##### FUNCTION TO GENERATE CONCATENATE TESTS #####
 def concat_arrs(function_name, type, no_of_test_cases, file):
@@ -322,7 +334,9 @@ def concat_arrs(function_name, type, no_of_test_cases, file):
             temp_arr2.append(eval(rand_per_type[type]))
         arrs1.append(temp_arr1)
         arrs2.append(temp_arr2)
-        concat_arrs.append([eval(rand_per_type[type])] * (len(temp_arr1) + len(temp_arr2)))
+        concat_arrs.append(
+            [eval(rand_per_type[type])] * (len(temp_arr1) + len(temp_arr2))
+        )
 
     file.write(f"# Correctness of {function_name}()\n\n")
     file.write("# Output:\n")
@@ -331,8 +345,6 @@ def concat_arrs(function_name, type, no_of_test_cases, file):
         file.write(
             f"# arr1 = {arrs1[i]}\n# arr2 = {arrs2[i]}\n# concat = {arrs1[i] + arrs2[i]}\n"
         )
-
-    single_quote = "'"
 
     file.write(
         f'\n\nmod {path};\n\nbegin\n\t{type}[] arr1 = {arrs1[0]} ;\n\t{type}[] arr2 = {arrs2[0]} ;\n\t{type}[] concat = {concat_arrs[0]} ;\n\tcall {function_name}(arr1, arr2, concat) ;\n\tcall print_{type}_arr("arr1", arr1) ;\n\tcall print_{type}_arr("arr2", arr2) ;\n\tcall print_{type}_arr("concat", concat) ;\n'
@@ -343,6 +355,44 @@ def concat_arrs(function_name, type, no_of_test_cases, file):
             f'\tarr1 = {arrs1[i]} ;\n\tarr2 = {arrs2[i]} ;\n\tconcat = {concat_arrs[i]} ;\n\tcall {function_name}(arr1, arr2, concat) ;\n\tcall print_{type}_arr("arr1", arr1) ;\n\tcall print_{type}_arr("arr2", arr2) ;\n\tcall print_{type}_arr("concat", concat) ;\n'
         )
 
+
+##### FUNCTION TO GENERATE FOLD TESTS #####
+def fold_arr(function_name, type, no_of_test_cases, file, fold_with_or = False):
+    arrs = list()
+
+    for i in range(no_of_test_cases):
+        temp_arr = list()
+        for j in range(i):
+            temp_arr.append(eval(rand_per_type["real_" + type]))
+        arrs.append(temp_arr)
+
+    file.write(f"# Correctness of {function_name}()\n\n")
+    file.write("# Output:\n")
+
+    
+    bool_fun = bool_or if fold_with_or else bool_and
+    wacc_fun = f"fold_or_{type}_arr" if fold_with_or else f"fold_and_{type}_arr"
+
+    file.write(f"# arr = {arrs[0]}\n# Given array to fold with {'OR' if fold_with_or else 'AND'} was empty!\n# false\n")
+
+    for i in range(1, no_of_test_cases):
+        file.write(f"# arr = {str(arrs[i]).lower()}\n# {str(reduce(bool_fun, arrs[i])).lower()}\n")
+
+    file.write(
+        f'\n\nmod {path};\n\nbegin\n\t{type}[] arr = {str(arrs[0]).lower()} ;\n\tcall print_{type}_arr("arr", arr) ;\n\tbool folded = call {wacc_fun}(arr) ;\n\tprintln folded ;\n'
+    )
+
+    for i in range(1, no_of_test_cases):
+        file.write(f'\tarr = {str(arrs[i]).lower()} ;\n\tcall print_{type}_arr("arr", arr) ;\n\tfolded = call {wacc_fun}(arr) ;\n\tprintln folded ;\n')
+
+
+##### FUNCTION TO GENERATE FOLD_AND TESTS #####
+def fold_and_arr(function_name, type, no_of_test_cases, file, fold_with_or = False):
+    fold_arr(function_name, type, no_of_test_cases, file, fold_with_or)
+
+##### FUNCTION TO GENERATE FOLD_OR TESTS #####
+def fold_or_arr(function_name, type, no_of_test_cases, file, fold_with_or = True):
+    fold_arr(function_name, type, no_of_test_cases, file, fold_with_or)
 
 ##### DICTIONARY OF AVAILABLE FUNCTIONS TO GENERATE TESTS FOR AND WHAT TYPE OF TESTS CAN BE GENEREATED FOR THOSE FUNCTIONS #####
 function_dict = {
@@ -357,6 +407,8 @@ function_dict = {
     "copy_arr": copy_arr,
     "move_arr": move_arr,
     "concat_arrs": concat_arrs,
+    "fold_and_arr": fold_and_arr,
+    "fold_or_arr": fold_or_arr,
 }
 type_per_function = {
     "print_arr": ["int", "bool", "char"],
@@ -370,6 +422,8 @@ type_per_function = {
     "copy_arr": ["int", "bool", "char"],
     "move_arr": ["int", "bool", "char"],
     "concat_arrs": ["int", "bool", "char"],
+    "fold_and_arr": ["bool"],
+    "fold_or_arr": ["bool"],
 }
 
 ##### MAIN FUNCTION #####
