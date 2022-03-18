@@ -1,3 +1,8 @@
+//! Data flow analysis for use in live range, dead code and constant propagation.
+//!
+//! This module abstracts dataflow analysis to work over any types of in/out sets,
+//! initializers and update functions, on any graph node.
+
 use crate::graph::{Deleted, NodeRef};
 use std::collections::{HashMap, HashSet};
 

@@ -584,6 +584,6 @@ pub type FunWrap<W, IdRepr> = ASTWrapper<W, Function<W, IdRepr>>;
 
 /// Program is the root of the abstract syntax tree, containing all function
 /// definitions and the main program body, with all nested structures being
-/// associated with the original source code by [wrappers](WrapSpan).
+/// associated with the original source code by [wrappers](ASTWrapper).
 #[derive(Debug)]
 pub struct Program<W, IdRepr>(pub Vec<FunWrap<W, IdRepr>>, pub Vec<StatWrap<W, IdRepr>>);

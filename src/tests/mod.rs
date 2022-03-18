@@ -319,10 +319,5 @@ fn compiler_test(filename: &str, input: String, output: Behaviour, _exit_code: O
 
     let stdout = dbg!(child.wait_with_output().expect("Failed to read stdout"));
 
-    // match dbg!(exit_code) {
-    //     Some(e) => assert_eq!(stdout.status.code().unwrap(), e),
-    //     None => assert!(stdout.status.success()),
-    // }
-
     assert_eq!(output, &String::from_utf8_lossy(&stdout.stdout).as_ref());
 }

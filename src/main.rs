@@ -33,17 +33,20 @@
 //!     <FILE>    
 //!
 //! OPTIONS:
-//!     -a, --arm-temp             Print the backend representations (arm with temporaries)
-//!         --const-prop           Enable constant propagation
-//!         --dead-code            Enable dead code elimination
-//!     -h, --help                 Print help information
-//!     -i, --ir-print             Print the intermediate representation generated
-//!         --inlining <MODE>      Set the function inlining mode [default: off] [possible values: off,
-//!                                low, medium, high]
-//!     -o, --outputpath <FILE>    The name of the output file
-//!     -t, --three-code           Print the three code representation of the program
-//!         --tail-call            run tail call optimisation
-//!     -V, --version              Print version information
+//!     -a, --arm-temp                  Print the backend representations (arm with temporaries)
+//!         --const-branch              Enable constant branch optimization
+//!         --const-prop                Enable constant propagation
+//!         --dead-code                 Enable dead code elimination
+//!     -f, --final-three-code          Print the three code optimised threecode of the program
+//!     -h, --help                      Print help information
+//!     -i, --ir-print                  Print the intermediate representation generated
+//!         --inlining <MODE>           Set the function inlining mode [default: off] [possible values:
+//!                                     off, low, medium, high]
+//!     -o, --outputpath <FILE>         The name of the output file
+//!     -O                              Enable all optimizations
+//!         --tail-call                 run tail call optimisation
+//!     -u, --unoptimised-three-code    Print the three code representation of the program
+//!     -V, --version                   Print version information
 //! ```
 
 #[macro_use]
@@ -96,7 +99,14 @@ struct Args {
         long,
         help = "Print the three code representation of the program"
     )]
-    three_code: bool,
+    unoptimised_three_code: bool,
+
+    #[clap(
+        short,
+        long,
+        help = "Print the three code optimised threecode of the program"
+    )]
+    final_three_code: bool,
 
     #[clap(short, long, help = "Print the intermediate representation generated")]
     ir_print: bool,
@@ -121,6 +131,9 @@ struct Args {
 
     #[clap(long, help = "Enable dead code elimination")]
     dead_code: bool,
+
+    #[clap(short = 'O', help = "Enable all optimizations")]
+    optimizations: bool,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
@@ -154,22 +167,30 @@ fn get_relative_path(path: &Path) -> io::Result<PathBuf> {
     Ok(diff_paths(path, current_dir()?).unwrap())
 }
 
+const POOL_STACK_SIZE: usize = 1024 * 1024 * 1024;
+
 /// Compiler main entry.
 /// - Processes command line arguments controlling compiler behaviour.
 /// - Halts and reports failures through returning exit codes.
 #[allow(unused_variables)]
 fn main() -> io::Result<()> {
+    rayon::ThreadPoolBuilder::new()
+        .stack_size(POOL_STACK_SIZE)
+        .build_global()
+        .unwrap();
     let Args {
         filepath: mut main_file_path,
         outputpath,
         arm_temp,
-        three_code,
+        unoptimised_three_code,
+        final_three_code,
         ir_print,
         tail_call,
         inlining,
         const_prop,
         const_branch,
         dead_code,
+        optimizations,
     } = Args::parse();
 
     let (main_file, module_files) = match gather_modules(&main_file_path) {
@@ -229,14 +250,20 @@ fn main() -> io::Result<()> {
                 println!("Intermediate Representation:\n{}", ir);
             }
             let options = Options {
-                sethi_ullman_weights: false,
-                dead_code_removal: dead_code,
-                const_propagation: const_prop,
-                const_branch,
-                inlining: inlining.into(),
-                tail_call,
+                dead_code_removal: dead_code || optimizations,
+                const_propagation: const_prop || optimizations,
+                const_branch: const_branch || optimizations,
+                inlining: if inlining != InlineMode::Off {
+                    inlining.into()
+                } else if optimizations {
+                    InlineMode::Medium.into()
+                } else {
+                    InlineMode::Off.into()
+                },
+                tail_call: tail_call || optimizations,
                 show_arm_temp_rep: arm_temp,
-                show_three_code: three_code,
+                show_three_code: unoptimised_three_code,
+                show_optimised_three_code: final_three_code,
             };
 
             let result = compile(ir, options);

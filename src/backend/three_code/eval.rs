@@ -1,7 +1,13 @@
+//! Basic constant evaluation to reduce the size of the expressions in the [ir].
+//!
+//! This evaluation is not used for normal expressions, but rather for calculating
+//! values to place in the data references section (e.g values in constant structs,
+//! strings with lengths associated).
+
 use super::{stat::get_type_width, Size};
 use crate::intermediate as ir;
 
-/// Evaluates a constant boolean expression. Assumes no variable refrences or
+/// Evaluates a constant boolean expression. Assumes no variable references or
 /// function calls present.
 fn eval_bool_expr(bool_expr: ir::BoolExpr) -> bool {
     match bool_expr {

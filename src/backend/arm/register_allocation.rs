@@ -15,8 +15,10 @@ use super::{
         Stat, Subroutine, Temporary,
     },
     live_ranges::{get_live_ranges, LiveRanges},
+    peephole_opts::remove_self_moves,
 };
 use crate::graph::Graph;
+use rayon::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
     ops::DerefMut,
@@ -45,10 +47,13 @@ pub fn allocate_registers(program: ArmCode) -> ArmCode {
     ArmCode {
         data,
         reserved_stack,
-        main: allocate_for_routine(main, &[], reserved_stack, &temps, &live_ranges, &mut cfg),
+        main: remove_self_moves(
+            allocate_for_routine(main, &[], reserved_stack, &temps, &live_ranges, &mut cfg),
+            &mut cfg,
+        ),
         temps,
         subroutines: functions
-            .into_iter()
+            .into_par_iter()
             .map(
                 |(
                     name,
@@ -72,7 +77,7 @@ pub fn allocate_registers(program: ArmCode) -> ArmCode {
                         name,
                         Subroutine {
                             args,
-                            start_node,
+                            start_node: remove_self_moves(start_node, &mut cfg),
                             temps,
                             reserved_stack,
                             cfg,
@@ -642,9 +647,9 @@ fn translate_from_node(
 }
 
 impl Ident {
-    /// used to extract temporaries for temporary idents. Used when a mutable
-    /// reference to the entire ident is required, so no immutable references to
-    /// the temporary value inside the ident can be made.
+    /// used to extract temporaries for temporary [identifiers](Ident). Used when
+    /// a mutable reference to the entire ident is required, so no immutable
+    /// references to the temporary value inside the ident can be made.
     pub fn get_temp(&self) -> Temporary {
         if let Ident::Temp(t) = self {
             *t
