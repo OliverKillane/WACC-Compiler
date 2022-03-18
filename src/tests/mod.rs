@@ -260,7 +260,7 @@ fn compiler_test(filename: &str, input: String, output: Behaviour, _exit_code: O
 
     let options = Options {
         dead_code_removal: true,
-        const_propagation: false,
+        const_propagation: true,
         inlining: Some(1000),
         tail_call: true,
         const_branch: true,

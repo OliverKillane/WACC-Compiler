@@ -833,7 +833,12 @@ fn translate_statcode(
                 }
                 OpSrc::Var(temp_ptr) => (MemOperand::Zero(temp_map.use_temp(*temp_ptr)), None),
                 OpSrc::DataRef(dref, offset) => {
-                    (MemOperand::Label(convert_data_ref(*dref), *offset), None)
+                    let new_temp = temp_map.get_new_temp();
+
+                    (MemOperand::Zero(new_temp), Some(simple_node(
+                        Stat::MemOp(MemOp::Ldr, Cond::Al, size == &Size::Byte, new_temp, MemOperand::Label(convert_data_ref(*dref), *offset)),
+                        graph
+                    )))
                 }
                 OpSrc::ReadRef => {
                     let new_temp = temp_map.get_new_temp();
@@ -883,7 +888,12 @@ fn translate_statcode(
                 }
                 OpSrc::Var(temp_ptr) => (MemOperand::Zero(temp_map.use_temp(*temp_ptr)), None),
                 OpSrc::DataRef(dref, offset) => {
-                    (MemOperand::Label(convert_data_ref(*dref), *offset), None)
+                    let new_temp = temp_map.get_new_temp();
+
+                    (MemOperand::Zero(new_temp), Some(simple_node(
+                        Stat::MemOp(MemOp::Ldr, Cond::Al, size == &Size::Byte, new_temp, MemOperand::Label(convert_data_ref(*dref), *offset)),
+                        graph
+                    )))
                 }
                 OpSrc::ReadRef => {
                     let new_temp = temp_map.get_new_temp();
