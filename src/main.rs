@@ -167,11 +167,17 @@ fn get_relative_path(path: &Path) -> io::Result<PathBuf> {
     Ok(diff_paths(path, current_dir()?).unwrap())
 }
 
+const POOL_STACK_SIZE: usize = 1024 * 1024 * 1024;
+
 /// Compiler main entry.
 /// - Processes command line arguments controlling compiler behaviour.
 /// - Halts and reports failures through returning exit codes.
 #[allow(unused_variables)]
 fn main() -> io::Result<()> {
+    rayon::ThreadPoolBuilder::new()
+        .stack_size(POOL_STACK_SIZE)
+        .build_global()
+        .unwrap();
     let Args {
         filepath: mut main_file_path,
         outputpath,
