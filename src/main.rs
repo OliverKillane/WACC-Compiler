@@ -34,6 +34,7 @@
 //!
 //! OPTIONS:
 //!     -a, --arm-temp                  Print the backend representations (arm with temporaries)
+//!         --const-branch              Enable constant branch optimization
 //!         --const-prop                Enable constant propagation
 //!         --dead-code                 Enable dead code elimination
 //!     -f, --final-three-code          Print the three code optimised threecode of the program
@@ -42,6 +43,7 @@
 //!         --inlining <MODE>           Set the function inlining mode [default: off] [possible values:
 //!                                     off, low, medium, high]
 //!     -o, --outputpath <FILE>         The name of the output file
+//!     -O                              Enable all optimizations
 //!         --tail-call                 run tail call optimisation
 //!     -u, --unoptimised-three-code    Print the three code representation of the program
 //!     -V, --version                   Print version information
