@@ -1,3 +1,5 @@
+//! A graph data structure using refcells for use in control flow graphs.
+
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 use std::{collections::HashSet, fmt::Debug, hash::Hash, mem, sync::Arc};
 
