@@ -586,33 +586,43 @@ begin
     ##### ARRAY FOLD FUNCTIONS #####
 
     # Folds the given boolean array using bitwise AND operation
-    bool fold_and_bool_arr(bool[] arr) is
-        int i = 0 ; 
+    bool fold_and_bool_arr(bool[] arr) is 
         int arr_len = len arr ;
-        while (i < arr_len) do
-            if (arr[i] == false) then
-                return false
-            else
-                skip
-            fi ;
-            i = i + 1
-        done ;
-        return true
+        if (arr_len == 0) then
+            println "Given array to fold with AND was empty!" ;
+            return false
+        else
+            int i = 0 ;
+            while (i < arr_len) do
+                if (arr[i] == false) then
+                    return false
+                else
+                    skip
+                fi ;
+                i = i + 1
+            done ;
+            return true
+        fi
     end
 
     # Folds the given boolean array using bitwise OR operation
     bool fold_or_bool_arr(bool[] arr) is
-        int i = 0 ; 
         int arr_len = len arr ;
-        while (i < arr_len) do
-            if (arr[i] == true) then
-                return true
-            else
-                skip
-            fi ;
-            i = i + 1
-        done ;
-        return false
+        if (arr_len == 0) then
+            println "Given array to fold with OR was empty!" ;
+            return false
+        else
+            int i = 0 ; 
+            while (i < arr_len) do
+                if (arr[i] == true) then
+                    return true
+                else
+                    skip
+                fi ;
+                i = i + 1
+            done ;
+            return false
+        fi
     end
 
     ##### ARRAY SORT FUNCTIONS #####
