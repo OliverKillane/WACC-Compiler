@@ -1,0 +1,54 @@
+# Correctness of print_char_arr()
+
+# Output:
+# arr = []
+# arr = ['f']
+# arr = ['S', 'e']
+# arr = ['+', 'X', '`']
+# arr = ['e', '&', 'n', '+']
+# arr = ['~', '-', 'I', 'Y', '`']
+# arr = ['x', 'H', '2', 'R', 'l', '+']
+# arr = ['<', 'w', 'L', 'K', 'U', 's', '$']
+# arr = ['I', '@', 'A', '&', 'r', 'X', 'P', '/']
+# arr = ['c', 'I', 'B', '(', 'Z', '{', '_', '(', 'Q']
+# arr = ['+', '@', '!', '&', '7', 'H', '$', '/', '+', 'j']
+# arr = ['T', '?', 'H', '>', '8', 'I', ']', 'f', 'U', 'o', ',']
+# arr = ['@', '?', 'S', 'w', 'I', 'h', '@', 'Y', 'E', '3', '}', '1']
+# arr = ['J', '2', 'o', 'H', 'U', 'Y', 'l', 'F', 'W', '!', 'g', 'q', ',']
+# arr = ['^', 'c', 'R', ';', 'F', '>', '7', '*', 'U', 'I', '$', 'O', ',', 'U']
+
+
+mod ../../../../../../stdlib/array_utils.wacc;
+
+begin
+	char[] arr = [] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['f'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['S', 'e'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['+', 'X', '`'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['e', '&', 'n', '+'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['~', '-', 'I', 'Y', '`'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['x', 'H', '2', 'R', 'l', '+'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['<', 'w', 'L', 'K', 'U', 's', '$'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['I', '@', 'A', '&', 'r', 'X', 'P', '/'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['c', 'I', 'B', '(', 'Z', '{', '_', '(', 'Q'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['+', '@', '!', '&', '7', 'H', '$', '/', '+', 'j'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['T', '?', 'H', '>', '8', 'I', ']', 'f', 'U', 'o', ','] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['@', '?', 'S', 'w', 'I', 'h', '@', 'Y', 'E', '3', '}', '1'] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['J', '2', 'o', 'H', 'U', 'Y', 'l', 'F', 'W', '!', 'g', 'q', ','] ;
+	call print_char_arr("arr", arr) ;
+	arr = ['^', 'c', 'R', ';', 'F', '>', '7', '*', 'U', 'I', '$', 'O', ',', 'U'] ;
+	call print_char_arr("arr", arr)
+end

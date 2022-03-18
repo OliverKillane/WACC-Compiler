@@ -1,0 +1,69 @@
+# Correctness of find_last_char_arr()
+
+# Output:
+# -1
+# -1
+# 0
+# -1
+# -1
+# -1
+# -1
+# -1
+# -1
+# 7
+# -1
+# 2
+# 9
+# 12
+# 0
+
+
+mod ../../../../../../stdlib/array_utils.wacc;
+
+begin
+	char[] arr = [] ;
+	int index = call find_last_char_arr('Z', arr) ;
+	println index ;
+	arr = ['['] ;
+	index = call find_last_char_arr('a', arr) ;
+	println index ;
+	arr = ['X', ']'] ;
+	index = call find_last_char_arr('X', arr) ;
+	println index ;
+	arr = ['Z', '[', 'Y'] ;
+	index = call find_last_char_arr('`', arr) ;
+	println index ;
+	arr = ['_', 'a', '`', '['] ;
+	index = call find_last_char_arr('Z', arr) ;
+	println index ;
+	arr = ['_', '[', 'Y', 'X', 'a'] ;
+	index = call find_last_char_arr('^', arr) ;
+	println index ;
+	arr = ['Z', '^', '[', '_', '`', ']'] ;
+	index = call find_last_char_arr('b', arr) ;
+	println index ;
+	arr = ['[', '[', 'a', '^', '^', 'b', 'b'] ;
+	index = call find_last_char_arr('Y', arr) ;
+	println index ;
+	arr = ['a', 'b', 'b', ']', 'Y', '[', '^', '^'] ;
+	index = call find_last_char_arr('Z', arr) ;
+	println index ;
+	arr = ['Y', 'c', '^', 'Y', 'Y', 'Z', '_', 'c', 'X'] ;
+	index = call find_last_char_arr('c', arr) ;
+	println index ;
+	arr = ['Y', '[', 'b', 'Y', 'Y', 'a', 'X', '`', '_', '`'] ;
+	index = call find_last_char_arr('Z', arr) ;
+	println index ;
+	arr = ['^', '[', 'Z', 'a', ']', 'X', 'c', '`', 'b', '^', 'a'] ;
+	index = call find_last_char_arr('Z', arr) ;
+	println index ;
+	arr = ['Y', ']', '^', ']', 'Y', '_', 'b', 'X', 'a', '^', '[', 'a'] ;
+	index = call find_last_char_arr('^', arr) ;
+	println index ;
+	arr = ['^', '^', 'a', 'b', '_', 'b', ']', '`', 'c', 'X', '`', 'a', 'X'] ;
+	index = call find_last_char_arr('X', arr) ;
+	println index ;
+	arr = ['[', 'c', 'X', 'X', 'X', 'c', 'b', '^', '^', '`', 'Y', 'a', 'a', 'a'] ;
+	index = call find_last_char_arr('[', arr) ;
+	println index
+end

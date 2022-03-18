@@ -1,0 +1,54 @@
+# Correctness of print_bool_arr()
+
+# Output:
+# arr = []
+# arr = [true]
+# arr = [true, true]
+# arr = [true, false, true]
+# arr = [true, false, true, true]
+# arr = [false, true, true, true, true]
+# arr = [true, true, true, true, false, false]
+# arr = [false, true, false, false, true, true, false]
+# arr = [false, true, true, true, false, false, false, false]
+# arr = [false, false, false, false, true, false, true, true, false]
+# arr = [true, true, true, true, true, false, false, true, false, false]
+# arr = [false, true, false, true, true, true, true, false, true, false, true]
+# arr = [true, true, true, true, true, true, true, false, true, true, true, true]
+# arr = [true, true, true, false, false, true, false, true, true, false, false, true, true]
+# arr = [false, false, true, false, true, true, false, false, true, false, true, false, true, true]
+
+
+mod ../../../../../../stdlib/array_utils.wacc;
+
+begin
+	bool[] arr = [] ;
+	call print_bool_arr("arr", arr) ;
+	arr = [true] ;
+	call print_bool_arr("arr", arr) ;
+	arr = [true, true] ;
+	call print_bool_arr("arr", arr) ;
+	arr = [true, false, true] ;
+	call print_bool_arr("arr", arr) ;
+	arr = [true, false, true, true] ;
+	call print_bool_arr("arr", arr) ;
+	arr = [false, true, true, true, true] ;
+	call print_bool_arr("arr", arr) ;
+	arr = [true, true, true, true, false, false] ;
+	call print_bool_arr("arr", arr) ;
+	arr = [false, true, false, false, true, true, false] ;
+	call print_bool_arr("arr", arr) ;
+	arr = [false, true, true, true, false, false, false, false] ;
+	call print_bool_arr("arr", arr) ;
+	arr = [false, false, false, false, true, false, true, true, false] ;
+	call print_bool_arr("arr", arr) ;
+	arr = [true, true, true, true, true, false, false, true, false, false] ;
+	call print_bool_arr("arr", arr) ;
+	arr = [false, true, false, true, true, true, true, false, true, false, true] ;
+	call print_bool_arr("arr", arr) ;
+	arr = [true, true, true, true, true, true, true, false, true, true, true, true] ;
+	call print_bool_arr("arr", arr) ;
+	arr = [true, true, true, false, false, true, false, true, true, false, false, true, true] ;
+	call print_bool_arr("arr", arr) ;
+	arr = [false, false, true, false, true, true, false, false, true, false, true, false, true, true] ;
+	call print_bool_arr("arr", arr)
+end

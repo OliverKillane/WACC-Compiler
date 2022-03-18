@@ -235,6 +235,7 @@ fn all_types_test() {
 #[case("static/pairsExtended")]
 #[case("static/while")]
 #[case("static/voidCalls")]
+
 fn examples_test(
     #[case] path: &str,
     #[values(true, false)] dead_code_removal: bool,
@@ -250,6 +251,22 @@ fn examples_test(
         inlining: inlining,
         tail_call: tail_call,
         const_branch: const_branch,
+        show_arm_temp_rep: false,
+        show_three_code: false,
+    };
+    examples_dir_test(path, options).expect("Unable to test directory:");
+}
+
+#[rstest]
+#[case("static/stdlib")]
+fn examples_test2(#[case] path: &str) {
+    let options = Options {
+        show_optimised_three_code: false,
+        dead_code_removal: false,
+        const_propagation: false,
+        inlining: None,
+        tail_call: false,
+        const_branch: false,
         show_arm_temp_rep: false,
         show_three_code: false,
     };

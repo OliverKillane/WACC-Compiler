@@ -1,0 +1,119 @@
+# Correctness of move_int_arr()
+
+# Output:
+# arr_before = []
+# buff_before = []
+# arr_after = []
+# buff_after = []
+# arr_before = [-686942213]
+# buff_before = [-802106701]
+# arr_after = []
+# buff_after = [-686942213]
+# arr_before = [-531513276, -310533023]
+# buff_before = [906902819, 2066831033]
+# arr_after = []
+# buff_after = [-531513276, -310533023]
+# arr_before = [-1955882038, 76553097, 1178616799]
+# buff_before = [-508457425, -1276070411, 1983548941]
+# arr_after = []
+# buff_after = [-1955882038, 76553097, 1178616799]
+# arr_before = [-375100652, -22474907, -1224799040, 111836522]
+# buff_before = [391894540, -818487878, -287766734, 1976340972]
+# arr_after = []
+# buff_after = [-375100652, -22474907, -1224799040, 111836522]
+# arr_before = [-2115316041, -347819864, -1914256842, 1223649416, -598092958]
+# buff_before = [1460554646, -1559880939, -1728515311, -558308584, -1683833974]
+# arr_after = []
+# buff_after = [-2115316041, -347819864, -1914256842, 1223649416, -598092958]
+# arr_before = [-198673146, -40155283, -382373817, -336916530, -1282445584, -958546480]
+# buff_before = [939568118, 1193854648, 1842053636, -1662404117, -724218490, 985787852]
+# arr_after = []
+# buff_after = [-958546480, -1282445584, -336916530, -382373817, -40155283, -198673146]
+# arr_before = [76047562, 1898777025, -29777329, 811640515, -1333179523, -1513089188, 606152235]
+# buff_before = [1795408369, -150107661, 446364836, -847267937, 22101381, 315068273, -757554196]
+# arr_after = []
+# buff_after = [76047562, 1898777025, -29777329, 811640515, -1333179523, -1513089188, 606152235]
+# arr_before = [-1534991489, -1974705526, -228082036, -1569152188, 1705180674, 1803464933, 1789405189, 1051879548]
+# buff_before = [2103330219, -1375965343, 1140678152, -1187628658, -608321164, -1768211, -2132301083, 111583250]
+# arr_after = []
+# buff_after = [-1534991489, -1974705526, -228082036, -1569152188, 1705180674, 1803464933, 1789405189, 1051879548]
+# arr_before = [1434281104, -383657034, -1339223887, -491720185, -75899722, 1674662668, 233699246, 1582257281, -1619643180]
+# buff_before = [-953247117, 958154307, -591564451, 103129707, -886196939, 311984616, -427608974, -1034849450, -657188735]
+# arr_after = []
+# buff_after = [-1619643180, 1582257281, 233699246, 1674662668, -75899722, -491720185, -1339223887, -383657034, 1434281104]
+
+
+mod ../../../../../../stdlib/array_utils.wacc;
+
+begin
+	int[] arr = [] ;
+	int[] buff_arr = [] ;
+	call print_int_arr("arr_before", arr) ;
+	call print_int_arr("buff_before", buff_arr) ;
+	call move_int_arr(arr, buff_arr, false) ;
+	call print_int_arr("arr_after", arr) ;
+	call print_int_arr("buff_after", buff_arr) ;
+	arr = [-686942213] ;
+	buff_arr = [-802106701] ;
+	call print_int_arr("arr_before", arr) ;
+	call print_int_arr("buff_before", buff_arr) ;
+	call move_int_arr(arr, buff_arr, false) ;
+	call print_int_arr("arr_after", arr) ;
+	call print_int_arr("buff_after", buff_arr) ;
+	arr = [-531513276, -310533023] ;
+	buff_arr = [906902819, 2066831033] ;
+	call print_int_arr("arr_before", arr) ;
+	call print_int_arr("buff_before", buff_arr) ;
+	call move_int_arr(arr, buff_arr, false) ;
+	call print_int_arr("arr_after", arr) ;
+	call print_int_arr("buff_after", buff_arr) ;
+	arr = [-1955882038, 76553097, 1178616799] ;
+	buff_arr = [-508457425, -1276070411, 1983548941] ;
+	call print_int_arr("arr_before", arr) ;
+	call print_int_arr("buff_before", buff_arr) ;
+	call move_int_arr(arr, buff_arr, false) ;
+	call print_int_arr("arr_after", arr) ;
+	call print_int_arr("buff_after", buff_arr) ;
+	arr = [-375100652, -22474907, -1224799040, 111836522] ;
+	buff_arr = [391894540, -818487878, -287766734, 1976340972] ;
+	call print_int_arr("arr_before", arr) ;
+	call print_int_arr("buff_before", buff_arr) ;
+	call move_int_arr(arr, buff_arr, false) ;
+	call print_int_arr("arr_after", arr) ;
+	call print_int_arr("buff_after", buff_arr) ;
+	arr = [-2115316041, -347819864, -1914256842, 1223649416, -598092958] ;
+	buff_arr = [1460554646, -1559880939, -1728515311, -558308584, -1683833974] ;
+	call print_int_arr("arr_before", arr) ;
+	call print_int_arr("buff_before", buff_arr) ;
+	call move_int_arr(arr, buff_arr, false) ;
+	call print_int_arr("arr_after", arr) ;
+	call print_int_arr("buff_after", buff_arr) ;
+	arr = [-198673146, -40155283, -382373817, -336916530, -1282445584, -958546480] ;
+	buff_arr = [939568118, 1193854648, 1842053636, -1662404117, -724218490, 985787852] ;
+	call print_int_arr("arr_before", arr) ;
+	call print_int_arr("buff_before", buff_arr) ;
+	call move_int_arr(arr, buff_arr, true) ;
+	call print_int_arr("arr_after", arr) ;
+	call print_int_arr("buff_after", buff_arr) ;
+	arr = [76047562, 1898777025, -29777329, 811640515, -1333179523, -1513089188, 606152235] ;
+	buff_arr = [1795408369, -150107661, 446364836, -847267937, 22101381, 315068273, -757554196] ;
+	call print_int_arr("arr_before", arr) ;
+	call print_int_arr("buff_before", buff_arr) ;
+	call move_int_arr(arr, buff_arr, false) ;
+	call print_int_arr("arr_after", arr) ;
+	call print_int_arr("buff_after", buff_arr) ;
+	arr = [-1534991489, -1974705526, -228082036, -1569152188, 1705180674, 1803464933, 1789405189, 1051879548] ;
+	buff_arr = [2103330219, -1375965343, 1140678152, -1187628658, -608321164, -1768211, -2132301083, 111583250] ;
+	call print_int_arr("arr_before", arr) ;
+	call print_int_arr("buff_before", buff_arr) ;
+	call move_int_arr(arr, buff_arr, false) ;
+	call print_int_arr("arr_after", arr) ;
+	call print_int_arr("buff_after", buff_arr) ;
+	arr = [1434281104, -383657034, -1339223887, -491720185, -75899722, 1674662668, 233699246, 1582257281, -1619643180] ;
+	buff_arr = [-953247117, 958154307, -591564451, 103129707, -886196939, 311984616, -427608974, -1034849450, -657188735] ;
+	call print_int_arr("arr_before", arr) ;
+	call print_int_arr("buff_before", buff_arr) ;
+	call move_int_arr(arr, buff_arr, true) ;
+	call print_int_arr("arr_after", arr) ;
+	call print_int_arr("buff_after", buff_arr)
+end

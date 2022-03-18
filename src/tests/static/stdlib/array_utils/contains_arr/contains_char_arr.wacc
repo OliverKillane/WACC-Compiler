@@ -1,0 +1,69 @@
+# Correctness of contains_char_arr()
+
+# Output:
+# false
+# false
+# false
+# false
+# false
+# true
+# false
+# true
+# false
+# false
+# true
+# true
+# false
+# true
+# false
+
+
+mod ../../../../../../stdlib/array_utils.wacc;
+
+begin
+	char[] arr = [] ;
+	bool contains = call contains_char_arr(']', arr) ;
+	println contains ;
+	arr = ['`'] ;
+	contains = call contains_char_arr('^', arr) ;
+	println contains ;
+	arr = ['_', 'Z'] ;
+	contains = call contains_char_arr('Y', arr) ;
+	println contains ;
+	arr = ['c', '_', '['] ;
+	contains = call contains_char_arr(']', arr) ;
+	println contains ;
+	arr = ['Z', ']', '^', '`'] ;
+	contains = call contains_char_arr('a', arr) ;
+	println contains ;
+	arr = ['Y', '^', '[', '`', 'Y'] ;
+	contains = call contains_char_arr('[', arr) ;
+	println contains ;
+	arr = ['c', ']', '_', 'X', '_', 'X'] ;
+	contains = call contains_char_arr('`', arr) ;
+	println contains ;
+	arr = ['Y', '^', '^', 'c', '^', '`', 'Z'] ;
+	contains = call contains_char_arr('Y', arr) ;
+	println contains ;
+	arr = ['Y', 'Y', 'c', 'Z', 'c', 'c', '`', 'b'] ;
+	contains = call contains_char_arr('a', arr) ;
+	println contains ;
+	arr = ['b', 'b', 'c', '^', '`', 'b', 'b', 'Z', 'c'] ;
+	contains = call contains_char_arr('_', arr) ;
+	println contains ;
+	arr = ['Y', 'Z', '`', 'b', 'c', 'a', 'Y', 'X', 'a', 'Y'] ;
+	contains = call contains_char_arr('Y', arr) ;
+	println contains ;
+	arr = ['a', '_', 'Z', '`', 'c', '_', 'b', '_', ']', 'b', 'b'] ;
+	contains = call contains_char_arr('`', arr) ;
+	println contains ;
+	arr = ['^', 'X', '^', 'X', 'c', '[', 'X', ']', '^', 'a', 'Y', '^'] ;
+	contains = call contains_char_arr('`', arr) ;
+	println contains ;
+	arr = ['a', 'Y', 'b', 'X', '_', '`', '_', '_', 'c', 'Y', 'b', ']', '['] ;
+	contains = call contains_char_arr('b', arr) ;
+	println contains ;
+	arr = ['Y', 'Y', ']', '[', ']', ']', ']', ']', '`', 'b', '^', '`', 'Y', 'b'] ;
+	contains = call contains_char_arr('Z', arr) ;
+	println contains
+end

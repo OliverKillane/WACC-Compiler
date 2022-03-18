@@ -1,0 +1,100 @@
+# Correctness of fold_and_bool_arr()
+
+# Output:
+# arr = []
+# Given array to fold with AND was empty!
+# false
+# arr = [true]
+# true
+# arr = [true, true]
+# true
+# arr = [true, true, false]
+# false
+# arr = [false, false, false, false]
+# false
+# arr = [false, false, true, false, true]
+# false
+# arr = [true, true, true, true, true, true]
+# true
+# arr = [false, true, false, true, false, false, true]
+# false
+# arr = [false, true, false, true, false, true, false, true]
+# false
+# arr = [true, true, false, false, true, false, true, false, false]
+# false
+# arr = [false, false, false, true, true, false, true, false, false, true]
+# false
+# arr = [false, true, false, true, false, false, false, true, false, true, false]
+# false
+# arr = [true, true, true, true, true, false, false, true, false, false, false, false]
+# false
+# arr = [false, false, true, true, true, true, false, true, true, true, true, false, false]
+# false
+# arr = [false, true, false, false, false, true, false, false, true, false, true, true, true, true]
+# false
+
+
+mod ../../../../../../stdlib/array_utils.wacc;
+
+begin
+	bool[] arr = [] ;
+	call print_bool_arr("arr", arr) ;
+	bool folded = call fold_and_bool_arr(arr) ;
+	println folded ;
+	arr = [true] ;
+	call print_bool_arr("arr", arr) ;
+	folded = call fold_and_bool_arr(arr) ;
+	println folded ;
+	arr = [true, true] ;
+	call print_bool_arr("arr", arr) ;
+	folded = call fold_and_bool_arr(arr) ;
+	println folded ;
+	arr = [true, true, false] ;
+	call print_bool_arr("arr", arr) ;
+	folded = call fold_and_bool_arr(arr) ;
+	println folded ;
+	arr = [false, false, false, false] ;
+	call print_bool_arr("arr", arr) ;
+	folded = call fold_and_bool_arr(arr) ;
+	println folded ;
+	arr = [false, false, true, false, true] ;
+	call print_bool_arr("arr", arr) ;
+	folded = call fold_and_bool_arr(arr) ;
+	println folded ;
+	arr = [true, true, true, true, true, true] ;
+	call print_bool_arr("arr", arr) ;
+	folded = call fold_and_bool_arr(arr) ;
+	println folded ;
+	arr = [false, true, false, true, false, false, true] ;
+	call print_bool_arr("arr", arr) ;
+	folded = call fold_and_bool_arr(arr) ;
+	println folded ;
+	arr = [false, true, false, true, false, true, false, true] ;
+	call print_bool_arr("arr", arr) ;
+	folded = call fold_and_bool_arr(arr) ;
+	println folded ;
+	arr = [true, true, false, false, true, false, true, false, false] ;
+	call print_bool_arr("arr", arr) ;
+	folded = call fold_and_bool_arr(arr) ;
+	println folded ;
+	arr = [false, false, false, true, true, false, true, false, false, true] ;
+	call print_bool_arr("arr", arr) ;
+	folded = call fold_and_bool_arr(arr) ;
+	println folded ;
+	arr = [false, true, false, true, false, false, false, true, false, true, false] ;
+	call print_bool_arr("arr", arr) ;
+	folded = call fold_and_bool_arr(arr) ;
+	println folded ;
+	arr = [true, true, true, true, true, false, false, true, false, false, false, false] ;
+	call print_bool_arr("arr", arr) ;
+	folded = call fold_and_bool_arr(arr) ;
+	println folded ;
+	arr = [false, false, true, true, true, true, false, true, true, true, true, false, false] ;
+	call print_bool_arr("arr", arr) ;
+	folded = call fold_and_bool_arr(arr) ;
+	println folded ;
+	arr = [false, true, false, false, false, true, false, false, true, false, true, true, true, true] ;
+	call print_bool_arr("arr", arr) ;
+	folded = call fold_and_bool_arr(arr) ;
+	println folded
+end

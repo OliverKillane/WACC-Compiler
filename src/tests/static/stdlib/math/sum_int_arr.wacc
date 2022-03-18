@@ -1,0 +1,32 @@
+# Correctness of sum_int_arr()
+
+# Output:
+# 600
+# 0
+# 0
+# -20
+# 20
+# 0
+
+mod ../../../../../stdlib/math.wacc;
+
+begin
+    int[] arr = [1, 2, 3, 10, 42, 53, 69, 420] ;
+    int sum = call sum_int_arr(arr) ;
+    println sum ;
+    arr = [0, 0, 0] ;
+    sum = call sum_int_arr(arr) ;
+    println sum ;
+    arr = [0, 0, 1, -1] ;
+    sum = call sum_int_arr(arr) ;
+    println sum ;
+    arr = [-12, 2, -10] ;
+    sum = call sum_int_arr(arr) ;
+    println sum ;
+    arr = [12, -2, 10] ;
+    sum = call sum_int_arr(arr) ;
+    println sum ;
+    arr = [] ;
+    sum = call sum_int_arr(arr) ;
+    println sum
+end

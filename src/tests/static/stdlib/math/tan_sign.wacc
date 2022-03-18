@@ -1,0 +1,97 @@
+# Correctness of tan_sign()
+
+# Output:
+# 0
+# 1
+# -1
+# 0
+# 1
+# -1
+# 0
+# 1
+# -1
+# 0
+# 1
+# -1
+# 0
+# 1
+# -1
+# 0
+# 1
+# -1
+# 0
+# 1
+# -1
+# 0
+# 1
+# -1
+# 0
+# The tangent trigonometric function is undefined for 90 degrees!
+
+# Exit:
+# 255
+
+mod ../../../../../stdlib/math.wacc;
+
+begin
+    # -ve angles
+    int test = call tan_sign(-720) ;
+	println test ;
+	test = call tan_sign(-675) ;
+	println test ;
+	test = call tan_sign(-585) ;
+	println test ;
+	test = call tan_sign(-540) ;
+	println test ;
+	test = call tan_sign(-495) ;
+	println test ;
+	test = call tan_sign(-405) ;
+	println test ;
+	test = call tan_sign(-360) ;
+	println test ;
+	test = call tan_sign(-315) ;
+	println test ;
+	test = call tan_sign(-225) ;
+	println test ;
+	test = call tan_sign(-180) ;
+	println test ;
+	test = call tan_sign(-135) ;
+	println test ;
+	test = call tan_sign(-45) ;
+	println test ;
+    
+    # zero angle
+	test = call tan_sign(0) ;
+	println test ;
+
+    # positive angles
+	test = call tan_sign(45) ;
+	println test ;
+	test = call tan_sign(135) ;
+	println test ;
+	test = call tan_sign(180) ;
+	println test ;
+	test = call tan_sign(225) ;
+	println test ;
+	test = call tan_sign(315) ;
+	println test ;
+	test = call tan_sign(360) ;
+	println test ;
+	test = call tan_sign(405) ;
+	println test ;
+	test = call tan_sign(495) ;
+	println test ;
+	test = call tan_sign(540) ;
+	println test ;
+	test = call tan_sign(585) ;
+	println test ;
+	test = call tan_sign(675) ;
+	println test ;
+	test = call tan_sign(720) ;
+	println test ;
+
+	# undefined tangent ;
+	test = call tan_sign(90) ;
+	# Should exit before reaching this
+	println test
+end
