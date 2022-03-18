@@ -352,8 +352,12 @@ impl AllocationState {
                 graph,
             )
         } else {
-            // choose a low usage register R12 to push and pop, we store the offset here
-            let tmp_register = Ident::Reg(Register::R12);
+            // choose a register to use, that is not the destination register
+            let tmp_register = Ident::Reg(if dst_register == Register::R4 {
+                Register::R12
+            } else {
+                Register::R4
+            });
 
             // as we push, we must increase offset by 4
 
