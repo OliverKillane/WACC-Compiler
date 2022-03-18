@@ -146,20 +146,7 @@ fn construct_defs_out(
     } else {
         return defs_in;
     };
-    let def_in = defs_in
-        .get(&def_var)
-        .cloned()
-        .unwrap_or_else(|| Rc::new(HashSet::new()));
-    defs_in.insert(
-        def_var,
-        if !def_in.contains(node) {
-            let mut def_in = (&*def_in).clone();
-            def_in.insert(node.clone());
-            Rc::new(def_in)
-        } else {
-            def_in
-        },
-    );
+    defs_in.insert(def_var, Rc::new(HashSet::from([node.clone()])));
     defs_in
 }
 
