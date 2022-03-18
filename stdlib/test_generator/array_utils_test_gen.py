@@ -3,12 +3,11 @@ import os
 from sys import exit
 from random import getrandbits, randint, choice
 
+##### DATA TO CHOOSE FROM DEPENDING ON THE TYPE #####
 rand_per_type = {"int": "randint(-2147483648, 2147483647)", "bool": "str(bool(getrandbits(1))).lower()", "char": "chr(choice(list(set(range(32, 127)) - set([34, 35, 39, 92]))))", "short_int": "randint(-3, 3)", "positive_short_int": "randint(1, 3)", "short_char": "chr(choice(list(set(range(88, 100)) - set([92]))))"}
 
-def print_arr(function_name, type, no_of_test_cases):
-
-    file = open(function_name + ".wacc", 'w+')
-
+##### FUNCTION TO GENERATE PRINT TESTS #####
+def print_arr(function_name, type, no_of_test_cases, file):
     arrs = list()
 
     for i in range(no_of_test_cases):
@@ -30,21 +29,8 @@ def print_arr(function_name, type, no_of_test_cases):
     for i in range(1, no_of_test_cases):
         file.write(f"\tarr = {arrs[i]} ;\n\tcall {function_name}(\"arr\", arr) ;\n")
 
-    file.seek(file.tell() - 3, os.SEEK_SET)
-    file.write("\nend")
-
-    if type == "bool":
-        file.seek(0)
-        to_write_back = file.read().replace("\'", "")
-        file.seek(0)
-        file.truncate()
-        file.write(to_write_back)
-
-    file.close()
-
-def count_arr(function_name, type, no_of_testcases):
-    file = open(function_name + ".wacc", 'w+')
-
+##### FUNCTION TO GENERATE COUNT TESTS #####
+def count_arr(function_name, type, no_of_test_cases, file):
     arrs = list()
     to_count = list()
 
@@ -72,21 +58,8 @@ def count_arr(function_name, type, no_of_testcases):
     for i in range(1, no_of_test_cases):
             file.write(f"\tarr = {arrs[i]} ;\n\tcount = call count_{type}_arr({padding}{to_count[i]}{padding}, arr) ;\n\tprintln count ;\n")
 
-    file.seek(file.tell() - 3, os.SEEK_SET)
-    file.write("\nend")
-
-    if type == "bool":
-        file.seek(0)
-        to_write_back = file.read().replace("\'", "")
-        file.seek(0)
-        file.truncate()
-        file.write(to_write_back)
-
-    file.close()
-
-def fill_arr(function_name, type, no_of_testcases):
-    file = open(function_name + ".wacc", 'w+')
-
+##### FUNCTION TO GENERATE FILL TESTS #####
+def fill_arr(function_name, type, no_of_testcases, file):
     arrs = list()
     out_arrs = list()
     to_fill_with = list()
@@ -105,7 +78,6 @@ def fill_arr(function_name, type, no_of_testcases):
     for i in range(no_of_testcases):
         file.write(f"# arr_before = {arrs[i]}\n# arr_after = {out_arrs[i]}\n")
 
-    
     path = "../../../../../stdlib/array_utils.wacc"
 
     padding = "'" if type == "char" else ""
@@ -115,18 +87,7 @@ def fill_arr(function_name, type, no_of_testcases):
     for i in range(1, no_of_testcases):
         file.write(f"\tarr = {arrs[i]} ;\n\tcall print_{type}_arr(\"arr_before\", arr) ;\n\tcall {function_name}({padding}{to_fill_with[i]}{padding}, arr) ;\n\tcall print_{type}_arr(\"arr_after\", arr) ;\n")
 
-    file.seek(file.tell() - 3, os.SEEK_SET)
-    file.write("\nend")
-
-    if type == "bool":
-        file.seek(0)
-        to_write_back = file.read().replace("\'", "")
-        file.seek(0)
-        file.truncate()
-        file.write(to_write_back)
-
-    file.close()
-
+##### DICTIONARY OF AVAILABLE FUNCTIONS TO GENERATE TESTS FOR AND WHAT TYPE OF TESTS CAN BE GENEREATED FOR THOSE FUNCTIONS #####
 function_dict = {"print_arr": print_arr, "count_arr": count_arr, "fill_arr": fill_arr}
 type_per_function = {"print_arr": ["int", "bool", "char"], "count_arr": ["int", "bool", "char"], "fill_arr": ["int", "bool", "char"]}
 
@@ -157,5 +118,20 @@ if __name__ == "__main__":
         for sel_type in selected_types:
             if sel_type not in type_per_function[function_name]:
                 exit(f"Invalid type ('{sel_type}') given!")
+
             local_function_name = test.replace("_type_", f"_{sel_type}_")
-            function_dict[function_name](local_function_name, sel_type, no_of_test_cases)
+            file = open(local_function_name + ".wacc", 'w+')
+
+            function_dict[function_name](local_function_name, sel_type, no_of_test_cases, file)
+
+            file.seek(file.tell() - 3, os.SEEK_SET)
+            file.write("\nend")
+
+            if sel_type == "bool":
+                file.seek(0)
+                to_write_back = file.read().replace("\'", "")
+                file.seek(0)
+                file.truncate()
+                file.write(to_write_back)
+
+            file.close()
