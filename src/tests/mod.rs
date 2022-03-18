@@ -259,14 +259,14 @@ fn compiler_test(filename: &str, input: String, output: Behaviour, _exit_code: O
     let (main_file, module_files) = gather_modules(Path::new(filename)).unwrap();
 
     let options = Options {
-        sethi_ullman_weights: false,
         dead_code_removal: true,
-        const_propagation: false,
+        const_propagation: true,
         inlining: Some(1000),
         tail_call: true,
         const_branch: true,
         show_arm_temp_rep: false,
         show_three_code: false,
+        show_optimised_three_code: false,
     };
     let assembly = compile(
         analyse(&main_file, module_files.iter().collect()).unwrap(),
@@ -313,11 +313,6 @@ fn compiler_test(filename: &str, input: String, output: Behaviour, _exit_code: O
     .join();
 
     let stdout = dbg!(child.wait_with_output().expect("Failed to read stdout"));
-
-    // match dbg!(exit_code) {
-    //     Some(e) => assert_eq!(stdout.status.code().unwrap(), e),
-    //     None => assert!(stdout.status.success()),
-    // }
 
     assert_eq!(output, &String::from_utf8_lossy(&stdout.stdout).as_ref());
 }

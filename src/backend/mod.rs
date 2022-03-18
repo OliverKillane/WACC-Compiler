@@ -1,3 +1,32 @@
+//! # The WACC compiler Backend
+//!
+//! ## Representations
+//! The two main representations used are the architecure-agnostic [threecode](ThreeCode)
+//! upon which high-level optimisation are performed, and the lower-level arm
+//! representation (which is initially temporaries upon which register allocation
+//! using live ranges & next use distance is done).
+//!
+//! ## Optimisations
+//! The main optimisations performed are:
+//! - Inlining
+//! - Constant Propagation
+//! - Tail Call Optimisation
+//! - Dead Code Removal
+//! - Same Branch Removal
+//!
+//! These are done on the threecode graph, as this means any architecture specific
+//! backend we develop requires no code changes to have these optimizations (just
+//! need to translate from threecode)
+//!
+//! ## Assembly Generation
+//! We translate the threecode to arm with temporaries, and live range analysis
+//! (implemented using [data flow analysis](data_flow)) to allocate registers,
+//! stack slots, and convert faux instructions (call, return) into arm instructions.
+//!
+//! ## Display
+//! The backend can produce the display for intermediate code generated for both
+//! the threecode, and arm with temporaries.
+
 mod arm;
 mod const_branch;
 mod const_prop;
@@ -21,7 +50,6 @@ use three_code::ThreeCode;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Options {
-    pub sethi_ullman_weights: bool,
     pub dead_code_removal: bool,
     pub const_propagation: bool,
     pub const_branch: bool,
@@ -29,6 +57,7 @@ pub struct Options {
     pub tail_call: bool,
     pub show_arm_temp_rep: bool,
     pub show_three_code: bool,
+    pub show_optimised_three_code: bool,
 }
 
 pub struct BackendOutput {
@@ -37,10 +66,15 @@ pub struct BackendOutput {
 }
 
 const CONST_LOOP_ITER_COUNT: u32 = 3;
-
 /// Compiles the given program into an arm32 assembly
 pub fn compile(program: Program, options: Options) -> BackendOutput {
     let mut three_code = ThreeCode::from((program, &options));
+    let mut intermediates = vec![];
+
+    if options.show_three_code {
+        intermediates.push(("Unoptimised ThreeCode".to_string(), three_code.to_string()))
+    }
+
     if let Some(instructions_limit) = options.inlining {
         three_code = inline(three_code, instructions_limit);
     }
@@ -78,10 +112,8 @@ pub fn compile(program: Program, options: Options) -> BackendOutput {
         .check_dummy()
         .expect("There are left-over dummy nodes in the ThreeCode");
 
-    let mut intermediates = vec![];
-
-    if options.show_three_code {
-        intermediates.push(("ThreeCode:".to_string(), three_code.to_string()))
+    if options.show_optimised_three_code {
+        intermediates.push(("Optimised ThreeCode".to_string(), three_code.to_string()))
     }
 
     // the arm result can return a printable intermediate representation.

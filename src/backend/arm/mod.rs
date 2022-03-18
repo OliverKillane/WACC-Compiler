@@ -21,10 +21,7 @@
 //! Furthermore every stage of this process is printable (temporaries, final
 //! arm, and between), which makes it significantly easier to debug.
 
-use self::{
-    peephole_opts::remove_self_moves, register_allocation::allocate_registers,
-    translation::translate_threecode,
-};
+use self::{register_allocation::allocate_registers, translation::translate_threecode};
 use super::{three_code::ThreeCode, Options};
 
 mod allocation_state;
@@ -49,15 +46,9 @@ impl From<(ThreeCode, &Options)> for ArmResult {
         if options.show_arm_temp_rep {
             let arm_temp = translate_threecode(three_code);
             let temp_string = arm_temp.to_string();
-            ArmResult(
-                remove_self_moves(allocate_registers(arm_temp)),
-                Some(temp_string),
-            )
+            ArmResult(allocate_registers(arm_temp), Some(temp_string))
         } else {
-            ArmResult(
-                remove_self_moves(allocate_registers(translate_threecode(three_code))),
-                None,
-            )
+            ArmResult(allocate_registers(translate_threecode(three_code)), None)
         }
     }
 }

@@ -1,3 +1,9 @@
+//! Translation of [IR expressions](ir::Expr) into three code graphs by flattening.
+//!
+//! By converting expressions from trees to flattened threecode further analysis
+//! and optimisation can be easily performed (e.g dead code removal or inlining
+//! of functions).
+
 use super::{super::Options, stat::get_type_width, BinOp, OpSrc, Size, StatCode, StatLine};
 use crate::intermediate::{self as ir, VarRepr};
 use std::{
@@ -61,6 +67,7 @@ impl From<ir::ArithOp> for BinOp {
     }
 }
 
+/// Helper function to create assignments.
 pub(super) fn assign_op_src(result: VarRepr, op_src: OpSrc, stat_line: &mut StatLine) {
     if let OpSrc::Var(var) = op_src {
         assert_eq!(var, result);
@@ -530,14 +537,14 @@ mod tests {
                 &vars,
                 &function_types,
                 &Options {
-                    sethi_ullman_weights: false,
                     dead_code_removal: false,
                     const_propagation: false,
                     inlining: Some(1000),
                     tail_call: false,
                     const_branch: false,
                     show_arm_temp_rep: false,
-                    show_three_code: false
+                    show_three_code: false,
+                    show_optimised_three_code: false,
                 }
             ),
             (expr_type, op_src)

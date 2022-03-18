@@ -5,10 +5,34 @@
 //! Generates instructions for moving allocations (temporary variables, or
 //! values to preserve) between their stack frame locations and registers.
 //!
-//! Generates register mappings for temporaries on a per-instruction basis
+//! Generates register mappings for temporaries on a per-instruction basis,
+//! using live ranges. This allows for highly efficient register usage.
 //!
 //! Uses 'instructions till use' associated with live ranges to determine when
 //! to spill values from registers.
+//!
+//! ## Registers are organised as:
+//! | R0   | R1   | R2   | R3   | R4      | R5      | R6      | R7      | R8      | R9      | R10     | R11     | R12      | SP        | LR       | PC        |
+//! |------|------|------|------|---------|---------|---------|---------|---------|---------|---------|---------|----------|-----------|----------|-----------|
+//! | Arg1 | Arg2 | Arg3 | Arg4 | Preserve| Preserve| Preserve| Preserve| Preserve| Preserve| Preserve| Preserve| Preserve | Protected | Preserve | Protected |
+//!
+//! ## Stack frame is composed of:
+//! |            | Stack Contents         |
+//! |------------|------------------------|
+//! |            | (Temp) Arg 4           |
+//! |            | (Temp) Arg 5           |
+//! |            | (Temp) Arg 6           |
+//! |            | (Temp) Arg 7           |
+//! |            | ...                    |
+//! | SP at Call | Temps                  |
+//! |            | ...                    |
+//! |            | preserved register R4  |
+//! |            | preserved register R5  |
+//! |            | ...                    |
+//! |            | preserved register R14 |
+//! |            | reserved stack space   |
+//! |            | reserved stack space   |
+//! |            | ...                    |
 
 use crate::graph::Graph;
 use std::{
@@ -27,41 +51,22 @@ use super::{
 };
 
 /// Type alias for the preserved value identifiers (registers R4-R12 and R14)
-type Preserved = u128;
+type Preserved = usize;
 
 /// A descriptor for the type of data held in a register.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Alloc {
-    /// A temporary variable (in register/stack)
+    /// A temporary variable (can be in register & stack)
     Temp(Temporary),
-    /// A value that must be preserved (register/stack)
+    /// A value that must be preserved (can be in register & stack)
     Preserve(Preserved),
-    /// Indicates a position is free for use.
+    /// Indicates a position is free for use (in registers).
     Free,
-    /// Space is protected, do not use! (register/stack)
+    /// Space is protected, do not use! (program counter/stack pointer)
     Protected,
 }
 
 /// Tracks the state of the registers, and the stack frame.
-/// Stack frame is composed of:
-/// |------------|------------------------|
-/// |            | Stack Contents         |
-/// |------------|------------------------|
-/// |            | (Temp) Arg 4           |
-/// |            | (Temp) Arg 5           |
-/// |            | (Temp) Arg 6           |
-/// |            | (Temp) Arg 7           |
-/// |            | ...                    |
-/// | SP at Call | Temps                  |
-/// |            | ...                    |
-/// |            | preserved register R4  |
-/// |            | preserved register R5  |
-/// |            | ...                    |
-/// |            | preserved register R14 |
-/// |            | reserved stack space   |
-/// |            | reserved stack space   |
-/// |            | ...                    |
-/// |------------|------------------------|
 #[derive(Debug, Clone)]
 pub struct AllocationState {
     /// Represents the usable registers:
@@ -78,7 +83,11 @@ pub struct AllocationState {
     alloc_map: HashMap<Alloc, i32>,
 
     /// The start of the stack reserve, distance in words from the sp at the
-    /// start of the subroutine call
+    /// start of the subroutine call.
+    ///
+    /// The stack reserve is a single continuous region of stack for use by
+    /// functions in storing structs, and low-overhead buffer allocation (in
+    /// case of reading characters).
     stack_reserve: i32,
 
     /// The displacement of the stack pointer from the the start of the call.
@@ -87,7 +96,7 @@ pub struct AllocationState {
 
 impl AllocationState {
     /// Creates a stack frame, initial state and label all registers. Generate
-    /// the first instructiosn for the call (moving the stack pointer).
+    /// the first instructions for the call (moving the stack pointer).
     pub fn create_stack_frame(
         args: &[Temporary],
         reserved_stack: u8,
@@ -105,39 +114,39 @@ impl AllocationState {
 
         let mut alloc_map = HashMap::new();
 
-        // Calling convention is encoded within the start state
+        // Calling convention is encoded within the start state (with register arguments)
         let mut registers: [Alloc; 16] = [
-            Alloc::Free,        // R0
-            Alloc::Free,        // R1
-            Alloc::Free,        // R2
-            Alloc::Free,        // R3
-            Alloc::Preserve(0), // R4
-            Alloc::Preserve(1), // R5
-            Alloc::Preserve(2), // R6
-            Alloc::Preserve(3), // R7
-            Alloc::Preserve(4), // R8
-            Alloc::Preserve(5), // R9
-            Alloc::Preserve(6), // R10
-            Alloc::Preserve(7), // R11
-            Alloc::Preserve(8), // R12
-            Alloc::Protected,   // R13 - SP
-            Alloc::Preserve(9), // R14 - LR
-            Alloc::Protected,   // R15 - PC
+            Alloc::Free,        // R0  - Arg 1 / Caller Saved
+            Alloc::Free,        // R1  - Arg 2 / Caller Saved
+            Alloc::Free,        // R2  - Arg 3 / Caller Saved
+            Alloc::Free,        // R3  - Arg 4 / Caller Saved
+            Alloc::Preserve(0), // R4  - Callee Saved
+            Alloc::Preserve(1), // R5  - Callee Saved
+            Alloc::Preserve(2), // R6  - Callee Saved
+            Alloc::Preserve(3), // R7  - Callee Saved
+            Alloc::Preserve(4), // R8  - Callee Saved
+            Alloc::Preserve(5), // R9  - Callee Saved
+            Alloc::Preserve(6), // R10 - Callee Saved
+            Alloc::Preserve(7), // R11 - Callee Saved
+            Alloc::Preserve(8), // R12 - Callee Saved
+            Alloc::Protected,   // SP  - Protected, only for stack pointer
+            Alloc::Preserve(9), // LR  - Callee Saved
+            Alloc::Protected,   // PC  - Protected, only for program counter
         ];
 
-        // place the first 3 arguments in registers.
+        // Place the first 3 arguments in registers.
         for reg in 0..(args.len().min(4)) {
             registers[reg] = Alloc::Temp(args[reg])
         }
 
-        // now put all other arguments onto the stack. These will be just
-        // before the stack pointer in reverse order (were pushed and popped)
+        // Allocate position of other arguments on the stack (these will be in
+        // slots above the stack pointer that the time of function call).
         for (arg_ind, temp) in args.iter().enumerate().skip(4) {
             alloc_map.insert(Alloc::Temp(*temp), arg_ind as i32 - args.len() as i32 + 1);
         }
 
-        // Now push all temporaries to the map to fill the frame. If it is
-        // already in the map (it is a stack argument) we ignore.
+        // Push all temporaries to the map to fill the frame. If it is already in
+        // the map (it is a stack argument) we can ignore.
         let mut sp_displacement = 1;
         for temp in temps_set {
             let temp_alloc = Alloc::Temp(*temp);
@@ -146,13 +155,13 @@ impl AllocationState {
             }
         }
 
-        // setup space for preserves
+        // Setup stack frame slots for preserves (callee saved values).
         for p in 0..=9 {
             alloc_map.insert(Alloc::Preserve(p), sp_displacement);
             sp_displacement += 1;
         }
 
-        // setup reserved stack space
+        // Setup reserved stack space as required.
         let stack_reserve = sp_displacement;
         sp_displacement += reserved_stack as i32;
 
@@ -163,7 +172,7 @@ impl AllocationState {
             sp_displacement,
         };
 
-        // generate stack pointer move
+        // Generate the stack pointer move to setup the stack frame.
         let chain = if new_state.sp_displacement != 0 {
             new_state.move_stack_pointer(-sp_displacement, graph)
         } else {
@@ -177,7 +186,7 @@ impl AllocationState {
     /// moving the stack pointer back, negative advancing it (descending arm
     /// stack).
     fn move_stack_pointer(&self, words: i32, graph: &mut Graph<ControlFlow>) -> Chain {
-        let (op, byte_displacement) = if words > 0 {
+        let (op, mut byte_displacement) = if words > 0 {
             (RegOp::Add, words * 4)
         } else {
             (RegOp::Sub, words * -4)
@@ -223,28 +232,32 @@ impl AllocationState {
                 )
             } else {
                 // Otherwise we just use R4 (most likely to be unused)
-                link_stats(
-                    vec![
-                        Stat::Push(Cond::Al, Ident::Reg(Register::R4)),
-                        Stat::MemOp(
-                            MemOp::Ldr,
-                            Cond::Al,
-                            false,
-                            Ident::Reg(Register::R4),
-                            MemOperand::Expression(byte_displacement),
-                        ),
-                        Stat::ApplyOp(
-                            op,
-                            Cond::Al,
-                            false,
-                            Ident::Reg(Register::Sp),
-                            Ident::Reg(Register::Sp),
-                            FlexOperand::ShiftReg(Ident::Reg(Register::Sp), None),
-                        ),
-                        Stat::Pop(Cond::Al, Ident::Reg(Register::R4)),
-                    ],
-                    graph,
-                )
+                let mut stats = vec![];
+
+                while byte_displacement > 255 {
+                    stats.push(Stat::ApplyOp(
+                        op,
+                        Cond::Al,
+                        false,
+                        Ident::Reg(Register::Sp),
+                        Ident::Reg(Register::Sp),
+                        FlexOperand::Imm(255),
+                    ));
+                    byte_displacement -= 255;
+                }
+
+                if byte_displacement != 0 {
+                    stats.push(Stat::ApplyOp(
+                        op,
+                        Cond::Al,
+                        false,
+                        Ident::Reg(Register::Sp),
+                        Ident::Reg(Register::Sp),
+                        FlexOperand::Imm(byte_displacement as u32),
+                    ))
+                }
+
+                link_stats(stats, graph)
             }
         }
     }
@@ -282,7 +295,6 @@ impl AllocationState {
         graph: &mut Graph<ControlFlow>,
     ) -> Chain {
         let sp_offset = self.get_alloc_sp_offset(alloc);
-        // println!("memop {}, Alloc: {:?}, sp_disp: {}, SP_Offset: {}",memop, alloc, self.sp_displacement, sp_offset);
 
         if -4095 <= sp_offset && sp_offset <= 4095 {
             // we can use a stack pointer offset to get the temporary
@@ -340,8 +352,12 @@ impl AllocationState {
                 graph,
             )
         } else {
-            // choose a low usage register R12 to push and pop, we store the offset here
-            let tmp_register = Ident::Reg(Register::R12);
+            // choose a register to use, that is not the destination register
+            let tmp_register = Ident::Reg(if dst_register == Register::R4 {
+                Register::R12
+            } else {
+                Register::R4
+            });
 
             // as we push, we must increase offset by 4
 
@@ -544,7 +560,7 @@ impl AllocationState {
         free_regs
     }
 
-    /// backup an allocation to the stack frame, if it is currently not in a
+    /// Backup an allocation to the stack frame, if it is currently not in a
     /// register, it is already backed up.
     fn backup_alloc_to_frame(
         &mut self,
@@ -601,14 +617,15 @@ impl AllocationState {
     ) -> Option<Chain> {
         let reg_ind = dst_register as usize;
 
-        // check it it is already in the correct register
+        // Check it it is already in the correct register.
         let other_alloc = if self.registers[reg_ind] == alloc_to_fetch {
             return None;
         } else {
             self.registers[reg_ind]
         };
 
-        // if the other_alloc was preserved or a temporary, place it back in its position in the stack frame.
+        // If the other_alloc was preserved or a temporary, place it back in its
+        // position in the stack frame.
         let put_to_stack =
             if matches!(other_alloc, Alloc::Temp(_)) || matches!(other_alloc, Alloc::Preserve(_)) {
                 Some(self.register_stack_move(
@@ -638,7 +655,7 @@ impl AllocationState {
                     graph,
                 );
 
-                // mark the register as containing the alloc_to_fetch
+                // Mark the register as containing the alloc_to_fetch.
                 self.registers[reg_ind] = alloc_to_fetch;
                 self.registers[other_reg_ind] = Alloc::Free;
 
@@ -649,7 +666,7 @@ impl AllocationState {
             }
         }
 
-        // was not in a register, hence we must pull it from the stack.
+        // Was not in a register, hence we must pull it from the stack.
         let pull_from_frame = self.register_stack_move(
             dst_register,
             &alloc_to_fetch,
@@ -658,7 +675,7 @@ impl AllocationState {
             graph,
         );
 
-        // mark the register as containing the alloc_to_fetch
+        // Mark the register as containing the alloc_to_fetch
         self.registers[reg_ind] = alloc_to_fetch;
 
         match put_to_stack {
@@ -683,8 +700,15 @@ impl AllocationState {
         Some(chain)
     }
 
-    /// - Places arguments in r0-r3 and then on the stack.
-    /// - Decrements the stack after the call, as well as getting the return.
+    /// Create the instructions for a function call (using the arm calling convention)
+    /// 1. Backup any arguments used after the call.
+    /// 2. Place arguments in the first 4 registers (R0-R4), moving any other
+    ///    values in these registers to their stack slots.
+    /// 3. If there are stack arguments, push them to the stack.
+    /// 4. Move the value stored in the link register to its stack slot.
+    /// 5. Branch link to the function.
+    /// 6. If there is a return, then allocate the defined temporary to R0.
+    /// 7. Move the stack back to its position prior to the call.
     pub fn call(
         &mut self,
         fun: String,
@@ -739,7 +763,7 @@ impl AllocationState {
             }
         }
 
-        // free link register
+        // Free the link register.
         chains.push(self.link(graph));
 
         chains.push(Some(simple_node(Stat::Link(Cond::Al, fun), graph)));
@@ -752,18 +776,18 @@ impl AllocationState {
                 }
             }
 
-            // set r0 as ret
+            // Set r0 as ret.
             self.registers[0] = Alloc::Temp(*ret);
         } else {
             self.registers[0] = Alloc::Free;
         }
 
-        // set r1-3 as free
+        // Set r1-3 as free.
         self.registers[1] = Alloc::Free;
         self.registers[2] = Alloc::Free;
         self.registers[3] = Alloc::Free;
 
-        // if stack arguments were used, decrement stack pointer by arguments
+        // If stack arguments were used, decrement stack pointer by arguments
         // move the stack pointer back to its original location.
         if args.len() > 4 {
             chains.push(Some(
@@ -771,7 +795,7 @@ impl AllocationState {
             ));
         }
 
-        // reset the sp_displacement for use in generating offsets for stack
+        // Reset the sp_displacement for use in generating offsets for stack
         // frame slots.
         self.sp_displacement = old_sp;
 
@@ -786,7 +810,6 @@ impl AllocationState {
             // We use an immediate operand added to sp
 
             // ADD reg, sp, #sp_displacement
-
             simple_node(
                 Stat::ApplyOp(
                     RegOp::Add,
@@ -804,7 +827,6 @@ impl AllocationState {
 
             // LDR reg, =sp_displacement
             // ADD reg, reg, SP
-
             link_stats(
                 vec![
                     Stat::MemOp(
@@ -828,7 +850,12 @@ impl AllocationState {
         }
     }
 
-    // Create clean up and return
+    /// Generate the instructions for a return statement
+    /// 1. Move the return temporary into register R0.
+    /// 2. Move the preserved values back to their registers (are fetched from
+    ///   registers, stack slots, may still be in correct register).
+    /// 3. Move the stack pointer back to its position at the start of the call.
+    /// 4. Place the address to return to (in LR) into the PC register.
     pub fn subroutine_return(
         &mut self,
         ret: &Option<Temporary>,
@@ -872,11 +899,11 @@ impl AllocationState {
             graph,
         )));
 
-        // link the statements together
+        // link the statements together.
         let Chain(start, mut end) = link_optional_chains(chains)
             .expect("Must place destination in PC, hence always has a chain");
 
-        // Add a literal pool at the end for large functions
+        // Add a literal pool at the end for large functions.
         end.set_successor(graph.new_node(ControlFlow::Ltorg(Some(end.clone()))));
 
         start
@@ -900,8 +927,7 @@ impl AllocationState {
             .into_iter()
         {
             match (conform, current) {
-                (Alloc::Free, Alloc::Free) => (),
-                (Alloc::Protected, Alloc::Protected) => (),
+                (Alloc::Free, Alloc::Free) | (Alloc::Protected, Alloc::Protected) => (),
                 (Alloc::Protected, _) | (_, Alloc::Protected) => {
                     panic!("Protected do not match, so protected areas have been mangled")
                 }
@@ -918,12 +944,14 @@ impl AllocationState {
         link_optional_chains(chain)
     }
 
+    /// Update the tracked position of the stack pointer (so that SP offsets
+    /// calculated are still correct)
     pub fn push_sp(&mut self) {
         self.sp_displacement += 1
     }
 
     /// Pop the Allocation State's stack displacement (done when a pop operation
-    /// occurs, ensures the offsets )
+    /// occurs, ensures the offsets)
     pub fn pop_sp(&mut self) {
         self.sp_displacement -= 1
     }

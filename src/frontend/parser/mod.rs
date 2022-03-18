@@ -37,12 +37,12 @@ use std::{
 
 use lexer::{parse_int, str_delimited};
 
-/// Wraps the result of the parser in a [WrapSpan]
+/// Wraps the result of the parser in a [ASTWrapper]
 ///
 /// Mimics the builder pattern's span in order to move building the span
 /// outside of parsing the AST node itself.
 ///
-/// * `inner` - Parser whose Result is wrapped in a [WrapSpan].
+/// * `inner` - Parser whose Result is wrapped in a [ASTWrapper].
 fn span<'a, F: 'a, O, E: ParseError<&'a str>>(
     mut inner: F,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, ASTWrapper<&'a str, O>, E>
