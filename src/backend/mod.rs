@@ -66,7 +66,6 @@ pub struct BackendOutput {
 }
 
 const CONST_LOOP_ITER_COUNT: u32 = 3;
-
 /// Compiles the given program into an arm32 assembly
 pub fn compile(program: Program, options: Options) -> BackendOutput {
     let mut three_code = ThreeCode::from((program, &options));

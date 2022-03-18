@@ -129,6 +129,9 @@ struct Args {
 
     #[clap(long, help = "Enable dead code elimination")]
     dead_code: bool,
+
+    #[clap(short = 'O', help = "Enable all optimizations")]
+    optimizations: bool,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
@@ -179,6 +182,7 @@ fn main() -> io::Result<()> {
         const_prop,
         const_branch,
         dead_code,
+        optimizations,
     } = Args::parse();
 
     let (main_file, module_files) = match gather_modules(&main_file_path) {
@@ -238,11 +242,17 @@ fn main() -> io::Result<()> {
                 println!("Intermediate Representation:\n{}", ir);
             }
             let options = Options {
-                dead_code_removal: dead_code,
-                const_propagation: const_prop,
-                const_branch,
-                inlining: inlining.into(),
-                tail_call,
+                dead_code_removal: dead_code || optimizations,
+                const_propagation: const_prop || optimizations,
+                const_branch: const_branch || optimizations,
+                inlining: if inlining != InlineMode::Off {
+                    inlining.into()
+                } else if optimizations {
+                    InlineMode::Medium.into()
+                } else {
+                    InlineMode::Off.into()
+                },
+                tail_call: tail_call || optimizations,
                 show_arm_temp_rep: arm_temp,
                 show_three_code: unoptimised_three_code,
                 show_optimised_three_code: final_three_code,
