@@ -1,3 +1,8 @@
+//! Constant propagation on the [threecode](ThreeCode) control flow graph.
+//!
+//! Constants can include integers and data references (with offsets), and can
+//! be propagated through any control flow structure (graph).
+
 use super::data_flow::dataflow_analysis;
 use super::three_code::*;
 use crate::graph::{Deleted, Graph};
@@ -141,20 +146,7 @@ fn construct_defs_out(
     } else {
         return defs_in;
     };
-    let def_in = defs_in
-        .get(&def_var)
-        .cloned()
-        .unwrap_or_else(|| Rc::new(HashSet::new()));
-    defs_in.insert(
-        def_var,
-        if !def_in.contains(node) {
-            let mut def_in = (&*def_in).clone();
-            def_in.insert(node.clone());
-            Rc::new(def_in)
-        } else {
-            def_in
-        },
-    );
+    defs_in.insert(def_var, Rc::new(HashSet::from([node.clone()])));
     defs_in
 }
 
@@ -310,8 +302,10 @@ fn prop_const_node(node: &StatNode, int_handler: &Option<String>) -> Option<VarR
     ) = *node.get()
     {
         (assigned_var, op_src1, bin_op, op_src2, checked)
+    } else if let StatType::Simple(_, StatCode::Assign(assigned_var, op_src), _) = *node.get() && !matches!(op_src, OpSrc::Var(_)) {
+        return Some(assigned_var)
     } else {
-        return None;
+        return None
     };
     let propagate_op_result =
         propagate_op(op_src1, bin_op, op_src2, checked || int_handler.is_some());
@@ -390,20 +384,7 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr], int_handler: &Option<Stri
                     .iter()
                     .filter_map(|(var, defs)| {
                         if uses.contains(var) {
-                            Some((
-                                *var,
-                                defs.iter()
-                                    .filter(|def| {
-                                        if let StatType::Simple(_, StatCode::Assign(_, op_src), _) =
-                                            &*def.get()
-                                        {
-                                            matches!(op_src, OpSrc::Var(_))
-                                        } else {
-                                            true
-                                        }
-                                    })
-                                    .count(),
-                            ))
+                            Some((*var, defs.iter().count()))
                         } else {
                             None
                         }
@@ -477,17 +458,13 @@ fn prop_const_graph(code: &StatNode, args: &[VarRepr], int_handler: &Option<Stri
 }
 
 /// Performs constant propagation on the [three code](ThreeCode).
-pub(super) fn prop_consts(mut threecode: ThreeCode) -> ThreeCode {
-    prop_const_graph(&threecode.code, &[], &threecode.int_handler);
+pub(super) fn prop_consts(three_code: ThreeCode) -> ThreeCode {
+    prop_const_graph(&three_code.code, &[], &three_code.int_handler);
 
-    threecode.functions = threecode
+    three_code
         .functions
-        .into_par_iter()
-        .map(|(name, fun)| {
-            prop_const_graph(&fun.code, &fun.args, &threecode.int_handler);
-            (name, fun)
-        })
-        .collect();
+        .par_iter()
+        .for_each(|(_, fun)| prop_const_graph(&fun.code, &fun.args, &three_code.int_handler));
 
-    threecode
+    three_code
 }

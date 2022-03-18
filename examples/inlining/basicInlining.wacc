@@ -1,0 +1,107 @@
+# Demonstration of inlining removing small functions
+#
+# Here fun1, fun2 and fun3 can be inlined
+#
+# With inlining the three-code is as follows:
+# 
+# Data References:
+# DRef[0]:
+#         dword: 12
+#         String: "this is fun2"
+# 
+# DRef[3]:
+#         String: "\n\0"
+# 
+# DRef[2]:
+#         String: "%.*s\0"
+# 
+# DRef[1]:
+#         dword: 79
+#         String: "OverflowError: the result is to small/large to store in a 4-byte signed-integer"
+# 
+# 
+# Integer Handler: overflow_handler
+# Def main():
+#         V0 = 3
+#         V4 = 4
+#         V8 = 4
+#         V9 = 3
+#         V5 = V9
+#         V7 = V8
+#         V6 = 2 * V7 (Overflow Check)
+#         V5 = V5 + V6 (Overflow Check)
+#         V0 = V5
+#         V1 = V0
+#         V0 = 122
+#         V13 = DRef[0]
+#         V10 = DRef[0]
+#         V10 = V10 + 4
+#         V12 = DRef[0]
+#         V12 = (dword) *V12
+#         V11 = DRef[2]
+#         printf(V11,V12,V10)
+#         V10 = 0
+#         fflush(V10)
+#         V10 = DRef[3]
+#         printf(V10)
+#         V10 = 0
+#         fflush(V10)
+#         V2 = 0
+#         V0 = 4
+#         V4 = 97
+#         V16 = 97
+#         V17 = 4
+#         V14 = V17
+#         V14 = V14 && 255
+#         V15 = V16
+#         V14 = V14 == V15
+#         V0 = V14
+#         V3 = V0
+#         V0 = V3
+#         if V0 then goto b_main_37
+#         V2 = 4
+# b_main_39:
+#         V0 = V1
+#         exit(V0)
+#         Return
+# b_main_37:
+#         V2 = 7
+#         goto b_main_39
+# 
+# Def overflow_handler():
+#         V0 = (DRef[1] + 4)
+#         V2 = 79
+#         V1 = DRef[2]
+#         printf(V1,V2,V0)
+#         V0 = 0
+#         fflush(V0)
+#         V0 = 255
+#         exit(V0)
+#         Return
+
+begin
+
+    int fun1(int a, int b) is
+        return a + 2 * b
+    end
+
+    void fun2(char a) is
+        println "this is fun2";
+        return
+    end
+
+    bool fun3(int a, char b) is
+        return (chr a) == b
+    end
+
+    int exit_code = call fun1(3,4);
+    call fun2('z');
+    int i = 0;
+    bool res = call fun3(4,'a');
+    if res then
+        i = 7
+    else 
+        i = 4
+    fi;
+    exit exit_code
+end

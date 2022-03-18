@@ -1,3 +1,22 @@
+//! Definition of (and translation from [ir] to) the architecture-agnostic
+//! [threecode](ThreeCode) representation.
+//!
+//! It is designed to be a generalized assembly language to allow for extension
+//! to many different architectures. It supports basic operations, calls (including
+//! void), stack memory references associated with functions (readref), and
+//! structs in its data section.
+//!
+//! It is structured as a control flow graph with a single statement per node,
+//! which allows for fine grained analysis of live ranges, dead code, etc.
+//!
+//! Control flow is managed by the [stat type](StatType) enumeration. While most
+//! statements are contained in [stat code nodes](StatCode), including binary
+//! operations (which can be set as overflow checked), assignments, load/store and
+//! function calls.
+//!
+//! Display is implemented for the threecode to allow for debugging, and analysis
+//! of the optimizations performed on threecode.
+
 mod eval;
 mod expr;
 mod stat;
@@ -1012,7 +1031,6 @@ mod tests {
             &HashMap::from([(0, ir::Type::Num(ir::NumSize::DWord))]),
             &HashMap::new(),
             &Options {
-                sethi_ullman_weights: false,
                 dead_code_removal: false,
                 const_propagation: false,
                 inlining: Some(1000),
@@ -1020,6 +1038,7 @@ mod tests {
                 const_branch: false,
                 show_arm_temp_rep: false,
                 show_three_code: false,
+                show_optimised_three_code: false,
             },
         );
 
@@ -1124,7 +1143,6 @@ mod tests {
             &HashMap::from([(0, ir::Type::Bool)]),
             &HashMap::new(),
             &Options {
-                sethi_ullman_weights: false,
                 dead_code_removal: false,
                 const_propagation: false,
                 inlining: Some(1000),
@@ -1132,6 +1150,7 @@ mod tests {
                 const_branch: false,
                 show_arm_temp_rep: false,
                 show_three_code: false,
+                show_optimised_three_code: false,
             },
         );
 
@@ -1196,7 +1215,6 @@ mod tests {
             &mut FmtDataRefFlags::default(),
             &HashMap::from([("function".to_string(), Some(ir::Type::Bool))]),
             &Options {
-                sethi_ullman_weights: false,
                 dead_code_removal: false,
                 const_propagation: false,
                 inlining: Some(1000),
@@ -1204,6 +1222,7 @@ mod tests {
                 const_branch: false,
                 show_arm_temp_rep: false,
                 show_three_code: false,
+                show_optimised_three_code: false,
             },
         );
         assert_eq!(args, vec![0]);
@@ -1233,7 +1252,6 @@ mod tests {
             &mut FmtDataRefFlags::default(),
             &HashMap::from([("function".to_string(), None)]),
             &Options {
-                sethi_ullman_weights: false,
                 dead_code_removal: false,
                 const_propagation: false,
                 inlining: Some(1000),
@@ -1241,6 +1259,7 @@ mod tests {
                 const_branch: false,
                 show_arm_temp_rep: false,
                 show_three_code: false,
+                show_optimised_three_code: false,
             },
         );
         assert_eq!(args, vec![0]);
@@ -1272,7 +1291,6 @@ mod tests {
                 Some("malloc".to_string()),
             ),
             &Options {
-                sethi_ullman_weights: false,
                 dead_code_removal: false,
                 const_propagation: false,
                 inlining: Some(1000),
@@ -1280,6 +1298,7 @@ mod tests {
                 const_branch: false,
                 show_arm_temp_rep: false,
                 show_three_code: false,
+                show_optimised_three_code: false,
             },
         )
             .into();

@@ -925,7 +925,8 @@ impl Program {
             function.validate(functions, data_refs)?;
         }
         if let Some(int_handler) = int_handler {
-            if let Function(_, args, _, _) = functions.get(int_handler).ok_or(())? && !args.is_empty() {
+            let Function(_, args, _, _) = functions.get(int_handler).ok_or(())?;
+            if !args.is_empty() {
                 return Err(());
             }
         }

@@ -1,5 +1,12 @@
-//! Converts [ARM Representation](Program) into a string format, suitable for
+//! Converts [ARM Representation](ArmCode) into a string format, suitable for
 //! assembly.
+//!
+//! Traverses along a linear chain of the graph, adding label entires for every
+//! branch from the chain, and every node in the chain that has multiple
+//! predecessors.
+//!
+//! Can then continually translate un-translated entries (potentially adding more
+//! entires to the label map) in the label map until all are translated.
 
 use lazy_static::__Deref;
 
@@ -300,20 +307,21 @@ impl Display for Stat {
             Stat::Link(cond, link_to) => write!(f, "\tBL{}\t{}", cond, link_to),
             Stat::Call(fun_name, ret_temp, arg_temps) => write!(
                 f,
-                "\tINTERNAL OPERATION: CALL\t{}\t{}, ARGS({})",
+                "\tCALL\t{} ({}) {} (INTERNAL OPERATION)",
                 fun_name,
-                match ret_temp {
-                    Some(t) => format!("T{}", t),
-                    None => "No Return".to_string(),
-                },
                 arg_temps
                     .iter()
                     .map(|t| format!("T{}", t))
                     .collect::<Vec<_>>()
-                    .join(",")
+                    .join(","),
+                if let Some(ret) = ret_temp {
+                    format!("-> T{}", ret)
+                } else {
+                    "".to_string()
+                }
             ),
             Stat::AssignStackWord(ident) => {
-                write!(f, "\tINTERNAL OPERATION: ASSIGN WORD OF STACK TO {}", ident)
+                write!(f, "\tASSIGN STACK WORD {} (INTERNAL OPERATION)", ident)
             }
             Stat::Nop => write!(f, "\tNOP"),
         }
@@ -329,6 +337,10 @@ fn get_next_node(label_map: &HashMap<ArmNode, (usize, bool)>) -> Option<ArmNode>
     None
 }
 
+/// Display from a start node:
+/// - Create the subroutine label
+/// - Ensures all instructions are in range of a literal pool
+/// - Determines the
 fn display_routine(
     start_node: &ArmNode,
     name: &str,
@@ -343,7 +355,7 @@ fn display_routine(
     //
     // This is done by placing a pool every 2000 instructions (literal pools always <= 4000 bytes away).
     // Starts at 1000 since there are no literal pools at the start of the program.
-    let mut since_lit = 1000;
+    let mut since_lit = 500;
     let mut lit_branch_ident = 0;
 
     // Label identifier conversion to strings.
@@ -357,7 +369,7 @@ fn display_routine(
 
     while next.is_some() {
         while let Some(current) = next {
-            if since_lit > 2000 {
+            if since_lit >= 1000 {
                 writeln!(f, "\tB\t{}", lit_label_conv(&lit_branch_ident))?;
                 writeln!(f, "\t.ltorg")?;
                 writeln!(f, "{}:", lit_label_conv(&lit_branch_ident))?;
@@ -367,7 +379,8 @@ fn display_routine(
 
             match label_map.get_mut(&current) {
                 Some((id, true)) => {
-                    writeln!(f, "\tB\t{}", label_conv(id))?;
+                    writeln!(f, "\tB\t{}\n\t.ltorg", label_conv(id))?;
+                    since_lit = 0;
                     break;
                 }
                 Some((id, l)) => {
@@ -394,20 +407,22 @@ fn display_routine(
                     };
 
                     writeln!(f, "\tB{}\t{}", cond, label_conv(&id))?;
+
                     branch_false.clone()
                 }
                 ControlFlow::Ltorg(_) => {
                     writeln!(f, "\t.ltorg")?;
+                    since_lit = 0;
                     None
                 }
                 ControlFlow::Return(_, ret) => {
                     writeln!(
                         f,
-                        "\tINTERNAL OPERATION: RETURN\t{}",
+                        "\tRETURN\t{}(INTERNAL OPERATION)",
                         if let Some(ret_temp) = ret {
-                            format! {"T{}", ret_temp}
+                            format! {"T{} ", ret_temp}
                         } else {
-                            "no value returned".to_string()
+                            "".to_string()
                         }
                     )?;
                     None

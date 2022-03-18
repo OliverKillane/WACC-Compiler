@@ -1,10 +1,18 @@
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+//! Optimising out redundant branch operations
+//!
+//! When a branch goes to the same location when true or false, it is redundant
+//! and can be removed.
+//!
+//! This can occur when the inner blocks of control flow structures are eliminated,
+//! by dead code removal, or a combination of dead code removal with other
+//! optimisation.
 
 use super::three_code::*;
 use crate::{
     backend::data_flow::DataflowNode,
     graph::{Deleted, Graph},
 };
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::collections::LinkedList;
 
 /// Performs the same branch reduction on a single graph.
