@@ -1,0 +1,79 @@
+# Correctness of concat_char_arrs()
+
+# Output:
+# arr1 = []
+# arr2 = []
+# concat = []
+# arr1 = ['%']
+# arr2 = ['C']
+# concat = ['%', 'C']
+# arr1 = ['$', '+']
+# arr2 = ['U', 'n']
+# concat = ['$', '+', 'U', 'n']
+# arr1 = ['Z', 'q', 'h']
+# arr2 = ['<', 'd', '.']
+# concat = ['Z', 'q', 'h', '<', 'd', '.']
+# arr1 = ['Z', '|', 'V', '<']
+# arr2 = ['.', 'H', '8', 'e']
+# concat = ['Z', '|', 'V', '<', '.', 'H', '8', 'e']
+# arr1 = [';', '|', 'S', 'G', 'x']
+# arr2 = ['e', '<', '[', 'f', ' ']
+# concat = [';', '|', 'S', 'G', 'x', 'e', '<', '[', 'f', ' ']
+# arr1 = ['2', '.', 'm', 'f', '(', 'M']
+# arr2 = ['*', '}', '~', '|', 'b', 'A']
+# concat = ['2', '.', 'm', 'f', '(', 'M', '*', '}', '~', '|', 'b', 'A']
+
+
+mod ../../../../../../stdlib/array_utils.wacc;
+
+begin
+	char[] arr1 = [] ;
+	char[] arr2 = [] ;
+	char[] concat = [] ;
+	call concat_char_arrs(arr1, arr2, concat) ;
+	call print_char_arr("arr1", arr1) ;
+	call print_char_arr("arr2", arr2) ;
+	call print_char_arr("concat", concat) ;
+	arr1 = ['%'] ;
+	arr2 = ['C'] ;
+	concat = ['M', 'M'] ;
+	call concat_char_arrs(arr1, arr2, concat) ;
+	call print_char_arr("arr1", arr1) ;
+	call print_char_arr("arr2", arr2) ;
+	call print_char_arr("concat", concat) ;
+	arr1 = ['$', '+'] ;
+	arr2 = ['U', 'n'] ;
+	concat = ['-', '-', '-', '-'] ;
+	call concat_char_arrs(arr1, arr2, concat) ;
+	call print_char_arr("arr1", arr1) ;
+	call print_char_arr("arr2", arr2) ;
+	call print_char_arr("concat", concat) ;
+	arr1 = ['Z', 'q', 'h'] ;
+	arr2 = ['<', 'd', '.'] ;
+	concat = ['!', '!', '!', '!', '!', '!'] ;
+	call concat_char_arrs(arr1, arr2, concat) ;
+	call print_char_arr("arr1", arr1) ;
+	call print_char_arr("arr2", arr2) ;
+	call print_char_arr("concat", concat) ;
+	arr1 = ['Z', '|', 'V', '<'] ;
+	arr2 = ['.', 'H', '8', 'e'] ;
+	concat = ['x', 'x', 'x', 'x', 'x', 'x', 'x', 'x'] ;
+	call concat_char_arrs(arr1, arr2, concat) ;
+	call print_char_arr("arr1", arr1) ;
+	call print_char_arr("arr2", arr2) ;
+	call print_char_arr("concat", concat) ;
+	arr1 = [';', '|', 'S', 'G', 'x'] ;
+	arr2 = ['e', '<', '[', 'f', ' '] ;
+	concat = ['G', 'G', 'G', 'G', 'G', 'G', 'G', 'G', 'G', 'G'] ;
+	call concat_char_arrs(arr1, arr2, concat) ;
+	call print_char_arr("arr1", arr1) ;
+	call print_char_arr("arr2", arr2) ;
+	call print_char_arr("concat", concat) ;
+	arr1 = ['2', '.', 'm', 'f', '(', 'M'] ;
+	arr2 = ['*', '}', '~', '|', 'b', 'A'] ;
+	concat = ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'] ;
+	call concat_char_arrs(arr1, arr2, concat) ;
+	call print_char_arr("arr1", arr1) ;
+	call print_char_arr("arr2", arr2) ;
+	call print_char_arr("concat", concat)
+end

@@ -1,0 +1,119 @@
+# Correctness of copy_bool_arr()
+
+# Output:
+# arr_before = []
+# buff_before = []
+# arr_after = []
+# buff_after = []
+# arr_before = [true]
+# buff_before = [true]
+# arr_after = [true]
+# buff_after = [true]
+# arr_before = [false, false]
+# buff_before = [true, false]
+# arr_after = [false, false]
+# buff_after = [false, false]
+# arr_before = [true, false, true]
+# buff_before = [false, true, false]
+# arr_after = [true, false, true]
+# buff_after = [true, false, true]
+# arr_before = [false, true, true, true]
+# buff_before = [false, true, true, false]
+# arr_after = [false, true, true, true]
+# buff_after = [false, true, true, true]
+# arr_before = [true, true, false, false, true]
+# buff_before = [true, true, false, false, false]
+# arr_after = [true, true, false, false, true]
+# buff_after = [true, false, false, true, true]
+# arr_before = [true, false, false, true, false, true]
+# buff_before = [false, false, true, true, true, true]
+# arr_after = [true, false, false, true, false, true]
+# buff_after = [true, false, true, false, false, true]
+# arr_before = [true, false, true, true, true, false, true]
+# buff_before = [true, false, true, true, true, true, false]
+# arr_after = [true, false, true, true, true, false, true]
+# buff_after = [true, false, true, true, true, false, true]
+# arr_before = [true, false, true, true, true, false, false, true]
+# buff_before = [false, true, false, true, true, true, false, false]
+# arr_after = [true, false, true, true, true, false, false, true]
+# buff_after = [true, false, true, true, true, false, false, true]
+# arr_before = [false, true, false, false, true, true, true, false, true]
+# buff_before = [false, true, false, false, false, false, false, false, false]
+# arr_after = [false, true, false, false, true, true, true, false, true]
+# buff_after = [false, true, false, false, true, true, true, false, true]
+
+
+mod ../../../../../../stdlib/array_utils.wacc;
+
+begin
+	bool[] arr = [] ;
+	bool[] buff_arr = [] ;
+	call print_bool_arr("arr_before", arr) ;
+	call print_bool_arr("buff_before", buff_arr) ;
+	call copy_bool_arr(arr, buff_arr, true) ;
+	call print_bool_arr("arr_after", arr) ;
+	call print_bool_arr("buff_after", buff_arr) ;
+	arr = [true] ;
+	buff_arr = [true] ;
+	call print_bool_arr("arr_before", arr) ;
+	call print_bool_arr("buff_before", buff_arr) ;
+	call copy_bool_arr(arr, buff_arr, true) ;
+	call print_bool_arr("arr_after", arr) ;
+	call print_bool_arr("buff_after", buff_arr) ;
+	arr = [false, false] ;
+	buff_arr = [true, false] ;
+	call print_bool_arr("arr_before", arr) ;
+	call print_bool_arr("buff_before", buff_arr) ;
+	call copy_bool_arr(arr, buff_arr, true) ;
+	call print_bool_arr("arr_after", arr) ;
+	call print_bool_arr("buff_after", buff_arr) ;
+	arr = [true, false, true] ;
+	buff_arr = [false, true, false] ;
+	call print_bool_arr("arr_before", arr) ;
+	call print_bool_arr("buff_before", buff_arr) ;
+	call copy_bool_arr(arr, buff_arr, false) ;
+	call print_bool_arr("arr_after", arr) ;
+	call print_bool_arr("buff_after", buff_arr) ;
+	arr = [false, true, true, true] ;
+	buff_arr = [false, true, true, false] ;
+	call print_bool_arr("arr_before", arr) ;
+	call print_bool_arr("buff_before", buff_arr) ;
+	call copy_bool_arr(arr, buff_arr, false) ;
+	call print_bool_arr("arr_after", arr) ;
+	call print_bool_arr("buff_after", buff_arr) ;
+	arr = [true, true, false, false, true] ;
+	buff_arr = [true, true, false, false, false] ;
+	call print_bool_arr("arr_before", arr) ;
+	call print_bool_arr("buff_before", buff_arr) ;
+	call copy_bool_arr(arr, buff_arr, true) ;
+	call print_bool_arr("arr_after", arr) ;
+	call print_bool_arr("buff_after", buff_arr) ;
+	arr = [true, false, false, true, false, true] ;
+	buff_arr = [false, false, true, true, true, true] ;
+	call print_bool_arr("arr_before", arr) ;
+	call print_bool_arr("buff_before", buff_arr) ;
+	call copy_bool_arr(arr, buff_arr, true) ;
+	call print_bool_arr("arr_after", arr) ;
+	call print_bool_arr("buff_after", buff_arr) ;
+	arr = [true, false, true, true, true, false, true] ;
+	buff_arr = [true, false, true, true, true, true, false] ;
+	call print_bool_arr("arr_before", arr) ;
+	call print_bool_arr("buff_before", buff_arr) ;
+	call copy_bool_arr(arr, buff_arr, false) ;
+	call print_bool_arr("arr_after", arr) ;
+	call print_bool_arr("buff_after", buff_arr) ;
+	arr = [true, false, true, true, true, false, false, true] ;
+	buff_arr = [false, true, false, true, true, true, false, false] ;
+	call print_bool_arr("arr_before", arr) ;
+	call print_bool_arr("buff_before", buff_arr) ;
+	call copy_bool_arr(arr, buff_arr, false) ;
+	call print_bool_arr("arr_after", arr) ;
+	call print_bool_arr("buff_after", buff_arr) ;
+	arr = [false, true, false, false, true, true, true, false, true] ;
+	buff_arr = [false, true, false, false, false, false, false, false, false] ;
+	call print_bool_arr("arr_before", arr) ;
+	call print_bool_arr("buff_before", buff_arr) ;
+	call copy_bool_arr(arr, buff_arr, false) ;
+	call print_bool_arr("arr_after", arr) ;
+	call print_bool_arr("buff_after", buff_arr)
+end

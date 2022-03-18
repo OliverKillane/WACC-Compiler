@@ -1,0 +1,69 @@
+# Correctness of find_nth_bool_arr()
+
+# Output:
+# -1
+# -1
+# -1
+# -1
+# 2
+# -1
+# 3
+# 1
+# 1
+# 1
+# 2
+# 2
+# 2
+# 4
+# 3
+
+
+mod ../../../../../../stdlib/array_utils.wacc;
+
+begin
+	bool[] arr = [] ;
+	int index = call find_nth_bool_arr(false, 2, arr) ;
+	println index ;
+	arr = [true] ;
+	index = call find_nth_bool_arr(true, 3, arr) ;
+	println index ;
+	arr = [false, false] ;
+	index = call find_nth_bool_arr(true, 3, arr) ;
+	println index ;
+	arr = [false, false, true] ;
+	index = call find_nth_bool_arr(true, 2, arr) ;
+	println index ;
+	arr = [false, false, false, true] ;
+	index = call find_nth_bool_arr(false, 3, arr) ;
+	println index ;
+	arr = [false, false, false, true, true] ;
+	index = call find_nth_bool_arr(true, 3, arr) ;
+	println index ;
+	arr = [true, true, false, false, false, true] ;
+	index = call find_nth_bool_arr(false, 2, arr) ;
+	println index ;
+	arr = [true, false, true, true, true, false, true] ;
+	index = call find_nth_bool_arr(false, 1, arr) ;
+	println index ;
+	arr = [true, false, false, true, true, false, false, true] ;
+	index = call find_nth_bool_arr(false, 1, arr) ;
+	println index ;
+	arr = [true, false, true, false, false, true, true, true, true] ;
+	index = call find_nth_bool_arr(false, 1, arr) ;
+	println index ;
+	arr = [true, true, false, false, false, true, false, true, true, true] ;
+	index = call find_nth_bool_arr(false, 1, arr) ;
+	println index ;
+	arr = [false, false, false, true, false, true, false, true, true, true, false] ;
+	index = call find_nth_bool_arr(false, 3, arr) ;
+	println index ;
+	arr = [true, true, true, true, true, true, false, false, true, false, false, false] ;
+	index = call find_nth_bool_arr(true, 3, arr) ;
+	println index ;
+	arr = [false, false, true, false, true, true, true, false, false, false, true, false, false] ;
+	index = call find_nth_bool_arr(true, 2, arr) ;
+	println index ;
+	arr = [true, true, false, false, false, true, false, false, true, false, true, true, true, false] ;
+	index = call find_nth_bool_arr(false, 2, arr) ;
+	println index
+end
