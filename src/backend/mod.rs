@@ -70,6 +70,12 @@ const CONST_LOOP_ITER_COUNT: u32 = 3;
 /// Compiles the given program into an arm32 assembly
 pub fn compile(program: Program, options: Options) -> BackendOutput {
     let mut three_code = ThreeCode::from((program, &options));
+    let mut intermediates = vec![];
+
+    if options.show_three_code {
+        intermediates.push(("Unoptimised ThreeCode".to_string(), three_code.to_string()))
+    }
+
     if let Some(instructions_limit) = options.inlining {
         three_code = inline(three_code, instructions_limit);
     }
