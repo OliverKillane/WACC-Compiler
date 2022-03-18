@@ -186,7 +186,7 @@ impl AllocationState {
     /// moving the stack pointer back, negative advancing it (descending arm
     /// stack).
     fn move_stack_pointer(&self, words: i32, graph: &mut Graph<ControlFlow>) -> Chain {
-        let (op, byte_displacement) = if words > 0 {
+        let (op, mut byte_displacement) = if words > 0 {
             (RegOp::Add, words * 4)
         } else {
             (RegOp::Sub, words * -4)
@@ -232,28 +232,32 @@ impl AllocationState {
                 )
             } else {
                 // Otherwise we just use R4 (most likely to be unused)
-                link_stats(
-                    vec![
-                        Stat::Push(Cond::Al, Ident::Reg(Register::R4)),
-                        Stat::MemOp(
-                            MemOp::Ldr,
-                            Cond::Al,
-                            false,
-                            Ident::Reg(Register::R4),
-                            MemOperand::Expression(byte_displacement),
-                        ),
-                        Stat::ApplyOp(
-                            op,
-                            Cond::Al,
-                            false,
-                            Ident::Reg(Register::Sp),
-                            Ident::Reg(Register::Sp),
-                            FlexOperand::ShiftReg(Ident::Reg(Register::Sp), None),
-                        ),
-                        Stat::Pop(Cond::Al, Ident::Reg(Register::R4)),
-                    ],
-                    graph,
-                )
+                let mut stats = vec![];
+
+                while byte_displacement > 255 {
+                    stats.push(Stat::ApplyOp(
+                        op,
+                        Cond::Al,
+                        false,
+                        Ident::Reg(Register::Sp),
+                        Ident::Reg(Register::Sp),
+                        FlexOperand::Imm(255),
+                    ));
+                    byte_displacement -= 255;
+                }
+
+                if byte_displacement != 0 {
+                    stats.push(Stat::ApplyOp(
+                        op,
+                        Cond::Al,
+                        false,
+                        Ident::Reg(Register::Sp),
+                        Ident::Reg(Register::Sp),
+                        FlexOperand::Imm(byte_displacement as u32),
+                    ))
+                }
+
+                link_stats(stats, graph)
             }
         }
     }
