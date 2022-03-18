@@ -1,0 +1,69 @@
+# Correctness of count_char_arr()
+
+# Output:
+# 0
+# 0
+# 0
+# 0
+# 0
+# 0
+# 0
+# 1
+# 0
+# 1
+# 1
+# 2
+# 1
+# 3
+# 0
+
+
+mod ../../../../../stdlib/array_utils.wacc;
+
+begin
+	char[] arr = [] ;
+	int count = call count_char_arr('c', arr) ;
+	println count ;
+	arr = ['^'] ;
+	count = call count_char_arr('a', arr) ;
+	println count ;
+	arr = ['a', ']'] ;
+	count = call count_char_arr('Z', arr) ;
+	println count ;
+	arr = ['c', ']', 'c'] ;
+	count = call count_char_arr('a', arr) ;
+	println count ;
+	arr = ['X', ']', '`', '_'] ;
+	count = call count_char_arr('a', arr) ;
+	println count ;
+	arr = ['c', '^', 'Z', 'X', 'X'] ;
+	count = call count_char_arr('a', arr) ;
+	println count ;
+	arr = ['Z', 'Y', 'c', 'X', 'X', 'a'] ;
+	count = call count_char_arr('`', arr) ;
+	println count ;
+	arr = ['a', 'a', '_', '[', 'a', '[', 'a'] ;
+	count = call count_char_arr('_', arr) ;
+	println count ;
+	arr = ['_', '^', '_', 'Z', 'b', 'Y', 'b', '_'] ;
+	count = call count_char_arr('X', arr) ;
+	println count ;
+	arr = ['c', 'Z', '_', '[', 'a', 'X', 'a', 'Z', ']'] ;
+	count = call count_char_arr('X', arr) ;
+	println count ;
+	arr = ['_', 'Z', 'c', ']', 'X', 'a', 'Y', 'c', 'a', 'a'] ;
+	count = call count_char_arr(']', arr) ;
+	println count ;
+	arr = ['c', '`', 'b', 'b', '[', ']', '[', ']', 'Y', 'c', 'c'] ;
+	count = call count_char_arr(']', arr) ;
+	println count ;
+	arr = ['_', 'Z', '_', '^', '^', 'b', 'Z', 'Z', 'b', '`', '_', 'X'] ;
+	count = call count_char_arr('`', arr) ;
+	println count ;
+	arr = ['a', '`', 'X', 'a', 'b', 'X', '^', 'X', 'c', 'c', '[', 'Z', 'c'] ;
+	count = call count_char_arr('c', arr) ;
+	println count ;
+	arr = ['`', 'a', '`', 'a', 'b', '^', 'b', 'b', 'a', '^', 'c', '^', 'a', 'Z'] ;
+	count = call count_char_arr('Y', arr) ;
+	println count
+end

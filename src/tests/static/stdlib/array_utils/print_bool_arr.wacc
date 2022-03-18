@@ -2,67 +2,53 @@
 
 # Output:
 # arr = []
-# arr = [true]
-# arr = [true, false]
-# arr = [true, true, false]
-# arr = [false, false, true, false]
-# arr = [false, true, true, true, false]
-# arr = [false, false, true, true, false, true]
-# arr = [false, false, false, true, false, false, false]
-# arr = [true, true, true, true, false, true, false, true]
-# arr = [false, false, false, false, false, true, false, false, false]
-# arr = [false, false, true, false, true, false, true, true, true, false]
-# arr = [false, false, true, false, false, false, false, true, true, true, true]
-# arr = [false, false, false, false, true, true, true, true, false, true, false, true]
-# arr = [false, false, false, true, true, true, false, false, false, true, false, false, false]
-# arr = [false, false, true, false, false, true, false, false, true, false, true, false, false, true]
-# arr = [true, false, false, false, false, true, false, true, true, false, false, true, false, false, true]
-# arr = [false, true, true, false, false, false, false, false, false, true, true, false, true, true, true, false]
-# arr = [true, false, true, true, true, true, true, false, false, true, true, true, true, false, false, true, false]
-# arr = [true, true, false, false, false, true, true, true, false, true, true, true, true, false, true, false, false, true]
-# arr = [true, false, true, true, false, false, true, true, true, true, false, true, true, false, true, false, false, false, false]
+# arr = [false]
+# arr = [true, true]
+# arr = [false, true, true]
+# arr = [true, true, true, true]
+# arr = [false, false, true, true, false]
+# arr = [false, true, true, false, true, false]
+# arr = [true, false, true, false, true, true, false]
+# arr = [true, false, true, false, true, true, false, true]
+# arr = [true, true, true, true, false, false, false, true, false]
+# arr = [false, false, false, false, false, true, true, true, true, false]
+# arr = [false, true, true, true, true, false, true, false, true, false, true]
+# arr = [false, true, false, true, true, false, true, true, true, false, true, false]
+# arr = [true, true, true, true, true, false, false, false, true, false, false, false, false]
+# arr = [true, true, true, false, true, false, true, true, true, true, false, true, false, false]
+
 
 mod ../../../../../stdlib/array_utils.wacc;
 
 begin
-    bool[] arr = [] ;
+	bool[] arr = [] ;
 	call print_bool_arr("arr", arr) ;
-	arr = [true] ;
+	arr = [false] ;
 	call print_bool_arr("arr", arr) ;
-	arr = [true, false] ;
+	arr = [true, true] ;
 	call print_bool_arr("arr", arr) ;
-	arr = [true, true, false] ;
+	arr = [false, true, true] ;
 	call print_bool_arr("arr", arr) ;
-	arr = [false, false, true, false] ;
+	arr = [true, true, true, true] ;
 	call print_bool_arr("arr", arr) ;
-	arr = [false, true, true, true, false] ;
+	arr = [false, false, true, true, false] ;
 	call print_bool_arr("arr", arr) ;
-	arr = [false, false, true, true, false, true] ;
+	arr = [false, true, true, false, true, false] ;
 	call print_bool_arr("arr", arr) ;
-	arr = [false, false, false, true, false, false, false] ;
+	arr = [true, false, true, false, true, true, false] ;
 	call print_bool_arr("arr", arr) ;
-	arr = [true, true, true, true, false, true, false, true] ;
+	arr = [true, false, true, false, true, true, false, true] ;
 	call print_bool_arr("arr", arr) ;
-	arr = [false, false, false, false, false, true, false, false, false] ;
+	arr = [true, true, true, true, false, false, false, true, false] ;
 	call print_bool_arr("arr", arr) ;
-	arr = [false, false, true, false, true, false, true, true, true, false] ;
+	arr = [false, false, false, false, false, true, true, true, true, false] ;
 	call print_bool_arr("arr", arr) ;
-	arr = [false, false, true, false, false, false, false, true, true, true, true] ;
+	arr = [false, true, true, true, true, false, true, false, true, false, true] ;
 	call print_bool_arr("arr", arr) ;
-	arr = [false, false, false, false, true, true, true, true, false, true, false, true] ;
+	arr = [false, true, false, true, true, false, true, true, true, false, true, false] ;
 	call print_bool_arr("arr", arr) ;
-	arr = [false, false, false, true, true, true, false, false, false, true, false, false, false] ;
+	arr = [true, true, true, true, true, false, false, false, true, false, false, false, false] ;
 	call print_bool_arr("arr", arr) ;
-	arr = [false, false, true, false, false, true, false, false, true, false, true, false, false, true] ;
-	call print_bool_arr("arr", arr) ;
-	arr = [true, false, false, false, false, true, false, true, true, false, false, true, false, false, true] ;
-	call print_bool_arr("arr", arr) ;
-	arr = [false, true, true, false, false, false, false, false, false, true, true, false, true, true, true, false] ;
-	call print_bool_arr("arr", arr) ;
-	arr = [true, false, true, true, true, true, true, false, false, true, true, true, true, false, false, true, false] ;
-	call print_bool_arr("arr", arr) ;
-	arr = [true, true, false, false, false, true, true, true, false, true, true, true, true, false, true, false, false, true] ;
-	call print_bool_arr("arr", arr) ;
-	arr = [true, false, true, true, false, false, true, true, true, true, false, true, true, false, true, false, false, false, false] ;
+	arr = [true, true, true, false, true, false, true, true, true, true, false, true, false, false] ;
 	call print_bool_arr("arr", arr)
 end
