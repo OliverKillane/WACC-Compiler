@@ -120,3 +120,39 @@ OPTIONS:
     -u, --unoptimised-three-code    Print the three code representation of the program
     -V, --version                   Print version information
 ```
+
+## Assembling and Emulating
+For this project we targetted ARM, specifically the [ARM1176JZF-S processor](https://developer.arm.com/documentation/ddi0301/h).
+
+Hence while working on x86, we must cross compile compiler generated assembly to ARM, and them emulate.
+```Bash
+# ARM cross-compiler
+sudo apt install gcc-arm-linux-gnueabi
+
+# Install QEMU for emulation
+sudo apt install qemu-user
+sudo apt install qemu-system
+```
+
+We can then assemble and execute a program using the following script.
+```Bash
+#!/bin/bash
+# assemble-emulate: Takes the assembly file name, and executable name as arguments.
+
+# Assemble for the ARM1176JZF-S processor
+arm-linux-gnueabi-gcc -o $2 -mcpu=arm1176jzf-s -mtune=arm1176jzf-s $1
+
+# Emulate using qemu (-L flag sets path prefix for elf binary interpreter)
+qemu-arm -L /usr/arm-linux-gnueabi/ $2
+```
+We can them use this script as:
+```Bash
+./compile source.wacc -o compiled.s
+assemble-emulate compiled.s executable
+```
+User input and output then use the terminal normally.
+
+To provide user input from a file:
+```Bash
+assemble-emulate compiled.s executable < inputs.txt
+```
