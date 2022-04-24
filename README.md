@@ -1,10 +1,12 @@
-# WACC Compiler - Group 33
-The WACC compiler project for group 33 composed of Jordan Hall, Bartłomiej Cieślar, Panayiotis Gavriil and Oliver Killane.
+# WACC Compiler
+A WACC Compiler written in Rust by Jordan Hall, Bartłomiej Cieślar, Panayiotis Gavriil and Oliver Killane. Compiling WACC programs to ARM assembly.
 
-This compiler was developed from the 24th of january to the 4th of march 2022.
+This compiler was developed from the 24th of january to the 4th of march 2022 as part of the second year WACC Compiler project at Imperial College.
 
-## WACC Language
-WACC is a basic language supporting procedural programming. It supports basic if 
+Our [final report](docs/report.pdf) detailing the compiler design & extensions added to the compiler can be found in the `/docs`.
+
+## What is WACC?
+WACC is a basic language in the procedural paradigm. It supports basic if 
 statements, while loops, functions, modules, standard IO and a simple static type system.
 
 ```
@@ -54,16 +56,18 @@ We designed our compiler to be as extendable as possible. By separating it into 
 This modularity also allowed us to test large compiler components in isolation, with printouts for the various representations useful for debugging.
 
 ### Optimisations
-The main two components of our backend are the `ThreeCode` (general three-address code) and `ArmRepr` (arm based representation) both of which are control flow graphs.
+The main two components of our backend are the `ThreeCode` (general three-address code) and `ArmCode` (arm based representation) both of which are control flow graphs.
 
 Architecture non-specific optimisations such as inlining, constant propagation, dead code elimination and tail-call optimisation are done no the `ThreeCode` representation. This enabled us to inspect optimisations on the threecode independent of the backend arm translation.
 
-Instruction selection (including optimisations for constants - e.g reorganising comparisons), register allocation (using our own, fast `O(n)` allocation algorithm) and stack organisation are all done by the `ArmRepr`.
+Instruction selection (including optimisations for constants - e.g reorganising comparisons), register allocation (using our own, fast allocation algorithm) and stack organisation are all done by the `ArmCode`.
 
 
 ## Get Started
 ## Prerequisites
-[Cargo](https://doc.rust-lang.org/cargo/).
+[Cargo](https://doc.rust-lang.org/cargo/). This will allow nightly rust and dependencies to be installed and used.
+
+We heavily recommend using [Rust Analyser](https://rust-analyzer.github.io/) with VSCode when exploring this repository.
 
 ### Build
 The provided makefile can be used (used by Imperial's Testing environment).
