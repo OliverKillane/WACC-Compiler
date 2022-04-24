@@ -1,4 +1,4 @@
-# WACC Compiler - Group 33
+# WACC Compiler - Group 33 
 The WACC compiler project for group 33 composed of
 - Jordan Hall
 - Bartłomiej Cieślar
