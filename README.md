@@ -48,7 +48,7 @@ We chose Rust for several reasons:
 - Supporting Infrastructure - cargo made managing dependencies a breeze, as well as running our extensive tests. Rustdoc allowed for extensive documentation (updated and hosted on gitlab pages by our CI).
 - To improve our Rust through a large project!
 
-We decided to use nightly rust in order to take advantage of features such as 
+We decided to use nightly rust in order to take advantage of features such as box patterns (boxes used heavily in our AST), box syntax, let chains, and more.
 
 ### Design philosophy
 We designed our compiler to be as extendable as possible. By separating it into multiple intermediate representations we allow for new backends, optimisations passes, and potentially entire language frontends to be implemented and connected.
