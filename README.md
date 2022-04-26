@@ -1,7 +1,7 @@
 # WACC Compiler
 A WACC Compiler written in Rust by Jordan Hall, Bartłomiej Cieślar, Panayiotis Gavriil and Oliver Killane. Compiling WACC programs to ARM assembly.
 
-This compiler was developed from the 24th of january to the 4th of march 2022 as part of the second year WACC Compiler project at Imperial College.
+This compiler was developed from the 24th of January to the 4th of march 2022 as part of the second year WACC Compiler project at Imperial College.
 
 Our [final report](docs/report.pdf) detailing the compiler design & extensions added to the compiler can be found in the `/docs`.
 
